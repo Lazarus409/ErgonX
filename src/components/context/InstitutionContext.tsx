@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { createContext, useContext } from "react";
 
@@ -17,14 +17,22 @@ const DEV_INSTITUTION = {
   ],
 };
 
-const InstitutionContext = createContext({
+interface InstitutionContextValue {
+  institution: typeof DEV_INSTITUTION;
+  activeInstitution: typeof DEV_INSTITUTION;
+  institutionId: string;
+  enabledModules: string[];
+  hasModule: (module: string) => boolean;
+}
+
+const InstitutionContext = createContext<InstitutionContextValue>({
   institution: DEV_INSTITUTION,
+  activeInstitution: DEV_INSTITUTION,
   institutionId: DEV_INSTITUTION.id,
   enabledModules: DEV_INSTITUTION.enabledModules,
   hasModule: (module: string) =>
     DEV_INSTITUTION.enabledModules.includes(module),
 });
-
 export default function InstitutionProvider({
   children,
 }: {
@@ -34,6 +42,7 @@ export default function InstitutionProvider({
     <InstitutionContext.Provider
       value={{
         institution: DEV_INSTITUTION,
+        activeInstitution: DEV_INSTITUTION,
         institutionId: DEV_INSTITUTION.id,
         enabledModules: DEV_INSTITUTION.enabledModules,
         hasModule: (module: string) =>

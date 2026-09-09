@@ -166,20 +166,29 @@ function SelectField({
 function SectionCard({
   title,
   description,
+  action,
   children,
 }: {
   title: string;
   description?: string;
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
-;
   return (
     <section className="rounded-2xl border border-slate-200 bg-white">
-      <div className="border-b border-slate-200 px-6 py-5">
-        <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+      <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
+        <div className="min-w-0">
+          <h2 className="text-base font-semibold text-slate-900">{title}</h2>
 
-        {description && (
-          <p className="mt-1 text-sm text-slate-500">{description}</p>
+          {description && (
+            <p className="mt-1 text-sm text-slate-500">{description}</p>
+          )}
+        </div>
+
+        {action && (
+          <div className="shrink-0">
+            {action}
+          </div>
         )}
       </div>
 
@@ -241,6 +250,7 @@ export default function EmployeeDetailPage() {
       phone: string;
       email: string;
       address: string;
+    primary: boolean;
     }[]
   >([]);
 
@@ -253,6 +263,7 @@ export default function EmployeeDetailPage() {
     phone: "",
     email: "",
     address: "",
+    primary: false,
   });
 
   const resetEmergencyForm = () => {
@@ -262,6 +273,7 @@ export default function EmployeeDetailPage() {
       phone: "",
       email: "",
       address: "",
+    primary: false,
     });
     setEditingEmergencyId(null);
     setShowEmergencyForm(false);
@@ -274,6 +286,7 @@ export default function EmployeeDetailPage() {
       phone: "",
       email: "",
       address: "",
+    primary: false,
     });
     setEditingEmergencyId(null);
     setShowEmergencyForm(true);
@@ -288,6 +301,7 @@ export default function EmployeeDetailPage() {
       phone: contact.phone,
       email: contact.email,
       address: contact.address,
+      primary: contact.primary,
     });
     setEditingEmergencyId(contact.id);
     setShowEmergencyForm(true);
@@ -373,7 +387,7 @@ export default function EmployeeDetailPage() {
               </div>
 
               <p className="mt-1 text-sm text-slate-500">
-                {employee.employeeNumber} · {employee.position}
+                {employee.employeeNumber} - {employee.position}
               </p>
 
               <div className="mt-2 flex flex-wrap gap-4 text-sm text-slate-500">

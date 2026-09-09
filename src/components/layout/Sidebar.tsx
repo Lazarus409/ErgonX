@@ -1,5 +1,6 @@
 "use client";
 
+/* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -84,7 +85,6 @@ export default function Sidebar({
 
   return (
     <>
-      {/* Mobile backdrop */}
       {mobileOpen && (
         <button
           type="button"
@@ -107,7 +107,8 @@ export default function Sidebar({
           w-64
         `}
       >
-        {/* Header */}
+
+        {/* HEADER */}
         <div
           className={`
             flex h-16 shrink-0 items-center
@@ -129,7 +130,7 @@ export default function Sidebar({
                 <img
                   src="/ergonx-logo.png"
                   alt="ErgonX"
-                  className="h-8 w-auto max-w-[36px] object-contain object-left"
+                  className="h-8 w-auto max-w-[36px] object-contain"
                 />
               </div>
             ) : (
@@ -141,7 +142,7 @@ export default function Sidebar({
             )}
           </Link>
 
-          {/* Mobile close */}
+          {/* MOBILE CLOSE */}
           <button
             type="button"
             onClick={closeMobile}
@@ -151,18 +152,13 @@ export default function Sidebar({
             <X className="h-5 w-5" />
           </button>
 
-          {/* Desktop collapse */}
+          {/* DESKTOP COLLAPSE */}
           <button
             type="button"
             onClick={() =>
               onCollapsedChange(!collapsed)
             }
-            className={`
-              hidden rounded-lg p-2
-              text-slate-500
-              hover:bg-slate-100
-              lg:block
-            `}
+            className="hidden rounded-lg p-2 text-slate-500 hover:bg-slate-100 lg:block"
             title={
               collapsed
                 ? "Expand sidebar"
@@ -182,7 +178,7 @@ export default function Sidebar({
           </button>
         </div>
 
-        {/* Navigation */}
+        {/* NAVIGATION */}
         <nav className="flex-1 overflow-y-auto px-3 py-4">
           <div className="space-y-1">
             {visibleNavigation.map((item) => {
@@ -236,7 +232,7 @@ export default function Sidebar({
             })}
           </div>
 
-          {/* Self Service */}
+          {/* SELF SERVICE */}
           {visibleSelfService.length > 0 && (
             <div className="mt-8">
               {!collapsed && (
@@ -291,7 +287,7 @@ export default function Sidebar({
           )}
         </nav>
 
-        {/* Institution */}
+        {/* INSTITUTION */}
         <div className="shrink-0 border-t border-slate-200 p-3">
           <div
             className={`
@@ -321,6 +317,7 @@ export default function Sidebar({
                 <p className="truncate text-sm font-semibold text-slate-900">
                   ErgonX Demo Institution
                 </p>
+
                 <p className="truncate text-xs text-slate-500">
                   DEMO
                 </p>
@@ -328,6 +325,7 @@ export default function Sidebar({
             )}
           </div>
         </div>
+
       </aside>
     </>
   );

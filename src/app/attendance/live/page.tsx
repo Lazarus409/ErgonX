@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
@@ -132,13 +132,6 @@ const initialRecords: AttendanceRecord[] = [
   },
 ];
 
-const statusLabels: Record<AttendanceRecord["status"], string> = {
-  PRESENT: "Present",
-  LATE: "Late",
-  ABSENT: "Absent",
-  ON_LEAVE: "On Leave",
-  NOT_STARTED: "Not Started",
-};
 
 export default function LiveAttendancePage() {
   const [records, setRecords] = useState(initialRecords);

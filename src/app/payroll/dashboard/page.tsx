@@ -158,7 +158,7 @@ export default function PayrollDashboardPage() {
               ["FINALIZED", false],
             ].map(([label, done]) => (
               <div
-                key={label}
+                key={String(label)}
                 className="flex items-center gap-3 rounded-lg border p-3"
               >
                 <span

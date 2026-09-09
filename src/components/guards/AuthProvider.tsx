@@ -1,6 +1,11 @@
-﻿"use client";
+"use client";
 
-import { createContext, useContext, useMemo, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useMemo,
+  useState,
+} from "react";
 
 const DEV_INSTITUTION = {
   id: "dev-institution",
@@ -28,17 +33,30 @@ const DEV_USER = {
   institution: DEV_INSTITUTION,
 };
 
-const AuthContext = createContext(undefined);
+interface AuthContextValue {
+  user: typeof DEV_USER | null;
+  institution: typeof DEV_INSTITUTION | null;
+  isAuthenticated: boolean;
+  loading: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => void;
+}
+
+const AuthContext = createContext<AuthContextValue | undefined>(
+  undefined
+);
 
 export default function AuthProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [user] = useState(DEV_USER);
-  const [institution] = useState(DEV_INSTITUTION);
+  const [user] = useState<typeof DEV_USER | null>(DEV_USER);
+  const [institution] = useState<typeof DEV_INSTITUTION | null>(
+    DEV_INSTITUTION
+  );
 
-  const value = useMemo(
+  const value = useMemo<AuthContextValue>(
     () => ({
       user,
       institution,
@@ -57,7 +75,7 @@ export default function AuthProvider({
   );
 }
 
-export function useAuth() {
+export function useAuth(): AuthContextValue {
   const context = useContext(AuthContext);
 
   if (!context) {

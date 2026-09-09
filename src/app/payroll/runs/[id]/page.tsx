@@ -13,8 +13,8 @@ const employees = [
 ];
 
 export default function PayrollRunDetailPage() {
-  const status = "UNDER_REVIEW";
-  const finalized = status === "FINALIZED";
+  const status: "DRAFT" | "CALCULATING" | "CALCULATED" | "UNDER_REVIEW" | "APPROVED" | "FINALIZED" = "UNDER_REVIEW";
+  const finalized = String(status) === "FINALIZED";
 
   return (
     <main className="space-y-6">

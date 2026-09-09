@@ -12,7 +12,7 @@ export interface PaginatedData<T> {
   results: T[];
 }
 
-export interface ApiListResponse<T> extends ApiResponse<PaginatedData<T>> {}
+export type ApiListResponse<T> = ApiResponse<PaginatedData<T>>;
 
 export interface ApiError {
   success: false;

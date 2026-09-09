@@ -1,10 +1,8 @@
-﻿"use client";
+"use client";
 
 import {
   Activity,
   AlertTriangle,
-  ArrowDownRight,
-  ArrowUpRight,
   CalendarDays,
   Clock3,
   Moon,

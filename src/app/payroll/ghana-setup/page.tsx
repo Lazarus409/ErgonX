@@ -55,6 +55,7 @@ export default function GhanaPayrollSetupPage() {
               Use Ghana Payroll Preset
             </h3>
             <p className="mt-1 text-sm text-slate-500">
+{/* eslint-disable-next-line react/no-unescaped-entities */}
               Recommended. Apply the institution's versioned Ghana statutory
               payroll configuration.
             </p>

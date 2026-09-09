@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 
 export type ModuleCode =
-  | "CORE_HR"
+  | "HR"
   | "LEAVE"
   | "ATTENDANCE"
   | "PAYROLL"
@@ -38,7 +38,7 @@ export const navigation: NavigationItem[] = [
     label: "HR",
     href: "/hr/dashboard",
     icon: Users,
-    module: "CORE_HR",
+    module: "HR",
     permission: "dashboard.hr.view",
   },
   {

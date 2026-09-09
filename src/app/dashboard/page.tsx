@@ -3,25 +3,25 @@ import { Users, Clock3, CalendarDays, WalletCards } from "lucide-react";
 const stats = [
   {
     title: "Workforce",
-    value: "â€”",
+    value: "—",
     description: "Current employees",
     icon: Users,
   },
   {
     title: "Attendance",
-    value: "â€”",
+    value: "—",
     description: "Today's attendance",
     icon: Clock3,
   },
   {
     title: "Leave",
-    value: "â€”",
+    value: "—",
     description: "Pending requests",
     icon: CalendarDays,
   },
   {
     title: "Payroll",
-    value: "â€”",
+    value: "—",
     description: "Current payroll status",
     icon: WalletCards,
   },

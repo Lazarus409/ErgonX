@@ -1,6 +1,6 @@
 # ErgonX Development Discrepancies and Limitations Register
 
-Last updated: 2026-09-13
+Last updated: 2026-09-16
 
 ## Purpose
 
@@ -60,6 +60,32 @@ Under the Module Delivery and Frontend Integration Contract v1.0, the current de
 | Recruitment / ATS | `COMPLETE WITH DOCUMENTED LIMITATIONS` | ERD-required Recruitment entities, tenant/RBAC APIs, explicit workflow services, shared document linkage, audit/notifications, deterministic demo data, and atomic/idempotent Employee conversion are complete. PostgreSQL focused tests and full regression are green; only `RECRUIT-001` and `RECRUIT-002` remain as documented scope/ERD decisions. |
 
 ## Open discrepancies and decisions
+
+### HOME-001 - Experience-layer foundation is delivered; reference-code adoption and activity capture remain incremental
+
+- Area: Personalized Home / universal search / settings / reference codes
+- Type: Governing-instruction delivery gap
+- Status: `OPEN`
+- Priority: `P1`
+- Governing references: `ERGONX_CODEX_HOME_SEARCH_SETTINGS_REFERENCE_IDS_INSTRUCTIONS_v1.0.md` sections 4-50.
+- Historical finding (2026-09-16): Before this increment there was no Home endpoint, search registry, preference/activity storage, reusable reference-sequence service, or settings API hierarchy.
+- Current implementation and limitation: `/api/v1/home/`, `/api/v1/search/`, personal preferences, institution/module settings, permission-aware action catalogue, tenant-scoped PostgreSQL provider registry, and locked `ReferenceSequence` issuance are now implemented. Existing business entities still retain their historical code fields, and not every create workflow has been migrated to request a generated reference. Activity events are available for Home ranking, but not every user action emits one yet.
+- Impact: The platform contract is available now; generated-reference coverage and Home recency will grow per domain without invalidating legacy references.
+- Decision or work needed: Integrate `next_reference` and `UserActivityEvent` into each relevant write service only when its existing identifier compatibility is reviewed.
+- Evidence: `apps/dashboards/home.py`, `apps/institutions/search.py`, `apps/institutions/models.py`, `apps/institutions/services.py`, `apps/institutions/views.py`, `docs/integration/home_frontend_contract.md`, and `docs/integration/reference_codes_frontend_contract.md`.
+
+### ACCESS-001 - Access and lifecycle foundations are delivered; invitation and rehire flows remain outstanding
+
+- Area: Access, RBAC, institution onboarding, employee lifecycle
+- Type: Governing-instruction delivery gap
+- Status: `OPEN`
+- Priority: `P1`
+- Governing references: `ERGONX_CODEX_ACCESS_RBAC_ONBOARDING_LIFECYCLE_INSTRUCTIONS_v1.0.md` sections 3-41.
+- Historical finding (2026-09-16): Before this increment bootstrap metadata, protected custom-role APIs, server-derived onboarding steps, lifecycle actions, last-admin safeguards, and recruitment-to-onboarding handoff were absent.
+- Current implementation and limitation: Tenant bootstrap, reserved/custom role controls, membership reassignment/status updates, platform-only permission protection, institution onboarding validation, employee onboarding/offboarding actions, institution-only access deactivation, and recruitment handoff are implemented. One-time invitation-token delivery/acceptance and a rehire action that creates a new employment/onboarding cycle are not yet implemented.
+- Impact: Administrators can manage the active lifecycle safely, but invitation and rehire must remain manual operational workflows until their dedicated contracts are delivered.
+- Decision or work needed: Add expiring single-use invitation tokens and a service-backed rehire endpoint without mutating historical employment/offboarding records.
+- Evidence: `apps/accounts/views.py`, `apps/institutions/services.py`, `apps/institutions/views.py`, `apps/employees/services.py`, `apps/recruitment/services.py`, and `docs/integration/access_rbac_frontend_contract.md`.
 
 ### RECRUIT-001 - Recruitment ERD names entities but leaves field-level and workflow details unspecified
 

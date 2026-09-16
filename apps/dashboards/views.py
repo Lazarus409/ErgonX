@@ -12,6 +12,9 @@ from apps.employees.models import Employee
 from apps.leave.models import LeaveRequest
 from apps.payroll.models import PayrollRecord, PayrollRun
 from common.permissions import TenantContextPermission, TenantRBACPermission
+from apps.institutions.services import effective_permission_codes
+from apps.dashboards.home import home_payload
+from apps.dashboards.serializers import HomeSerializer
 
 
 class DashboardViewSet(ViewSet):
@@ -68,3 +71,18 @@ class DashboardViewSet(ViewSet):
     def finance(self, request):
         institution = request.institution
         return Response({"pending_journals": JournalEntry.objects.filter(institution=institution, status=JournalEntry.Status.PENDING_APPROVAL).count(), "accounts_payable": VendorBill.objects.filter(institution=institution, status__in=(VendorBill.Status.POSTED, VendorBill.Status.PART_PAID)).aggregate(total=Sum("amount_payable"))["total"] or 0, "accounts_receivable": Invoice.objects.filter(institution=institution, status__in=(Invoice.Status.ISSUED, Invoice.Status.PART_PAID)).aggregate(total=Sum("total_amount"))["total"] or 0, "expenses": Expense.objects.filter(institution=institution, status=Expense.Status.POSTED).aggregate(total=Sum("amount"))["total"] or 0})
+
+
+class HomeViewSet(ViewSet):
+    permission_classes = (TenantContextPermission, TenantRBACPermission)
+
+    def get_required_permission(self):
+        return "home.view"
+
+    def list(self, request):
+        payload = home_payload(
+            user=request.user,
+            institution=request.institution,
+            permission_codes=effective_permission_codes(request.membership),
+        )
+        return Response(HomeSerializer(payload).data)

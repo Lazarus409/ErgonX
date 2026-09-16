@@ -18,6 +18,18 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class AuthBootstrapSerializer(serializers.Serializer):
+    user = UserSerializer()
+    active_institution = serializers.DictField()
+    active_membership = serializers.DictField()
+    effective_permissions = serializers.ListField(child=serializers.CharField())
+    enabled_modules = serializers.ListField(child=serializers.CharField())
+    onboarding_ready = serializers.BooleanField()
+    onboarding_status = serializers.CharField()
+    default_landing = serializers.CharField()
+    available_dashboards = serializers.ListField(child=serializers.CharField())
+
+
 class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):

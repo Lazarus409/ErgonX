@@ -1,8 +1,11 @@
 from django.urls import include, path
 
+from apps.institutions.views import UniversalSearchView
+
 urlpatterns = [
     path("auth/", include("apps.accounts.urls")),
     path("institutions/", include("apps.institutions.urls")),
+    path("search/", UniversalSearchView.as_view(), name="universal-search"),
     path("", include("apps.organization.urls")),
     path("", include("apps.employees.urls")),
     path("", include("apps.leave.urls")),

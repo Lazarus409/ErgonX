@@ -1,13 +1,58 @@
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from apps.institutions.models import (
     InstitutionModule,
     InstitutionMembership,
     InstitutionOnboarding,
+    InstitutionOnboardingStep,
     Permission,
+    ReferenceSequence,
     Role,
+)
+from apps.audit.services import record_audit_event
+from common.exceptions import CodedValidationError
+
+
+RESERVED_ROLE_CODES = frozenset(
+    {
+        "INSTITUTION_ADMIN",
+        "HR_ADMIN",
+        "DIRECTOR",
+        "EMPLOYEE",
+        "ACCOUNTANT",
+        "FINANCE_MANAGER",
+        "AUDITOR",
+    }
+)
+
+
+REFERENCE_DEFAULTS = {
+    "EMPLOYEE": ("EMP", 6, ReferenceSequence.ResetPolicy.NEVER),
+    "JOB_OPENING": ("JOB", 6, ReferenceSequence.ResetPolicy.YEARLY),
+    "APPLICATION": ("APP", 6, ReferenceSequence.ResetPolicy.YEARLY),
+    "OFFER": ("OFF", 6, ReferenceSequence.ResetPolicy.YEARLY),
+    "PAYROLL_RUN": ("PR", 4, ReferenceSequence.ResetPolicy.MONTHLY),
+    "JOURNAL": ("JE", 6, ReferenceSequence.ResetPolicy.YEARLY),
+    "VENDOR_BILL": ("BILL", 6, ReferenceSequence.ResetPolicy.YEARLY),
+    "INVOICE": ("INV", 6, ReferenceSequence.ResetPolicy.YEARLY),
+    "PAYMENT": ("PAY", 6, ReferenceSequence.ResetPolicy.YEARLY),
+    "RECEIPT": ("RCT", 6, ReferenceSequence.ResetPolicy.YEARLY),
+    "EXPENSE": ("EXP", 6, ReferenceSequence.ResetPolicy.YEARLY),
+}
+
+
+ONBOARDING_STEP_DEFINITIONS = (
+    ("INSTITUTION_PROFILE", 10, ""),
+    ("MODULE_SELECTION", 20, ""),
+    ("ORGANIZATION_SETUP", 30, "CORE_HR"),
+    ("HR_CONFIGURATION", 40, "CORE_HR"),
+    ("PAYROLL_CONFIGURATION", 50, "PAYROLL"),
+    ("ACCOUNTING_CONFIGURATION", 60, "ACCOUNTING"),
+    ("RECRUITMENT_CONFIGURATION", 70, "RECRUITMENT"),
+    ("USERS_AND_ROLES", 80, "CORE_HR"),
+    ("VALIDATION", 90, ""),
 )
 
 
@@ -62,6 +107,18 @@ ACCOUNTING_PERMISSIONS = {
 
 
 PERMISSIONS = {
+    "home.view": "View personalized home",
+    "search.use": "Use universal search",
+    "settings.profile.manage_self": "Manage personal preferences",
+    "settings.institution.view": "View institution settings",
+    "settings.institution.manage": "Manage institution settings",
+    "settings.modules.manage": "Manage institution modules",
+    "settings.users.manage": "Manage institution memberships",
+    "settings.roles.manage": "Manage custom roles and permissions",
+    "settings.notifications.manage": "Manage notification settings",
+    "settings.security.manage": "Manage institution security settings",
+    "onboarding.view": "View institution onboarding state",
+    "onboarding.manage": "Manage institution onboarding",
     "job_posting.view": "View job postings",
     "job_posting.create": "Create and publish job postings",
     "job_posting.update": "Update and close job postings",
@@ -164,8 +221,20 @@ ROLE_PERMISSION_CODES = {
         for code in PERMISSIONS
         if code not in ACCOUNTING_PERMISSIONS
         and code not in {"dashboard.executive.view", "dashboard.finance.view"}
+        and code not in {
+            "settings.institution.manage",
+            "settings.modules.manage",
+            "settings.users.manage",
+            "settings.roles.manage",
+            "settings.notifications.manage",
+            "settings.security.manage",
+            "onboarding.manage",
+        }
     ),
     "DIRECTOR": (
+        "home.view",
+        "search.use",
+        "settings.profile.manage_self",
         "institution.view",
         "organization.view",
         "employee.view",
@@ -180,6 +249,9 @@ ROLE_PERMISSION_CODES = {
         "report.view",
     ),
     "EMPLOYEE": (
+        "home.view",
+        "search.use",
+        "settings.profile.manage_self",
         "institution.view",
         "leave.view",
         "leave.request",
@@ -193,6 +265,9 @@ ROLE_PERMISSION_CODES = {
         "tax_relief.claim",
     ),
     "ACCOUNTANT": (
+        "home.view",
+        "search.use",
+        "settings.profile.manage_self",
         "institution.view",
         "payroll.view",
         "payroll.prepare",
@@ -226,6 +301,9 @@ ROLE_PERMISSION_CODES = {
         "dashboard.finance.view",
     ),
     "FINANCE_MANAGER": (
+        "home.view",
+        "search.use",
+        "settings.profile.manage_self",
         "institution.view",
         "payroll.view",
         "payroll.approve",
@@ -239,6 +317,9 @@ ROLE_PERMISSION_CODES = {
         *ACCOUNTING_PERMISSIONS,
     ),
     "AUDITOR": (
+        "home.view",
+        "search.use",
+        "settings.profile.manage_self",
         "institution.view",
         "payroll.view",
         "payslip.view",
@@ -267,6 +348,287 @@ def ensure_system_permissions():
     return permissions
 
 
+def effective_permission_codes(membership):
+    if membership is None or membership.status != InstitutionMembership.Status.ACTIVE:
+        return ()
+    return tuple(membership.role.permissions.order_by("code").values_list("code", flat=True))
+
+
+def _assert_active_actor(actor, institution):
+    if actor is None or not actor.memberships.filter(
+        institution=institution, status=InstitutionMembership.Status.ACTIVE
+    ).exists():
+        raise CodedValidationError(
+            "Actor must have an active membership.", api_code="membership_inactive"
+        )
+
+
+def _validate_delegable_permissions(permission_codes):
+    permissions = list(Permission.objects.filter(code__in=set(permission_codes)))
+    found = {item.code for item in permissions}
+    missing = set(permission_codes) - found
+    if missing:
+        raise ValidationError({"permissions": f"Unknown permission code(s): {', '.join(sorted(missing))}."})
+    platform_only = [item.code for item in permissions if item.classification == Permission.Classification.PLATFORM_ONLY]
+    if platform_only:
+        raise CodedValidationError(
+            f"Platform-only permission(s) cannot be delegated: {', '.join(platform_only)}.",
+            api_code="permission_not_delegable",
+        )
+    return permissions
+
+
+def _ensure_admin_continuity(*, membership, next_role=None, next_status=None):
+    role = next_role or membership.role
+    status = next_status or membership.status
+    leaves_active_admin = (
+        membership.status == InstitutionMembership.Status.ACTIVE
+        and membership.role.code == "INSTITUTION_ADMIN"
+        and (status != InstitutionMembership.Status.ACTIVE or role.code != "INSTITUTION_ADMIN")
+    )
+    if not leaves_active_admin:
+        return
+    other_admin_exists = InstitutionMembership.objects.filter(
+        institution=membership.institution,
+        status=InstitutionMembership.Status.ACTIVE,
+        role__code="INSTITUTION_ADMIN",
+    ).exclude(pk=membership.pk).exists()
+    if not other_admin_exists:
+        raise CodedValidationError(
+            "An institution must retain at least one active Institution Admin.",
+            api_code="last_required_admin",
+        )
+
+
+@transaction.atomic
+def create_custom_role(*, institution, actor, code, name, description="", permission_codes=()):
+    _assert_active_actor(actor, institution)
+    normalized_code = code.strip().upper()
+    if normalized_code in RESERVED_ROLE_CODES:
+        raise CodedValidationError("Reserved role codes cannot be created as custom roles.", api_code="role_protected")
+    permissions = _validate_delegable_permissions(permission_codes)
+    role = Role(
+        institution=institution,
+        code=normalized_code,
+        name=name.strip(),
+        description=description,
+        is_system_role=False,
+        is_custom=True,
+        created_by=actor,
+    )
+    role.full_clean()
+    role.save()
+    role.permissions.set(permissions)
+    record_audit_event(actor=actor, institution=institution, entity=role, action="access.role.created", metadata={"permission_codes": sorted(item.code for item in permissions)})
+    return role
+
+
+@transaction.atomic
+def clone_role(*, source_role, institution, actor, code, name, description=""):
+    if source_role.institution_id != institution.id:
+        raise ValidationError({"source_role": "Role belongs to another institution."})
+    return create_custom_role(
+        institution=institution,
+        actor=actor,
+        code=code,
+        name=name,
+        description=description or source_role.description,
+        permission_codes=list(source_role.permissions.values_list("code", flat=True)),
+    )
+
+
+@transaction.atomic
+def update_custom_role(*, role, institution, actor, name=None, description=None, permission_codes=None, is_active=None):
+    _assert_active_actor(actor, institution)
+    locked = Role.objects.select_for_update().get(pk=role.pk)
+    if locked.institution_id != institution.id:
+        raise ValidationError({"role": "Role belongs to another institution."})
+    if locked.is_system_role or locked.code in RESERVED_ROLE_CODES:
+        raise CodedValidationError("Reserved system roles cannot be changed.", api_code="role_protected")
+    old_permissions = sorted(locked.permissions.values_list("code", flat=True))
+    if name is not None:
+        locked.name = name.strip()
+    if description is not None:
+        locked.description = description
+    if is_active is not None:
+        locked.is_active = is_active
+    locked.full_clean()
+    locked.save()
+    if permission_codes is not None:
+        permissions = _validate_delegable_permissions(permission_codes)
+        locked.permissions.set(permissions)
+    record_audit_event(actor=actor, institution=institution, entity=locked, action="access.role.updated", metadata={"old_permission_codes": old_permissions, "new_permission_codes": sorted(locked.permissions.values_list("code", flat=True))})
+    return locked
+
+
+@transaction.atomic
+def update_membership(*, membership, institution, actor, role=None, status=None, is_primary=None):
+    _assert_active_actor(actor, institution)
+    locked = InstitutionMembership.objects.select_for_update().select_related("role").get(pk=membership.pk)
+    if locked.institution_id != institution.id:
+        raise ValidationError({"membership": "Membership belongs to another institution."})
+    if role is not None and role.institution_id != institution.id:
+        raise ValidationError({"role": "Role belongs to another institution."})
+    next_status = status if status is not None else locked.status
+    _ensure_admin_continuity(membership=locked, next_role=role, next_status=next_status)
+    old_values = {"role": locked.role.code, "status": locked.status, "is_primary": locked.is_primary}
+    if role is not None:
+        if not role.is_active:
+            raise ValidationError({"role": "An inactive role cannot be assigned."})
+        locked.role = role
+    if status is not None:
+        locked.status = status
+        if status == InstitutionMembership.Status.ACTIVE and locked.joined_at is None:
+            locked.joined_at = timezone.now()
+        if status in (InstitutionMembership.Status.SUSPENDED, InstitutionMembership.Status.INACTIVE):
+            locked.ended_at = timezone.now()
+    if is_primary is not None:
+        locked.is_primary = is_primary
+    locked.full_clean()
+    locked.save()
+    record_audit_event(
+        actor=actor,
+        institution=institution,
+        entity=locked,
+        action="access.membership.updated",
+        metadata={
+            "old": old_values,
+            "new": {"role": locked.role.code, "status": locked.status, "is_primary": locked.is_primary},
+        },
+    )
+    return locked
+
+
+def _reset_key(policy, at):
+    if policy == ReferenceSequence.ResetPolicy.YEARLY:
+        return str(at.year)
+    if policy == ReferenceSequence.ResetPolicy.MONTHLY:
+        return at.strftime("%Y-%m")
+    return ""
+
+
+@transaction.atomic
+def next_reference(*, institution, namespace, at=None):
+    """Issue a locked, tenant-local reference. Failed outer transactions roll back increments."""
+    at = at or timezone.localdate()
+    namespace = namespace.strip().upper()
+    default = REFERENCE_DEFAULTS.get(namespace)
+    if default is None:
+        raise ValidationError({"namespace": "Unsupported reference namespace."})
+    prefix, padding, policy = default
+    try:
+        sequence, _ = ReferenceSequence.objects.get_or_create(
+            institution=institution,
+            namespace=namespace,
+            defaults={"prefix": prefix, "padding": padding, "reset_policy": policy},
+        )
+    except IntegrityError:
+        sequence = ReferenceSequence.objects.get(institution=institution, namespace=namespace)
+    sequence = ReferenceSequence.objects.select_for_update().get(pk=sequence.pk)
+    reset_key = _reset_key(sequence.reset_policy, at)
+    if reset_key and sequence.last_reset_key != reset_key:
+        sequence.current_value = 0
+        sequence.last_reset_key = reset_key
+    sequence.current_value += 1
+    sequence.save(update_fields=("current_value", "last_reset_key", "updated_at"))
+    prefix_parts = [sequence.prefix]
+    if sequence.reset_policy == ReferenceSequence.ResetPolicy.YEARLY:
+        prefix_parts.append(str(at.year))
+    elif sequence.reset_policy == ReferenceSequence.ResetPolicy.MONTHLY:
+        prefix_parts.extend((str(at.year), f"{at.month:02d}"))
+    prefix_parts.append(f"{sequence.current_value:0{sequence.padding}d}")
+    return "-".join(prefix_parts)
+
+
+def _onboarding_step_blocker(institution, step):
+    from apps.organization.models import Department, Grade, Location, Position
+
+    if step.code == "INSTITUTION_PROFILE":
+        if not institution.email or not institution.timezone or not institution.country_code:
+            return ("INSTITUTION_PROFILE_INCOMPLETE", "Add the institution email, country, and timezone.")
+    elif step.code == "MODULE_SELECTION":
+        if not institution.modules.filter(is_enabled=True).exists():
+            return ("NO_MODULE_ENABLED", "Enable at least the Core HR module.")
+    elif step.code == "ORGANIZATION_SETUP":
+        checks = ((Department, "department"), (Position, "position"), (Grade, "grade"), (Location, "location"))
+        missing = [name for model, name in checks if not model.objects.for_institution(institution).exists()]
+        if missing:
+            return ("ORGANIZATION_SETUP_INCOMPLETE", f"Create at least one {', '.join(missing)}.")
+    elif step.code == "HR_CONFIGURATION":
+        if not institution.modules.filter(module_code="CORE_HR", configuration_status=InstitutionModule.ConfigurationStatus.READY).exists():
+            return ("CORE_HR_NOT_READY", "Core HR configuration must be marked ready by server validation.")
+    elif step.code == "USERS_AND_ROLES":
+        if not InstitutionMembership.objects.filter(
+            institution=institution,
+            status=InstitutionMembership.Status.ACTIVE,
+            role__code="INSTITUTION_ADMIN",
+        ).exists():
+            return ("ACTIVE_ADMIN_REQUIRED", "At least one active Institution Admin is required.")
+    return None
+
+
+@transaction.atomic
+def reconcile_institution_onboarding(institution):
+    enabled_modules = set(institution.modules.filter(is_enabled=True).values_list("module_code", flat=True))
+    for code, sequence, required_module in ONBOARDING_STEP_DEFINITIONS:
+        step, created = InstitutionOnboardingStep.objects.get_or_create(
+            institution=institution,
+            code=code,
+            defaults={"sequence": sequence, "required_module": required_module},
+        )
+        if required_module and required_module not in enabled_modules and step.status != InstitutionOnboardingStep.Status.COMPLETED:
+            step.status = InstitutionOnboardingStep.Status.SKIPPED
+            step.blocker_code = ""
+            step.blocker_message = ""
+            step.save(update_fields=("status", "blocker_code", "blocker_message", "updated_at"))
+        elif step.status == InstitutionOnboardingStep.Status.SKIPPED:
+            step.status = InstitutionOnboardingStep.Status.PENDING
+            step.save(update_fields=("status", "updated_at"))
+    return list(institution.onboarding_steps.order_by("sequence", "created_at"))
+
+
+@transaction.atomic
+def validate_institution_onboarding(*, institution, actor):
+    _assert_active_actor(actor, institution)
+    steps = reconcile_institution_onboarding(institution)
+    completed = 0
+    blockers = []
+    for step in steps:
+        if step.status == InstitutionOnboardingStep.Status.SKIPPED:
+            completed += 1
+            continue
+        blocker = _onboarding_step_blocker(institution, step)
+        if blocker:
+            step.status = InstitutionOnboardingStep.Status.BLOCKED
+            step.blocker_code, step.blocker_message = blocker
+            blockers.append({"step": step.code, "code": blocker[0], "message": blocker[1]})
+        else:
+            step.status = InstitutionOnboardingStep.Status.COMPLETED
+            step.completed_at = step.completed_at or timezone.now()
+            step.blocker_code = ""
+            step.blocker_message = ""
+            completed += 1
+        step.save(update_fields=("status", "blocker_code", "blocker_message", "completed_at", "updated_at"))
+    onboarding, _ = InstitutionOnboarding.objects.get_or_create(institution=institution)
+    onboarding.completion_percentage = round((completed / len(steps)) * 100) if steps else 0
+    onboarding.started_at = onboarding.started_at or timezone.now()
+    onboarding.validation_summary = {"blockers": blockers}
+    onboarding.current_step = next((step.code for step in steps if step.status not in ("COMPLETED", "SKIPPED")), "VALIDATION")
+    if blockers:
+        onboarding.status = InstitutionOnboarding.Status.BLOCKED
+        onboarding.completed_at = None
+        onboarding.completed_by = None
+    elif completed == len(steps):
+        onboarding.status = InstitutionOnboarding.Status.READY
+        onboarding.completed_at = timezone.now()
+        onboarding.completed_by = actor
+    else:
+        onboarding.status = InstitutionOnboarding.Status.IN_PROGRESS
+    onboarding.save()
+    record_audit_event(actor=actor, institution=institution, entity=onboarding, action="institution.onboarding.validated", metadata=onboarding.validation_summary)
+    return onboarding, steps
+
+
 @transaction.atomic
 def bootstrap_institution(institution):
     permissions = ensure_system_permissions()
@@ -293,6 +655,7 @@ def bootstrap_institution(institution):
         InstitutionModule.ModuleCode.PAYROLL,
         InstitutionModule.ModuleCode.ACCOUNTING,
         InstitutionModule.ModuleCode.RECRUITMENT,
+        InstitutionModule.ModuleCode.REPORTS,
     ):
         InstitutionModule.objects.get_or_create(
             institution=institution,
@@ -303,6 +666,7 @@ def bootstrap_institution(institution):
             },
         )
     InstitutionOnboarding.objects.get_or_create(institution=institution)
+    reconcile_institution_onboarding(institution)
 
 
 @transaction.atomic

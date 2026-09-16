@@ -220,12 +220,12 @@ class EmergencyContact(TenantOwnedModel):
                 {"employee": "Employee must belong to the same institution."}
             )
 
-
 class EmployeeOnboarding(TenantOwnedModel):
     class Status(models.TextChoices):
         NOT_STARTED = "NOT_STARTED", "Not started"
         IN_PROGRESS = "IN_PROGRESS", "In progress"
         BLOCKED = "BLOCKED", "Blocked"
+        READY_FOR_ACTIVATION = "READY_FOR_ACTIVATION", "Ready for activation"
         COMPLETED = "COMPLETED", "Completed"
         CANCELLED = "CANCELLED", "Cancelled"
 
@@ -236,7 +236,7 @@ class EmployeeOnboarding(TenantOwnedModel):
         Employee, on_delete=models.PROTECT, related_name="onboarding_records"
     )
     status = models.CharField(
-        max_length=12, choices=Status.choices, default=Status.NOT_STARTED
+        max_length=24, choices=Status.choices, default=Status.NOT_STARTED
     )
     started_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
@@ -252,12 +252,12 @@ class EmployeeOnboarding(TenantOwnedModel):
                 {"employee": "Employee must belong to the same institution."}
             )
 
-
 class EmployeeOffboarding(TenantOwnedModel):
     class Status(models.TextChoices):
         NOT_STARTED = "NOT_STARTED", "Not started"
         IN_PROGRESS = "IN_PROGRESS", "In progress"
         BLOCKED = "BLOCKED", "Blocked"
+        READY_TO_TERMINATE = "READY_TO_TERMINATE", "Ready to terminate"
         COMPLETED = "COMPLETED", "Completed"
         CANCELLED = "CANCELLED", "Cancelled"
 
@@ -268,7 +268,7 @@ class EmployeeOffboarding(TenantOwnedModel):
         Employee, on_delete=models.PROTECT, related_name="offboarding_records"
     )
     status = models.CharField(
-        max_length=12, choices=Status.choices, default=Status.NOT_STARTED
+        max_length=24, choices=Status.choices, default=Status.NOT_STARTED
     )
     initiated_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)

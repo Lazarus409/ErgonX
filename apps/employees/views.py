@@ -4,7 +4,9 @@ from rest_framework.response import Response
 from apps.employees.filters import EmployeeFilter
 from apps.employees.models import Employee, Employment
 from apps.employees.selectors import employment_history_for_employee
-from apps.employees.serializers import EmployeeSerializer, EmploymentSerializer
+from apps.employees.serializers import EmployeeOffboardingSerializer, EmployeeOffboardingStartSerializer, EmployeeOnboardingSerializer, EmployeeSerializer, EmploymentSerializer
+from apps.employees.services import complete_employee_offboarding, complete_employee_onboarding, initiate_employee_offboarding, start_employee_onboarding
+from common.serializers import call_validated_service
 from common.viewsets import TenantModelViewSet
 
 
@@ -35,6 +37,8 @@ class EmployeeViewSet(TenantModelViewSet):
     def get_required_permission(self):
         if self.action == "employment_history":
             return "employment.view"
+        if self.action in ("onboarding_start", "onboarding_complete", "offboarding_start", "offboarding_complete"):
+            return "employee.update"
         return super().get_required_permission()
 
     def perform_destroy(self, instance):
@@ -55,6 +59,28 @@ class EmployeeViewSet(TenantModelViewSet):
             history, many=True, context=self.get_serializer_context()
         )
         return Response(serializer.data)
+
+    @action(detail=True, methods=("post",), url_path="onboarding/start")
+    def onboarding_start(self, request, pk=None):
+        record = call_validated_service(start_employee_onboarding, institution=request.institution, employee=self.get_object(), actor=request.user)
+        return Response(EmployeeOnboardingSerializer(record).data)
+
+    @action(detail=True, methods=("post",), url_path="onboarding/complete")
+    def onboarding_complete(self, request, pk=None):
+        record = call_validated_service(complete_employee_onboarding, institution=request.institution, employee=self.get_object(), actor=request.user)
+        return Response(EmployeeOnboardingSerializer(record).data)
+
+    @action(detail=True, methods=("post",), url_path="offboarding/start")
+    def offboarding_start(self, request, pk=None):
+        payload = EmployeeOffboardingStartSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        record = call_validated_service(initiate_employee_offboarding, institution=request.institution, employee=self.get_object(), actor=request.user, **payload.validated_data)
+        return Response(EmployeeOffboardingSerializer(record).data)
+
+    @action(detail=True, methods=("post",), url_path="offboarding/complete")
+    def offboarding_complete(self, request, pk=None):
+        record = call_validated_service(complete_employee_offboarding, institution=request.institution, employee=self.get_object(), actor=request.user)
+        return Response(EmployeeOffboardingSerializer(record).data)
 
 
 class EmploymentViewSet(TenantModelViewSet):

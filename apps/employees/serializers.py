@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from apps.accounts.models import User
-from apps.employees.models import Employee, Employment
+from apps.employees.models import Employee, EmployeeOffboarding, EmployeeOnboarding, Employment
 from apps.employees.services import change_current_employment, create_employment
 from apps.organization.models import Department, Grade, Location, Position
 from common.serializers import ValidatedModelSerializer, call_validated_service
@@ -115,3 +115,23 @@ class EmploymentSerializer(ValidatedModelSerializer):
                 change_current_employment, **validated_data
             )
         return call_validated_service(create_employment, **validated_data)
+
+
+class EmployeeOnboardingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EmployeeOnboarding
+        fields = ("id", "employee", "status", "started_at", "completed_at", "notes", "created_at", "updated_at")
+        read_only_fields = fields
+
+
+class EmployeeOffboardingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EmployeeOffboarding
+        fields = ("id", "employee", "status", "initiated_at", "completed_at", "last_working_day", "reason", "notes", "created_at", "updated_at")
+        read_only_fields = ("id", "employee", "status", "initiated_at", "completed_at", "created_at", "updated_at")
+
+
+class EmployeeOffboardingStartSerializer(serializers.Serializer):
+    last_working_day = serializers.DateField(required=False)
+    reason = serializers.CharField(required=False, allow_blank=True)
+    notes = serializers.CharField(required=False, allow_blank=True)

@@ -31,10 +31,18 @@ class Institution(BaseModel):
 
 
 class Permission(BaseModel):
+    class Classification(models.TextChoices):
+        NORMAL = "NORMAL", "Normal"
+        PRIVILEGED = "PRIVILEGED", "Privileged"
+        PLATFORM_ONLY = "PLATFORM_ONLY", "Platform only"
+
     code = models.CharField(max_length=100, unique=True)
     name = models.CharField(max_length=150)
     module_code = models.CharField(max_length=50, default="CORE_HR")
     description = models.TextField(blank=True)
+    classification = models.CharField(
+        max_length=20, choices=Classification.choices, default=Classification.NORMAL
+    )
 
     class Meta:
         ordering = ("code",)
@@ -55,7 +63,15 @@ class Role(TenantOwnedModel):
     name = models.CharField(max_length=150)
     description = models.TextField(blank=True)
     is_system_role = models.BooleanField(default=False)
+    is_custom = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="institution_roles_created",
+    )
     permissions = models.ManyToManyField(Permission, related_name="roles", blank=True)
 
     class Meta:
@@ -75,6 +91,16 @@ class Role(TenantOwnedModel):
     def save(self, *args, **kwargs):
         self.code = self.code.strip().upper()
         super().save(*args, **kwargs)
+
+    def clean(self):
+        self.code = self.code.strip().upper()
+        if self.is_system_role and self.is_custom:
+            raise ValidationError({"is_custom": "A system role cannot be a custom role."})
+        if self.created_by_id and self.institution_id:
+            if not self.created_by.memberships.filter(institution_id=self.institution_id).exists():
+                raise ValidationError(
+                    {"created_by": "Role creator must belong to the same institution."}
+                )
 
     def __str__(self):
         scope = self.institution.code if self.institution_id else "GLOBAL"
@@ -237,6 +263,138 @@ class InstitutionOnboarding(BaseModel):
 
     def __str__(self):
         return f"{self.institution.code}: {self.status}"
+
+
+class InstitutionOnboardingStep(TenantOwnedModel):
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        IN_PROGRESS = "IN_PROGRESS", "In progress"
+        COMPLETED = "COMPLETED", "Completed"
+        SKIPPED = "SKIPPED", "Skipped"
+        BLOCKED = "BLOCKED", "Blocked"
+
+    institution = models.ForeignKey(
+        Institution, on_delete=models.CASCADE, related_name="onboarding_steps"
+    )
+    code = models.CharField(max_length=64)
+    sequence = models.PositiveSmallIntegerField()
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
+    required_module = models.CharField(max_length=20, blank=True)
+    blocker_code = models.CharField(max_length=100, blank=True)
+    blocker_message = models.TextField(blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("sequence", "created_at")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("institution", "code"), name="uniq_onboarding_step_per_institution"
+            ),
+            models.UniqueConstraint(
+                fields=("institution", "sequence"), name="uniq_onboarding_step_sequence"
+            ),
+        ]
+        indexes = [models.Index(fields=("institution", "status"))]
+
+
+class UserPreference(TenantOwnedModel):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="preferences"
+    )
+    institution = models.ForeignKey(
+        Institution, on_delete=models.CASCADE, related_name="user_preferences"
+    )
+    preference_key = models.CharField(max_length=100)
+    value_json = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("user", "institution", "preference_key"),
+                name="uniq_user_preference_per_institution",
+            )
+        ]
+        indexes = [models.Index(fields=("institution", "user"))]
+
+    def clean(self):
+        self.preference_key = self.preference_key.strip().lower()
+        if self.user_id and self.institution_id and not self.user.memberships.filter(
+            institution_id=self.institution_id
+        ).exists():
+            raise ValidationError({"user": "User must belong to the selected institution."})
+
+    def save(self, *args, **kwargs):
+        self.preference_key = self.preference_key.strip().lower()
+        super().save(*args, **kwargs)
+
+
+class UserActivityEvent(TenantOwnedModel):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="activity_events"
+    )
+    institution = models.ForeignKey(
+        Institution, on_delete=models.CASCADE, related_name="user_activity_events"
+    )
+    activity_code = models.CharField(max_length=100)
+    entity_type = models.CharField(max_length=150, blank=True)
+    entity_id = models.UUIDField(null=True, blank=True)
+    occurred_at = models.DateTimeField()
+
+    class Meta:
+        ordering = ("-occurred_at",)
+        indexes = [
+            models.Index(fields=("institution", "user", "activity_code")),
+            models.Index(fields=("institution", "user", "occurred_at")),
+        ]
+
+    def clean(self):
+        if self.user_id and self.institution_id and not self.user.memberships.filter(
+            institution_id=self.institution_id
+        ).exists():
+            raise ValidationError({"user": "User must belong to the selected institution."})
+
+
+class ReferenceSequence(TenantOwnedModel):
+    class ResetPolicy(models.TextChoices):
+        NEVER = "NEVER", "Never"
+        YEARLY = "YEARLY", "Yearly"
+        MONTHLY = "MONTHLY", "Monthly"
+
+    institution = models.ForeignKey(
+        Institution, on_delete=models.CASCADE, related_name="reference_sequences"
+    )
+    namespace = models.CharField(max_length=50)
+    prefix = models.CharField(max_length=32)
+    current_value = models.PositiveBigIntegerField(default=0)
+    padding = models.PositiveSmallIntegerField(default=6)
+    reset_policy = models.CharField(
+        max_length=10, choices=ResetPolicy.choices, default=ResetPolicy.NEVER
+    )
+    last_reset_key = models.CharField(max_length=20, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=("institution", "namespace"),
+                name="uniq_reference_sequence_per_institution_namespace",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(padding__gte=1) & models.Q(padding__lte=12),
+                name="reference_sequence_padding_range",
+            ),
+        ]
+        indexes = [models.Index(fields=("institution", "namespace"))]
+
+    def clean(self):
+        self.namespace = self.namespace.strip().upper()
+        self.prefix = self.prefix.strip().upper()
+        if not self.prefix:
+            raise ValidationError({"prefix": "A reference prefix is required."})
+
+    def save(self, *args, **kwargs):
+        self.namespace = self.namespace.strip().upper()
+        self.prefix = self.prefix.strip().upper()
+        super().save(*args, **kwargs)
 
 
 class SystemFeatureFlag(BaseModel):

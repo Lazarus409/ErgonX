@@ -16,8 +16,8 @@ ACTION_CATALOG = {
     "payroll.approve": {"permission": "payroll.approve", "module": "PAYROLL", "label": "Review payroll runs", "route_hint": "/payroll/runs?status=UNDER_REVIEW"},
     "journal.create": {"permission": "journal.create", "module": "ACCOUNTING", "label": "Create journal", "route_hint": "/accounting/journals/new"},
     "journal.approve": {"permission": "journal.approve", "module": "ACCOUNTING", "label": "Approve journals", "route_hint": "/accounting/journals?status=PENDING_APPROVAL"},
-    "candidate.create": {"permission": "candidate.create", "module": "RECRUITMENT", "label": "Add candidate", "route_hint": "/recruitment/candidates/new"},
-    "offer.manage": {"permission": "offer.manage", "module": "RECRUITMENT", "label": "Review offers", "route_hint": "/recruitment/offers?status=ACCEPTED"},
+    "candidate.create": {"permission": "candidate.create", "module": "RECRUITMENT", "label": "Manage candidates", "route_hint": "/recruitment/candidates"},
+    "offer.manage": {"permission": "offer.manage", "module": "RECRUITMENT", "label": "Recruitment workspace", "route_hint": "/recruitment"},
 }
 
 

@@ -1,7 +1,7 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
-from apps.institutions.views import CurrentInstitutionView, InstitutionModuleViewSet, InstitutionOnboardingView, InstitutionSettingsView, MembershipViewSet, MyMembershipsView, MyPreferencesView, PermissionCatalogView, RoleViewSet, UniversalSearchView
+from apps.institutions.views import CurrentInstitutionView, InstitutionModuleViewSet, InstitutionOnboardingStepActionView, InstitutionOnboardingView, InstitutionSettingsView, MembershipViewSet, MyMembershipsView, MyPreferencesView, PermissionCatalogView, RoleViewSet, UniversalSearchView
 
 router = DefaultRouter()
 router.register("roles", RoleViewSet, basename="role")
@@ -15,6 +15,7 @@ urlpatterns = [
     path("preferences/", MyPreferencesView.as_view(), name="my-preferences"),
     path("settings/", InstitutionSettingsView.as_view(), name="institution-settings"),
     path("onboarding/", InstitutionOnboardingView.as_view(), name="institution-onboarding"),
+    path("onboarding/<str:step_code>/<str:action_name>/", InstitutionOnboardingStepActionView.as_view(), name="institution-onboarding-step-action"),
     path("search/", UniversalSearchView.as_view(), name="universal-search"),
 ]
 

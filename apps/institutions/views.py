@@ -2,12 +2,16 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.decorators import action
+from django.utils import timezone
+from datetime import timedelta
 from drf_spectacular.utils import extend_schema
 
 from apps.institutions.serializers import (
     CurrentInstitutionSerializer,
     MembershipSerializer,
     MembershipUpdateSerializer,
+    MembershipInviteSerializer,
+    InvitationCreateSerializer,
     PermissionSerializer,
     RoleSerializer,
     CustomRoleCreateSerializer,
@@ -17,9 +21,10 @@ from apps.institutions.serializers import (
     InstitutionOnboardingSerializer,
     InstitutionModuleSerializer,
     InstitutionSettingSerializer,
+    InstitutionProfileUpdateSerializer,
 )
-from apps.institutions.models import InstitutionMembership, InstitutionModule, InstitutionOnboarding, InstitutionSetting, Permission, Role, UserPreference
-from apps.institutions.services import clone_role, create_custom_role, reconcile_institution_onboarding, update_custom_role, update_membership, validate_institution_onboarding
+from apps.institutions.models import InstitutionMembership, InstitutionModule, InstitutionOnboarding, InstitutionOnboardingStep, InstitutionSetting, Permission, Role, UserPreference
+from apps.institutions.services import ONBOARDING_STEP_DEFINITIONS, clone_role, create_custom_role, create_invitation, invite_existing_user, reconcile_institution_onboarding, resume_institution_onboarding_step, skip_institution_onboarding_step, update_custom_role, update_membership, validate_institution_onboarding
 from apps.institutions.search import universal_search
 from common.serializers import call_validated_service
 from common.viewsets import TenantModelViewSet
@@ -31,23 +36,36 @@ class CurrentInstitutionView(APIView):
     required_module = None
 
     def get_required_permission(self):
-        return "institution.view"
+        return "settings.institution.manage" if self.request.method == "PATCH" else "institution.view"
 
-    @extend_schema(responses=CurrentInstitutionSerializer)
-    def get(self, request):
+    def _context_response(self, request):
         capabilities = list(
             request.institution.modules.filter(is_enabled=True)
             .order_by("module_code")
             .values_list("module_code", flat=True)
         )
-        serializer = CurrentInstitutionSerializer(
-            {
-                "institution": request.institution,
-                "membership": request.membership,
-                "active_capabilities": capabilities,
-            }
+        return Response(CurrentInstitutionSerializer({
+            "institution": request.institution,
+            "membership": request.membership,
+            "active_capabilities": capabilities,
+        }).data)
+
+    @extend_schema(responses=CurrentInstitutionSerializer)
+    def get(self, request):
+        return self._context_response(request)
+
+    @extend_schema(request=InstitutionProfileUpdateSerializer, responses=CurrentInstitutionSerializer)
+    def patch(self, request):
+        serializer = InstitutionProfileUpdateSerializer(
+            request.institution,
+            data=request.data,
+            partial=True,
         )
-        return Response(serializer.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        reconcile_institution_onboarding(request.institution)
+        call_validated_service(validate_institution_onboarding, institution=request.institution, actor=request.user)
+        return self._context_response(request)
 
 
 class MyMembershipsView(APIView):
@@ -65,7 +83,7 @@ class MembershipViewSet(TenantModelViewSet):
     model = InstitutionMembership
     serializer_class = MembershipSerializer
     required_permission = "settings.users.manage"
-    http_method_names = ("get", "patch", "head", "options")
+    http_method_names = ("get", "post", "patch", "head", "options")
     search_fields = ("user__email", "user__first_name", "user__last_name", "role__code")
     ordering_fields = ("status", "joined_at", "created_at")
 
@@ -89,6 +107,28 @@ class MembershipViewSet(TenantModelViewSet):
             **values,
         )
         return Response(self.get_serializer(membership).data)
+
+    def create(self, request, *args, **kwargs):
+        payload = MembershipInviteSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        role = Role.objects.for_institution(request.institution).get(pk=payload.validated_data["role_id"])
+        membership = call_validated_service(
+            invite_existing_user,
+            institution=request.institution,
+            actor=request.user,
+            role=role,
+            email=payload.validated_data["email"],
+            is_primary=payload.validated_data["is_primary"],
+        )
+        return Response(self.get_serializer(membership).data, status=201)
+
+    @action(detail=False, methods=("post",), url_path="invite-link")
+    def invite_link(self, request):
+        payload = InvitationCreateSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        role = Role.objects.for_institution(request.institution).get(pk=payload.validated_data["role_id"])
+        invitation, token = call_validated_service(create_invitation, institution=request.institution, actor=request.user, role=role, email=payload.validated_data["email"], expires_at=timezone.now() + timedelta(hours=payload.validated_data["expires_in_hours"]))
+        return Response({"id": str(invitation.id), "email": invitation.email, "expires_at": invitation.expires_at, "acceptance_token": token})
 
 
 class PermissionCatalogView(APIView):
@@ -192,6 +232,7 @@ class InstitutionModuleViewSet(TenantModelViewSet):
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         module = serializer.save(enabled_by=request.user if serializer.validated_data.get("is_enabled") else instance.enabled_by)
+        call_validated_service(validate_institution_onboarding, institution=request.institution, actor=request.user)
         return Response(self.get_serializer(module).data)
 
 
@@ -212,6 +253,26 @@ class InstitutionOnboardingView(APIView):
         if "onboarding.manage" not in request.membership.role.permissions.values_list("code", flat=True):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied("Your institution role does not grant this permission.")
+        onboarding, _ = call_validated_service(validate_institution_onboarding, institution=request.institution, actor=request.user)
+        return Response(InstitutionOnboardingSerializer(onboarding).data)
+
+
+class InstitutionOnboardingStepActionView(APIView):
+    permission_classes = [TenantContextPermission, TenantRBACPermission]
+
+    def get_required_permission(self):
+        return "onboarding.manage"
+
+    def post(self, request, step_code, action_name):
+        if action_name not in {"skip", "resume"}:
+            from rest_framework.exceptions import NotFound
+            raise NotFound("Unsupported onboarding action.")
+        if step_code not in {item[0] for item in ONBOARDING_STEP_DEFINITIONS}:
+            from rest_framework.exceptions import NotFound
+            raise NotFound("Onboarding step was not found.")
+        reconcile_institution_onboarding(request.institution)
+        service = skip_institution_onboarding_step if action_name == "skip" else resume_institution_onboarding_step
+        call_validated_service(service, institution=request.institution, actor=request.user, step_code=step_code)
         onboarding, _ = call_validated_service(validate_institution_onboarding, institution=request.institution, actor=request.user)
         return Response(InstitutionOnboardingSerializer(onboarding).data)
 

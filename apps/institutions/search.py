@@ -119,7 +119,7 @@ def _vendor_bill_results(institution, query, limit):
 
 SEARCH_PROVIDERS = (
     SearchProvider("EMPLOYEE", "CORE_HR", "employee.view", "/hr/employees/{id}", _employee_results),
-    SearchProvider("JOB_POSTING", "RECRUITMENT", "job_posting.view", "/recruitment/jobs/{id}", _job_results),
+    SearchProvider("JOB_POSTING", "RECRUITMENT", "job_posting.view", "/recruitment/job-postings/{id}", _job_results),
     SearchProvider("CANDIDATE", "RECRUITMENT", "candidate.view", "/recruitment/candidates/{id}", _candidate_results),
     SearchProvider("OFFER", "RECRUITMENT", "offer.view", "/recruitment/offers/{id}", _offer_results),
     SearchProvider("PAYROLL_RUN", "PAYROLL", "payroll.view", "/payroll/runs/{id}", _payroll_results),

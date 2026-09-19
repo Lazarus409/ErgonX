@@ -1,13 +1,94 @@
+from datetime import timedelta
+from smtplib import SMTPException
+
+from django.conf import settings
+from django.core.mail import BadHeaderError
+from django.utils import timezone
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework import status
+from django.shortcuts import get_object_or_404
 
-from apps.employees.filters import EmployeeFilter
-from apps.employees.models import Employee, Employment
+from apps.employees.filters import EmergencyContactFilter, EmployeeFilter
+from apps.employees.models import EmergencyContact, Employee, EmployeeOffboarding, EmployeeOnboarding, Employment
 from apps.employees.selectors import employment_history_for_employee
-from apps.employees.serializers import EmployeeOffboardingSerializer, EmployeeOffboardingStartSerializer, EmployeeOnboardingSerializer, EmployeeSerializer, EmploymentSerializer
-from apps.employees.services import complete_employee_offboarding, complete_employee_onboarding, initiate_employee_offboarding, start_employee_onboarding
+from apps.employees.serializers import EmergencyContactSerializer, EmployeeOffboardingSerializer, EmployeeOffboardingStartSerializer, EmployeeOnboardingSerializer, EmployeeRehireSerializer, EmployeeSelfServiceInvitationSerializer, NewEmployeeSelfServiceInvitationSerializer, EmployeeSerializer, EmploymentSerializer, SelfServiceProfileSerializer
+from apps.employees.services import complete_employee_offboarding, complete_employee_onboarding, initiate_employee_offboarding, rehire_employee, start_employee_onboarding
+from apps.accounts.emails import send_employee_self_service_invitation
+from apps.institutions.models import Role
+from apps.institutions.services import create_invitation
+from apps.organization.models import Department, Grade, Location, Position
+from apps.documents.models import Document
+from apps.documents.serializers import DocumentSerializer
 from common.serializers import call_validated_service
 from common.viewsets import TenantModelViewSet
+from common.permissions import TenantContextPermission, TenantRBACPermission
+
+
+class SelfServiceBaseView(APIView):
+    permission_classes = (TenantContextPermission, TenantRBACPermission)
+
+    def get_required_permission(self):
+        return "home.view"
+
+    def employee(self, request):
+        return get_object_or_404(Employee.objects.for_institution(request.institution), user=request.user)
+
+
+class SelfServiceProfileView(SelfServiceBaseView):
+    def get(self, request):
+        return Response(SelfServiceProfileSerializer(self.employee(request)).data)
+
+    def patch(self, request):
+        serializer = SelfServiceProfileSerializer(self.employee(request), data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+
+class SelfServiceEmergencyContactsView(SelfServiceBaseView):
+    def get(self, request):
+        contacts = EmergencyContact.objects.for_institution(request.institution).filter(employee=self.employee(request))
+        return Response(EmergencyContactSerializer(contacts, many=True, context={"request": request}).data)
+
+    def post(self, request):
+        employee = self.employee(request)
+        serializer = EmergencyContactSerializer(data={**request.data, "employee": str(employee.id)}, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        contact = serializer.save()
+        return Response(EmergencyContactSerializer(contact, context={"request": request}).data, status=status.HTTP_201_CREATED)
+
+
+class SelfServiceEmergencyContactDetailView(SelfServiceBaseView):
+    def _contact(self, request, pk):
+        return get_object_or_404(EmergencyContact.objects.for_institution(request.institution), pk=pk, employee=self.employee(request))
+
+    def patch(self, request, pk):
+        # Never trust an employee ID supplied by the browser. A Self-Service
+        # contact must stay owned by the signed-in employee.
+        employee = self.employee(request)
+        serializer = EmergencyContactSerializer(
+            self._contact(request, pk),
+            data={**request.data, "employee": str(employee.id)},
+            partial=True,
+            context={"request": request},
+        )
+        serializer.is_valid(raise_exception=True)
+        contact = serializer.save()
+        return Response(EmergencyContactSerializer(contact, context={"request": request}).data)
+
+    def delete(self, request, pk):
+        self._contact(request, pk).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class SelfServiceDocumentsView(SelfServiceBaseView):
+    def get(self, request):
+        documents = Document.objects.for_institution(request.institution).filter(
+            entity_type="EMPLOYEE", entity_id=self.employee(request).id, is_active=True
+        )
+        return Response(DocumentSerializer(documents, many=True).data)
 
 
 class EmployeeViewSet(TenantModelViewSet):
@@ -35,15 +116,80 @@ class EmployeeViewSet(TenantModelViewSet):
         return super().get_queryset().select_related("user")
 
     def get_required_permission(self):
-        if self.action == "employment_history":
+        if self.action == "me":
+            return "home.view"
+        if self.action in ("employment_history", "lifecycle"):
             return "employment.view"
-        if self.action in ("onboarding_start", "onboarding_complete", "offboarding_start", "offboarding_complete"):
+        if self.action in ("onboarding_start", "onboarding_complete", "offboarding_start", "offboarding_complete", "rehire", "invite_self_service", "invite_new_self_service"):
             return "employee.update"
         return super().get_required_permission()
 
     def perform_destroy(self, instance):
         instance.status = Employee.Status.INACTIVE
         instance.save(update_fields=("status", "updated_at"))
+
+    @action(detail=False, methods=("get",), url_path="me")
+    def me(self, request):
+        """Return only the employee record linked to the signed-in user."""
+        employee = self.get_queryset().filter(user=request.user).first()
+        if employee is None:
+            return Response({"detail": "No employee record is linked to this account."}, status=404)
+        return Response(self.get_serializer(employee).data)
+
+    @action(detail=False, methods=("post",), url_path="invite-self-service")
+    def invite_new_self_service(self, request):
+        """Invite a new employee before an HR employee record exists."""
+        payload = NewEmployeeSelfServiceInvitationSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        role = Role.objects.for_institution(request.institution).filter(code="EMPLOYEE", is_active=True).first()
+        if role is None:
+            return Response({"detail": "The Employee role is not configured for this institution."}, status=409)
+        email = payload.validated_data["email"].strip().lower()
+        expires_at = timezone.now() + timedelta(hours=payload.validated_data["expires_in_hours"])
+        invitation, token = call_validated_service(
+            create_invitation, email=email, institution=request.institution, role=role,
+            actor=request.user, expires_at=expires_at,
+        )
+        delivery_status = "not_configured"
+        if getattr(settings, "EMAIL_DELIVERY_ENABLED", False):
+            try:
+                send_employee_self_service_invitation(recipient_email=email, acceptance_token=token, institution_name=request.institution.name, expires_at=expires_at)
+                delivery_status = "sent"
+            except (BadHeaderError, OSError, SMTPException):
+                delivery_status = "failed"
+        return Response({"id": str(invitation.id), "email": email, "expires_at": expires_at, "acceptance_token": token, "email_delivery_status": delivery_status}, status=201)
+
+    @action(detail=True, methods=("post",), url_path="invite-self-service")
+    def invite_self_service(self, request, pk=None):
+        """Issue a one-time account activation link for this employee."""
+        payload = EmployeeSelfServiceInvitationSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        employee = self.get_object()
+        email = employee.work_email or employee.personal_email
+        if not email:
+            return Response({"detail": "Add a work or personal email before inviting this employee."}, status=400)
+        role = Role.objects.for_institution(request.institution).filter(code="EMPLOYEE", is_active=True).first()
+        if role is None:
+            return Response({"detail": "The Employee role is not configured for this institution."}, status=409)
+        expires_at = timezone.now() + timedelta(hours=payload.validated_data["expires_in_hours"])
+        invitation, token = call_validated_service(
+            create_invitation, email=email, institution=request.institution, role=role,
+            actor=request.user, expires_at=expires_at, employee=employee,
+        )
+        delivery_status = "not_configured"
+        if getattr(settings, "EMAIL_DELIVERY_ENABLED", False):
+            try:
+                send_employee_self_service_invitation(
+                    recipient_email=email, acceptance_token=token,
+                    institution_name=request.institution.name, expires_at=expires_at,
+                )
+                delivery_status = "sent"
+            except (BadHeaderError, OSError, SMTPException):
+                delivery_status = "failed"
+        return Response({
+            "id": str(invitation.id), "email": email, "expires_at": expires_at,
+            "acceptance_token": token, "email_delivery_status": delivery_status,
+        }, status=201)
 
     @action(detail=True, methods=("get",), url_path="employment-history")
     def employment_history(self, request, pk=None):
@@ -59,6 +205,21 @@ class EmployeeViewSet(TenantModelViewSet):
             history, many=True, context=self.get_serializer_context()
         )
         return Response(serializer.data)
+
+    @action(detail=True, methods=("get",), url_path="lifecycle")
+    def lifecycle(self, request, pk=None):
+        """Returns the latest onboarding and offboarding records for an employee."""
+        employee = self.get_object()
+        onboarding = EmployeeOnboarding.objects.for_institution(request.institution).filter(
+            employee=employee
+        ).order_by("-created_at").first()
+        offboarding = EmployeeOffboarding.objects.for_institution(request.institution).filter(
+            employee=employee
+        ).order_by("-created_at").first()
+        return Response({
+            "onboarding": EmployeeOnboardingSerializer(onboarding).data if onboarding else None,
+            "offboarding": EmployeeOffboardingSerializer(offboarding).data if offboarding else None,
+        })
 
     @action(detail=True, methods=("post",), url_path="onboarding/start")
     def onboarding_start(self, request, pk=None):
@@ -82,6 +243,22 @@ class EmployeeViewSet(TenantModelViewSet):
         record = call_validated_service(complete_employee_offboarding, institution=request.institution, employee=self.get_object(), actor=request.user)
         return Response(EmployeeOffboardingSerializer(record).data)
 
+    @action(detail=True, methods=("post",))
+    def rehire(self, request, pk=None):
+        payload = EmployeeRehireSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        values = payload.validated_data
+        institution = request.institution
+        employment, onboarding = call_validated_service(
+            rehire_employee, institution=institution, employee=self.get_object(), actor=request.user,
+            department=Department.objects.for_institution(institution).get(pk=values["department_id"]),
+            position=Position.objects.for_institution(institution).get(pk=values["position_id"]),
+            grade=Grade.objects.for_institution(institution).get(pk=values["grade_id"]),
+            location=Location.objects.for_institution(institution).get(pk=values["location_id"]),
+            employment_type=values["employment_type"], staff_category=values["staff_category"], start_date=values["start_date"],
+        )
+        return Response({"employee": EmployeeSerializer(self.get_object()).data, "employment": EmploymentSerializer(employment).data, "onboarding": EmployeeOnboardingSerializer(onboarding).data})
+
 
 class EmploymentViewSet(TenantModelViewSet):
     model = Employment
@@ -101,3 +278,15 @@ class EmploymentViewSet(TenantModelViewSet):
         return super().get_queryset().select_related(
             "employee", "department", "position", "grade", "location", "reports_to"
         )
+
+
+class EmergencyContactViewSet(TenantModelViewSet):
+    model = EmergencyContact
+    serializer_class = EmergencyContactSerializer
+    permission_resource = "employee"
+    filterset_class = EmergencyContactFilter
+    search_fields = ("full_name", "relationship", "phone", "email")
+    ordering_fields = ("full_name", "is_primary", "created_at", "updated_at")
+
+    def get_queryset(self):
+        return super().get_queryset().select_related("employee")

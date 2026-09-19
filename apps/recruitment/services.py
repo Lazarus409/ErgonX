@@ -235,39 +235,57 @@ def withdraw_offer(*, offer, actor):
 
 
 @transaction.atomic
-def hire_candidate(*, offer, actor, employee_number):
-    """Atomically creates the canonical HR records exactly once for an accepted offer."""
+def hire_candidate(*, offer, actor, employee_number=None, existing_employee=None):
+    """Complete an accepted offer by creating or linking canonical HR records.
+
+    ``existing_employee`` supports controlled historical recruitment imports and
+    deterministic demo scenarios where an employee was seeded before the ATS
+    history. It never rewrites the employee or current employment record.
+    """
     instance = Offer.objects.select_for_update().select_related("application__candidate").get(pk=offer.pk)
     _active_member(actor, instance.institution)
     if instance.hired_employee_id:
         return instance.hired_employee
     if instance.status != Offer.Status.ACCEPTED:
         raise ValidationError({"status": "Only accepted offers can be hired."})
-    if not employee_number or not employee_number.strip():
+    if existing_employee is None and (not employee_number or not employee_number.strip()):
         raise ValidationError({"employee_number": "An employee number is required."})
     candidate = Candidate.objects.select_for_update().get(pk=instance.application.candidate_id)
-    employee = Employee(
-        institution=instance.institution,
-        employee_number=employee_number,
-        first_name=candidate.first_name,
-        middle_name=candidate.middle_name,
-        last_name=candidate.last_name,
-        personal_email=candidate.email,
-        phone=candidate.phone,
-        hire_date=instance.proposed_start_date,
-    )
-    employee.full_clean()
-    employee.save()
-    employment = Employment(institution=instance.institution, employee=employee, department=instance.department, position=instance.position, grade=instance.grade, location=instance.location, employment_type=instance.employment_type, staff_category=instance.staff_category, start_date=instance.proposed_start_date, status=Employment.Status.ACTIVE, is_current=True)
-    employment.full_clean()
-    employment.save()
-    EmployeeOnboarding.objects.create(
-        institution=instance.institution,
-        employee=employee,
-        status=EmployeeOnboarding.Status.NOT_STARTED,
-        notes="Created from accepted recruitment offer.",
-    )
-    if instance.salary_structure_id:
+    if existing_employee is not None:
+        employee = Employee.objects.select_for_update().get(pk=existing_employee.pk)
+        if employee.institution_id != instance.institution_id:
+            raise ValidationError({"existing_employee": "Employee belongs to another institution."})
+        employment = Employment.objects.filter(employee=employee, is_current=True).first()
+        if employment is None:
+            raise ValidationError({"existing_employee": "Employee must have a current employment record."})
+        EmployeeOnboarding.objects.get_or_create(
+            institution=instance.institution,
+            employee=employee,
+            defaults={"status": EmployeeOnboarding.Status.NOT_STARTED, "notes": "Linked from accepted recruitment offer."},
+        )
+    else:
+        employee = Employee(
+            institution=instance.institution,
+            employee_number=employee_number,
+            first_name=candidate.first_name,
+            middle_name=candidate.middle_name,
+            last_name=candidate.last_name,
+            personal_email=candidate.email,
+            phone=candidate.phone,
+            hire_date=instance.proposed_start_date,
+        )
+        employee.full_clean()
+        employee.save()
+        employment = Employment(institution=instance.institution, employee=employee, department=instance.department, position=instance.position, grade=instance.grade, location=instance.location, employment_type=instance.employment_type, staff_category=instance.staff_category, start_date=instance.proposed_start_date, status=Employment.Status.ACTIVE, is_current=True)
+        employment.full_clean()
+        employment.save()
+        EmployeeOnboarding.objects.create(
+            institution=instance.institution,
+            employee=employee,
+            status=EmployeeOnboarding.Status.NOT_STARTED,
+            notes="Created from accepted recruitment offer.",
+        )
+    if instance.salary_structure_id and existing_employee is None:
         compensation = EmployeeCompensation(institution=instance.institution, employee=employee, salary_structure=instance.salary_structure, base_salary=instance.base_salary, currency=instance.currency, effective_from=instance.proposed_start_date, is_current=True)
         compensation.full_clean()
         compensation.save()

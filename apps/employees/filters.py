@@ -1,6 +1,6 @@
 import django_filters
 
-from apps.employees.models import Employee, Employment
+from apps.employees.models import EmergencyContact, Employee, Employment
 
 
 class EmployeeFilter(django_filters.FilterSet):
@@ -23,3 +23,12 @@ class EmployeeFilter(django_filters.FilterSet):
         return queryset.filter(
             **{f"employments__{name}": value, "employments__is_current": True}
         ).distinct()
+
+
+class EmergencyContactFilter(django_filters.FilterSet):
+    employee = django_filters.UUIDFilter()
+    is_primary = django_filters.BooleanFilter()
+
+    class Meta:
+        model = EmergencyContact
+        fields = ("employee", "is_primary")

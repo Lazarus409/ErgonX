@@ -1,6 +1,9 @@
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
+from django.db.models import F
 from django.utils import timezone
+from django.utils.crypto import salted_hmac
+import secrets
 
 from apps.institutions.models import (
     InstitutionModule,
@@ -10,6 +13,7 @@ from apps.institutions.models import (
     Permission,
     ReferenceSequence,
     Role,
+    InstitutionInvitation,
 )
 from apps.audit.services import record_audit_event
 from common.exceptions import CodedValidationError
@@ -48,11 +52,21 @@ ONBOARDING_STEP_DEFINITIONS = (
     ("MODULE_SELECTION", 20, ""),
     ("ORGANIZATION_SETUP", 30, "CORE_HR"),
     ("HR_CONFIGURATION", 40, "CORE_HR"),
-    ("PAYROLL_CONFIGURATION", 50, "PAYROLL"),
-    ("ACCOUNTING_CONFIGURATION", 60, "ACCOUNTING"),
-    ("RECRUITMENT_CONFIGURATION", 70, "RECRUITMENT"),
-    ("USERS_AND_ROLES", 80, "CORE_HR"),
-    ("VALIDATION", 90, ""),
+    ("SCHEDULING_CONFIGURATION", 50, "ATTENDANCE"),
+    ("PAYROLL_CONFIGURATION", 60, "PAYROLL"),
+    ("ACCOUNTING_CONFIGURATION", 70, "ACCOUNTING"),
+    ("PAYROLL_GL_MAPPING", 80, ""),
+    ("RECRUITMENT_CONFIGURATION", 90, "RECRUITMENT"),
+    ("USERS_AND_ROLES", 100, "CORE_HR"),
+    ("VALIDATION", 110, ""),
+)
+
+ONBOARDING_SETUP_OWNER_ROLES = (
+    "HR_ADMIN",
+    "FINANCE_MANAGER",
+    "ACCOUNTANT",
+    "AUDITOR",
+    "DIRECTOR",
 )
 
 
@@ -242,9 +256,20 @@ ROLE_PERMISSION_CODES = {
         "leave.view",
         "leave.approve",
         "leave.reject",
+        "dashboard.leave.view",
         "schedule.view",
         "attendance.view",
+        "dashboard.attendance.view",
         "compensation.view",
+        "payroll.view",
+        "payslip.view",
+        "tax_relief.view",
+        "dashboard.payroll.view",
+        "job_posting.view",
+        "candidate.view",
+        "recruitment_stage.view",
+        "interview.view",
+        "offer.view",
         "dashboard.executive.view",
         "report.view",
     ),
@@ -270,9 +295,12 @@ ROLE_PERMISSION_CODES = {
         "settings.profile.manage_self",
         "institution.view",
         "payroll.view",
-        "payroll.prepare",
+        "payroll.approve",
+        "payroll.finalize",
         "payslip.view",
         "tax_relief.view",
+        "tax_relief.approve",
+        "dashboard.payroll.view",
         "account.view",
         "account.create",
         "account.update",
@@ -557,6 +585,12 @@ def _onboarding_step_blocker(institution, step):
     elif step.code == "HR_CONFIGURATION":
         if not institution.modules.filter(module_code="CORE_HR", configuration_status=InstitutionModule.ConfigurationStatus.READY).exists():
             return ("CORE_HR_NOT_READY", "Core HR configuration must be marked ready by server validation.")
+    elif step.code == "SCHEDULING_CONFIGURATION":
+        if not institution.work_schedules.filter(is_active=True).exists():
+            return ("SCHEDULE_REQUIRED", "Create at least one active work schedule.")
+    elif step.code == "PAYROLL_GL_MAPPING":
+        if not institution.pay_component_account_mappings.filter(is_active=True).exists():
+            return ("PAYROLL_GL_MAPPING_REQUIRED", "Create at least one active payroll-to-account mapping.")
     elif step.code == "USERS_AND_ROLES":
         if not InstitutionMembership.objects.filter(
             institution=institution,
@@ -564,32 +598,188 @@ def _onboarding_step_blocker(institution, step):
             role__code="INSTITUTION_ADMIN",
         ).exists():
             return ("ACTIVE_ADMIN_REQUIRED", "At least one active Institution Admin is required.")
+        assigned_owner_roles = set(
+            InstitutionMembership.objects.filter(
+                institution=institution,
+                status__in=(InstitutionMembership.Status.INVITED, InstitutionMembership.Status.ACTIVE),
+                role__code__in=ONBOARDING_SETUP_OWNER_ROLES,
+            ).values_list("role__code", flat=True)
+        )
+        pending_owner_roles = set(
+            InstitutionInvitation.objects.filter(
+                institution=institution,
+                status=InstitutionInvitation.Status.PENDING,
+                role__code__in=ONBOARDING_SETUP_OWNER_ROLES,
+            ).values_list("role__code", flat=True)
+        )
+        missing = [
+            code.replace("_", " ").title()
+            for code in ONBOARDING_SETUP_OWNER_ROLES
+            if code not in assigned_owner_roles | pending_owner_roles
+        ]
+        if missing:
+            return (
+                "SETUP_OWNERS_REQUIRED",
+                f"Invite a setup owner for: {', '.join(missing)}.",
+            )
     return None
+
+
+def _onboarding_step_required(code, required_module, enabled_modules):
+    """Return whether an onboarding item applies to the selected modules."""
+    if code == "PAYROLL_GL_MAPPING":
+        return {"PAYROLL", "ACCOUNTING"}.issubset(enabled_modules)
+    return not required_module or required_module in enabled_modules
 
 
 @transaction.atomic
 def reconcile_institution_onboarding(institution):
     enabled_modules = set(institution.modules.filter(is_enabled=True).values_list("module_code", flat=True))
+    definitions_by_code = {code: (sequence, required_module) for code, sequence, required_module in ONBOARDING_STEP_DEFINITIONS}
+    existing_steps = {step.code: step for step in institution.onboarding_steps.all()}
+    # The onboarding flow can gain a step over time. Move existing sequence
+    # values out of the way first so a new step never collides with an old one.
+    needs_resequence = (
+        set(existing_steps) != set(definitions_by_code)
+        or any(
+            step.sequence != definitions_by_code[code][0]
+            or step.required_module != definitions_by_code[code][1]
+            for code, step in existing_steps.items()
+            if code in definitions_by_code
+        )
+    )
+    if needs_resequence and existing_steps:
+        InstitutionOnboardingStep.objects.filter(institution=institution).update(sequence=F("sequence") + 1000)
+
     for code, sequence, required_module in ONBOARDING_STEP_DEFINITIONS:
         step, created = InstitutionOnboardingStep.objects.get_or_create(
             institution=institution,
             code=code,
             defaults={"sequence": sequence, "required_module": required_module},
         )
-        if required_module and required_module not in enabled_modules and step.status != InstitutionOnboardingStep.Status.COMPLETED:
+        if not created and (step.sequence != sequence or step.required_module != required_module):
+            step.sequence = sequence
+            step.required_module = required_module
+            step.save(update_fields=("sequence", "required_module", "updated_at"))
+        applies = _onboarding_step_required(code, required_module, enabled_modules)
+        if not applies and step.status != InstitutionOnboardingStep.Status.COMPLETED:
             step.status = InstitutionOnboardingStep.Status.SKIPPED
+            step.is_admin_skipped = False
             step.blocker_code = ""
             step.blocker_message = ""
-            step.save(update_fields=("status", "blocker_code", "blocker_message", "updated_at"))
-        elif step.status == InstitutionOnboardingStep.Status.SKIPPED:
+            step.save(update_fields=("status", "is_admin_skipped", "blocker_code", "blocker_message", "updated_at"))
+        elif applies and step.status == InstitutionOnboardingStep.Status.SKIPPED and not step.is_admin_skipped:
             step.status = InstitutionOnboardingStep.Status.PENDING
-            step.save(update_fields=("status", "updated_at"))
+            step.blocker_code = ""
+            step.blocker_message = ""
+            step.completed_at = None
+            step.save(update_fields=("status", "blocker_code", "blocker_message", "completed_at", "updated_at"))
     return list(institution.onboarding_steps.order_by("sequence", "created_at"))
+
+
+@transaction.atomic
+def skip_institution_onboarding_step(*, institution, actor, step_code):
+    """Allow an Institution Admin to defer any onboarding item deliberately."""
+    _assert_active_actor(actor, institution)
+    step = institution.onboarding_steps.get(code=step_code)
+    step.status = InstitutionOnboardingStep.Status.SKIPPED
+    step.is_admin_skipped = True
+    step.blocker_code = ""
+    step.blocker_message = ""
+    step.save(update_fields=("status", "is_admin_skipped", "blocker_code", "blocker_message", "updated_at"))
+    return step
+
+
+@transaction.atomic
+def resume_institution_onboarding_step(*, institution, actor, step_code):
+    """Return a deferred onboarding item to the administrator's checklist."""
+    _assert_active_actor(actor, institution)
+    step = institution.onboarding_steps.get(code=step_code)
+    step.status = InstitutionOnboardingStep.Status.PENDING
+    step.is_admin_skipped = False
+    step.blocker_code = ""
+    step.blocker_message = ""
+    step.completed_at = None
+    step.save(update_fields=("status", "is_admin_skipped", "blocker_code", "blocker_message", "completed_at", "updated_at"))
+    return step
+
+
+def _reconcile_core_hr_configuration(institution):
+    """Derive Core HR readiness from its real minimum organisation structure.
+
+    Core HR has no separate client-controlled "mark ready" action.  Its
+    readiness is therefore server-derived: once a tenant has each required
+    organisation record, the module is ready for the onboarding validator.
+    """
+    from apps.organization.models import Department, Grade, Location, Position
+
+    module = institution.modules.filter(
+        module_code=InstitutionModule.ModuleCode.CORE_HR,
+    ).first()
+    if not module or not module.is_enabled:
+        return
+
+    structure_is_ready = all(
+        model.objects.for_institution(institution).exists()
+        for model in (Department, Position, Grade, Location)
+    )
+    status = (
+        InstitutionModule.ConfigurationStatus.READY
+        if structure_is_ready
+        else InstitutionModule.ConfigurationStatus.IN_PROGRESS
+    )
+    if module.configuration_status != status:
+        module.configuration_status = status
+        module.save(update_fields=("configuration_status", "updated_at"))
+
+
+def _reconcile_module_configuration(institution, module_code, is_ready):
+    module = institution.modules.filter(module_code=module_code).first()
+    if not module or not module.is_enabled:
+        return
+    status = (
+        InstitutionModule.ConfigurationStatus.READY
+        if is_ready
+        else InstitutionModule.ConfigurationStatus.IN_PROGRESS
+    )
+    if module.configuration_status != status:
+        module.configuration_status = status
+        module.save(update_fields=("configuration_status", "updated_at"))
+
+
+def _reconcile_enabled_module_configurations(institution):
+    from apps.accounting.models import InstitutionAccountingConfiguration
+    from apps.payroll.models import InstitutionPayrollConfiguration
+    from apps.recruitment.models import RecruitmentStage
+    from apps.scheduling.models import WorkSchedule
+
+    _reconcile_module_configuration(
+        institution,
+        InstitutionModule.ModuleCode.ATTENDANCE,
+        WorkSchedule.objects.filter(institution=institution, is_active=True).exists(),
+    )
+    _reconcile_module_configuration(
+        institution,
+        InstitutionModule.ModuleCode.PAYROLL,
+        InstitutionPayrollConfiguration.objects.filter(institution=institution, is_configured=True).exists(),
+    )
+    _reconcile_module_configuration(
+        institution,
+        InstitutionModule.ModuleCode.ACCOUNTING,
+        InstitutionAccountingConfiguration.objects.filter(institution=institution, is_configured=True).exists(),
+    )
+    _reconcile_module_configuration(
+        institution,
+        InstitutionModule.ModuleCode.RECRUITMENT,
+        RecruitmentStage.objects.filter(institution=institution, is_active=True).exists(),
+    )
 
 
 @transaction.atomic
 def validate_institution_onboarding(*, institution, actor):
     _assert_active_actor(actor, institution)
+    _reconcile_core_hr_configuration(institution)
+    _reconcile_enabled_module_configurations(institution)
     steps = reconcile_institution_onboarding(institution)
     completed = 0
     blockers = []
@@ -597,6 +787,53 @@ def validate_institution_onboarding(*, institution, actor):
         if step.status == InstitutionOnboardingStep.Status.SKIPPED:
             completed += 1
             continue
+        if step.code == "VALIDATION":
+            prior_steps_ready = all(
+                prior_step.status in (
+                    InstitutionOnboardingStep.Status.COMPLETED,
+                    InstitutionOnboardingStep.Status.SKIPPED,
+                )
+                for prior_step in steps
+                if prior_step.sequence < step.sequence
+            )
+            if prior_steps_ready:
+                step.status = InstitutionOnboardingStep.Status.COMPLETED
+                step.completed_at = step.completed_at or timezone.now()
+                completed += 1
+            else:
+                step.status = InstitutionOnboardingStep.Status.PENDING
+                step.completed_at = None
+            step.blocker_code = ""
+            step.blocker_message = ""
+            step.save(update_fields=("status", "blocker_code", "blocker_message", "completed_at", "updated_at"))
+            continue
+        if step.code in {"SCHEDULING_CONFIGURATION", "PAYROLL_CONFIGURATION", "ACCOUNTING_CONFIGURATION", "RECRUITMENT_CONFIGURATION"}:
+            module_code = step.required_module
+            module_ready = institution.modules.filter(
+                module_code=module_code,
+                is_enabled=True,
+                configuration_status=InstitutionModule.ConfigurationStatus.READY,
+            ).exists()
+            if not module_ready:
+                step.status = InstitutionOnboardingStep.Status.PENDING
+                step.blocker_code = ""
+                step.blocker_message = ""
+                step.completed_at = None
+                step.save(update_fields=("status", "blocker_code", "blocker_message", "completed_at", "updated_at"))
+                continue
+        if step.code == "PAYROLL_GL_MAPPING":
+            prerequisites_ready = institution.modules.filter(
+                module_code__in=("PAYROLL", "ACCOUNTING"),
+                is_enabled=True,
+                configuration_status=InstitutionModule.ConfigurationStatus.READY,
+            ).count() == 2
+            if not prerequisites_ready:
+                step.status = InstitutionOnboardingStep.Status.PENDING
+                step.blocker_code = ""
+                step.blocker_message = ""
+                step.completed_at = None
+                step.save(update_fields=("status", "blocker_code", "blocker_message", "completed_at", "updated_at"))
+                continue
         blocker = _onboarding_step_blocker(institution, step)
         if blocker:
             step.status = InstitutionOnboardingStep.Status.BLOCKED
@@ -683,3 +920,62 @@ def create_membership(*, user, institution, role, **values):
     )
     membership.save()
     return membership
+
+
+@transaction.atomic
+def invite_existing_user(*, email, institution, role, actor, is_primary=False):
+    """Create or reactivate an invitation for an existing ErgonX account.
+
+    Delivery is deliberately outside this service: no email-provider contract
+    exists yet. The invited account will see the membership after sign-in.
+    """
+    from apps.accounts.models import User
+
+    _assert_active_actor(actor, institution)
+    user = User.objects.filter(email__iexact=email.strip()).first()
+    if user is None:
+        raise CodedValidationError(
+            "No ErgonX account exists for that email address.",
+            api_code="invitee_not_found",
+        )
+    if role.institution_id != institution.id or not role.is_active:
+        raise ValidationError({"role": "Select an active role from this institution."})
+    membership, created = InstitutionMembership.objects.select_for_update().get_or_create(
+        institution=institution,
+        user=user,
+        defaults={"role": role, "status": InstitutionMembership.Status.INVITED, "is_primary": is_primary},
+    )
+    if not created:
+        if membership.status == InstitutionMembership.Status.ACTIVE:
+            raise CodedValidationError("This account already has an active membership.", api_code="membership_exists")
+        membership.role = role
+        membership.status = InstitutionMembership.Status.INVITED
+        membership.is_primary = is_primary
+        membership.ended_at = None
+        membership.full_clean()
+        membership.save()
+    record_audit_event(actor=actor, institution=institution, entity=membership, action="access.membership.invited", metadata={"email": user.email, "role": role.code})
+    return membership
+
+
+@transaction.atomic
+def create_invitation(*, email, institution, role, actor, expires_at, employee=None):
+    _assert_active_actor(actor, institution)
+    if role.institution_id != institution.id or not role.is_active:
+        raise ValidationError({"role": "Select an active role from this institution."})
+    normalized_email = email.strip().lower()
+    if employee is not None:
+        if employee.institution_id != institution.id:
+            raise ValidationError({"employee": "Employee must belong to the current institution."})
+        if role.code != "EMPLOYEE":
+            raise ValidationError({"role": "Employee self-service invitations must use the Employee role."})
+        employee_emails = {value.strip().lower() for value in (employee.work_email, employee.personal_email) if value}
+        if normalized_email not in employee_emails:
+            raise ValidationError({"email": "Invitation email must match the employee's work or personal email."})
+        InstitutionInvitation.objects.filter(
+            institution=institution, employee=employee, status=InstitutionInvitation.Status.PENDING
+        ).update(status=InstitutionInvitation.Status.REVOKED)
+    token = secrets.token_urlsafe(32)
+    invitation = InstitutionInvitation.objects.create(institution=institution, email=normalized_email, role=role, employee=employee, token_hash=salted_hmac("institution-invitation", token).hexdigest(), invited_by=actor, expires_at=expires_at)
+    record_audit_event(actor=actor, institution=institution, entity=invitation, action="access.invitation.created", metadata={"email": invitation.email, "role": role.code})
+    return invitation, token

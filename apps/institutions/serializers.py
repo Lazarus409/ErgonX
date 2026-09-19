@@ -68,7 +68,7 @@ class UserPreferenceSerializer(serializers.ModelSerializer):
 class InstitutionOnboardingStepSerializer(serializers.ModelSerializer):
     class Meta:
         model = InstitutionOnboardingStep
-        fields = ("code", "sequence", "status", "required_module", "blocker_code", "blocker_message", "completed_at")
+        fields = ("code", "sequence", "status", "required_module", "blocker_code", "blocker_message", "completed_at", "is_admin_skipped")
         read_only_fields = fields
 
 
@@ -104,10 +104,28 @@ class InstitutionSerializer(serializers.ModelSerializer):
         )
 
 
+class InstitutionProfileUpdateSerializer(serializers.ModelSerializer):
+    """The editable profile fields needed by institution onboarding."""
+
+    class Meta:
+        model = Institution
+        fields = (
+            "name",
+            "email",
+            "phone",
+            "address",
+            "country_code",
+            "default_currency",
+            "timezone",
+            "logo",
+        )
+
+
 class InstitutionModuleSerializer(serializers.ModelSerializer):
     class Meta:
         model = InstitutionModule
-        fields = ("module_code", "is_enabled", "configuration_status")
+        fields = ("id", "module_code", "is_enabled", "configuration_status")
+        read_only_fields = ("id", "module_code", "configuration_status")
 
 
 class InstitutionSettingSerializer(serializers.ModelSerializer):
@@ -117,15 +135,26 @@ class InstitutionSettingSerializer(serializers.ModelSerializer):
         read_only_fields = ("id", "is_sensitive", "updated_at")
 
 
+class MembershipUserSerializer(serializers.Serializer):
+    """Safe user identity shown to institution access administrators."""
+
+    id = serializers.UUIDField(read_only=True)
+    email = serializers.EmailField(read_only=True)
+    first_name = serializers.CharField(read_only=True)
+    last_name = serializers.CharField(read_only=True)
+
+
 class MembershipSerializer(serializers.ModelSerializer):
     institution = InstitutionSerializer(read_only=True)
     role = RoleSummarySerializer(read_only=True)
+    user = MembershipUserSerializer(read_only=True)
 
     class Meta:
         model = InstitutionMembership
         fields = (
             "id",
             "institution",
+            "user",
             "role",
             "status",
             "is_primary",
@@ -143,6 +172,18 @@ class MembershipUpdateSerializer(serializers.Serializer):
         if not attrs:
             raise serializers.ValidationError("Provide at least one membership field to update.")
         return attrs
+
+
+class MembershipInviteSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    role_id = serializers.UUIDField()
+    is_primary = serializers.BooleanField(required=False, default=False)
+
+
+class InvitationCreateSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    role_id = serializers.UUIDField()
+    expires_in_hours = serializers.IntegerField(required=False, default=168, min_value=1, max_value=720)
 
 
 class CurrentInstitutionSerializer(serializers.Serializer):

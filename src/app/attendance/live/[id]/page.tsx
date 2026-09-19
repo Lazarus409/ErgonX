@@ -1,356 +1,420 @@
-﻿"use client";
+"use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import {
   ArrowLeft,
   CalendarDays,
-  CheckCircle2,
   Clock3,
-  MapPin,
-  User,
-  AlertTriangle,
-  FileText,
   History,
+  LogOut,
   Pencil,
+  User,
+  X,
 } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
+import ErrorState from "@/components/ui/ErrorState";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import {
+  attendanceApi,
+  employeesApi,
+  getApiErrorMessage,
+  schedulingApi,
+} from "@/lib/api";
+import { useApiResource } from "@/lib/useApiResource";
+import { MAX_PAGE_SIZE } from "@/types/api";
+import type { AttendanceRecord, WorkSchedule } from "@/types/attendance";
+import type { Employee } from "@/types/hr";
+import { EM_DASH, formatDate, humanizeEnum } from "@/lib/format";
 
-const attendanceRecord = {
-  id: "ATT-001",
-  employeeNumber: "EMP-0001",
-  employee: "Ama Mensah",
-  department: "Finance",
-  position: "Senior Finance Officer",
-  location: "Head Office",
-  shift: "Morning Shift",
-  date: "12 September 2026",
-  scheduledIn: "08:00",
-  scheduledOut: "17:00",
-  checkIn: "07:54",
-  checkOut: "17:12",
-  breakDuration: "1h 00m",
-  workedHours: "9h 18m",
-  overtimeHours: "0h 12m",
-  lateMinutes: 0,
-  earlyDepartureMinutes: 0,
-  status: "PRESENT",
-  source: "Biometric Device",
-  device: "Main Entrance Terminal",
-};
+const HISTORY_LIMIT = 10;
 
-const attendanceHistory = [
-  {
-    date: "12 Sep 2026",
-    scheduled: "08:00 - 17:00",
-    checkIn: "07:54",
-    checkOut: "17:12",
-    status: "PRESENT",
-  },
-  {
-    date: "11 Sep 2026",
-    scheduled: "08:00 - 17:00",
-    checkIn: "08:17",
-    checkOut: "17:03",
-    status: "LATE",
-  },
-  {
-    date: "10 Sep 2026",
-    scheduled: "08:00 - 17:00",
-    checkIn: "07:58",
-    checkOut: "17:01",
-    status: "PRESENT",
-  },
-  {
-    date: "09 Sep 2026",
-    scheduled: "08:00 - 17:00",
-    checkIn: "08:02",
-    checkOut: "17:00",
-    status: "PRESENT",
-  },
-];
+interface RecordDetail {
+  record: AttendanceRecord;
+  employee: Employee | null;
+  schedule: WorkSchedule | null;
+  history: AttendanceRecord[];
+}
+
+function clockTime(value: string | null): string {
+  if (!value) {
+    return EM_DASH;
+  }
+
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return parsed.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/** `datetime-local` wants `YYYY-MM-DDTHH:MM` in local time. */
+function toLocalInput(value: string | null): string {
+  if (!value) {
+    return "";
+  }
+
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return "";
+  }
+
+  const pad = (part: number) => `${part}`.padStart(2, "0");
+
+  return (
+    `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}` +
+    `T${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`
+  );
+}
 
 export default function AttendanceRecordDetailPage() {
-  const [adjustmentRequested, setAdjustmentRequested] = useState(false);
+  const params = useParams<{ id: string }>();
+  const id = params?.id ?? "";
+
+  const [showAdjustment, setShowAdjustment] = useState(false);
+  const [adjustCheckIn, setAdjustCheckIn] = useState("");
+  const [adjustCheckOut, setAdjustCheckOut] = useState("");
+  const [adjustNotes, setAdjustNotes] = useState("");
+  const [reason, setReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [actionError, setActionError] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [confirmClockOut, setConfirmClockOut] = useState(false);
+
+  const load = useCallback(async (): Promise<RecordDetail> => {
+    const record = await attendanceApi.getAttendanceRecord(id);
+
+    const [employee, history, schedule] = await Promise.all([
+      employeesApi.getEmployee(record.employee).catch(() => null),
+      attendanceApi
+        .listAttendanceRecords({
+          employee: record.employee,
+          page_size: HISTORY_LIMIT,
+          ordering: "-attendance_date",
+        })
+        .then((page) => page.results)
+        .catch(() => [] as AttendanceRecord[]),
+      record.schedule_assignment
+        ? schedulingApi
+            .listScheduleAssignments({ page_size: MAX_PAGE_SIZE })
+            .then(async (page) => {
+              const assignment = page.results.find(
+                (item) => item.id === record.schedule_assignment,
+              );
+
+              return assignment
+                ? await schedulingApi
+                    .getWorkSchedule(assignment.work_schedule)
+                    .catch(() => null)
+                : null;
+            })
+            .catch(() => null)
+        : Promise.resolve(null),
+    ]);
+
+    return { record, employee, schedule, history };
+  }, [id]);
+
+  const { data, loading, error, reload } = useApiResource(load);
+
+  const openAdjustment = useCallback(() => {
+    if (!data) {
+      return;
+    }
+
+    setActionError("");
+    setSubmitted(false);
+    setReason("");
+    setAdjustCheckIn(toLocalInput(data.record.check_in));
+    setAdjustCheckOut(toLocalInput(data.record.check_out));
+    setAdjustNotes(data.record.notes ?? "");
+    setShowAdjustment(true);
+  }, [data]);
+
+  /**
+   * The backend accepts only `check_in`, `check_out` and `notes` in
+   * `proposed_values`, and snapshots the originals itself.
+   */
+  const submitAdjustment = useCallback(async () => {
+    if (!data) {
+      return;
+    }
+
+    if (!reason.trim()) {
+      setActionError("A reason is required for an adjustment request.");
+      return;
+    }
+
+    const proposed: Record<string, unknown> = {};
+
+    if (adjustCheckIn !== toLocalInput(data.record.check_in)) {
+      proposed.check_in = adjustCheckIn
+        ? new Date(adjustCheckIn).toISOString()
+        : null;
+    }
+
+    if (adjustCheckOut !== toLocalInput(data.record.check_out)) {
+      proposed.check_out = adjustCheckOut
+        ? new Date(adjustCheckOut).toISOString()
+        : null;
+    }
+
+    if (adjustNotes !== (data.record.notes ?? "")) {
+      proposed.notes = adjustNotes;
+    }
+
+    if (Object.keys(proposed).length === 0) {
+      setActionError("Change at least one value before submitting.");
+      return;
+    }
+
+    setSubmitting(true);
+    setActionError("");
+
+    try {
+      await attendanceApi.createAttendanceAdjustment({
+        attendance_record: data.record.id,
+        reason: reason.trim(),
+        proposed_values: proposed,
+      });
+
+      setShowAdjustment(false);
+      setSubmitted(true);
+      reload();
+    } catch (caught) {
+      setActionError(getApiErrorMessage(caught));
+    } finally {
+      setSubmitting(false);
+    }
+  }, [data, reason, adjustCheckIn, adjustCheckOut, adjustNotes, reload]);
+
+  const runClockOut = useCallback(async () => {
+    if (!data) {
+      return;
+    }
+
+    setSubmitting(true);
+    setActionError("");
+
+    try {
+      await attendanceApi.clockOut(data.record.id);
+      setConfirmClockOut(false);
+      reload();
+    } catch (caught) {
+      setConfirmClockOut(false);
+      setActionError(getApiErrorMessage(caught));
+    } finally {
+      setSubmitting(false);
+    }
+  }, [data, reload]);
+
+  if (loading && !data) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="text-center">
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-slate-900" />
+          <p className="mt-4 text-sm text-slate-500">
+            Loading attendance record...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="space-y-6">
+        <BackLink />
+
+        <PageHeader
+          title="Attendance Record"
+          description="Attendance detail and correction requests."
+        />
+
+        <ErrorState
+          message={error ?? "This attendance record could not be loaded."}
+          onRetry={reload}
+        />
+      </div>
+    );
+  }
+
+  const { record, employee, schedule, history } = data;
+
+  const employeeName = employee
+    ? employeesApi.employeeDisplayName(employee)
+    : EM_DASH;
+
+  const canClockOut = record.check_in !== null && record.check_out === null;
 
   return (
     <div className="space-y-6">
-      <Link
-        href="/attendance/live"
-        className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Back to Live Attendance
-      </Link>
+      <BackLink />
 
       <PageHeader
         title="Attendance Record"
-        description={`${attendanceRecord.employeeNumber} · ${attendanceRecord.date}`}
+        description={`${employee?.employee_number ?? EM_DASH} · ${formatDate(
+          record.attendance_date,
+        )}`}
         actions={
-          <button
-            onClick={() => setAdjustmentRequested(true)}
-            disabled={adjustmentRequested}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <Pencil className="h-4 w-4" />
-            {adjustmentRequested
-              ? "Adjustment Requested"
-              : "Request Adjustment"}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            {canClockOut && (
+              <button
+                onClick={() => setConfirmClockOut(true)}
+                className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
+              >
+                <LogOut className="h-4 w-4" />
+                Clock Out
+              </button>
+            )}
+
+            <button
+              onClick={openAdjustment}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              <Pencil className="h-4 w-4" />
+              Request Adjustment
+            </button>
+          </div>
         }
       />
 
-      {adjustmentRequested && (
-        <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <CheckCircle2 className="mt-0.5 h-5 w-5 text-slate-700" />
+      {actionError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {actionError}
+        </div>
+      )}
 
-          <div>
-            <p className="text-sm font-semibold text-slate-900">
-              Adjustment request created
-            </p>
-            <p className="mt-1 text-sm text-slate-600">
-              The attendance record has been marked for adjustment review.
-            </p>
-          </div>
+      {submitted && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+          <p className="text-sm font-semibold text-emerald-900">
+            Adjustment request created
+          </p>
+          <p className="mt-1 text-sm text-emerald-800">
+            The request is pending approval. It will appear on the{" "}
+            <Link
+              href="/attendance/adjustments"
+              className="font-medium underline"
+            >
+              adjustments
+            </Link>{" "}
+            screen.
+          </p>
         </div>
       )}
 
       <div className="grid gap-6 xl:grid-cols-3">
         <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm xl:col-span-2">
-          <div className="mb-6 flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-base font-semibold text-slate-900">
-                Employee Information
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Employee and organisational assignment.
-              </p>
-            </div>
+          <div className="mb-5 flex items-center justify-between">
+            <h2 className="text-base font-semibold text-slate-900">
+              Record Detail
+            </h2>
 
-            <StatusBadge status="APPROVED" />
+            <StatusBadge status={record.status} />
           </div>
 
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-5 sm:grid-cols-2">
             <DetailItem
               icon={<User className="h-4 w-4" />}
               label="Employee"
-              value={attendanceRecord.employee}
+              value={employeeName}
             />
-
             <DetailItem
-              label="Employee Number"
-              value={attendanceRecord.employeeNumber}
+              icon={<CalendarDays className="h-4 w-4" />}
+              label="Date"
+              value={formatDate(record.attendance_date)}
             />
-
             <DetailItem
-              label="Department"
-              value={attendanceRecord.department}
+              icon={<Clock3 className="h-4 w-4" />}
+              label="Check In"
+              value={clockTime(record.check_in)}
             />
-
             <DetailItem
-              label="Position"
-              value={attendanceRecord.position}
+              icon={<Clock3 className="h-4 w-4" />}
+              label="Check Out"
+              value={clockTime(record.check_out)}
             />
-
             <DetailItem
-              icon={<MapPin className="h-4 w-4" />}
-              label="Location"
-              value={attendanceRecord.location}
+              icon={<CalendarDays className="h-4 w-4" />}
+              label="Schedule"
+              value={schedule?.name ?? EM_DASH}
             />
-
             <DetailItem
-              label="Shift"
-              value={attendanceRecord.shift}
+              icon={<History className="h-4 w-4" />}
+              label="Source"
+              value={humanizeEnum(record.source)}
             />
           </div>
+
+          {record.notes && (
+            <div className="mt-5 rounded-lg bg-slate-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                Notes
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-700">
+                {record.notes}
+              </p>
+            </div>
+          )}
         </section>
 
         <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-5">
-            <h2 className="text-base font-semibold text-slate-900">
-              Attendance Status
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Current record status.
-            </p>
-          </div>
+          <h2 className="mb-5 text-base font-semibold text-slate-900">
+            Derived Minutes
+          </h2>
 
-          <div className="flex items-center gap-3 rounded-lg bg-slate-50 p-4">
-            <CheckCircle2 className="h-6 w-6 text-slate-700" />
-
-            <div>
-              <p className="text-sm font-semibold text-slate-900">
-                Present
-              </p>
-              <p className="mt-1 text-xs text-slate-500">
-                Attendance recorded successfully.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-5 space-y-3">
+          <div className="space-y-3">
             <MiniStat
-              label="Late Minutes"
-              value={`${attendanceRecord.lateMinutes} min`}
+              label="Worked"
+              value={attendanceApi.formatMinutes(record.worked_minutes)}
             />
-
             <MiniStat
-              label="Early Departure"
-              value={`${attendanceRecord.earlyDepartureMinutes} min`}
+              label="Late"
+              value={attendanceApi.formatMinutes(record.late_minutes)}
             />
-
+            <MiniStat
+              label="Early departure"
+              value={attendanceApi.formatMinutes(
+                record.early_departure_minutes,
+              )}
+            />
             <MiniStat
               label="Overtime"
-              value={attendanceRecord.overtimeHours}
+              value={attendanceApi.formatMinutes(record.overtime_minutes)}
             />
           </div>
-        </section>
-      </div>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="mb-6 flex items-center gap-3">
-          <Clock3 className="h-5 w-5 text-slate-600" />
-
-          <div>
-            <h2 className="text-base font-semibold text-slate-900">
-              Time Details
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Scheduled and recorded attendance times.
-            </p>
-          </div>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <TimeCard
-            label="Scheduled In"
-            value={attendanceRecord.scheduledIn}
-          />
-
-          <TimeCard
-            label="Actual Check In"
-            value={attendanceRecord.checkIn}
-          />
-
-          <TimeCard
-            label="Scheduled Out"
-            value={attendanceRecord.scheduledOut}
-          />
-
-          <TimeCard
-            label="Actual Check Out"
-            value={attendanceRecord.checkOut}
-          />
-        </div>
-
-        <div className="mt-5 grid gap-4 border-t border-slate-100 pt-5 sm:grid-cols-3">
-          <MiniStat
-            label="Break Duration"
-            value={attendanceRecord.breakDuration}
-          />
-
-          <MiniStat
-            label="Worked Hours"
-            value={attendanceRecord.workedHours}
-          />
-
-          <MiniStat
-            label="Overtime Hours"
-            value={attendanceRecord.overtimeHours}
-          />
-        </div>
-      </section>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-5 flex items-center gap-3">
-            <FileText className="h-5 w-5 text-slate-600" />
-
-            <div>
-              <h2 className="text-base font-semibold text-slate-900">
-                Attendance Source
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Source of the recorded attendance event.
-              </p>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <DetailItem
-              label="Source"
-              value={attendanceRecord.source}
-            />
-
-            <DetailItem
-              label="Device"
-              value={attendanceRecord.device}
-            />
-
-            <DetailItem
-              label="Record ID"
-              value={attendanceRecord.id}
-            />
-          </div>
-        </section>
-
-        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-5 flex items-center gap-3">
-            <AlertTriangle className="h-5 w-5 text-slate-600" />
-
-            <div>
-              <h2 className="text-base font-semibold text-slate-900">
-                Exceptions
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Attendance exceptions requiring attention.
-              </p>
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-slate-200 p-4">
-            <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-5 w-5 text-slate-600" />
-
-              <div>
-                <p className="text-sm font-medium text-slate-900">
-                  No attendance exception
-                </p>
-                <p className="mt-1 text-xs text-slate-500">
-                  This record currently requires no corrective action.
-                </p>
-              </div>
-            </div>
-          </div>
+          <p className="mt-4 text-xs leading-5 text-slate-500">
+            All minute values are classified by the backend against the
+            employee&apos;s effective schedule.
+          </p>
         </section>
       </div>
 
       <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 p-5">
-          <div className="flex items-center gap-3">
-            <History className="h-5 w-5 text-slate-600" />
-
-            <div>
-              <h2 className="text-base font-semibold text-slate-900">
-                Recent Attendance History
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Recent attendance records for this employee.
-              </p>
-            </div>
-          </div>
+        <div className="border-b border-slate-200 px-5 py-4">
+          <h2 className="text-base font-semibold text-slate-900">
+            Recent Attendance
+          </h2>
+          <p className="mt-1 text-xs text-slate-500">
+            The employee&apos;s most recent attendance records.
+          </p>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[700px]">
+          <table className="w-full min-w-[700px] text-left">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-left">
+              <tr className="border-b border-slate-200 bg-slate-50">
                 <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Date
-                </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Scheduled
                 </th>
                 <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Check In
@@ -359,64 +423,176 @@ export default function AttendanceRecordDetailPage() {
                   Check Out
                 </th>
                 <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Worked
+                </th>
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Status
                 </th>
               </tr>
             </thead>
 
-            <tbody>
-              {attendanceHistory.map((record) => (
-                <tr
-                  key={record.date}
-                  className="border-b border-slate-100 last:border-0"
-                >
-                  <td className="px-5 py-4 text-sm font-medium text-slate-800">
-                    {record.date}
+            <tbody className="divide-y divide-slate-100">
+              {history.map((entry) => (
+                <tr key={entry.id} className={entry.id === record.id ? "bg-slate-50" : ""}>
+                  <td className="px-5 py-4 text-sm text-slate-700">
+                    <Link
+                      href={`/attendance/live/${entry.id}`}
+                      className="hover:underline"
+                    >
+                      {formatDate(entry.attendance_date)}
+                    </Link>
                   </td>
-
-                  <td className="px-5 py-4 text-sm text-slate-600">
-                    {record.scheduled}
+                  <td className="px-5 py-4 text-sm text-slate-700">
+                    {clockTime(entry.check_in)}
                   </td>
-
-                  <td className="px-5 py-4 text-sm text-slate-600">
-                    {record.checkIn}
+                  <td className="px-5 py-4 text-sm text-slate-700">
+                    {clockTime(entry.check_out)}
                   </td>
-
-                  <td className="px-5 py-4 text-sm text-slate-600">
-                    {record.checkOut}
+                  <td className="px-5 py-4 text-sm text-slate-700">
+                    {attendanceApi.formatMinutes(entry.worked_minutes)}
                   </td>
-
                   <td className="px-5 py-4">
-                    {record.status === "PRESENT" ? (
-                      <StatusBadge status="APPROVED" />
-                    ) : (
-                      <StatusBadge status="PENDING" />
-                    )}
+                    <StatusBadge status={entry.status} />
                   </td>
                 </tr>
               ))}
+
+              {history.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-5 py-10 text-center text-sm text-slate-500">
+                    No other attendance records for this employee.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
       </section>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex items-start gap-3">
-          <CalendarDays className="mt-0.5 h-5 w-5 text-slate-500" />
+      {/* Adjustment request */}
+      {showAdjustment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-xl">
+            <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
+              <h2 className="text-lg font-semibold text-slate-900">
+                Request Adjustment
+              </h2>
 
-          <div>
-            <p className="text-sm font-semibold text-slate-900">
-              Attendance record integrity
-            </p>
-            <p className="mt-1 text-sm leading-6 text-slate-500">
-              Attendance records should remain traceable and historical
-              changes should be handled through authorised adjustment
-              workflows rather than silently overwriting the original record.
-            </p>
+              <button
+                onClick={() => setShowAdjustment(false)}
+                disabled={submitting}
+                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 p-6">
+              {actionError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {actionError}
+                </div>
+              )}
+
+              <p className="rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-600">
+                Only check-in, check-out and notes can be adjusted. The original
+                values are snapshotted by the backend when the request is
+                raised.
+              </p>
+
+              <label className="block space-y-1.5">
+                <span className="text-sm font-medium text-slate-700">
+                  Proposed Check In
+                </span>
+                <input
+                  type="datetime-local"
+                  value={adjustCheckIn}
+                  onChange={(event) => setAdjustCheckIn(event.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                />
+              </label>
+
+              <label className="block space-y-1.5">
+                <span className="text-sm font-medium text-slate-700">
+                  Proposed Check Out
+                </span>
+                <input
+                  type="datetime-local"
+                  value={adjustCheckOut}
+                  onChange={(event) => setAdjustCheckOut(event.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                />
+              </label>
+
+              <label className="block space-y-1.5">
+                <span className="text-sm font-medium text-slate-700">
+                  Notes
+                </span>
+                <input
+                  value={adjustNotes}
+                  onChange={(event) => setAdjustNotes(event.target.value)}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                />
+              </label>
+
+              <label className="block space-y-1.5">
+                <span className="text-sm font-medium text-slate-700">
+                  Reason
+                </span>
+                <textarea
+                  value={reason}
+                  onChange={(event) => setReason(event.target.value)}
+                  rows={3}
+                  placeholder="Why does this record need correcting?"
+                  className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                />
+              </label>
+            </div>
+
+            <div className="sticky bottom-0 flex justify-end gap-3 border-t border-slate-200 bg-white px-6 py-4">
+              <button
+                onClick={() => setShowAdjustment(false)}
+                disabled={submitting}
+                className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={submitAdjustment}
+                disabled={submitting || !reason.trim()}
+                className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {submitting ? "Submitting..." : "Submit Request"}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      <ConfirmDialog
+        open={confirmClockOut}
+        title="Clock out this employee?"
+        description="The backend records the clock-out time and reclassifies worked, late and overtime minutes for the day."
+        confirmLabel="Clock out"
+        loading={submitting}
+        onConfirm={runClockOut}
+        onCancel={() => setConfirmClockOut(false)}
+      />
     </div>
+  );
+}
+
+function BackLink() {
+  return (
+    <Link
+      href="/attendance/live"
+      className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"
+    >
+      <ArrowLeft className="h-4 w-4" />
+      Back to Live Attendance
+    </Link>
   );
 }
 
@@ -425,54 +601,27 @@ function DetailItem({
   label,
   value,
 }: {
-  icon?: React.ReactNode;
+  icon: React.ReactNode;
   label: string;
   value: string;
 }) {
   return (
     <div>
-      <div className="flex items-center gap-1.5 text-xs text-slate-500">
+      <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
         {icon}
-        <span>{label}</span>
-      </div>
-
-      <p className="mt-1.5 text-sm font-medium text-slate-800">
-        {value}
+        {label}
       </p>
+
+      <p className="mt-2 text-sm font-medium text-slate-900">{value}</p>
     </div>
   );
 }
 
-function TimeCard({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function MiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-slate-200 p-4">
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="mt-2 text-xl font-semibold text-slate-900">
-        {value}
-      </p>
-    </div>
-  );
-}
-
-function MiniStat({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="rounded-lg bg-slate-50 p-3">
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="mt-1 text-sm font-semibold text-slate-800">
-        {value}
-      </p>
+    <div className="flex items-center justify-between rounded-lg bg-slate-50 px-4 py-3">
+      <span className="text-sm text-slate-600">{label}</span>
+      <span className="text-sm font-semibold text-slate-900">{value}</span>
     </div>
   );
 }

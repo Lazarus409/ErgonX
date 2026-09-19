@@ -1,1321 +1,147 @@
 "use client";
 
+import Link from "next/link";
+import { useCallback, useMemo, useState } from "react";
 import {
-  ArrowLeft,
   ArrowRight,
+  BadgeCheck,
+  Building2,
   CheckCircle2,
-  Save,
+  CircleAlert,
+  ClipboardCheck,
+  CreditCard,
+  CalendarDays,
+  Landmark,
+  Layers3,
+  RefreshCw,
+  UsersRound,
+  type LucideIcon,
 } from "lucide-react";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-
 import { useAuth } from "@/components/guards/AuthProvider";
-import OnboardingStepper from "@/components/onboarding/OnboardingStepper";
-import ModuleSelector from "@/components/onboarding/ModuleSelector";
-import ConfigurationIncomplete from "@/components/ui/ConfigurationIncomplete";
+import ErrorState from "@/components/ui/ErrorState";
+import LoadingState from "@/components/ui/LoadingState";
+import StatusBadge from "@/components/ui/StatusBadge";
+import { getApiErrorMessage, institutionsApi } from "@/lib/api";
+import { useApiResource } from "@/lib/useApiResource";
+import type { InstitutionOnboardingStep } from "@/types/institutions";
 
-import {
-  DEFAULT_ONBOARDING_DATA,
-  ONBOARDING_STEPS,
-} from "@/lib/onboarding";
+type StepAction = { href: string; label: string };
 
-import {
-  OnboardingData,
-  OnboardingStepId,
-} from "@/types/onboarding";
+type StepPresentation = {
+  title: string;
+  description: string;
+  icon: LucideIcon;
+  action?: StepAction;
+};
 
-const STORAGE_KEY = "ergonx_onboarding_draft";
+const stepPresentation: Record<string, StepPresentation> = {
+  INSTITUTION_PROFILE: { title: "Institution profile", description: "Add your organization contact details, country, and time zone.", icon: Building2, action: { href: "/onboarding/profile", label: "Complete profile" } },
+  MODULE_SELECTION: { title: "Choose your modules", description: "Enable the ErgonX modules your organization will use.", icon: Layers3, action: { href: "/settings/modules", label: "Choose modules" } },
+  ORGANIZATION_SETUP: { title: "Organization structure", description: "Create a department, position, grade, and location for Core HR.", icon: Landmark, action: { href: "/onboarding/organization", label: "Create structure" } },
+  HR_CONFIGURATION: { title: "Core HR readiness", description: "Review your starter organization structure before validation.", icon: BadgeCheck, action: { href: "/onboarding/organization", label: "Review structure" } },
+  PAYROLL_CONFIGURATION: { title: "Payroll configuration", description: "Set up payroll preferences when Payroll is enabled.", icon: CreditCard, action: { href: "/payroll/configuration", label: "Configure payroll" } },
+  SCHEDULING_CONFIGURATION: { title: "Scheduling configuration", description: "Create an active work schedule for Attendance.", icon: CalendarDays, action: { href: "/attendance/schedules", label: "Configure schedules" } },
+  ACCOUNTING_CONFIGURATION: { title: "Accounting configuration", description: "Review accounting setup when Accounting is enabled.", icon: Landmark, action: { href: "/accounting", label: "Open accounting" } },
+  PAYROLL_GL_MAPPING: { title: "Payroll-to-GL mapping", description: "Map payroll components to accounting accounts.", icon: Landmark, action: { href: "/accounting/chart-of-accounts", label: "Configure mapping" } },
+  RECRUITMENT_CONFIGURATION: { title: "Recruitment configuration", description: "Review recruitment setup when Recruitment is enabled.", icon: UsersRound, action: { href: "/recruitment", label: "Open recruitment" } },
+  USERS_AND_ROLES: { title: "Invite your setup owners", description: "Assign the administrators who will configure their authorized areas.", icon: UsersRound, action: { href: "/settings/users", label: "Invite administrators" } },
+  VALIDATION: { title: "Validate your setup", description: "Run the server checks to confirm your institution is ready.", icon: ClipboardCheck },
+};
+
+const institutionAdminSteps = new Set([
+  "INSTITUTION_PROFILE",
+  "MODULE_SELECTION",
+  "USERS_AND_ROLES",
+]);
+
+function formatStep(value: string): string {
+  return value.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function isFinished(status: string): boolean {
+  return status === "COMPLETED" || status === "SKIPPED";
+}
 
 export default function OnboardingPage() {
-  const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
+  const load = useCallback(() => institutionsApi.getInstitutionOnboarding(), []);
+  const { data, loading, error, reload } = useApiResource(load);
+  const { institution, refreshSession, user } = useAuth();
+  const [validating, setValidating] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  const [currentStep, setCurrentStep] = useState(0);
-  const [data, setData] = useState<OnboardingData>(
-    DEFAULT_ONBOARDING_DATA
+  const validate = async () => {
+    setValidating(true);
+    setActionError(null);
+    try {
+      await institutionsApi.validateInstitutionOnboarding();
+      await refreshSession();
+      reload();
+    } catch (caught) {
+      setActionError(getApiErrorMessage(caught));
+    } finally {
+      setValidating(false);
+    }
+  };
+
+  const visibleSteps = useMemo(
+    () => data?.steps.filter((step) => user?.role !== "INSTITUTION_ADMIN" || institutionAdminSteps.has(step.code)) ?? [],
+    [data, user?.role],
   );
 
-  const [completedSteps, setCompletedSteps] =
-    useState<OnboardingStepId[]>([]);
+  const setupSummary = useMemo(() => {
+    if (!data) return { complete: 0, required: 0 };
+    const required = visibleSteps.filter((step) => step.status !== "SKIPPED");
+    return {
+      complete: required.filter((step) => step.status === "COMPLETED").length,
+      required: required.length,
+    };
+  }, [data, visibleSteps]);
 
-  const [saved, setSaved] = useState(false);
+  if (loading) return <LoadingState />;
+  if (error || !data) return <ErrorState message={error ?? "You may not have permission to view institution onboarding."} onRetry={reload} />;
 
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.replace("/login");
-    }
-  }, [authLoading, user, router]);
-
-  useEffect(() => {
-    const stored =
-      localStorage.getItem(STORAGE_KEY);
-
-    if (!stored) {
-      return;
-    }
-
-    try {
-      const parsed = JSON.parse(stored);
-
-      if (parsed.data) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setData(parsed.data);
-      }
-
-      if (
-        Array.isArray(parsed.completedSteps)
-      ) {
-        setCompletedSteps(
-          parsed.completedSteps
-        );
-      }
-
-      if (
-        typeof parsed.currentStep === "number"
-      ) {
-        setCurrentStep(parsed.currentStep);
-      }
-    } catch {
-      localStorage.removeItem(STORAGE_KEY);
-    }
-  }, []);
-
-  const saveProgress = () => {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        currentStep,
-        completedSteps,
-        data,
-      })
-    );
-
-    setSaved(true);
-
-    setTimeout(() => {
-      setSaved(false);
-    }, 2000);
-  };
-
-  const updateData = <K extends keyof OnboardingData>(
-    key: K,
-    value: OnboardingData[K]
-  ) => {
-    setData((previous) => ({
-      ...previous,
-      [key]: value,
-    }));
-  };
-
-  const enabledModules = data.enabledModules;
-
-  const visibleSteps = useMemo(() => {
-    return ONBOARDING_STEPS.filter((step) => {
-      if (!step.module) {
-        return true;
-      }
-
-      return enabledModules.includes(step.module);
-    });
-  }, [enabledModules]);
-
-  const currentVisibleStep =
-    visibleSteps[currentStep];
-
-  const blockers = useMemo(() => {
-    const result: string[] = [];
-
-    if (!data.institution.name.trim()) {
-      result.push("Institution name is required.");
-    }
-
-    if (!data.institution.code.trim()) {
-      result.push("Institution code is required.");
-    }
-
-    if (!data.organisation.organisationType) {
-      result.push(
-        "Organisation type is required."
-      );
-    }
-
-    if (
-      enabledModules.includes("HR") &&
-      !data.hr.employeeNumberPrefix.trim()
-    ) {
-      result.push(
-        "Employee number prefix is required."
-      );
-    }
-
-    if (
-      enabledModules.includes("PAYROLL") &&
-      !data.payroll.configurationMode
-    ) {
-      result.push(
-        "Payroll configuration must be selected."
-      );
-    }
-
-    if (
-      enabledModules.includes("ACCOUNTING") &&
-      !data.accounting.institutionType
-    ) {
-      result.push(
-        "Accounting institution type is required."
-      );
-    }
-
-    if (
-      enabledModules.includes("ACCOUNTING") &&
-      !data.accounting.configurationMode
-    ) {
-      result.push(
-        "Accounting configuration must be selected."
-      );
-    }
-
-    if (
-      enabledModules.includes("PAYROLL") &&
-      !data.payrollGl.mapped
-    ) {
-      result.push(
-        "Payroll-to-GL mapping must be completed."
-      );
-    }
-
-    if (!data.usersRoles.adminEmail.trim()) {
-      result.push(
-        "Initial administrator email is required."
-      );
-    }
-
-    return result;
-  }, [data, enabledModules]);
-
-  const markCurrentStepComplete = () => {
-    if (!currentVisibleStep) {
-      return;
-    }
-
-    if (
-      !completedSteps.includes(
-        currentVisibleStep.id
-      )
-    ) {
-      setCompletedSteps((previous) => [
-        ...previous,
-        currentVisibleStep.id,
-      ]);
-    }
-  };
-
-  const nextStep = () => {
-    markCurrentStepComplete();
-
-    if (
-      currentStep <
-      visibleSteps.length - 1
-    ) {
-      setCurrentStep((previous) => previous + 1);
-    }
-  };
-
-  const previousStep = () => {
-    if (currentStep > 0) {
-      setCurrentStep((previous) => previous - 1);
-    }
-  };
-
-  const completeOnboarding = () => {
-    if (blockers.length > 0) {
-      return;
-    }
-
-    localStorage.setItem(
-      "ergonx_onboarding_ready",
-      "true"
-    );
-
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        currentStep,
-        completedSteps: visibleSteps.map(
-          (step) => step.id
-        ),
-        data,
-        ready: true,
-      })
-    );
-
-    setCompletedSteps(
-      visibleSteps.map((step) => step.id)
-    );
-  };
-
-  if (authLoading || !user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <div className="text-sm text-slate-500">
-          Loading onboarding...
-        </div>
-      </div>
-    );
-  }
-
+  const blockers = (data.validation_summary.blockers ?? []).filter((blocker) =>
+    user?.role !== "INSTITUTION_ADMIN" || institutionAdminSteps.has(blocker.step),
+  );
   return (
-    <main className="min-h-screen bg-slate-50">
-      <div className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-              ERGONX
-            </p>
-
-            <h1 className="mt-1 text-xl font-semibold text-slate-950">
-              Institution Setup
-            </h1>
-
-            <p className="mt-1 text-sm text-slate-500">
-              Configure your institution before using
-              operational modules.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={saveProgress}
-            className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <Save size={16} />
-
-            {saved
-              ? "Progress saved"
-              : "Save progress"}
-          </button>
-        </div>
-      </div>
-
-      <div className="mx-auto grid max-w-7xl gap-8 px-6 py-8 lg:grid-cols-[280px_1fr]">
-
-        <aside className="h-fit rounded-xl border border-slate-200 bg-white p-4">
-          <div className="mb-4 border-b border-slate-100 pb-4">
-            <p className="text-xs text-slate-400">
-              Setup progress
-            </p>
-
-            <p className="mt-1 text-lg font-semibold text-slate-950">
-              {currentStep + 1} of{" "}
-              {visibleSteps.length}
-            </p>
-          </div>
-
-          <OnboardingStepper
-            steps={visibleSteps}
-            currentStep={currentStep}
-            completedSteps={completedSteps}
-            onStepClick={setCurrentStep}
-          />
-        </aside>
-
-        <section className="min-w-0">
-          <div className="rounded-xl border border-slate-200 bg-white">
-
-            <div className="border-b border-slate-200 px-6 py-6">
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                Step {currentStep + 1}
-              </p>
-
-              <h2 className="mt-1 text-2xl font-semibold text-slate-950">
-                {currentVisibleStep?.title}
-              </h2>
-
-              <p className="mt-2 text-sm text-slate-500">
-                {currentVisibleStep?.description}
-              </p>
-            </div>
-
-            <div className="p-6">
-
-              {currentVisibleStep?.id ===
-                "institution" && (
-                <div className="grid gap-5 md:grid-cols-2">
-
-                  <Field
-                    label="Institution name"
-                    required
-                    value={data.institution.name}
-                    onChange={(value) =>
-                      updateData(
-                        "institution",
-                        {
-                          ...data.institution,
-                          name: value,
-                        }
-                      )
-                    }
-                    placeholder="e.g. Cyber Security Authority"
-                  />
-
-                  <Field
-                    label="Institution code"
-                    required
-                    value={data.institution.code}
-                    onChange={(value) =>
-                      updateData(
-                        "institution",
-                        {
-                          ...data.institution,
-                          code: value,
-                        }
-                      )
-                    }
-                    placeholder="e.g. CSA"
-                  />
-
-                  <SelectField
-                    label="Country"
-                    value={data.institution.country}
-                    options={[
-                      "Ghana",
-                      "Nigeria",
-                      "Kenya",
-                      "Other",
-                    ]}
-                    onChange={(value) =>
-                      updateData(
-                        "institution",
-                        {
-                          ...data.institution,
-                          country: value,
-                          currency:
-                            value === "Ghana"
-                              ? "GHS"
-                              : data.institution.currency,
-                          timezone:
-                            value === "Ghana"
-                              ? "Africa/Accra"
-                              : data.institution.timezone,
-                        }
-                      )
-                    }
-                  />
-
-                  <Field
-                    label="Timezone"
-                    value={data.institution.timezone}
-                    onChange={(value) =>
-                      updateData(
-                        "institution",
-                        {
-                          ...data.institution,
-                          timezone: value,
-                        }
-                      )
-                    }
-                  />
-
-                  <Field
-                    label="Currency"
-                    value={data.institution.currency}
-                    onChange={(value) =>
-                      updateData(
-                        "institution",
-                        {
-                          ...data.institution,
-                          currency: value,
-                        }
-                      )
-                    }
-                  />
-                </div>
-              )}
-
-              {currentVisibleStep?.id ===
-                "modules" && (
-                <div>
-                  <p className="mb-5 text-sm text-slate-600">
-                    Select the modules your institution
-                    needs. Disabled modules will not appear
-                    in the operational navigation.
-                  </p>
-
-                  <ModuleSelector
-                    selected={data.enabledModules}
-                    onChange={(modules) =>
-                      updateData(
-                        "enabledModules",
-                        modules
-                      )
-                    }
-                  />
-                </div>
-              )}
-
-              {currentVisibleStep?.id ===
-                "organisation" && (
-                <div className="grid gap-5 md:grid-cols-2">
-
-                  <SelectField
-                    label="Organisation type"
-                    required
-                    value={
-                      data.organisation
-                        .organisationType
-                    }
-                    options={[
-                      "Private / Commercial",
-                      "SME",
-                      "Government / Public Sector",
-                      "NGO / Nonprofit",
-                      "School / Educational Institution",
-                      "Other",
-                    ]}
-                    placeholder="Select organisation type"
-                    onChange={(value) =>
-                      updateData(
-                        "organisation",
-                        {
-                          ...data.organisation,
-                          organisationType: value,
-                        }
-                      )
-                    }
-                  />
-
-                  <Field
-                    label="Official email"
-                    type="email"
-                    value={
-                      data.organisation.email
-                    }
-                    onChange={(value) =>
-                      updateData(
-                        "organisation",
-                        {
-                          ...data.organisation,
-                          email: value,
-                        }
-                      )
-                    }
-                  />
-
-                  <Field
-                    label="Phone"
-                    value={
-                      data.organisation.phone
-                    }
-                    onChange={(value) =>
-                      updateData(
-                        "organisation",
-                        {
-                          ...data.organisation,
-                          phone: value,
-                        }
-                      )
-                    }
-                  />
-
-                  <Field
-                    label="Website"
-                    value={
-                      data.organisation.website
-                    }
-                    onChange={(value) =>
-                      updateData(
-                        "organisation",
-                        {
-                          ...data.organisation,
-                          website: value,
-                        }
-                      )
-                    }
-                  />
-
-                  <div className="md:col-span-2">
-                    <Field
-                      label="Address"
-                      value={
-                        data.organisation.address
-                      }
-                      onChange={(value) =>
-                        updateData(
-                          "organisation",
-                          {
-                            ...data.organisation,
-                            address: value,
-                          }
-                        )
-                      }
-                    />
-                  </div>
-                </div>
-              )}
-
-              {currentVisibleStep?.id ===
-                "hr" && (
-                <div className="space-y-6">
-
-                  <Field
-                    label="Employee number prefix"
-                    required
-                    value={
-                      data.hr.employeeNumberPrefix
-                    }
-                    onChange={(value) =>
-                      updateData("hr", {
-                        ...data.hr,
-                        employeeNumberPrefix:
-                          value,
-                      })
-                    }
-                    placeholder="EMP"
-                  />
-
-                  <div>
-                    <label className="mb-3 block text-sm font-medium text-slate-700">
-                      Employment types
-                    </label>
-
-                    <div className="flex flex-wrap gap-2">
-                      {data.hr.employmentTypes.map(
-                        (type) => (
-                          <span
-                            key={type}
-                            className="rounded-full bg-slate-100 px-3 py-1.5 text-xs text-slate-700"
-                          >
-                            {type}
-                          </span>
-                        )
-                      )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="mb-3 block text-sm font-medium text-slate-700">
-                      Staff categories
-                    </label>
-
-                    <div className="flex flex-wrap gap-2">
-                      {data.hr.staffCategories.map(
-                        (category) => (
-                          <span
-                            key={category}
-                            className="rounded-full bg-slate-100 px-3 py-1.5 text-xs text-slate-700"
-                          >
-                            {category}
-                          </span>
-                        )
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {currentVisibleStep?.id ===
-                "scheduling" && (
-                <div className="space-y-6">
-
-                  <div>
-                    <label className="mb-3 block text-sm font-medium text-slate-700">
-                      Working days
-                    </label>
-
-                    <div className="flex flex-wrap gap-2">
-                      {[
-                        "Monday",
-                        "Tuesday",
-                        "Wednesday",
-                        "Thursday",
-                        "Friday",
-                        "Saturday",
-                        "Sunday",
-                      ].map((day) => {
-                        const selected =
-                          data.scheduling.workWeek.includes(
-                            day
-                          );
-
-                        return (
-                          <button
-                            key={day}
-                            type="button"
-                            onClick={() => {
-                              const next =
-                                selected
-                                  ? data.scheduling.workWeek.filter(
-                                      (item) =>
-                                        item !== day
-                                    )
-                                  : [
-                                      ...data
-                                        .scheduling
-                                        .workWeek,
-                                      day,
-                                    ];
-
-                              updateData(
-                                "scheduling",
-                                {
-                                  ...data.scheduling,
-                                  workWeek: next,
-                                }
-                              );
-                            }}
-                            className={`rounded-lg border px-3 py-2 text-xs font-medium ${
-                              selected
-                                ? "border-slate-950 bg-slate-950 text-white"
-                                : "border-slate-200 text-slate-600"
-                            }`}
-                          >
-                            {day}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="grid gap-5 md:grid-cols-3">
-
-                    <Field
-                      label="Start time"
-                      type="time"
-                      value={
-                        data.scheduling.startTime
-                      }
-                      onChange={(value) =>
-                        updateData(
-                          "scheduling",
-                          {
-                            ...data.scheduling,
-                            startTime: value,
-                          }
-                        )
-                      }
-                    />
-
-                    <Field
-                      label="End time"
-                      type="time"
-                      value={
-                        data.scheduling.endTime
-                      }
-                      onChange={(value) =>
-                        updateData(
-                          "scheduling",
-                          {
-                            ...data.scheduling,
-                            endTime: value,
-                          }
-                        )
-                      }
-                    />
-
-                    <Field
-                      label="Working hours"
-                      type="number"
-                      value={
-                        data.scheduling.workingHours
-                      }
-                      onChange={(value) =>
-                        updateData(
-                          "scheduling",
-                          {
-                            ...data.scheduling,
-                            workingHours: value,
-                          }
-                        )
-                      }
-                    />
-
-                  </div>
-                </div>
-              )}
-
-              {currentVisibleStep?.id ===
-                "payroll" && (
-                <div className="space-y-6">
-
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-5">
-                    <h3 className="font-semibold text-slate-950">
-                      Payroll configuration
-                    </h3>
-
-                    <p className="mt-1 text-sm text-slate-500">
-                      Choose whether to use the Ghana
-                      payroll preset or configure payroll
-                      manually.
-                    </p>
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-2">
-
-                    <OptionCard
-                      selected={
-                        data.payroll
-                          .configurationMode ===
-                        "ghana_preset"
-                      }
-                      title="Ghana Payroll Preset"
-                      description="Recommended. Applies versioned Ghana payroll configuration including PAYE, pension and compliance settings."
-                      onClick={() =>
-                        updateData("payroll", {
-                          ...data.payroll,
-                          configurationMode:
-                            "ghana_preset",
-                        })
-                      }
-                    />
-
-                    <OptionCard
-                      selected={
-                        data.payroll
-                          .configurationMode ===
-                        "manual"
-                      }
-                      title="Configure Manually"
-                      description="Use generic payroll configuration and configure the required rules yourself."
-                      onClick={() =>
-                        updateData("payroll", {
-                          ...data.payroll,
-                          configurationMode:
-                            "manual",
-                        })
-                      }
-                    />
-
-                  </div>
-
-                  {data.institution.country ===
-                    "Ghana" && (
-                    <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
-                      Ghana payroll localisation is
-                      optional. The preset is recommended
-                      but is not forced solely because the
-                      institution is in Ghana.
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {currentVisibleStep?.id ===
-                "accounting" && (
-                <div className="space-y-6">
-
-                  <SelectField
-                    label="Institution type"
-                    required
-                    value={
-                      data.accounting
-                        .institutionType
-                    }
-                    options={[
-                      "Private / Commercial",
-                      "SME",
-                      "Government / Public Sector",
-                      "NGO / Nonprofit",
-                      "Other",
-                    ]}
-                    placeholder="Select institution type"
-                    onChange={(value) =>
-                      updateData(
-                        "accounting",
-                        {
-                          ...data.accounting,
-                          institutionType:
-                            value,
-                        }
-                      )
-                    }
-                  />
-
-                  <div className="grid gap-4 md:grid-cols-2">
-
-                    <OptionCard
-                      selected={
-                        data.accounting
-                          .configurationMode ===
-                        "ghana_preset"
-                      }
-                      title="Ghana Accounting Preset"
-                      description="Includes GHS defaults, starter Chart of Accounts, tax codes and compliance reminders."
-                      onClick={() =>
-                        updateData("accounting", {
-                          ...data.accounting,
-                          configurationMode:
-                            "ghana_preset",
-                        })
-                      }
-                    />
-
-                    <OptionCard
-                      selected={
-                        data.accounting
-                          .configurationMode ===
-                        "manual"
-                      }
-                      title="Configure Manually"
-                      description="Create your own accounting configuration and tax settings."
-                      onClick={() =>
-                        updateData("accounting", {
-                          ...data.accounting,
-                          configurationMode:
-                            "manual",
-                        })
-                      }
-                    />
-
-                  </div>
-
-                  {data.institution.country ===
-                    "Ghana" && (
-                    <div className="rounded-lg border border-slate-200 bg-white p-4">
-                      <p className="text-sm font-medium text-slate-800">
-                        Ghana accounting localisation
-                      </p>
-
-                      <p className="mt-1 text-xs leading-5 text-slate-500">
-                        The accounting configuration can
-                        support VAT, NHIL, GETFund,
-                        withholding tax and VAT withholding.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {currentVisibleStep?.id ===
-                "payroll_gl" && (
-                <div className="space-y-6">
-
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-sm font-semibold text-slate-900">
-                      Payroll-to-GL mapping
-                    </p>
-
-                    <p className="mt-1 text-xs leading-5 text-slate-500">
-                      These mappings connect payroll
-                      transactions to accounting accounts.
-                      Payroll finalisation will not silently
-                      post directly to the ledger.
-                    </p>
-                  </div>
-
-                  <div className="grid gap-5">
-
-                    <Field
-                      label="Payroll clearing account"
-                      value={
-                        data.payrollGl.payrollAccount
-                      }
-                      onChange={(value) =>
-                        updateData(
-                          "payrollGl",
-                          {
-                            ...data.payrollGl,
-                            payrollAccount:
-                              value,
-                            mapped:
-                              Boolean(
-                                value &&
-                                data.payrollGl
-                                  .salaryExpenseAccount &&
-                                data.payrollGl
-                                  .taxPayableAccount
-                              ),
-                          }
-                        )
-                      }
-                      placeholder="e.g. 2100"
-                    />
-
-                    <Field
-                      label="Salary expense account"
-                      value={
-                        data.payrollGl
-                          .salaryExpenseAccount
-                      }
-                      onChange={(value) =>
-                        updateData(
-                          "payrollGl",
-                          {
-                            ...data.payrollGl,
-                            salaryExpenseAccount:
-                              value,
-                            mapped:
-                              Boolean(
-                                data.payrollGl
-                                  .payrollAccount &&
-                                value &&
-                                data.payrollGl
-                                  .taxPayableAccount
-                              ),
-                          }
-                        )
-                      }
-                      placeholder="e.g. 6100"
-                    />
-
-                    <Field
-                      label="Tax payable account"
-                      value={
-                        data.payrollGl
-                          .taxPayableAccount
-                      }
-                      onChange={(value) =>
-                        updateData(
-                          "payrollGl",
-                          {
-                            ...data.payrollGl,
-                            taxPayableAccount:
-                              value,
-                            mapped:
-                              Boolean(
-                                data.payrollGl
-                                  .payrollAccount &&
-                                data.payrollGl
-                                  .salaryExpenseAccount &&
-                                value
-                              ),
-                          }
-                        )
-                      }
-                      placeholder="e.g. 2200"
-                    />
-                  </div>
-
-                  {data.payrollGl.mapped && (
-                    <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
-                      <CheckCircle2 size={18} />
-                      Required payroll mappings are
-                      complete.
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {currentVisibleStep?.id ===
-                "users_roles" && (
-                <div className="space-y-6">
-
-                  <Field
-                    label="Initial administrator email"
-                    required
-                    type="email"
-                    value={
-                      data.usersRoles.adminEmail
-                    }
-                    onChange={(value) =>
-                      updateData(
-                        "usersRoles",
-                        {
-                          ...data.usersRoles,
-                          adminEmail: value,
-                        }
-                      )
-                    }
-                    placeholder="admin@example.com"
-                  />
-
-                  <SelectField
-                    label="Administrator role"
-                    value={
-                      data.usersRoles.adminRole
-                    }
-                    options={[
-                      "INSTITUTION_ADMIN",
-                      "HR_ADMIN",
-                    ]}
-                    onChange={(value) =>
-                      updateData(
-                        "usersRoles",
-                        {
-                          ...data.usersRoles,
-                          adminRole: value,
-                        }
-                      )
-                    }
-                  />
-
-                  <label className="flex items-center gap-3 rounded-lg border border-slate-200 p-4">
-                    <input
-                      type="checkbox"
-                      checked={
-                        data.usersRoles.inviteUsers
-                      }
-                      onChange={(event) =>
-                        updateData(
-                          "usersRoles",
-                          {
-                            ...data.usersRoles,
-                            inviteUsers:
-                              event.target.checked,
-                          }
-                        )
-                      }
-                      className="h-4 w-4 rounded border-slate-300"
-                    />
-
-                    <div>
-                      <p className="text-sm font-medium text-slate-800">
-                        Invite additional users
-                      </p>
-
-                      <p className="text-xs text-slate-500">
-                        User invitations can be completed
-                        after the institution is created.
-                      </p>
-                    </div>
-                  </label>
-                </div>
-              )}
-
-              {currentVisibleStep?.id ===
-                "validation" && (
-                <div className="space-y-6">
-
-                  <ConfigurationIncomplete
-                    blockers={blockers}
-                  />
-
-                  {blockers.length === 0 ? (
-                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-6">
-                      <div className="flex items-center gap-3">
-                        <CheckCircle2
-                          size={24}
-                          className="text-emerald-600"
-                        />
-
-                        <div>
-                          <h3 className="font-semibold text-emerald-900">
-                            Configuration ready
-                          </h3>
-
-                          <p className="mt-1 text-sm text-emerald-700">
-                            All required onboarding
-                            configuration has been completed.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="rounded-xl border border-slate-200 bg-white p-5">
-                      <p className="text-sm text-slate-600">
-                        Return to the relevant steps using
-                        the setup menu to resolve the
-                        remaining blockers.
-                      </p>
-                    </div>
-                  )}
-
-                  <button
-                    type="button"
-                    disabled={blockers.length > 0}
-                    onClick={completeOnboarding}
-                    className="flex h-11 items-center justify-center gap-2 rounded-lg bg-slate-950 px-5 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <CheckCircle2 size={17} />
-                    Mark Institution READY
-                  </button>
-
-                  {localStorage.getItem(
-                    "ergonx_onboarding_ready"
-                  ) === "true" && (
-                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-800">
-                      Institution is READY.
-                    </div>
-                  )}
-                </div>
-              )}
-
-            </div>
-
-            <div className="flex items-center justify-between border-t border-slate-200 px-6 py-5">
-
-              <button
-                type="button"
-                onClick={previousStep}
-                disabled={currentStep === 0}
-                className="flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <ArrowLeft size={16} />
-                Back
-              </button>
-
-              <div className="flex items-center gap-3">
-
-                <button
-                  type="button"
-                  onClick={saveProgress}
-                  className="hidden items-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 sm:flex"
-                >
-                  <Save size={16} />
-                  Save
-                </button>
-
-                {currentStep <
-                visibleSteps.length - 1 ? (
-                  <button
-                    type="button"
-                    onClick={nextStep}
-                    className="flex items-center gap-2 rounded-lg bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"
-                  >
-                    Continue
-                    <ArrowRight size={16} />
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    disabled={blockers.length > 0}
-                    onClick={completeOnboarding}
-                    className="flex items-center gap-2 rounded-lg bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    Complete Setup
-                    <CheckCircle2 size={16} />
-                  </button>
-                )}
-
-              </div>
-            </div>
-
+    <main className="min-h-screen bg-slate-50 px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
+      <div className="mx-auto max-w-6xl">
+        <section className="relative overflow-hidden rounded-3xl bg-slate-950 px-6 py-7 text-white shadow-[0_22px_55px_rgba(15,23,42,0.18)] sm:px-8 sm:py-9">
+          <div className="absolute -right-16 -top-20 h-64 w-64 rounded-full bg-sky-500/20 blur-3xl" />
+          <div className="absolute bottom-0 right-24 h-28 w-28 rounded-full border border-sky-300/20" />
+          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-2xl"><h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Set up {institution?.name ?? "your institution"}.</h1><p className="mt-3 max-w-xl text-sm leading-6 text-slate-300">Complete the essentials to prepare your organization.</p></div>
+            <button type="button" disabled={validating} onClick={() => void validate()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-slate-950 shadow-lg transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"><RefreshCw className={validating ? "h-4 w-4 animate-spin" : "h-4 w-4"} />{validating ? "Validating…" : "Validate setup"}</button>
           </div>
         </section>
+
+        <section className="mt-6 max-w-3xl">
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_12px_35px_rgba(15,23,42,0.04)] sm:p-7">
+            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+              <div><div className="flex flex-wrap items-center gap-3"><h2 className="text-xl font-semibold tracking-tight text-slate-950">Setup progress</h2><StatusBadge status={data.status} /></div><p className="mt-2 text-sm text-slate-500">{setupSummary.complete} of {setupSummary.required} required setup items completed.</p></div>
+              <p className="text-4xl font-semibold tracking-tight text-slate-950">{setupSummary.required ? Math.round((setupSummary.complete / setupSummary.required) * 100) : 100}<span className="text-xl text-slate-400">%</span></p>
+            </div>
+            <div className="mt-6 h-3 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-gradient-to-r from-sky-500 to-cyan-400 transition-all duration-500" style={{ width: `${setupSummary.required ? Math.round((setupSummary.complete / setupSummary.required) * 100) : 100}%` }} /></div>
+            <div className="mt-5 flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3"><ClipboardCheck className="h-5 w-5 shrink-0 text-sky-700" /><p className="text-sm text-slate-600"><span className="font-semibold text-slate-900">Current focus:</span> {user?.role === "INSTITUTION_ADMIN" ? "Institution profile, module selection, and setup owners" : formatStep(data.current_step)}</p></div>
+          </div>
+        </section>
+
+        {actionError && <div className="mt-6"><ErrorState title="Setup validation failed" message={actionError} onRetry={reload} /></div>}
+        {blockers.length > 0 && <section className="mt-6 rounded-3xl border border-amber-200 bg-amber-50 p-5 sm:p-6"><div className="flex gap-3"><CircleAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" /><div><h2 className="font-semibold text-amber-950">Attention needed before setup can be completed</h2><p className="mt-1 text-sm text-amber-800">Resolve these server-identified requirements, then validate again.</p><ul className="mt-4 space-y-2 text-sm text-amber-900">{blockers.map((blocker) => <li key={`${blocker.step}-${blocker.code}`} className="rounded-xl bg-white/60 px-3 py-2"><span className="font-semibold">{formatStep(blocker.step)}:</span> {blocker.message}</li>)}</ul></div></div></section>}
+        {data.status === "READY" && <section className="mt-6 flex items-start gap-3 rounded-3xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-900 sm:p-6"><CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0" /><div><h2 className="font-semibold">Your institution is ready</h2><p className="mt-1 text-sm text-emerald-800">All enabled-module setup requirements have passed server validation.</p></div></section>}
+
+        <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_12px_35px_rgba(15,23,42,0.04)] sm:p-7"><div className="flex flex-col gap-2 border-b border-slate-100 pb-5 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-sky-700">Guided checklist</p><h2 className="mt-2 text-xl font-semibold tracking-tight text-slate-950">{user?.role === "INSTITUTION_ADMIN" ? "Prepare your organization" : "Complete your setup"}</h2><p className="mt-1 text-sm text-slate-500">{user?.role === "INSTITUTION_ADMIN" ? "Role owners complete their own authorized configuration after you invite them." : "Complete the setup items assigned to your role."}</p></div><p className="text-sm text-slate-500">{visibleSteps.length} setup steps</p></div><div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{visibleSteps.map((step) => <SetupStepCard key={step.code} step={step} validating={validating} onValidate={validate} />)}</div></section>
       </div>
     </main>
   );
 }
 
+function SetupStepCard({ step, validating, onValidate }: { step: InstitutionOnboardingStep; validating: boolean; onValidate: () => Promise<void> }) {
+  const presentation = stepPresentation[step.code] ?? { title: formatStep(step.code), description: "Complete this setup requirement.", icon: ClipboardCheck };
+  const Icon = presentation.icon;
+  const complete = isFinished(step.status);
+  const needsAttention = step.status === "BLOCKED";
 
-function Field({
-  label,
-  value,
-  onChange,
-  placeholder,
-  type = "text",
-  required = false,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  type?: string;
-  required?: boolean;
-}) {
-  return (
-    <div>
-      <label className="mb-2 block text-sm font-medium text-slate-700">
-        {label}
-        {required && (
-          <span className="ml-1 text-red-500">
-            *
-          </span>
-        )}
-      </label>
-
-      <input
-        type={type}
-        value={value}
-        placeholder={placeholder}
-        onChange={(event) =>
-          onChange(event.target.value)
-        }
-        className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
-      />
-    </div>
-  );
-}
-
-
-function SelectField({
-  label,
-  value,
-  options,
-  onChange,
-  placeholder,
-  required = false,
-}: {
-  label: string;
-  value: string;
-  options: string[];
-  onChange: (value: string) => void;
-  placeholder?: string;
-  required?: boolean;
-}) {
-  return (
-    <div>
-      <label className="mb-2 block text-sm font-medium text-slate-700">
-        {label}
-        {required && (
-          <span className="ml-1 text-red-500">
-            *
-          </span>
-        )}
-      </label>
-
-      <select
-        value={value}
-        onChange={(event) =>
-          onChange(event.target.value)
-        }
-        className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
-      >
-        {placeholder && (
-          <option value="">
-            {placeholder}
-          </option>
-        )}
-
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
-
-function OptionCard({
-  selected,
-  title,
-  description,
-  onClick,
-}: {
-  selected: boolean;
-  title: string;
-  description: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-xl border p-5 text-left transition ${
-        selected
-          ? "border-slate-950 bg-slate-50 ring-1 ring-slate-950"
-          : "border-slate-200 bg-white hover:border-slate-400"
-      }`}
-    >
-      <div className="flex items-center gap-3">
-        <div
-          className={`h-4 w-4 rounded-full border-4 ${
-            selected
-              ? "border-slate-950"
-              : "border-slate-300"
-          }`}
-        />
-
-        <h3 className="text-sm font-semibold text-slate-950">
-          {title}
-        </h3>
-      </div>
-
-      <p className="mt-3 text-xs leading-5 text-slate-500">
-        {description}
-      </p>
-    </button>
-  );
+  return <article className={`flex min-h-44 flex-col rounded-2xl border p-5 transition ${needsAttention ? "border-red-200 bg-red-50/40" : complete ? "border-slate-200 bg-slate-50/70" : "border-slate-200 bg-white shadow-sm"}`}><div className="flex items-start justify-between gap-3"><div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${needsAttention ? "bg-red-100 text-red-700" : complete ? "bg-emerald-100 text-emerald-700" : "bg-sky-100 text-sky-700"}`}><Icon className="h-5 w-5" /></div><StatusBadge status={step.status} /></div><h3 className="mt-5 font-semibold text-slate-950">{presentation.title}</h3>{step.blocker_message && <p className="mt-2 text-sm leading-5 text-red-700">{step.blocker_message}</p>}{step.required_module && <p className="mt-2 text-xs font-medium text-slate-400">Required for {formatStep(step.required_module)}</p>}<div className="mt-auto flex flex-wrap items-center gap-4 pt-5">{step.code === "VALIDATION" && !complete ? <button type="button" disabled={validating} onClick={() => void onValidate()} className="inline-flex items-center gap-2 text-sm font-semibold text-sky-700 hover:text-sky-900 disabled:opacity-60">{validating ? "Validating…" : "Validate setup"} <ArrowRight className="h-4 w-4" /></button> : presentation.action ? <Link href={presentation.action.href} className="inline-flex items-center gap-2 text-sm font-semibold text-sky-700 hover:text-sky-900">{complete ? "Manage" : presentation.action.label} <ArrowRight className="h-4 w-4" /></Link> : <span className={`inline-flex items-center gap-2 text-sm font-semibold ${step.status === "SKIPPED" ? "text-slate-400" : "text-emerald-700"}`}>{step.status === "SKIPPED" ? "Skipped" : "Completed"}{step.status !== "SKIPPED" && <CheckCircle2 className="h-4 w-4" />}</span>}</div></article>;
 }

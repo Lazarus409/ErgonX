@@ -8,7 +8,17 @@ import {
   Save,
 } from "lucide-react";
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+
+import ErrorState from "@/components/ui/ErrorState";
+import {
+  employeesApi,
+  getApiErrorMessage,
+  isApiRequestError,
+  organizationApi,
+} from "@/lib/api";
+import type { OrganizationLookups } from "@/lib/api/organization";
+import type { EmploymentType, Gender } from "@/types/hr";
 
 type FormData = {
   firstName: string;
@@ -44,39 +54,77 @@ const initialForm: FormData = {
   inviteAccount: false,
 };
 
-const departments = [
-  "Human Resources",
-  "Finance",
-  "Information Technology",
-  "Operations",
-  "Administration",
+const emptyLookups: OrganizationLookups = {
+  departments: [],
+  positions: [],
+  grades: [],
+  locations: [],
+};
+
+const genderOptions: Array<{ value: Gender; label: string }> = [
+  { value: "MALE", label: "Male" },
+  { value: "FEMALE", label: "Female" },
+  { value: "OTHER", label: "Other" },
+  { value: "PREFER_NOT_TO_SAY", label: "Prefer not to say" },
 ];
 
-const positions = [
-  "HR Manager",
-  "HR Officer",
-  "Accountant",
-  "Finance Officer",
-  "Software Engineer",
-  "Network Administrator",
-  "Operations Officer",
-  "Administrative Officer",
-];
-
-const grades = ["Grade A", "Grade B", "Grade C", "Grade D"];
-
-const locations = ["Accra", "Kumasi", "Tema"];
-
-const employmentTypes = [
-  "Full Time",
-  "Part Time",
-  "Contract",
+const employmentTypeOptions: Array<{ value: EmploymentType; label: string }> = [
+  { value: "PERMANENT", label: "Permanent" },
+  { value: "CONTRACT", label: "Contract" },
+  { value: "TEMPORARY", label: "Temporary" },
+  { value: "INTERN", label: "Intern" },
+  { value: "CASUAL", label: "Casual" },
 ];
 
 export default function CreateEmployeePage() {
   const [form, setForm] = useState<FormData>(initialForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState(false);
+  const [lookups, setLookups] = useState<OrganizationLookups>(emptyLookups);
+  const [lookupsLoading, setLookupsLoading] = useState(true);
+  const [lookupsError, setLookupsError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [invitationStatus, setInvitationStatus] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadLookups() {
+      setLookupsLoading(true);
+      setLookupsError(null);
+
+      try {
+        const result = await organizationApi.loadOrganizationLookups();
+
+        if (active) {
+          setLookups(result);
+        }
+      } catch (caught) {
+        if (active) {
+          setLookupsError(getApiErrorMessage(caught));
+        }
+      } finally {
+        if (active) {
+          setLookupsLoading(false);
+        }
+      }
+    }
+
+    loadLookups();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const positions = useMemo(
+    () =>
+      lookups.positions.filter(
+        (position) => !form.department || position.department === form.department,
+      ),
+    [lookups.positions, form.department],
+  );
 
   const updateField = (
     field: keyof FormData,
@@ -96,6 +144,8 @@ export default function CreateEmployeePage() {
     }
 
     setSaved(false);
+    setInvitationStatus(null);
+    setSubmitError(null);
   };
 
   const validate = () => {
@@ -149,20 +199,83 @@ export default function CreateEmployeePage() {
     return Object.keys(nextErrors).length === 0;
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!validate()) {
+    if (!validate() || submitting) {
       return;
     }
 
-    /*
-     * Development mode:
-     * The approved backend endpoint is POST /api/v1/employees/.
-     * Backend integration will be added once the API contract is ready.
-     */
+    setSubmitting(true);
+    setSubmitError(null);
 
-    setSaved(true);
+    try {
+      const employee = await employeesApi.createEmployee({
+        first_name: form.firstName.trim(),
+        middle_name: form.middleName.trim(),
+        last_name: form.lastName.trim(),
+        employee_number: form.employeeNumber.trim(),
+        work_email: form.email.trim(),
+        phone: form.phone.trim(),
+        gender: form.gender,
+        hire_date: form.hireDate,
+      });
+
+      await employeesApi.createEmployment({
+        employee: employee.id,
+        department: form.department,
+        position: form.position,
+        grade: form.grade,
+        location: form.location,
+        employment_type: form.employmentType,
+        start_date: form.hireDate,
+      });
+
+      if (form.inviteAccount) {
+        const invitation = await employeesApi.inviteEmployeeToSelfService(employee.id);
+        setInvitationStatus(
+          invitation.email_delivery_status === "sent"
+            ? `A Self-Service invitation was sent to ${invitation.email}.`
+            : `The employee account invitation was created for ${invitation.email}. Email delivery is not configured; send them the secure invitation link from the employee record.`,
+        );
+      }
+
+      setSaved(true);
+    } catch (caught) {
+      const apiError = isApiRequestError(caught) ? caught : null;
+      const fieldMap: Record<string, keyof FormData> = {
+        first_name: "firstName",
+        middle_name: "middleName",
+        last_name: "lastName",
+        employee_number: "employeeNumber",
+        work_email: "email",
+        phone: "phone",
+        gender: "gender",
+        hire_date: "hireDate",
+        department: "department",
+        position: "position",
+        grade: "grade",
+        location: "location",
+        employment_type: "employmentType",
+        start_date: "hireDate",
+      };
+      const fieldErrors: Record<string, string> = {};
+
+      for (const [apiField, formField] of Object.entries(fieldMap)) {
+        const message = apiError?.fieldError(apiField);
+        if (message) {
+          fieldErrors[formField] = message;
+        }
+      }
+
+      if (Object.keys(fieldErrors).length > 0) {
+        setErrors(fieldErrors);
+      }
+
+      setSubmitError(getApiErrorMessage(caught));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -195,11 +308,21 @@ export default function CreateEmployeePage() {
               Employee record saved
             </p>
             <p className="mt-0.5 text-sm text-emerald-700">
-              Development mode is active. The record has not yet been
-              submitted to the backend.
+              {invitationStatus ?? "The employee and their current employment assignment have been saved."}
             </p>
           </div>
         </div>
+      )}
+
+      {lookupsError && (
+        <ErrorState
+          title="Unable to load organisation data"
+          message={lookupsError}
+        />
+      )}
+
+      {submitError && (
+        <ErrorState title="Unable to create employee" message={submitError} />
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -241,7 +364,7 @@ export default function CreateEmployeePage() {
               required
               value={form.gender}
               error={errors.gender}
-              options={["Male", "Female", "Other"]}
+              options={genderOptions}
               onChange={(value) => updateField("gender", value)}
             />
           </div>
@@ -312,7 +435,7 @@ export default function CreateEmployeePage() {
               required
               value={form.employmentType}
               error={errors.employmentType}
-              options={employmentTypes}
+              options={employmentTypeOptions}
               onChange={(value) => updateField("employmentType", value)}
             />
 
@@ -321,7 +444,10 @@ export default function CreateEmployeePage() {
               required
               value={form.department}
               error={errors.department}
-              options={departments}
+              options={lookups.departments.map((department) => ({
+                value: department.id,
+                label: department.name,
+              }))}
               onChange={(value) => updateField("department", value)}
             />
 
@@ -330,7 +456,10 @@ export default function CreateEmployeePage() {
               required
               value={form.position}
               error={errors.position}
-              options={positions}
+              options={positions.map((position) => ({
+                value: position.id,
+                label: position.title,
+              }))}
               onChange={(value) => updateField("position", value)}
             />
 
@@ -339,7 +468,10 @@ export default function CreateEmployeePage() {
               required
               value={form.grade}
               error={errors.grade}
-              options={grades}
+              options={lookups.grades.map((grade) => ({
+                value: grade.id,
+                label: grade.name,
+              }))}
               onChange={(value) => updateField("grade", value)}
             />
 
@@ -348,7 +480,10 @@ export default function CreateEmployeePage() {
               required
               value={form.location}
               error={errors.location}
-              options={locations}
+              options={lookups.locations.map((location) => ({
+                value: location.id,
+                label: location.name,
+              }))}
               onChange={(value) => updateField("location", value)}
             />
           </div>
@@ -405,6 +540,7 @@ export default function CreateEmployeePage() {
                 setErrors({});
                 setSaved(false);
               }}
+              disabled={submitting}
               className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
             >
               Clear Form
@@ -412,10 +548,11 @@ export default function CreateEmployeePage() {
 
             <button
               type="submit"
+              disabled={submitting || lookupsLoading || Boolean(lookupsError)}
               className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
             >
               <Save className="h-4 w-4" />
-              Create Employee
+              {submitting ? "Creating..." : "Create Employee"}
             </button>
           </div>
         </div>
@@ -493,7 +630,7 @@ function SelectField({
   required?: boolean;
   value: string;
   error?: string;
-  options: string[];
+  options: Array<{ value: string; label: string }>;
   onChange: (value: string) => void;
 }) {
   return (
@@ -516,8 +653,8 @@ function SelectField({
           <option value="">Select {label.toLowerCase()}</option>
 
           {options.map((option) => (
-            <option key={option} value={option}>
-              {option}
+            <option key={option.value} value={option.value}>
+              {option.label}
             </option>
           ))}
         </select>

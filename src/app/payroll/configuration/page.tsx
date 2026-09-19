@@ -1,143 +1,20 @@
 "use client";
-
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CheckCircle2, Save, Settings2 } from "lucide-react";
+import ErrorState from "@/components/ui/ErrorState";
+import LoadingState from "@/components/ui/LoadingState";
 import PageHeader from "@/components/ui/PageHeader";
+import { getApiErrorMessage, payrollApi } from "@/lib/api";
+import type { PayrollConfiguration, PayrollSetupChoices } from "@/types/payroll";
 
 export default function PayrollConfigurationPage() {
-  const [preset, setPreset] = useState("GHANA");
-  const [currency, setCurrency] = useState("GHS");
-  const [frequency, setFrequency] = useState("MONTHLY");
-  const [saved, setSaved] = useState(false);
-
-  const save = () => {
-    setSaved(true);
-
-    window.setTimeout(() => {
-      setSaved(false);
-    }, 2500);
-  };
-
-  return (
-    <main className="space-y-6 p-4 md:p-6">
-      <PageHeader
-        title="Payroll Configuration"
-        description="Configure institution-level payroll settings, presets and component mappings."
-      />
-
-      {saved && (
-        <div className="flex items-center gap-3 rounded-xl border bg-white p-4 text-sm">
-          <CheckCircle2 size={18} />
-          Payroll configuration saved in development mode.
-        </div>
-      )}
-
-      <section className="rounded-xl border bg-white">
-        <div className="border-b p-5">
-          <div className="flex items-center gap-3">
-            <Settings2 size={20} />
-            <div>
-              <h2 className="font-semibold">General Payroll Settings</h2>
-              <p className="text-sm text-slate-500">
-                Institution-wide payroll defaults.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid gap-5 p-5 md:grid-cols-2">
-          <label className="space-y-1">
-            <span className="text-sm font-medium">Payroll Preset</span>
-            <select
-              value={preset}
-              onChange={(e) => setPreset(e.target.value)}
-              className="w-full rounded-lg border px-3 py-2.5 text-sm"
-            >
-              <option value="GHANA">Ghana Payroll Preset</option>
-              <option value="CUSTOM">Custom Configuration</option>
-            </select>
-          </label>
-
-          <label className="space-y-1">
-            <span className="text-sm font-medium">Payroll Frequency</span>
-            <select
-              value={frequency}
-              onChange={(e) => setFrequency(e.target.value)}
-              className="w-full rounded-lg border px-3 py-2.5 text-sm"
-            >
-              <option value="MONTHLY">Monthly</option>
-              <option value="WEEKLY">Weekly</option>
-              <option value="BIWEEKLY">Biweekly</option>
-            </select>
-          </label>
-
-          <label className="space-y-1">
-            <span className="text-sm font-medium">Currency</span>
-            <select
-              value={currency}
-              onChange={(e) => setCurrency(e.target.value)}
-              className="w-full rounded-lg border px-3 py-2.5 text-sm"
-            >
-              <option value="GHS">GHS — Ghana Cedi</option>
-              <option value="USD">USD — US Dollar</option>
-              <option value="GBP">GBP — Pound Sterling</option>
-            </select>
-          </label>
-
-          <label className="space-y-1">
-            <span className="text-sm font-medium">Current Configuration Version</span>
-            <input
-              value={preset === "GHANA" ? "GH-PAYROLL-2026.1" : "CUSTOM"}
-              readOnly
-              className="w-full rounded-lg border bg-slate-50 px-3 py-2.5 text-sm"
-            />
-          </label>
-        </div>
-      </section>
-
-      <section className="rounded-xl border bg-white">
-        <div className="border-b p-5">
-          <h2 className="font-semibold">Payroll Component Mapping</h2>
-          <p className="text-sm text-slate-500">
-            Components available to the selected payroll configuration.
-          </p>
-        </div>
-
-        <div className="divide-y">
-          {[
-            ["BASIC", "Basic Salary", "EARNING"],
-            ["HOUSING", "Housing Allowance", "EARNING"],
-            ["TRANSPORT", "Transport Allowance", "EARNING"],
-            ["PAYE", "PAYE Tax", "DEDUCTION"],
-            ["SSNIT", "SSNIT / Tier 1", "DEDUCTION"],
-          ].map(([code, name, type]) => (
-            <div
-              key={code}
-              className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div>
-                <p className="font-medium">{name}</p>
-                <p className="text-xs text-slate-500">
-                  {code} · {type}
-                </p>
-              </div>
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium">
-                Mapped
-              </span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <div className="flex justify-end">
-        <button
-          onClick={save}
-          className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white"
-        >
-          <Save size={17} />
-          Save Configuration
-        </button>
-      </div>
-    </main>
-  );
+  const [configuration, setConfiguration] = useState<PayrollConfiguration | null>(null); const [choices, setChoices] = useState<PayrollSetupChoices | null>(null); const [mode, setMode] = useState(""); const [preset, setPreset] = useState(""); const [frequency, setFrequency] = useState("MONTHLY"); const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false); const [error, setError] = useState(""); const [saved, setSaved] = useState(false);
+  const load = async () => { setLoading(true); setError(""); try { const [configs, setup] = await Promise.all([payrollApi.listPayrollConfigurations(), payrollApi.getPayrollSetupChoices()]); const current = configs.results[0] ?? null; setConfiguration(current); setChoices(setup); setMode(current?.payroll_setup_mode ?? setup.choices[0]?.mode ?? ""); setPreset(current?.selected_payroll_preset_version ?? setup.choices[0]?.preset_version_id ?? ""); setFrequency(current?.payroll_frequency ?? "MONTHLY"); } catch (caught) { setError(getApiErrorMessage(caught)); } finally { setLoading(false); } };
+  useEffect(() => { // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load(); }, []);
+  const save = async () => { if (!choices || !mode) return; setSaving(true); setError(""); try { const payload = { country_code: choices.country_code, currency: choices.currency, payroll_frequency: frequency, payroll_setup_mode: mode, selected_payroll_preset_version: mode === "CUSTOM" ? null : preset || null, pay_day_rule: configuration?.pay_day_rule ?? {}, rounding_rule: configuration?.rounding_rule ?? { method: "HALF_UP", decimal_places: 2 }, is_configured: true }; const result = configuration ? await payrollApi.updatePayrollConfiguration(configuration.id, payload) : await payrollApi.createPayrollConfiguration(payload); setConfiguration(result); setSaved(true); } catch (caught) { setError(getApiErrorMessage(caught)); } finally { setSaving(false); } };
+  if (loading) return <LoadingState />;
+  if (error && !choices) return <ErrorState title="Unable to load payroll configuration" message={error} onRetry={() => void load()} />;
+  const available = choices?.choices ?? [];
+  return <main className="space-y-6 p-4 md:p-6"><PageHeader title="Payroll Configuration" description="Configure institution-level payroll settings from supported backend presets." />{error && <ErrorState message={error} onRetry={() => void load()} />}{saved && <div className="flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700"><CheckCircle2 size={18} />Payroll configuration saved.</div>}<section className="rounded-xl border bg-white"><div className="border-b p-5"><div className="flex items-center gap-3"><Settings2 size={20} /><div><h2 className="font-semibold">General Payroll Settings</h2><p className="text-sm text-slate-500">Available choices are determined by the institution country.</p></div></div></div><div className="grid gap-5 p-5 md:grid-cols-2"><label><span className="text-sm font-medium">Payroll Setup</span><select value={mode} onChange={(event) => { const selected = available.find((choice) => choice.mode === event.target.value); setMode(event.target.value); setPreset(selected?.preset_version_id ?? ""); }} className="mt-1 w-full rounded-lg border px-3 py-2.5 text-sm">{available.map((choice) => <option key={`${choice.mode}-${choice.preset_version_id}`} value={choice.mode}>{choice.name}</option>)}</select></label><label><span className="text-sm font-medium">Payroll Frequency</span><select value={frequency} onChange={(event) => setFrequency(event.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2.5 text-sm"><option value="MONTHLY">Monthly</option><option value="WEEKLY">Weekly</option><option value="BIWEEKLY">Biweekly</option></select></label><label><span className="text-sm font-medium">Country</span><input value={choices?.country_code ?? ""} readOnly className="mt-1 w-full rounded-lg border bg-slate-50 px-3 py-2.5 text-sm" /></label><label><span className="text-sm font-medium">Currency</span><input value={choices?.currency ?? ""} readOnly className="mt-1 w-full rounded-lg border bg-slate-50 px-3 py-2.5 text-sm" /></label><label className="md:col-span-2"><span className="text-sm font-medium">Selected Preset Version</span><input value={available.find((choice) => choice.preset_version_id === preset)?.version_code ?? "Custom configuration"} readOnly className="mt-1 w-full rounded-lg border bg-slate-50 px-3 py-2.5 text-sm" /></label></div>{available.find((choice) => choice.mode === mode)?.compliance_warning && <p className="mx-5 mb-5 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">{available.find((choice) => choice.mode === mode)?.compliance_warning}</p>}</section><div className="flex justify-end"><button onClick={() => void save()} disabled={saving || !mode} className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white"><Save size={17} />{saving ? "Saving..." : "Save Configuration"}</button></div></main>;
 }

@@ -2,6 +2,7 @@
 
 import { ReactNode } from "react";
 import { useAuth } from "./AuthProvider";
+import { hasModule } from "@/types/institutions";
 
 export default function ModuleGuard({
   children,
@@ -31,7 +32,8 @@ export default function ModuleGuard({
     );
   }
 
-  if (!institution.enabledModules?.includes(module)) {
+  // Accepts both the UI label "HR" and the backend module code "CORE_HR".
+  if (!hasModule(institution.enabledModules, module)) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="rounded-xl border border-slate-200 bg-white p-8 text-center">

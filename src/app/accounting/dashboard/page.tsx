@@ -1,145 +1,66 @@
 "use client";
 
 import Link from "next/link";
-import {
-  ArrowRight,
-  Banknote,
-  CircleAlert,
-  FileText,
-  Plus,
-  Receipt,
-  TrendingDown,
-  TrendingUp,
-  Wallet,
-} from "lucide-react";
-import PageHeader from "@/components/ui/PageHeader";
+import { useCallback } from "react";
+import { ArrowRight, CircleAlert, FileText, Plus, Receipt, TrendingDown, TrendingUp } from "lucide-react";
+
+import ErrorState from "@/components/ui/ErrorState";
 import KPIStatCard from "@/components/ui/KPIStatCard";
-import StatusBadge from "@/components/ui/StatusBadge";
+import PageHeader from "@/components/ui/PageHeader";
+import { dashboardsApi } from "@/lib/api";
+import { EM_DASH, formatAmount, formatNumber } from "@/lib/format";
+import { useApiResource } from "@/lib/useApiResource";
+import { useAuth } from "@/components/guards/AuthProvider";
 
-const kpis = [
-  { title: "Bank / Cash", value: "GHS 842,500", icon: Banknote },
-  { title: "Accounts Receivable", value: "GHS 218,400", icon: TrendingUp },
-  { title: "Accounts Payable", value: "GHS 143,750", icon: TrendingDown },
-  { title: "Revenue", value: "GHS 1.84M", icon: Wallet },
-  { title: "Expenses", value: "GHS 1.21M", icon: Receipt },
-  { title: "Profit / Loss", value: "GHS 630K", icon: TrendingUp },
-  { title: "Unposted Journals", value: "8", icon: FileText },
-  { title: "Pending Approvals", value: "5", icon: CircleAlert },
-];
-
-const recent = [
-  ["JV-2026-0091", "Payroll Journal - August", "GHS 486,200", "UNDER_REVIEW"],
-  ["JV-2026-0090", "Office Equipment", "GHS 18,500", "APPROVED"],
-  ["JV-2026-0089", "Utility Expense", "GHS 9,840", "DRAFT"],
-  ["JV-2026-0088", "Bank Charges", "GHS 1,240", "POSTED"],
-];
+const actions = [
+  ["New Journal", "/accounting/journals/new"],
+  ["New Vendor Bill", "/accounting/payables"],
+  ["Create Invoice", "/accounting/receivables"],
+  ["Record Payment", "/accounting/banking"],
+  ["Close Period", "/accounting/periods"],
+] as const;
 
 export default function AccountingDashboard() {
+  const { user } = useAuth();
+  const load = useCallback(() => dashboardsApi.getFinanceDashboard(), []);
+  const { data, loading, error, reload } = useApiResource(load);
+  const placeholder = loading ? "…" : EM_DASH;
+
   return (
     <main className="space-y-6">
       <PageHeader
         title="Accounting Dashboard"
-        description="Financial position, accounting workflow and items requiring attention."
-        actions={
-          <Link
-            href="/accounting/journals/new"
-            className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"
-          >
-            <Plus className="h-4 w-4" />
-            New Journal
-          </Link>
-        }
+        description="Financial operations and items requiring attention."
+        actions={<Link href="/accounting/journals/new" className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"><Plus className="h-4 w-4" />New Journal</Link>}
       />
 
+      <section className="rounded-2xl bg-slate-950 p-6 text-white sm:p-8"><p className="text-sm font-medium text-slate-300">Accounting workspace</p><h2 className="mt-2 text-3xl font-semibold tracking-tight">Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, {user?.firstName ?? "there"}.</h2><p className="mt-2 text-sm text-slate-300">Review financial operations, approvals, and period controls that need your attention.</p></section>
+
+      {error && <ErrorState message={error} onRetry={reload} />}
+
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {kpis.map((item) => (
-          <KPIStatCard
-            key={item.title}
-            title={item.title}
-            value={item.value}
-            icon={<item.icon className="h-5 w-5" />}
-          />
-        ))}
+        <KPIStatCard title="Accounts Receivable" value={data ? formatAmount(data.accounts_receivable) : placeholder} icon={<TrendingUp className="h-5 w-5" />} />
+        <KPIStatCard title="Accounts Payable" value={data ? formatAmount(data.accounts_payable) : placeholder} icon={<TrendingDown className="h-5 w-5" />} />
+        <KPIStatCard title="Posted Expenses" value={data ? formatAmount(data.expenses) : placeholder} icon={<Receipt className="h-5 w-5" />} />
+        <KPIStatCard title="Pending Journals" value={data ? formatNumber(data.pending_journals) : placeholder} icon={<FileText className="h-5 w-5" />} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
         <section className="rounded-2xl border bg-white p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="font-semibold text-slate-900">Recent Journals</h2>
-              <p className="text-sm text-slate-500">Latest accounting activity.</p>
-            </div>
-            <Link href="/accounting/journals" className="text-sm font-semibold text-slate-700">
-              View all
-            </Link>
-          </div>
-
-          <div className="mt-5 overflow-x-auto">
-            <table className="w-full min-w-[650px] text-sm">
-              <thead>
-                <tr className="border-b text-left text-xs uppercase text-slate-500">
-                  <th className="pb-3">Reference</th>
-                  <th className="pb-3">Description</th>
-                  <th className="pb-3">Amount</th>
-                  <th className="pb-3">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recent.map(([ref, description, amount, status]) => (
-                  <tr key={ref} className="border-b last:border-0">
-                    <td className="py-4 font-medium">{ref}</td>
-                    <td className="py-4">{description}</td>
-                    <td className="py-4 font-medium">{amount}</td>
-                    <td className="py-4">
-                      <StatusBadge status={status} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <div className="flex items-center justify-between"><div><h2 className="font-semibold text-slate-900">Financial Operations</h2><p className="text-sm text-slate-500">Tenant-scoped operational totals from the finance dashboard.</p></div><Link href="/accounting/reports" className="text-sm font-semibold text-slate-700">View reports</Link></div>
+          <dl className="mt-5 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl bg-slate-50 p-4"><dt className="text-xs text-slate-500">Open receivables</dt><dd className="mt-1 text-xl font-semibold text-slate-900">{data ? formatAmount(data.accounts_receivable) : placeholder}</dd></div>
+            <div className="rounded-xl bg-slate-50 p-4"><dt className="text-xs text-slate-500">Open payables</dt><dd className="mt-1 text-xl font-semibold text-slate-900">{data ? formatAmount(data.accounts_payable) : placeholder}</dd></div>
+            <div className="rounded-xl bg-slate-50 p-4"><dt className="text-xs text-slate-500">Posted expenses</dt><dd className="mt-1 text-xl font-semibold text-slate-900">{data ? formatAmount(data.expenses) : placeholder}</dd></div>
+            <div className="rounded-xl bg-slate-50 p-4"><dt className="text-xs text-slate-500">Journals awaiting review</dt><dd className="mt-1 text-xl font-semibold text-slate-900">{data ? formatNumber(data.pending_journals) : placeholder}</dd></div>
+          </dl>
         </section>
 
-        <section className="rounded-2xl border bg-white p-5">
-          <h2 className="font-semibold text-slate-900">Quick Actions</h2>
-          <div className="mt-4 space-y-2">
-            {[
-              ["New Journal", "/accounting/journals/new"],
-              ["New Vendor Bill", "/accounting/payables"],
-              ["Create Invoice", "/accounting/receivables"],
-              ["Record Payment", "/accounting/banking"],
-              ["Record Receipt", "/accounting/banking"],
-              ["Review Payroll Posting", "/accounting/journals"],
-              ["View General Ledger", "/accounting/reports"],
-              ["Close Period", "/accounting/periods"],
-            ].map(([label, href]) => (
-              <Link
-                key={label}
-                href={href}
-                className="flex items-center justify-between rounded-xl border p-3 text-sm font-medium hover:bg-slate-50"
-              >
-                {label}
-                <ArrowRight className="h-4 w-4 text-slate-400" />
-              </Link>
-            ))}
-          </div>
-        </section>
+        <section className="rounded-2xl border bg-white p-5"><h2 className="font-semibold text-slate-900">Quick Actions</h2><div className="mt-4 space-y-2">{actions.map(([label, href]) => <Link key={label} href={href} className="flex items-center justify-between rounded-xl border p-3 text-sm font-medium hover:bg-slate-50">{label}<ArrowRight className="h-4 w-4 text-slate-400" /></Link>)}</div></section>
       </div>
 
       <section className="rounded-2xl border bg-white p-5">
-        <h2 className="font-semibold text-slate-900">Ghana Tax & Compliance</h2>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {["VAT Liability", "NHIL Liability", "GETFund Liability", "Withholding Tax"].map(
-            (item, index) => (
-              <div key={item} className="rounded-xl bg-slate-50 p-4">
-                <p className="text-xs font-medium text-slate-500">{item}</p>
-                <p className="mt-2 text-lg font-semibold text-slate-900">
-                  GHS {[84200, 42100, 42100, 18650][index].toLocaleString()}
-                </p>
-              </div>
-            )
-          )}
-        </div>
+        <div className="flex items-start gap-3"><CircleAlert className="mt-0.5 h-5 w-5 text-slate-500" /><div><h2 className="font-semibold text-slate-900">Journal and Compliance Detail</h2><p className="mt-1 text-sm text-slate-500">The finance dashboard does not expose recent-journal rows, bank/cash balances, revenue, profit/loss, or Ghana tax liabilities. These remain available only where supported by their dedicated screens and reports.</p></div></div>
       </section>
     </main>
   );

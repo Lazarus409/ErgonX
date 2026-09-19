@@ -1,221 +1,263 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CalendarDays,
   Clock3,
   Edit3,
   Plus,
   Search,
-  Users,
   X,
 } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
+import ErrorState from "@/components/ui/ErrorState";
+import EmptyState from "@/components/ui/EmptyState";
+import { getApiErrorMessage, schedulingApi } from "@/lib/api";
+import { MAX_PAGE_SIZE } from "@/types/api";
+import type { Shift, ShiftPattern, ShiftPatternDay } from "@/types/attendance";
+import { EM_DASH } from "@/lib/format";
 
-type Pattern = {
-  id: string;
+const ALL = "ALL";
+
+interface PatternForm {
   name: string;
   code: string;
-  type: string;
-  cycleLength: number;
-  assignedEmployees: number;
-  status: string;
-  description: string;
-  days: {
-    day: number;
-    label: string;
-    shift: string;
-  }[];
+  cycleLengthDays: number;
+  isActive: boolean;
+}
+
+const emptyForm: PatternForm = {
+  name: "",
+  code: "",
+  cycleLengthDays: 7,
+  isActive: true,
 };
 
-const initialPatterns: Pattern[] = [
-  {
-    id: "pattern-001",
-    name: "Standard 5-Day Pattern",
-    code: "SP-001",
-    type: "WEEKLY",
-    cycleLength: 5,
-    assignedEmployees: 28,
-    status: "ACTIVE",
-    description: "Standard Monday to Friday working pattern.",
-    days: [
-      { day: 1, label: "Day 1", shift: "Morning Shift" },
-      { day: 2, label: "Day 2", shift: "Morning Shift" },
-      { day: 3, label: "Day 3", shift: "Morning Shift" },
-      { day: 4, label: "Day 4", shift: "Morning Shift" },
-      { day: 5, label: "Day 5", shift: "Morning Shift" },
-    ],
-  },
-  {
-    id: "pattern-002",
-    name: "Day/Night Alternating",
-    code: "SP-002",
-    type: "ALTERNATING",
-    cycleLength: 4,
-    assignedEmployees: 16,
-    status: "ACTIVE",
-    description: "Employees alternate between day and night shifts.",
-    days: [
-      { day: 1, label: "Day 1", shift: "Morning Shift" },
-      { day: 2, label: "Day 2", shift: "Morning Shift" },
-      { day: 3, label: "Day 3", shift: "Night Shift" },
-      { day: 4, label: "Day 4", shift: "Night Shift" },
-    ],
-  },
-  {
-    id: "pattern-003",
-    name: "Support Team Pattern",
-    code: "SP-003",
-    type: "WEEKLY",
-    cycleLength: 7,
-    assignedEmployees: 11,
-    status: "ACTIVE",
-    description: "Seven-day operational support pattern.",
-    days: [
-      { day: 1, label: "Day 1", shift: "Morning Shift" },
-      { day: 2, label: "Day 2", shift: "Morning Shift" },
-      { day: 3, label: "Day 3", shift: "Morning Shift" },
-      { day: 4, label: "Day 4", shift: "Evening Shift" },
-      { day: 5, label: "Day 5", shift: "Evening Shift" },
-      { day: 6, label: "Day 6", shift: "Off" },
-      { day: 7, label: "Day 7", shift: "Off" },
-    ],
-  },
-  {
-    id: "pattern-004",
-    name: "Legacy Night Pattern",
-    code: "SP-004",
-    type: "WEEKLY",
-    cycleLength: 7,
-    assignedEmployees: 0,
-    status: "INACTIVE",
-    description: "Previously used night operations pattern.",
-    days: [
-      { day: 1, label: "Day 1", shift: "Night Shift" },
-      { day: 2, label: "Day 2", shift: "Night Shift" },
-      { day: 3, label: "Day 3", shift: "Night Shift" },
-      { day: 4, label: "Day 4", shift: "Off" },
-      { day: 5, label: "Day 5", shift: "Off" },
-      { day: 6, label: "Day 6", shift: "Night Shift" },
-      { day: 7, label: "Day 7", shift: "Night Shift" },
-    ],
-  },
-];
-
 export default function ShiftPatternsPage() {
-  const [patterns, setPatterns] = useState(initialPatterns);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("ALL");
-  const [typeFilter, setTypeFilter] = useState("ALL");
-  const [showModal, setShowModal] = useState(false);
-  const [editingPattern, setEditingPattern] = useState<Pattern | null>(null);
+  const [patterns, setPatterns] = useState<ShiftPattern[]>([]);
+  const [days, setDays] = useState<ShiftPatternDay[]>([]);
+  const [shifts, setShifts] = useState<Shift[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
 
-  const [form, setForm] = useState({
-    name: "",
-    code: "",
-    type: "WEEKLY",
-    cycleLength: "5",
-    description: "",
-  });
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState(ALL);
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<ShiftPattern | null>(null);
+  const [form, setForm] = useState<PatternForm>(emptyForm);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
+
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [dayError, setDayError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+
+    async function load() {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const [patternPage, dayPage, shiftPage] = await Promise.all([
+          schedulingApi.listShiftPatterns({
+            page_size: MAX_PAGE_SIZE,
+            ordering: "name",
+          }),
+          schedulingApi.listShiftPatternDays({
+            page_size: MAX_PAGE_SIZE,
+            ordering: "day_index",
+          }),
+          schedulingApi.listShifts({
+            page_size: MAX_PAGE_SIZE,
+            ordering: "name",
+          }),
+        ]);
+
+        if (!active) {
+          return;
+        }
+
+        setPatterns(patternPage.results);
+        setDays(dayPage.results);
+        setShifts(shiftPage.results);
+      } catch (caught) {
+        if (active) {
+          setError(getApiErrorMessage(caught));
+          setPatterns([]);
+          setDays([]);
+          setShifts([]);
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    load();
+
+    return () => {
+      active = false;
+    };
+  }, [reloadToken]);
+
+  const reload = useCallback(() => {
+    setReloadToken((token) => token + 1);
+  }, []);
+
+  const shiftNames = useMemo(
+    () => new Map(shifts.map((shift) => [shift.id, shift.name])),
+    [shifts],
+  );
+
+  const daysByPattern = useMemo(() => {
+    const grouped = new Map<string, ShiftPatternDay[]>();
+
+    for (const day of days) {
+      const existing = grouped.get(day.shift_pattern) ?? [];
+      existing.push(day);
+      grouped.set(day.shift_pattern, existing);
+    }
+
+    for (const list of grouped.values()) {
+      list.sort((a, b) => a.day_index - b.day_index);
+    }
+
+    return grouped;
+  }, [days]);
 
   const filteredPatterns = useMemo(() => {
-    return patterns.filter((pattern) => {
-      const query = search.toLowerCase().trim();
+    const value = search.trim().toLowerCase();
 
+    return patterns.filter((pattern) => {
       const matchesSearch =
-        !query ||
-        pattern.name.toLowerCase().includes(query) ||
-        pattern.code.toLowerCase().includes(query);
+        !value ||
+        pattern.name.toLowerCase().includes(value) ||
+        pattern.code.toLowerCase().includes(value);
 
       const matchesStatus =
-        statusFilter === "ALL" || pattern.status === statusFilter;
+        statusFilter === ALL ||
+        (statusFilter === "ACTIVE" ? pattern.is_active : !pattern.is_active);
 
-      const matchesType =
-        typeFilter === "ALL" || pattern.type === typeFilter;
-
-      return matchesSearch && matchesStatus && matchesType;
+      return matchesSearch && matchesStatus;
     });
-  }, [patterns, search, statusFilter, typeFilter]);
+  }, [patterns, search, statusFilter]);
 
-  function openCreate() {
-    setEditingPattern(null);
-    setForm({
-      name: "",
-      code: "",
-      type: "WEEKLY",
-      cycleLength: "5",
-      description: "",
-    });
-    setShowModal(true);
-  }
+  const openCreate = () => {
+    setEditing(null);
+    setForm(emptyForm);
+    setFormError("");
+    setModalOpen(true);
+  };
 
-  function openEdit(pattern: Pattern) {
-    setEditingPattern(pattern);
+  const openEdit = (pattern: ShiftPattern) => {
+    setEditing(pattern);
+    setFormError("");
     setForm({
       name: pattern.name,
       code: pattern.code,
-      type: pattern.type,
-      cycleLength: String(pattern.cycleLength),
-      description: pattern.description,
+      cycleLengthDays: pattern.cycle_length_days,
+      isActive: pattern.is_active,
     });
-    setShowModal(true);
-  }
+    setModalOpen(true);
+  };
 
-  function savePattern(event: React.FormEvent) {
-    event.preventDefault();
-
-    if (!form.name.trim() || !form.code.trim()) return;
-
-    if (editingPattern) {
-      setPatterns((current) =>
-        current.map((pattern) =>
-          pattern.id === editingPattern.id
-            ? {
-                ...pattern,
-                name: form.name,
-                code: form.code,
-                type: form.type,
-                cycleLength: Number(form.cycleLength),
-                description: form.description,
-              }
-            : pattern
-        )
-      );
-    } else {
-      const cycleLength = Number(form.cycleLength);
-
-      const newPattern: Pattern = {
-        id: `pattern-${Date.now()}`,
-        name: form.name,
-        code: form.code,
-        type: form.type,
-        cycleLength,
-        assignedEmployees: 0,
-        status: "ACTIVE",
-        description: form.description,
-        days: Array.from({ length: cycleLength }, (_, index) => ({
-          day: index + 1,
-          label: `Day ${index + 1}`,
-          shift: "Off",
-        })),
-      };
-
-      setPatterns((current) => [newPattern, ...current]);
+  const savePattern = useCallback(async () => {
+    if (!form.name.trim() || !form.code.trim()) {
+      setFormError("Pattern name and code are required.");
+      return;
     }
 
-    setShowModal(false);
-  }
+    setSaving(true);
+    setFormError("");
+
+    const payload: Partial<ShiftPattern> = {
+      name: form.name.trim(),
+      code: form.code.trim(),
+      cycle_length_days: form.cycleLengthDays,
+      is_active: form.isActive,
+    };
+
+    try {
+      if (editing) {
+        await schedulingApi.updateShiftPattern(editing.id, payload);
+      } else {
+        await schedulingApi.createShiftPattern(payload);
+      }
+
+      setModalOpen(false);
+      reload();
+    } catch (caught) {
+      setFormError(getApiErrorMessage(caught));
+    } finally {
+      setSaving(false);
+    }
+  }, [form, editing, reload]);
+
+  /** Pattern days are separate records under `/shift-pattern-days/`. */
+  const setPatternDay = useCallback(
+    async (
+      pattern: ShiftPattern,
+      dayIndex: number,
+      existing: ShiftPatternDay | undefined,
+      shiftId: string,
+    ) => {
+      setDayError("");
+
+      try {
+        if (shiftId === "") {
+          if (existing) {
+            await schedulingApi.deleteShiftPatternDay(existing.id);
+          }
+        } else if (shiftId === "OFF") {
+          const payload = {
+            shift_pattern: pattern.id,
+            day_index: dayIndex,
+            shift: null,
+            is_off_day: true,
+          };
+
+          if (existing) {
+            await schedulingApi.updateShiftPatternDay(existing.id, payload);
+          } else {
+            await schedulingApi.createShiftPatternDay(payload);
+          }
+        } else {
+          const payload = {
+            shift_pattern: pattern.id,
+            day_index: dayIndex,
+            shift: shiftId,
+            is_off_day: false,
+          };
+
+          if (existing) {
+            await schedulingApi.updateShiftPatternDay(existing.id, payload);
+          } else {
+            await schedulingApi.createShiftPatternDay(payload);
+          }
+        }
+
+        reload();
+      } catch (caught) {
+        setDayError(getApiErrorMessage(caught));
+      }
+    },
+    [reload],
+  );
+
+  const activeCount = patterns.filter((pattern) => pattern.is_active).length;
 
   return (
-    <main className="space-y-6">
+    <div className="space-y-6">
       <PageHeader
         title="Shift Patterns"
-        description="Create and manage recurring sequences of shifts and rest days."
+        description="Define repeating shift cycles and the shift worked on each day of the cycle."
         actions={
           <button
-            type="button"
             onClick={openCreate}
             className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
           >
@@ -225,465 +267,322 @@ export default function ShiftPatternsPage() {
         }
       />
 
-      {/* Summary */}
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard
-          icon={<CalendarDays className="h-5 w-5" />}
-          label="Total Patterns"
-          value={String(patterns.length)}
-          detail="Configured patterns"
-        />
+      {error && <ErrorState message={error} onRetry={reload} />}
 
+      {dayError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {dayError}
+        </div>
+      )}
+
+      <div className="grid gap-4 sm:grid-cols-3">
         <SummaryCard
+          title="Total Patterns"
+          value={patterns.length}
+          icon={<CalendarDays className="h-5 w-5" />}
+        />
+        <SummaryCard
+          title="Active"
+          value={activeCount}
           icon={<Clock3 className="h-5 w-5" />}
-          label="Active Patterns"
-          value={String(
-            patterns.filter((pattern) => pattern.status === "ACTIVE").length
-          )}
-          detail="Currently available"
         />
-
         <SummaryCard
-          icon={<Users className="h-5 w-5" />}
-          label="Assigned Employees"
-          value={String(
-            patterns.reduce(
-              (total, pattern) => total + pattern.assignedEmployees,
-              0
-            )
-          )}
-          detail="Across active patterns"
-        />
-
-        <SummaryCard
+          title="Configured Days"
+          value={days.length}
           icon={<CalendarDays className="h-5 w-5" />}
-          label="Pattern Days"
-          value={String(
-            patterns.reduce(
-              (total, pattern) => total + pattern.cycleLength,
-              0
-            )
-          )}
-          detail="Configured cycle days"
         />
-      </section>
+      </div>
 
-      {/* Filters */}
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
-        <div className="flex flex-col gap-3 lg:flex-row">
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="flex flex-col gap-3 sm:flex-row">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search pattern name or code..."
+              placeholder="Search shift patterns..."
               className="w-full rounded-lg border border-slate-200 py-2.5 pl-10 pr-3 text-sm outline-none focus:border-slate-400"
             />
           </div>
 
           <select
-            value={typeFilter}
-            onChange={(event) => setTypeFilter(event.target.value)}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none"
-          >
-            <option value="ALL">All Types</option>
-            <option value="WEEKLY">Weekly</option>
-            <option value="ALTERNATING">Alternating</option>
-          </select>
-
-          <select
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value)}
+            aria-label="Filter by status"
             className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none"
           >
-            <option value="ALL">All Statuses</option>
+            <option value={ALL}>All Statuses</option>
             <option value="ACTIVE">Active</option>
             <option value="INACTIVE">Inactive</option>
           </select>
         </div>
-      </section>
+      </div>
 
-      {/* Desktop table */}
-      <section className="hidden overflow-hidden rounded-xl border border-slate-200 bg-white lg:block">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="border-b border-slate-200 bg-slate-50">
-              <tr>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Pattern
-                </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Type
-                </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Cycle
-                </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Pattern Days
-                </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Employees
-                </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Status
-                </th>
-                <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Actions
-                </th>
-              </tr>
-            </thead>
+      {filteredPatterns.length === 0 ? (
+        <EmptyState
+          title={loading ? "Loading patterns..." : "No shift patterns"}
+          description={
+            loading
+              ? "Please wait."
+              : "Create a pattern to define a repeating shift cycle."
+          }
+        />
+      ) : (
+        <div className="space-y-4">
+          {filteredPatterns.map((pattern) => {
+            const patternDays = daysByPattern.get(pattern.id) ?? [];
+            const expanded = expandedId === pattern.id;
 
-            <tbody className="divide-y divide-slate-100">
-              {filteredPatterns.map((pattern) => (
-                <tr key={pattern.id} className="hover:bg-slate-50">
-                  <td className="px-5 py-4">
-                    <div>
-                      <p className="font-medium text-slate-900">
+            return (
+              <section
+                key={pattern.id}
+                className="rounded-xl border border-slate-200 bg-white"
+              >
+                <div className="flex flex-col gap-3 border-b border-slate-200 p-5 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <h2 className="text-base font-semibold text-slate-900">
                         {pattern.name}
-                      </p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {pattern.code}
-                      </p>
+                      </h2>
+
+                      <StatusBadge
+                        status={pattern.is_active ? "ACTIVE" : "INACTIVE"}
+                      />
                     </div>
-                  </td>
 
-                  <td className="px-5 py-4 text-sm text-slate-700">
-                    {formatType(pattern.type)}
-                  </td>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {pattern.code} · {pattern.cycle_length_days}-day cycle ·{" "}
+                      {patternDays.length} day
+                      {patternDays.length === 1 ? "" : "s"} configured
+                    </p>
+                  </div>
 
-                  <td className="px-5 py-4 text-sm text-slate-700">
-                    {pattern.cycleLength} days
-                  </td>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() =>
+                        setExpandedId(expanded ? null : pattern.id)
+                      }
+                      className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                      {expanded ? "Hide cycle" : "Edit cycle"}
+                    </button>
 
-                  <td className="px-5 py-4">
-                    <div className="flex flex-wrap gap-1">
-                      {pattern.days.slice(0, 5).map((day) => (
-                        <span
-                          key={day.day}
-                          className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600"
+                    <button
+                      onClick={() => openEdit(pattern)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                      <Edit3 className="h-4 w-4" />
+                      Edit
+                    </button>
+                  </div>
+                </div>
+
+                {expanded && (
+                  <div className="grid gap-3 p-5 sm:grid-cols-2 lg:grid-cols-4">
+                    {Array.from(
+                      { length: pattern.cycle_length_days },
+                      (_, index) => index + 1,
+                    ).map((dayIndex) => {
+                      const day = patternDays.find(
+                        (item) => item.day_index === dayIndex,
+                      );
+
+                      const value = day
+                        ? day.is_off_day
+                          ? "OFF"
+                          : (day.shift ?? "")
+                        : "";
+
+                      return (
+                        <label
+                          key={dayIndex}
+                          className="space-y-1.5 rounded-lg border border-slate-200 p-3"
                         >
-                          {day.shift}
-                        </span>
-                      ))}
+                          <span className="text-xs font-medium text-slate-500">
+                            Day {dayIndex}
+                          </span>
 
-                      {pattern.days.length > 5 && (
-                        <span className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-500">
-                          +{pattern.days.length - 5}
-                        </span>
-                      )}
-                    </div>
-                  </td>
+                          <select
+                            value={value}
+                            onChange={(event) =>
+                              setPatternDay(
+                                pattern,
+                                dayIndex,
+                                day,
+                                event.target.value,
+                              )
+                            }
+                            className="w-full rounded-lg border border-slate-200 px-2 py-2 text-sm outline-none focus:border-slate-400"
+                          >
+                            <option value="">Not configured</option>
+                            <option value="OFF">Off day</option>
 
-                  <td className="px-5 py-4 text-sm text-slate-700">
-                    {pattern.assignedEmployees}
-                  </td>
+                            {shifts.map((shift) => (
+                              <option key={shift.id} value={shift.id}>
+                                {shift.name}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
 
-                  <td className="px-5 py-4">
-                    <StatusBadge status={pattern.status} />
-                  </td>
-
-                  <td className="px-5 py-4">
-                    <div className="flex justify-end gap-2">
-                      <Link
-                        href={`/attendance/shift-patterns/${pattern.id}`}
-                        className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                {!expanded && patternDays.length > 0 && (
+                  <div className="flex flex-wrap gap-2 p-5">
+                    {patternDays.map((day) => (
+                      <span
+                        key={day.id}
+                        className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-700"
                       >
-                        View
-                      </Link>
-
-                      <button
-                        type="button"
-                        onClick={() => openEdit(pattern)}
-                        className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50"
-                        title="Edit pattern"
-                      >
-                        <Edit3 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-
-              {filteredPatterns.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center">
-                    <CalendarDays className="mx-auto h-8 w-8 text-slate-400" />
-                    <p className="mt-3 font-medium text-slate-900">
-                      No shift patterns found
-                    </p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Try changing your search or filters.
-                    </p>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                        Day {day.day_index}:{" "}
+                        {day.is_off_day
+                          ? "Off"
+                          : (shiftNames.get(day.shift ?? "") ?? EM_DASH)}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </section>
+            );
+          })}
         </div>
-      </section>
+      )}
 
-      {/* Mobile cards */}
-      <section className="space-y-3 lg:hidden">
-        {filteredPatterns.map((pattern) => (
-          <div
-            key={pattern.id}
-            className="rounded-xl border border-slate-200 bg-white p-4"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="font-semibold text-slate-900">
-                  {pattern.name}
-                </h3>
-                <p className="mt-1 text-xs text-slate-500">
-                  {pattern.code}
-                </p>
-              </div>
-
-              <StatusBadge status={pattern.status} />
-            </div>
-
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <Info label="Type" value={formatType(pattern.type)} />
-              <Info
-                label="Cycle"
-                value={`${pattern.cycleLength} days`}
-              />
-              <Info
-                label="Employees"
-                value={String(pattern.assignedEmployees)}
-              />
-              <Info
-                label="Pattern Days"
-                value={String(pattern.days.length)}
-              />
-            </div>
-
-            <div className="mt-4 flex gap-2">
-              <Link
-                href={`/attendance/shift-patterns/${pattern.id}`}
-                className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-center text-sm font-medium text-slate-700"
-              >
-                View
-              </Link>
-
-              <button
-                type="button"
-                onClick={() => openEdit(pattern)}
-                className="rounded-lg border border-slate-200 px-3 py-2 text-slate-600"
-              >
-                <Edit3 className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        ))}
-
-        {filteredPatterns.length === 0 && (
-          <div className="rounded-xl border border-dashed border-slate-300 p-10 text-center">
-            <CalendarDays className="mx-auto h-8 w-8 text-slate-400" />
-            <p className="mt-3 font-medium text-slate-900">
-              No shift patterns found
-            </p>
-          </div>
-        )}
-      </section>
-
-      {/* Add/Edit modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
+      {modalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-              <div>
-                <h2 className="font-semibold text-slate-900">
-                  {editingPattern ? "Edit Shift Pattern" : "Add Shift Pattern"}
-                </h2>
-                <p className="mt-1 text-xs text-slate-500">
-                  Configure the basic pattern definition.
-                </p>
-              </div>
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <h2 className="text-lg font-semibold text-slate-900">
+                {editing ? "Edit Shift Pattern" : "Add Shift Pattern"}
+              </h2>
 
               <button
-                type="button"
-                onClick={() => setShowModal(false)}
-                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                onClick={() => setModalOpen(false)}
+                disabled={saving}
+                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Close"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <form onSubmit={savePattern} className="space-y-5 p-5">
-              <div>
-                <label className="text-sm font-medium text-slate-700">
+            <div className="space-y-4 p-6">
+              {formError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {formError}
+                </div>
+              )}
+
+              <label className="block space-y-1.5">
+                <span className="text-sm font-medium text-slate-700">
                   Pattern Name
-                </label>
+                </span>
                 <input
                   value={form.name}
                   onChange={(event) =>
                     setForm({ ...form, name: event.target.value })
                   }
                   placeholder="e.g. Standard 5-Day Pattern"
-                  className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
-                  required
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
                 />
-              </div>
+              </label>
 
-              <div>
-                <label className="text-sm font-medium text-slate-700">
-                  Pattern Code
-                </label>
+              <label className="block space-y-1.5">
+                <span className="text-sm font-medium text-slate-700">Code</span>
                 <input
                   value={form.code}
                   onChange={(event) =>
                     setForm({ ...form, code: event.target.value })
                   }
-                  placeholder="e.g. SP-005"
-                  className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
-                  required
+                  placeholder="e.g. SP-001"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
                 />
-              </div>
+              </label>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="text-sm font-medium text-slate-700">
-                    Pattern Type
-                  </label>
-                  <select
-                    value={form.type}
-                    onChange={(event) =>
-                      setForm({ ...form, type: event.target.value })
-                    }
-                    className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none"
-                  >
-                    <option value="WEEKLY">Weekly</option>
-                    <option value="ALTERNATING">Alternating</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-slate-700">
-                    Cycle Length
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="31"
-                    value={form.cycleLength}
-                    onChange={(event) =>
-                      setForm({
-                        ...form,
-                        cycleLength: event.target.value,
-                      })
-                    }
-                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-slate-700">
-                  Description
-                </label>
-                <textarea
-                  value={form.description}
+              <label className="block space-y-1.5">
+                <span className="text-sm font-medium text-slate-700">
+                  Cycle Length (days)
+                </span>
+                <input
+                  type="number"
+                  min="1"
+                  value={form.cycleLengthDays}
                   onChange={(event) =>
                     setForm({
                       ...form,
-                      description: event.target.value,
+                      cycleLengthDays: Number(event.target.value),
                     })
                   }
-                  rows={3}
-                  placeholder="Describe how this pattern is used."
-                  className="mt-2 w-full resize-none rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
                 />
-              </div>
+              </label>
 
-              <div className="flex justify-end gap-2 border-t border-slate-200 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
+              <label className="flex items-center gap-3 rounded-lg border border-slate-200 p-3">
+                <input
+                  type="checkbox"
+                  checked={form.isActive}
+                  onChange={(event) =>
+                    setForm({ ...form, isActive: event.target.checked })
+                  }
+                  className="h-4 w-4"
+                />
+                <span className="text-sm font-medium text-slate-700">
+                  Active
+                </span>
+              </label>
+            </div>
 
-                <button
-                  type="submit"
-                  className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
-                >
-                  {editingPattern ? "Save Changes" : "Create Pattern"}
-                </button>
-              </div>
-            </form>
+            <div className="flex justify-end gap-3 border-t border-slate-200 px-6 py-4">
+              <button
+                onClick={() => setModalOpen(false)}
+                disabled={saving}
+                className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={savePattern}
+                disabled={saving || !form.name.trim() || !form.code.trim()}
+                className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {saving
+                  ? "Saving..."
+                  : editing
+                    ? "Save Changes"
+                    : "Create Pattern"}
+              </button>
+            </div>
           </div>
         </div>
       )}
-
-      <section className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4">
-        <div className="flex items-start gap-3">
-          <Clock3 className="mt-0.5 h-5 w-5 shrink-0 text-slate-600" />
-          <div>
-            <p className="text-sm font-semibold text-slate-800">
-              Pattern configuration
-            </p>
-            <p className="mt-1 text-sm leading-6 text-slate-600">
-              Pattern days determine the sequence of shifts and rest days.
-              Detailed assignments and authoritative scheduling calculations
-              will be handled by the backend when the scheduling API is
-              connected.
-            </p>
-          </div>
-        </div>
-      </section>
-    </main>
+    </div>
   );
 }
 
 function SummaryCard({
-  icon,
-  label,
+  title,
   value,
-  detail,
+  icon,
 }: {
+  title: string;
+  value: number;
   icon: React.ReactNode;
-  label: string;
-  value: string;
-  detail: string;
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5">
-      <div className="flex items-center gap-3">
-        <div className="rounded-lg bg-slate-100 p-2 text-slate-600">
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-slate-500">{title}</p>
+
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
           {icon}
-        </div>
-        <p className="text-sm font-medium text-slate-500">{label}</p>
+        </span>
       </div>
 
-      <p className="mt-4 text-2xl font-semibold text-slate-900">{value}</p>
-      <p className="mt-1 text-xs text-slate-500">{detail}</p>
+      <p className="mt-3 text-2xl font-bold text-slate-900">{value}</p>
     </div>
   );
-}
-
-function Info({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div>
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-        {label}
-      </p>
-      <p className="mt-1 text-sm font-medium text-slate-900">{value}</p>
-    </div>
-  );
-}
-
-function formatType(type: string) {
-  return type
-    .toLowerCase()
-    .replace("_", " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }

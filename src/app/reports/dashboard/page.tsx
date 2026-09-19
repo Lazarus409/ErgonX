@@ -1,0 +1,12 @@
+"use client";
+
+import { FileBarChart } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import ErrorState from "@/components/ui/ErrorState";
+import PageHeader from "@/components/ui/PageHeader";
+import { reportsApi } from "@/lib/api";
+import { useApiResource } from "@/lib/useApiResource";
+
+const reports = [{ id: "workforce-cost", title: "Workforce Cost" }, { id: "leave", title: "Leave" }, { id: "attendance", title: "Attendance" }, { id: "payroll", title: "Payroll" }, { id: "accounting", title: "Accounting" }, { id: "ap-ar", title: "AP / AR" }, { id: "expenses", title: "Expenses" }] as const;
+type ReportId = typeof reports[number]["id"];
+export default function ReportsDashboardPage() { const [selected, setSelected] = useState<ReportId>("workforce-cost"); const load = useCallback(() => reportsApi.getReport(selected), [selected]); const { data, loading, error, reload } = useApiResource(load); const columns = useMemo(() => Array.from(new Set((data?.rows ?? []).flatMap((row) => Object.keys(row)))), [data]); return <main className="space-y-6"><PageHeader title="Reports" description="Institution-scoped operational reports supplied by the backend." />{error && <ErrorState message={error} onRetry={reload} />}<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{reports.map((report) => <button type="button" key={report.id} onClick={() => setSelected(report.id)} className={`rounded-xl border bg-white p-4 text-left ${selected === report.id ? "border-slate-900" : ""}`}><FileBarChart className="h-5 w-5" /><p className="mt-3 font-semibold">{report.title}</p></button>)}</div><section className="rounded-2xl border bg-white p-5"><h2 className="font-semibold">{reports.find((item) => item.id === selected)?.title}</h2><div className="mt-5 overflow-x-auto"><table className="w-full min-w-[600px] text-sm"><thead><tr className="border-b text-left text-xs uppercase text-slate-500">{columns.map((column) => <th key={column} className="pb-3 pr-4">{column.replaceAll("_", " ")}</th>)}</tr></thead><tbody>{data?.rows.map((row, index) => <tr key={index} className="border-b last:border-0">{columns.map((column) => <td key={column} className="py-4 pr-4">{row[column] ?? "—"}</td>)}</tr>)}</tbody></table>{loading && <p className="py-10 text-center text-sm text-slate-500">Loading report...</p>}{!loading && !data?.rows.length && <p className="py-10 text-center text-sm text-slate-500">No report rows found.</p>}</div></section></main>; }

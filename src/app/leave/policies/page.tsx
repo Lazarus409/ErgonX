@@ -1,6 +1,6 @@
-﻿"use client";
+"use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Plus,
   Search,
@@ -11,100 +11,64 @@ import {
 } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
+import ErrorState from "@/components/ui/ErrorState";
+import {
+  getApiErrorMessage,
+  leaveApi,
+  organizationApi,
+} from "@/lib/api";
+import { MAX_PAGE_SIZE } from "@/types/api";
+import type { Department, Grade, Location } from "@/types/hr";
+import { EMPLOYMENT_TYPES } from "@/types/hr";
+import { ACCRUAL_METHODS } from "@/types/leave";
+import type { LeavePolicy, LeavePolicyPayload, LeaveType } from "@/types/leave";
+import { formatDate, formatNumber, humanizeEnum } from "@/lib/format";
 
-type LeavePolicy = {
-  id: string;
+const ALL_TYPES = "ALL_TYPES";
+const ALL_STATUSES = "ALL_STATUSES";
+
+const GENDERS = ["MALE", "FEMALE", "OTHER", "PREFER_NOT_TO_SAY"];
+
+interface Option {
+  value: string;
+  label: string;
+}
+
+interface PolicyForm {
   name: string;
   leaveType: string;
   entitlement: number;
-  accrual: string;
+  accrualMethod: string;
+  accrualRate: number;
   carryForward: number;
-  minService: number;
-  maxConsecutive: number;
+  minServiceDays: number;
+  maxConsecutive: string;
   negativeBalance: boolean;
   documentsRequired: boolean;
   effectiveFrom: string;
-  effectiveTo?: string;
+  effectiveTo: string;
+  isActive: boolean;
   employmentTypes: string[];
   departments: string[];
   grades: string[];
   genders: string[];
   locations: string[];
-  status: "ACTIVE" | "INACTIVE";
-};
+}
 
-const initialPolicies: LeavePolicy[] = [
-  {
-    id: "LP-001",
-    name: "Annual Leave Policy",
-    leaveType: "Annual Leave",
-    entitlement: 20,
-    accrual: "Monthly",
-    carryForward: 5,
-    minService: 3,
-    maxConsecutive: 15,
-    negativeBalance: false,
-    documentsRequired: false,
-    effectiveFrom: "2026-01-01",
-    employmentTypes: [],
-    departments: [],
-    grades: [],
-    genders: [],
-    locations: [],
-    status: "ACTIVE",
-  },
-  {
-    id: "LP-002",
-    name: "Sick Leave Policy",
-    leaveType: "Sick Leave",
-    entitlement: 10,
-    accrual: "Annual",
-    carryForward: 0,
-    minService: 0,
-    maxConsecutive: 10,
-    negativeBalance: false,
-    documentsRequired: true,
-    effectiveFrom: "2026-01-01",
-    employmentTypes: [],
-    departments: [],
-    grades: [],
-    genders: [],
-    locations: [],
-    status: "ACTIVE",
-  },
-  {
-    id: "LP-003",
-    name: "Maternity Leave Policy",
-    leaveType: "Maternity Leave",
-    entitlement: 84,
-    accrual: "Fixed",
-    carryForward: 0,
-    minService: 6,
-    maxConsecutive: 84,
-    negativeBalance: false,
-    documentsRequired: true,
-    effectiveFrom: "2026-01-01",
-    employmentTypes: [],
-    departments: [],
-    grades: [],
-    genders: ["Female"],
-    locations: [],
-    status: "ACTIVE",
-  },
-];
-
-const emptyForm: Omit<LeavePolicy, "id" | "status"> = {
+const emptyForm: PolicyForm = {
   name: "",
   leaveType: "",
   entitlement: 0,
-  accrual: "Monthly",
+  accrualMethod: "NONE",
+  accrualRate: 0,
   carryForward: 0,
-  minService: 0,
-  maxConsecutive: 0,
+  minServiceDays: 0,
+  maxConsecutive: "",
   negativeBalance: false,
   documentsRequired: false,
   effectiveFrom: "",
   effectiveTo: "",
+  isActive: true,
   employmentTypes: [],
   departments: [],
   grades: [],
@@ -112,94 +76,165 @@ const emptyForm: Omit<LeavePolicy, "id" | "status"> = {
   locations: [],
 };
 
-const employmentTypeOptions = [
-  "Permanent",
-  "Contract",
-  "Temporary",
-  "Intern",
-];
+interface Reference {
+  leaveTypes: LeaveType[];
+  departments: Department[];
+  grades: Grade[];
+  locations: Location[];
+}
 
-const departmentOptions = [
-  "Human Resources",
-  "Finance",
-  "IT",
-  "Operations",
-];
-
-const gradeOptions = [
-  "Junior",
-  "Intermediate",
-  "Senior",
-  "Management",
-];
-
-const genderOptions = [
-  "Male",
-  "Female",
-];
-
-const locationOptions = [
-  "Head Office",
-  "Regional Office",
-  "Remote",
-];
+const emptyReference: Reference = {
+  leaveTypes: [],
+  departments: [],
+  grades: [],
+  locations: [],
+};
 
 export default function LeavePoliciesPage() {
-  const [policies, setPolicies] = useState(initialPolicies);
+  const [policies, setPolicies] = useState<LeavePolicy[]>([]);
+  const [reference, setReference] = useState<Reference>(emptyReference);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
+
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("All Statuses");
-  const [typeFilter, setTypeFilter] = useState("All Types");
+  const [statusFilter, setStatusFilter] = useState(ALL_STATUSES);
+  const [typeFilter, setTypeFilter] = useState(ALL_TYPES);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPolicy, setEditingPolicy] = useState<LeavePolicy | null>(null);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState<PolicyForm>(emptyForm);
   const [expandedPolicy, setExpandedPolicy] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+
+    async function load() {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const [policyPage, types, departments, grades, locations] =
+          await Promise.all([
+            leaveApi.listLeavePolicies({
+              page_size: MAX_PAGE_SIZE,
+              ordering: "name",
+            }),
+            leaveApi.listLeaveTypes({
+              page_size: MAX_PAGE_SIZE,
+              ordering: "name",
+            }),
+            organizationApi.listDepartments({
+              page_size: MAX_PAGE_SIZE,
+              ordering: "name",
+            }),
+            organizationApi.listGrades({
+              page_size: MAX_PAGE_SIZE,
+              ordering: "name",
+            }),
+            organizationApi.listLocations({
+              page_size: MAX_PAGE_SIZE,
+              ordering: "name",
+            }),
+          ]);
+
+        if (!active) {
+          return;
+        }
+
+        setPolicies(policyPage.results);
+        setReference({
+          leaveTypes: types.results,
+          departments: departments.results,
+          grades: grades.results,
+          locations: locations.results,
+        });
+      } catch (caught) {
+        if (active) {
+          setError(getApiErrorMessage(caught));
+          setPolicies([]);
+          setReference(emptyReference);
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    load();
+
+    return () => {
+      active = false;
+    };
+  }, [reloadToken]);
+
+  const reload = useCallback(() => {
+    setReloadToken((token) => token + 1);
+  }, []);
+
+  const leaveTypeNames = useMemo(
+    () => new Map(reference.leaveTypes.map((type) => [type.id, type.name])),
+    [reference.leaveTypes],
+  );
 
   const filteredPolicies = useMemo(() => {
     const value = search.toLowerCase().trim();
 
     return policies.filter((policy) => {
+      const typeName = leaveTypeNames.get(policy.leave_type) ?? "";
+
       const matchesSearch =
         !value ||
         policy.name.toLowerCase().includes(value) ||
-        policy.leaveType.toLowerCase().includes(value);
+        typeName.toLowerCase().includes(value);
 
       const matchesStatus =
-        statusFilter === "All Statuses" ||
-        policy.status === statusFilter;
+        statusFilter === ALL_STATUSES ||
+        (statusFilter === "ACTIVE" ? policy.is_active : !policy.is_active);
 
       const matchesType =
-        typeFilter === "All Types" ||
-        policy.leaveType === typeFilter;
+        typeFilter === ALL_TYPES || policy.leave_type === typeFilter;
 
       return matchesSearch && matchesStatus && matchesType;
     });
-  }, [policies, search, statusFilter, typeFilter]);
+  }, [policies, search, statusFilter, typeFilter, leaveTypeNames]);
 
   const openCreate = () => {
     setEditingPolicy(null);
+    setFormError("");
     setForm(emptyForm);
     setModalOpen(true);
   };
 
   const openEdit = (policy: LeavePolicy) => {
     setEditingPolicy(policy);
+    setFormError("");
     setForm({
       name: policy.name,
-      leaveType: policy.leaveType,
-      entitlement: policy.entitlement,
-      accrual: policy.accrual,
-      carryForward: policy.carryForward,
-      minService: policy.minService,
-      maxConsecutive: policy.maxConsecutive,
-      negativeBalance: policy.negativeBalance,
-      documentsRequired: policy.documentsRequired,
-      effectiveFrom: policy.effectiveFrom,
-      effectiveTo: policy.effectiveTo || "",
-      employmentTypes: policy.employmentTypes,
-      departments: policy.departments,
-      grades: policy.grades,
-      genders: policy.genders,
-      locations: policy.locations,
+      leaveType: policy.leave_type,
+      entitlement: Number(policy.annual_entitlement),
+      accrualMethod: policy.accrual_method,
+      accrualRate: Number(policy.accrual_rate),
+      carryForward: Number(policy.max_carry_forward),
+      minServiceDays: policy.min_service_days,
+      maxConsecutive:
+        policy.max_consecutive_days === null
+          ? ""
+          : String(Number(policy.max_consecutive_days)),
+      negativeBalance: policy.allow_negative_balance,
+      documentsRequired: policy.requires_document,
+      effectiveFrom: policy.effective_from,
+      effectiveTo: policy.effective_to ?? "",
+      isActive: policy.is_active,
+      // Employment-type and gender eligibility are not returned by the API,
+      // so an edit starts from an empty selection for those two dimensions.
+      employmentTypes: policy.eligible_employment_types ?? [],
+      departments: policy.eligible_department_ids ?? [],
+      grades: policy.eligible_grade_ids ?? [],
+      genders: policy.eligible_genders ?? [],
+      locations: policy.eligible_location_ids ?? [],
     });
     setModalOpen(true);
   };
@@ -208,36 +243,55 @@ export default function LeavePoliciesPage() {
     setModalOpen(false);
     setEditingPolicy(null);
     setForm(emptyForm);
+    setFormError("");
   };
 
-  const savePolicy = () => {
+  const savePolicy = useCallback(async () => {
     if (!form.name.trim() || !form.leaveType || !form.effectiveFrom) {
+      setFormError("Policy name, leave type and effective-from are required.");
       return;
     }
 
-    if (editingPolicy) {
-      setPolicies((current) =>
-        current.map((policy) =>
-          policy.id === editingPolicy.id
-            ? {
-                ...policy,
-                ...form,
-              }
-            : policy
-        )
-      );
-    } else {
-      const newPolicy: LeavePolicy = {
-        id: `LP-${String(policies.length + 1).padStart(3, "0")}`,
-        ...form,
-        status: "ACTIVE",
-      };
+    setSaving(true);
+    setFormError("");
 
-      setPolicies((current) => [...current, newPolicy]);
+    const payload: LeavePolicyPayload = {
+      leave_type: form.leaveType,
+      name: form.name.trim(),
+      annual_entitlement: form.entitlement,
+      accrual_method: form.accrualMethod,
+      accrual_rate: form.accrualRate,
+      max_carry_forward: form.carryForward,
+      min_service_days: form.minServiceDays,
+      max_consecutive_days:
+        form.maxConsecutive === "" ? null : Number(form.maxConsecutive),
+      allow_negative_balance: form.negativeBalance,
+      requires_document: form.documentsRequired,
+      effective_from: form.effectiveFrom,
+      effective_to: form.effectiveTo || null,
+      is_active: form.isActive,
+      eligible_department_ids: form.departments,
+      eligible_grade_ids: form.grades,
+      eligible_location_ids: form.locations,
+      eligible_employment_types: form.employmentTypes,
+      eligible_genders: form.genders,
+    };
+
+    try {
+      if (editingPolicy) {
+        await leaveApi.updateLeavePolicy(editingPolicy.id, payload);
+      } else {
+        await leaveApi.createLeavePolicy(payload);
+      }
+
+      closeModal();
+      reload();
+    } catch (caught) {
+      setFormError(getApiErrorMessage(caught));
+    } finally {
+      setSaving(false);
     }
-
-    closeModal();
-  };
+  }, [form, editingPolicy, reload]);
 
   const toggleSelection = (
     field:
@@ -246,7 +300,7 @@ export default function LeavePoliciesPage() {
       | "grades"
       | "genders"
       | "locations",
-    value: string
+    value: string,
   ) => {
     setForm((current) => {
       const values = current[field];
@@ -261,7 +315,37 @@ export default function LeavePoliciesPage() {
   };
 
   const eligibilityText = (values: string[]) =>
-    values.length === 0 ? "All" : values.join(", ");
+    values.length === 0 ? "All" : `${values.length} selected`;
+
+  const employmentTypeOptions: Option[] = EMPLOYMENT_TYPES.map((type) => ({
+    value: type,
+    label: humanizeEnum(type),
+  }));
+
+  const genderOptions: Option[] = GENDERS.map((gender) => ({
+    value: gender,
+    label: humanizeEnum(gender),
+  }));
+
+  const departmentOptions: Option[] = reference.departments.map((item) => ({
+    value: item.id,
+    label: item.name,
+  }));
+
+  const gradeOptions: Option[] = reference.grades.map((item) => ({
+    value: item.id,
+    label: item.name,
+  }));
+
+  const locationOptions: Option[] = reference.locations.map((item) => ({
+    value: item.id,
+    label: item.name,
+  }));
+
+  const activeCount = policies.filter((policy) => policy.is_active).length;
+
+  const distinctTypes = new Set(policies.map((policy) => policy.leave_type))
+    .size;
 
   return (
     <div className="space-y-6">
@@ -279,6 +363,8 @@ export default function LeavePoliciesPage() {
         }
       />
 
+      {error && <ErrorState message={error} onRetry={reload} />}
+
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <p className="text-sm text-slate-500">Total Policies</p>
@@ -290,14 +376,14 @@ export default function LeavePoliciesPage() {
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <p className="text-sm text-slate-500">Active Policies</p>
           <p className="mt-2 text-2xl font-bold text-slate-900">
-            {policies.filter((policy) => policy.status === "ACTIVE").length}
+            {activeCount}
           </p>
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <p className="text-sm text-slate-500">Leave Types</p>
           <p className="mt-2 text-2xl font-bold text-slate-900">
-            {new Set(policies.map((policy) => policy.leaveType)).size}
+            {distinctTypes}
           </p>
         </div>
       </div>
@@ -317,22 +403,27 @@ export default function LeavePoliciesPage() {
           <select
             value={typeFilter}
             onChange={(event) => setTypeFilter(event.target.value)}
+            aria-label="Filter by leave type"
             className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none"
           >
-            <option>All Types</option>
-            <option>Annual Leave</option>
-            <option>Sick Leave</option>
-            <option>Maternity Leave</option>
+            <option value={ALL_TYPES}>All Types</option>
+
+            {reference.leaveTypes.map((type) => (
+              <option key={type.id} value={type.id}>
+                {type.name}
+              </option>
+            ))}
           </select>
 
           <select
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value)}
+            aria-label="Filter by status"
             className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none"
           >
-            <option>All Statuses</option>
-            <option>ACTIVE</option>
-            <option>INACTIVE</option>
+            <option value={ALL_STATUSES}>All Statuses</option>
+            <option value="ACTIVE">ACTIVE</option>
+            <option value="INACTIVE">INACTIVE</option>
           </select>
         </div>
 
@@ -371,32 +462,32 @@ export default function LeavePoliciesPage() {
                   className="border-b border-slate-100 last:border-0"
                 >
                   <td className="px-5 py-4">
-                    <p className="font-medium text-slate-900">
-                      {policy.name}
-                    </p>
+                    <p className="font-medium text-slate-900">{policy.name}</p>
                     <p className="mt-1 text-xs text-slate-500">
-                      {policy.leaveType}
+                      {leaveTypeNames.get(policy.leave_type) ?? "—"}
                     </p>
                   </td>
 
                   <td className="px-5 py-4 text-sm text-slate-700">
-                    {policy.entitlement} days
+                    {formatNumber(policy.annual_entitlement)} days
                   </td>
 
                   <td className="px-5 py-4 text-sm text-slate-700">
-                    {policy.accrual}
+                    {humanizeEnum(policy.accrual_method)}
                   </td>
 
                   <td className="px-5 py-4 text-sm text-slate-700">
-                    {policy.carryForward} days
+                    {formatNumber(policy.max_carry_forward)} days
                   </td>
 
                   <td className="px-5 py-4 text-sm text-slate-700">
-                    {policy.effectiveFrom}
+                    {formatDate(policy.effective_from)}
                   </td>
 
                   <td className="px-5 py-4">
-                    <StatusBadge status={policy.status} />
+                    <StatusBadge
+                      status={policy.is_active ? "ACTIVE" : "INACTIVE"}
+                    />
                   </td>
 
                   <td className="px-5 py-4 text-right">
@@ -415,10 +506,14 @@ export default function LeavePoliciesPage() {
                 <tr>
                   <td colSpan={7} className="px-5 py-12 text-center">
                     <p className="text-sm font-medium text-slate-700">
-                      No leave policies found
+                      {loading
+                        ? "Loading leave policies..."
+                        : "No leave policies found"}
                     </p>
                     <p className="mt-1 text-sm text-slate-500">
-                      Try changing your filters or search term.
+                      {loading
+                        ? "Please wait."
+                        : "Try changing your filters or search term."}
                     </p>
                   </td>
                 </tr>
@@ -440,11 +535,9 @@ export default function LeavePoliciesPage() {
                   className="flex w-full items-center justify-between text-left"
                 >
                   <div>
-                    <p className="font-medium text-slate-900">
-                      {policy.name}
-                    </p>
+                    <p className="font-medium text-slate-900">{policy.name}</p>
                     <p className="mt-1 text-xs text-slate-500">
-                      {policy.leaveType}
+                      {leaveTypeNames.get(policy.leave_type) ?? "—"}
                     </p>
                   </div>
 
@@ -456,7 +549,9 @@ export default function LeavePoliciesPage() {
                 </button>
 
                 <div className="mt-3 flex items-center justify-between">
-                  <StatusBadge status={policy.status} />
+                  <StatusBadge
+                    status={policy.is_active ? "ACTIVE" : "INACTIVE"}
+                  />
                   <button
                     onClick={() => openEdit(policy)}
                     className="text-sm font-medium text-slate-700"
@@ -469,19 +564,27 @@ export default function LeavePoliciesPage() {
                   <div className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3 text-sm">
                     <div>
                       <p className="text-xs text-slate-500">Entitlement</p>
-                      <p className="font-medium">{policy.entitlement} days</p>
+                      <p className="font-medium">
+                        {formatNumber(policy.annual_entitlement)} days
+                      </p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-500">Accrual</p>
-                      <p className="font-medium">{policy.accrual}</p>
+                      <p className="font-medium">
+                        {humanizeEnum(policy.accrual_method)}
+                      </p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-500">Carry Forward</p>
-                      <p className="font-medium">{policy.carryForward} days</p>
+                      <p className="font-medium">
+                        {formatNumber(policy.max_carry_forward)} days
+                      </p>
                     </div>
                     <div>
                       <p className="text-xs text-slate-500">Min Service</p>
-                      <p className="font-medium">{policy.minService} months</p>
+                      <p className="font-medium">
+                        {policy.min_service_days} days
+                      </p>
                     </div>
                   </div>
                 )}
@@ -514,6 +617,12 @@ export default function LeavePoliciesPage() {
             </div>
 
             <div className="space-y-6 p-6">
+              {formError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {formError}
+                </div>
+              )}
+
               <section>
                 <h3 className="mb-4 text-sm font-semibold text-slate-900">
                   Basic Information
@@ -546,10 +655,12 @@ export default function LeavePoliciesPage() {
                       className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
                     >
                       <option value="">Select leave type</option>
-                      <option>Annual Leave</option>
-                      <option>Sick Leave</option>
-                      <option>Maternity Leave</option>
-                      <option>Personal Leave</option>
+
+                      {reference.leaveTypes.map((type) => (
+                        <option key={type.id} value={type.id}>
+                          {type.name}
+                        </option>
+                      ))}
                     </select>
                   </label>
                 </div>
@@ -557,10 +668,10 @@ export default function LeavePoliciesPage() {
 
               <section>
                 <h3 className="mb-4 text-sm font-semibold text-slate-900">
-                  Entitlement & Accrual
+                  Entitlement &amp; Accrual
                 </h3>
 
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
                   <label className="space-y-1.5">
                     <span className="text-sm font-medium text-slate-700">
                       Entitlement (days)
@@ -568,6 +679,7 @@ export default function LeavePoliciesPage() {
                     <input
                       type="number"
                       min="0"
+                      step="0.01"
                       value={form.entitlement}
                       onChange={(event) =>
                         setForm({
@@ -581,19 +693,43 @@ export default function LeavePoliciesPage() {
 
                   <label className="space-y-1.5">
                     <span className="text-sm font-medium text-slate-700">
-                      Accrual
+                      Accrual Method
                     </span>
                     <select
-                      value={form.accrual}
+                      value={form.accrualMethod}
                       onChange={(event) =>
-                        setForm({ ...form, accrual: event.target.value })
+                        setForm({
+                          ...form,
+                          accrualMethod: event.target.value,
+                        })
                       }
                       className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none"
                     >
-                      <option>Monthly</option>
-                      <option>Annual</option>
-                      <option>Fixed</option>
+                      {ACCRUAL_METHODS.map((method) => (
+                        <option key={method} value={method}>
+                          {humanizeEnum(method)}
+                        </option>
+                      ))}
                     </select>
+                  </label>
+
+                  <label className="space-y-1.5">
+                    <span className="text-sm font-medium text-slate-700">
+                      Accrual Rate
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.0001"
+                      value={form.accrualRate}
+                      onChange={(event) =>
+                        setForm({
+                          ...form,
+                          accrualRate: Number(event.target.value),
+                        })
+                      }
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none"
+                    />
                   </label>
 
                   <label className="space-y-1.5">
@@ -603,6 +739,7 @@ export default function LeavePoliciesPage() {
                     <input
                       type="number"
                       min="0"
+                      step="0.01"
                       value={form.carryForward}
                       onChange={(event) =>
                         setForm({
@@ -621,11 +758,13 @@ export default function LeavePoliciesPage() {
                     <input
                       type="number"
                       min="0"
+                      step="0.01"
                       value={form.maxConsecutive}
+                      placeholder="No limit"
                       onChange={(event) =>
                         setForm({
                           ...form,
-                          maxConsecutive: Number(event.target.value),
+                          maxConsecutive: event.target.value,
                         })
                       }
                       className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none"
@@ -636,22 +775,26 @@ export default function LeavePoliciesPage() {
 
               <section>
                 <h3 className="mb-4 text-sm font-semibold text-slate-900">
-                  Service & Requirements
+                  Service &amp; Requirements
                 </h3>
 
                 <div className="grid gap-4 md:grid-cols-3">
+                  {/*
+                    The backend field is `min_service_days`; minimum service is
+                    stored and evaluated in days, not months.
+                  */}
                   <label className="space-y-1.5">
                     <span className="text-sm font-medium text-slate-700">
-                      Minimum Service (months)
+                      Minimum Service (days)
                     </span>
                     <input
                       type="number"
                       min="0"
-                      value={form.minService}
+                      value={form.minServiceDays}
                       onChange={(event) =>
                         setForm({
                           ...form,
-                          minService: Number(event.target.value),
+                          minServiceDays: Number(event.target.value),
                         })
                       }
                       className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none"
@@ -709,7 +852,7 @@ export default function LeavePoliciesPage() {
                   Effective Dates
                 </h3>
 
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 md:grid-cols-3">
                   <label className="space-y-1.5">
                     <span className="text-sm font-medium text-slate-700">
                       Effective From
@@ -743,6 +886,25 @@ export default function LeavePoliciesPage() {
                       className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none"
                     />
                   </label>
+
+                  <label className="flex items-center gap-3 rounded-lg border border-slate-200 p-3">
+                    <input
+                      type="checkbox"
+                      checked={form.isActive}
+                      onChange={(event) =>
+                        setForm({ ...form, isActive: event.target.checked })
+                      }
+                      className="h-4 w-4"
+                    />
+                    <span>
+                      <span className="block text-sm font-medium text-slate-700">
+                        Active
+                      </span>
+                      <span className="block text-xs text-slate-500">
+                        Policy is available for evaluation.
+                      </span>
+                    </span>
+                  </label>
                 </div>
               </section>
 
@@ -752,7 +914,9 @@ export default function LeavePoliciesPage() {
                 </h3>
                 <p className="mb-4 text-xs text-slate-500">
                   Leaving a dimension unselected means the policy applies to
-                  everyone in that dimension.
+                  everyone in that dimension. Employment-type and gender
+                  eligibility are write-only in the current API and will not
+                  reappear when this policy is reopened for editing.
                 </p>
 
                 <div className="grid gap-5 md:grid-cols-2">
@@ -770,9 +934,7 @@ export default function LeavePoliciesPage() {
                     title="Departments"
                     values={form.departments}
                     options={departmentOptions}
-                    onToggle={(value) =>
-                      toggleSelection("departments", value)
-                    }
+                    onToggle={(value) => toggleSelection("departments", value)}
                     allText={eligibilityText(form.departments)}
                   />
 
@@ -796,9 +958,7 @@ export default function LeavePoliciesPage() {
                     title="Locations"
                     values={form.locations}
                     options={locationOptions}
-                    onToggle={(value) =>
-                      toggleSelection("locations", value)
-                    }
+                    onToggle={(value) => toggleSelection("locations", value)}
                     allText={eligibilityText(form.locations)}
                   />
                 </div>
@@ -808,7 +968,8 @@ export default function LeavePoliciesPage() {
             <div className="sticky bottom-0 flex justify-end gap-3 border-t border-slate-200 bg-white px-6 py-4">
               <button
                 onClick={closeModal}
-                className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                disabled={saving}
+                className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -816,6 +977,7 @@ export default function LeavePoliciesPage() {
               <button
                 onClick={savePolicy}
                 disabled={
+                  saving ||
                   !form.name.trim() ||
                   !form.leaveType ||
                   !form.effectiveFrom
@@ -823,7 +985,11 @@ export default function LeavePoliciesPage() {
                 className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Check className="h-4 w-4" />
-                {editingPolicy ? "Save Changes" : "Create Policy"}
+                {saving
+                  ? "Saving..."
+                  : editingPolicy
+                    ? "Save Changes"
+                    : "Create Policy"}
               </button>
             </div>
           </div>
@@ -842,7 +1008,7 @@ function MultiSelectGroup({
 }: {
   title: string;
   values: string[];
-  options: string[];
+  options: Option[];
   onToggle: (value: string) => void;
   allText: string;
 }) {
@@ -854,21 +1020,27 @@ function MultiSelectGroup({
       </div>
 
       <div className="flex flex-wrap gap-2">
+        {options.length === 0 && (
+          <span className="text-xs text-slate-400">
+            No options configured.
+          </span>
+        )}
+
         {options.map((option) => {
-          const selected = values.includes(option);
+          const selected = values.includes(option.value);
 
           return (
             <button
-              key={option}
+              key={option.value}
               type="button"
-              onClick={() => onToggle(option)}
+              onClick={() => onToggle(option.value)}
               className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
                 selected
                   ? "border-slate-900 bg-slate-900 text-white"
                   : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
               }`}
             >
-              {option}
+              {option.label}
             </button>
           );
         })}

@@ -1,547 +1,353 @@
-﻿"use client";
+"use client";
 
-import { useState } from "react";
+import { useCallback } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import {
   ArrowLeft,
   CalendarDays,
   Clock3,
-  Users,
-  MapPin,
-  Pencil,
-  CheckCircle2,
-  UserCheck,
-  Building2,
   History,
+  Users,
 } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
+import ErrorState from "@/components/ui/ErrorState";
+import EmptyState from "@/components/ui/EmptyState";
+import { employeesApi, schedulingApi } from "@/lib/api";
+import { useApiResource } from "@/lib/useApiResource";
+import { MAX_PAGE_SIZE } from "@/types/api";
+import type {
+  FlexibleWorkRule,
+  RotationPattern,
+  ScheduleAssignment,
+  Shift,
+  ShiftPattern,
+  WorkSchedule,
+} from "@/types/attendance";
+import type { Employee } from "@/types/hr";
+import { EM_DASH, formatDate, humanizeEnum } from "@/lib/format";
 
-const schedule = {
-  id: "SCH-001",
-  name: "Standard Morning Schedule",
-  type: "FIXED",
-  status: "ACTIVE" as const,
-  startTime: "08:00",
-  endTime: "17:00",
-  breakDuration: "1 hour",
-  workingHours: "8 hours",
-  workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-  department: "All Departments",
-  location: "Head Office",
-  assignedEmployees: 286,
-  effectiveFrom: "01 January 2026",
-  effectiveTo: "31 December 2026",
-  gracePeriod: "10 minutes",
-  overtimeAfter: "17:00",
-};
-
-const employees = [
-  {
-    number: "EMP-0001",
-    name: "Ama Mensah",
-    department: "Finance",
-    position: "Senior Finance Officer",
-    status: "ACTIVE",
-  },
-  {
-    number: "EMP-0002",
-    name: "Kwame Asante",
-    department: "Human Resources",
-    position: "HR Officer",
-    status: "ACTIVE",
-  },
-  {
-    number: "EMP-0003",
-    name: "Akosua Boateng",
-    department: "IT",
-    position: "Systems Administrator",
-    status: "ACTIVE",
-  },
-  {
-    number: "EMP-0005",
-    name: "Michael Osei",
-    department: "Finance",
-    position: "Accountant",
-    status: "ACTIVE",
-  },
-  {
-    number: "EMP-0011",
-    name: "Esi Adjei",
-    department: "Administration",
-    position: "Administrative Officer",
-    status: "ACTIVE",
-  },
-];
-
-const recentActivity = [
-  {
-    date: "12 Sep 2026",
-    action: "Schedule applied",
-    detail: "286 employees evaluated against today's schedule.",
-  },
-  {
-    date: "11 Sep 2026",
-    action: "Attendance processed",
-    detail: "Attendance records processed for the scheduled workforce.",
-  },
-  {
-    date: "10 Sep 2026",
-    action: "Schedule applied",
-    detail: "Schedule remained active with no configuration changes.",
-  },
-];
+interface ScheduleDetail {
+  schedule: WorkSchedule;
+  sourceLabel: string;
+  sourceKind: string;
+  /** Every assignment for this schedule, current and historical. */
+  assignments: ScheduleAssignment[];
+  employees: Map<string, Employee>;
+}
 
 export default function ScheduleDetailPage() {
-  const [editMode, setEditMode] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const params = useParams<{ id: string }>();
+  const id = params?.id ?? "";
+
+  const load = useCallback(async (): Promise<ScheduleDetail> => {
+    const schedule = await schedulingApi.getWorkSchedule(id);
+
+    const [assignments, employees] = await Promise.all([
+      schedulingApi
+        .listScheduleAssignments({
+          work_schedule: id,
+          page_size: MAX_PAGE_SIZE,
+          ordering: "-effective_from",
+        })
+        .then((page) => page.results)
+        .catch(() => [] as ScheduleAssignment[]),
+      employeesApi
+        .loadEmployeeIndex()
+        .then((index) => index.byId)
+        .catch(() => new Map<string, Employee>()),
+    ]);
+
+    // Only the reference matching the schedule type is fetched.
+    let sourceLabel = EM_DASH;
+    let sourceKind = humanizeEnum(schedule.schedule_type);
+
+    if (schedule.schedule_type === "FIXED" && schedule.fixed_shift) {
+      const shift: Shift | null = await schedulingApi
+        .getShift(schedule.fixed_shift)
+        .catch(() => null);
+
+      sourceKind = "Fixed shift";
+      sourceLabel = shift
+        ? `${shift.name} (${shift.start_time.slice(0, 5)}–${shift.end_time.slice(0, 5)})`
+        : EM_DASH;
+    } else if (
+      schedule.schedule_type === "SHIFT_PATTERN" &&
+      schedule.shift_pattern
+    ) {
+      const pattern: ShiftPattern | null = await schedulingApi
+        .getShiftPattern(schedule.shift_pattern)
+        .catch(() => null);
+
+      sourceKind = "Shift pattern";
+      sourceLabel = pattern
+        ? `${pattern.name} (${pattern.cycle_length_days}-day cycle)`
+        : EM_DASH;
+    } else if (
+      schedule.schedule_type === "ROTATING" &&
+      schedule.rotation_pattern
+    ) {
+      const rotations: RotationPattern[] = await schedulingApi
+        .listRotationPatterns({ page_size: MAX_PAGE_SIZE })
+        .then((page) => page.results)
+        .catch(() => []);
+
+      sourceKind = "Rotation pattern";
+      sourceLabel =
+        rotations.find((item) => item.id === schedule.rotation_pattern)?.name ??
+        EM_DASH;
+    } else if (
+      schedule.schedule_type === "FLEXIBLE" &&
+      schedule.flexible_rule
+    ) {
+      const rules: FlexibleWorkRule[] = await schedulingApi
+        .listFlexibleWorkRules({ page_size: MAX_PAGE_SIZE })
+        .then((page) => page.results)
+        .catch(() => []);
+
+      sourceKind = "Flexible rule";
+      sourceLabel =
+        rules.find((item) => item.id === schedule.flexible_rule)?.name ??
+        EM_DASH;
+    }
+
+    return { schedule, sourceLabel, sourceKind, assignments, employees };
+  }, [id]);
+
+  const { data, loading, error, reload } = useApiResource(load);
+
+  if (loading && !data) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="text-center">
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-slate-900" />
+          <p className="mt-4 text-sm text-slate-500">Loading schedule...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <>
+        <PageHeader
+          title="Work Schedule"
+          description="Schedule configuration and assignment history."
+          actions={<BackLink />}
+        />
+
+        <div className="mt-6">
+          <ErrorState
+            message={error ?? "This work schedule could not be loaded."}
+            onRetry={reload}
+          />
+        </div>
+      </>
+    );
+  }
+
+  const { schedule, sourceLabel, sourceKind, assignments, employees } = data;
+
+  const currentAssignments = assignments.filter(
+    (assignment) => assignment.is_current,
+  );
 
   return (
     <div className="space-y-6">
-      <Link
-        href="/attendance/schedules"
-        className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Back to Schedules
-      </Link>
-
       <PageHeader
         title={schedule.name}
-        description={`${schedule.id} · ${schedule.type.toLowerCase()} schedule`}
-        actions={
-          <button
-            onClick={() => {
-              setEditMode(!editMode);
-              setSaved(false);
-            }}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <Pencil className="h-4 w-4" />
-            {editMode ? "Cancel Edit" : "Edit Schedule"}
-          </button>
-        }
+        description={`Schedule code ${schedule.code}`}
+        actions={<BackLink />}
       />
 
-      {saved && (
-        <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <CheckCircle2 className="mt-0.5 h-5 w-5 text-slate-700" />
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <SummaryCard
+          title="Type"
+          value={humanizeEnum(schedule.schedule_type)}
+          icon={<CalendarDays className="h-5 w-5" />}
+        />
 
-          <div>
-            <p className="text-sm font-semibold text-slate-900">
-              Schedule changes saved
-            </p>
-            <p className="mt-1 text-sm text-slate-600">
-              The schedule configuration has been updated in this frontend
-              prototype.
-            </p>
-          </div>
-        </div>
-      )}
+        <SummaryCard
+          title="Effective From"
+          value={formatDate(schedule.effective_from)}
+          icon={<Clock3 className="h-5 w-5" />}
+        />
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
-          <div className="mb-6 flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-base font-semibold text-slate-900">
-                Schedule Overview
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Core configuration for this working schedule.
-              </p>
-            </div>
+        <SummaryCard
+          title="Currently Assigned"
+          value={String(currentAssignments.length)}
+          icon={<Users className="h-5 w-5" />}
+        />
 
-            <StatusBadge status={schedule.status} />
-          </div>
-
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            <Detail
-              icon={<Clock3 className="h-4 w-4" />}
-              label="Start Time"
-              value={schedule.startTime}
-            />
-
-            <Detail
-              icon={<Clock3 className="h-4 w-4" />}
-              label="End Time"
-              value={schedule.endTime}
-            />
-
-            <Detail
-              label="Working Hours"
-              value={schedule.workingHours}
-            />
-
-            <Detail
-              label="Break Duration"
-              value={schedule.breakDuration}
-            />
-
-            <Detail
-              icon={<Users className="h-4 w-4" />}
-              label="Assigned Employees"
-              value={String(schedule.assignedEmployees)}
-            />
-
-            <Detail
-              label="Schedule Type"
-              value="Fixed"
-            />
-          </div>
-        </section>
-
-        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-5">
-            <h2 className="text-base font-semibold text-slate-900">
-              Assignment
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Where this schedule applies.
-            </p>
-          </div>
-
-          <div className="space-y-5">
-            <Detail
-              icon={<Building2 className="h-4 w-4" />}
-              label="Department"
-              value={schedule.department}
-            />
-
-            <Detail
-              icon={<MapPin className="h-4 w-4" />}
-              label="Location"
-              value={schedule.location}
-            />
-
-            <Detail
-              label="Effective From"
-              value={schedule.effectiveFrom}
-            />
-
-            <Detail
-              label="Effective To"
-              value={schedule.effectiveTo}
-            />
-          </div>
-        </section>
-      </div>
-
-      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="mb-5 flex items-center gap-3">
-          <CalendarDays className="h-5 w-5 text-slate-600" />
-
-          <div>
-            <h2 className="text-base font-semibold text-slate-900">
-              Working Days
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Days on which employees are expected to work.
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          {[
-            "Monday",
-            "Tuesday",
-            "Wednesday",
-            "Thursday",
-            "Friday",
-            "Saturday",
-            "Sunday",
-          ].map((day) => {
-            const active = schedule.workingDays.includes(day);
-
-            return (
-              <div
-                key={day}
-                className={`rounded-lg border px-4 py-2.5 text-sm font-medium ${
-                  active
-                    ? "border-slate-900 bg-slate-900 text-white"
-                    : "border-slate-200 bg-slate-50 text-slate-400"
-                }`}
-              >
-                {day}
-              </div>
-            );
-          })}
-        </div>
+        <SummaryCard
+          title="Total Assignments"
+          value={String(assignments.length)}
+          icon={<History className="h-5 w-5" />}
+        />
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-5 flex items-center gap-3">
-            <Clock3 className="h-5 w-5 text-slate-600" />
-
-            <div>
-              <h2 className="text-base font-semibold text-slate-900">
-                Attendance Rules
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Rules applied when attendance is evaluated.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <RuleCard
-              label="Grace Period"
-              value={schedule.gracePeriod}
-            />
-
-            <RuleCard
-              label="Overtime After"
-              value={schedule.overtimeAfter}
-            />
-
-            <RuleCard
-              label="Break"
-              value={schedule.breakDuration}
-            />
-
-            <RuleCard
-              label="Expected Hours"
-              value={schedule.workingHours}
-            />
-          </div>
-        </section>
-
-        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-5 flex items-center gap-3">
-            <UserCheck className="h-5 w-5 text-slate-600" />
-
-            <div>
-              <h2 className="text-base font-semibold text-slate-900">
-                Assignment Summary
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Current employee assignment.
-              </p>
-            </div>
-          </div>
-
-          <div className="rounded-lg bg-slate-50 p-5">
-            <p className="text-sm text-slate-500">
-              Employees assigned
-            </p>
-
-            <p className="mt-2 text-3xl font-bold text-slate-900">
-              {schedule.assignedEmployees}
-            </p>
-
-            <p className="mt-2 text-xs text-slate-500">
-              {schedule.department} · {schedule.location}
-            </p>
-          </div>
-        </section>
-      </div>
-
-      <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 p-5">
-          <div className="flex items-center gap-3">
-            <Users className="h-5 w-5 text-slate-600" />
-
-            <div>
-              <h2 className="text-base font-semibold text-slate-900">
-                Assigned Employees
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Employees currently associated with this schedule.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[700px]">
-            <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-left">
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Employee
-                </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Department
-                </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Position
-                </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Status
-                </th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {employees.map((employee) => (
-                <tr
-                  key={employee.number}
-                  className="border-b border-slate-100 last:border-0"
-                >
-                  <td className="px-5 py-4">
-                    <p className="font-medium text-slate-900">
-                      {employee.name}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {employee.number}
-                    </p>
-                  </td>
-
-                  <td className="px-5 py-4 text-sm text-slate-600">
-                    {employee.department}
-                  </td>
-
-                  <td className="px-5 py-4 text-sm text-slate-600">
-                    {employee.position}
-                  </td>
-
-                  <td className="px-5 py-4">
-                    <StatusBadge status="ACTIVE" />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="border-t border-slate-200 px-5 py-3">
-          <p className="text-xs text-slate-500">
-            Showing 5 sample employees of {schedule.assignedEmployees} assigned.
-          </p>
-        </div>
-      </section>
-
-      <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 p-5">
-          <div className="flex items-center gap-3">
-            <History className="h-5 w-5 text-slate-600" />
-
-            <div>
-              <h2 className="text-base font-semibold text-slate-900">
-                Recent Activity
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Recent activity associated with this schedule.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="divide-y divide-slate-100">
-          {recentActivity.map((activity) => (
-            <div
-              key={`${activity.date}-${activity.action}`}
-              className="flex gap-4 p-5"
-            >
-              <div className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-slate-700" />
-
-              <div>
-                <p className="text-sm font-medium text-slate-900">
-                  {activity.action}
-                </p>
-                <p className="mt-1 text-sm text-slate-500">
-                  {activity.detail}
-                </p>
-                <p className="mt-2 text-xs text-slate-400">
-                  {activity.date}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {editMode && (
-        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="rounded-xl border border-slate-200 bg-white">
+        <div className="border-b border-slate-200 px-5 py-4">
           <h2 className="text-base font-semibold text-slate-900">
             Schedule Configuration
           </h2>
+        </div>
 
-          <p className="mt-1 text-sm text-slate-500">
-            Frontend editing preview. Backend validation and persistence will
-            be connected when the schedule API is available.
+        <dl className="divide-y divide-slate-100">
+          <RuleRow label="Code" value={schedule.code} />
+          <RuleRow
+            label="Schedule type"
+            value={humanizeEnum(schedule.schedule_type)}
+          />
+          <RuleRow label={sourceKind} value={sourceLabel} />
+          <RuleRow
+            label="Effective from"
+            value={formatDate(schedule.effective_from)}
+          />
+          <RuleRow
+            label="Effective to"
+            value={
+              schedule.effective_to ? formatDate(schedule.effective_to) : "Open"
+            }
+          />
+          <RuleRow label="Timezone" value={schedule.timezone} />
+          <RuleRow
+            label="Status"
+            value={schedule.is_active ? "Active" : "Inactive"}
+          />
+        </dl>
+      </section>
+
+      <section className="rounded-xl border border-slate-200 bg-white">
+        <div className="border-b border-slate-200 px-5 py-4">
+          <h2 className="text-base font-semibold text-slate-900">
+            Assignment History
+          </h2>
+          <p className="mt-1 text-xs text-slate-500">
+            Effective-dated assignments for this schedule. Replacing a current
+            assignment preserves the previous record.
           </p>
+        </div>
 
-          <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <EditField label="Start Time" value={schedule.startTime} />
-            <EditField label="End Time" value={schedule.endTime} />
-            <EditField label="Break Duration" value={schedule.breakDuration} />
-            <EditField label="Grace Period" value={schedule.gracePeriod} />
+        {assignments.length === 0 ? (
+          <div className="p-5">
+            <EmptyState
+              title="No assignments"
+              description="No employee has been assigned to this work schedule."
+            />
           </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[700px] text-left">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50">
+                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Employee
+                  </th>
+                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Effective From
+                  </th>
+                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Effective To
+                  </th>
+                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Current
+                  </th>
+                </tr>
+              </thead>
 
-          <div className="mt-5 flex justify-end">
-            <button
-              onClick={() => {
-                setSaved(true);
-                setEditMode(false);
-              }}
-              className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
-            >
-              Save Changes
-            </button>
+              <tbody className="divide-y divide-slate-100">
+                {assignments.map((assignment) => {
+                  const employee = employees.get(assignment.employee);
+
+                  return (
+                    <tr key={assignment.id}>
+                      <td className="px-5 py-4">
+                        {employee ? (
+                          <Link
+                            href={`/hr/employees/${employee.id}`}
+                            className="font-medium text-slate-900 hover:underline"
+                          >
+                            {employeesApi.employeeDisplayName(employee)}
+                          </Link>
+                        ) : (
+                          <span className="text-slate-500">{EM_DASH}</span>
+                        )}
+
+                        <p className="mt-1 text-xs text-slate-500">
+                          {employee?.employee_number ?? EM_DASH}
+                        </p>
+                      </td>
+
+                      <td className="px-5 py-4 text-sm text-slate-700">
+                        {formatDate(assignment.effective_from)}
+                      </td>
+
+                      <td className="px-5 py-4 text-sm text-slate-700">
+                        {assignment.effective_to
+                          ? formatDate(assignment.effective_to)
+                          : EM_DASH}
+                      </td>
+
+                      <td className="px-5 py-4">
+                        <StatusBadge
+                          status={assignment.is_current ? "ACTIVE" : "INACTIVE"}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        </section>
-      )}
+        )}
+      </section>
     </div>
   );
 }
 
-function Detail({
-  icon,
-  label,
+function BackLink() {
+  return (
+    <Link
+      href="/attendance/schedules"
+      className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+    >
+      <ArrowLeft size={16} />
+      Back to Schedules
+    </Link>
+  );
+}
+
+function SummaryCard({
+  title,
   value,
+  icon,
 }: {
-  icon?: React.ReactNode;
-  label: string;
+  title: string;
   value: string;
+  icon: React.ReactNode;
 }) {
   return (
-    <div>
-      <div className="flex items-center gap-1.5 text-xs text-slate-500">
-        {icon}
-        {label}
+    <div className="rounded-xl border border-slate-200 bg-white p-5">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-slate-500">{title}</p>
+
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+          {icon}
+        </span>
       </div>
 
-      <p className="mt-1.5 text-sm font-medium text-slate-800">
-        {value}
-      </p>
+      <p className="mt-3 text-xl font-bold text-slate-900">{value}</p>
     </div>
   );
 }
 
-function RuleCard({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function RuleRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-slate-200 p-4">
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="mt-1.5 text-sm font-semibold text-slate-800">
-        {value}
-      </p>
+    <div className="flex items-center justify-between px-5 py-3.5">
+      <dt className="text-sm text-slate-600">{label}</dt>
+      <dd className="text-sm font-medium text-slate-900">{value}</dd>
     </div>
-  );
-}
-
-function EditField({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <label className="space-y-1.5">
-      <span className="text-sm font-medium text-slate-700">
-        {label}
-      </span>
-
-      <input
-        defaultValue={value}
-        className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
-      />
-    </label>
   );
 }

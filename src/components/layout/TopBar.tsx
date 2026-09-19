@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import {
   Bell,
   ChevronDown,
@@ -11,6 +12,9 @@ import {
   UserCircle,
   X,
 } from "lucide-react";
+import { getApiErrorMessage, searchApi } from "@/lib/api";
+import type { SearchResult } from "@/types/search";
+import { useAuth } from "@/components/guards/AuthProvider";
 
 
 interface TopBarProps {
@@ -20,14 +24,58 @@ interface TopBarProps {
 export default function TopBar({
   onOpenSidebar,
 }: TopBarProps) {
+  const router = useRouter();
+  const { institution } = useAuth();
   const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] =
     useState(false);
 
+  useEffect(() => {
+    const query = searchQuery.trim();
+    if (!searchOpen || query.length < 2) {
+      return;
+    }
+
+    let active = true;
+    const timer = window.setTimeout(() => {
+      setSearchLoading(true);
+      setSearchError(null);
+      searchApi.universalSearch({ query })
+        .then((response) => {
+          if (active) setSearchResults(response.results);
+        })
+        .catch((caught) => {
+          if (active) {
+            setSearchResults([]);
+            setSearchError(getApiErrorMessage(caught));
+          }
+        })
+        .finally(() => {
+          if (active) setSearchLoading(false);
+        });
+    }, 250);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [searchOpen, searchQuery]);
+
+  const closeSearch = () => {
+    setSearchOpen(false);
+    setSearchQuery("");
+    setSearchResults([]);
+    setSearchError(null);
+  };
+
   return (
-    <header className="sticky top-0 z-30 h-16 border-b border-slate-200 bg-white/95 backdrop-blur dark:border-slate-700 dark:bg-slate-900/95">
-      <div className="flex h-full items-center gap-2 px-4 sm:gap-3 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-30 h-16 border-b border-slate-800 bg-slate-950/95 text-slate-100 backdrop-blur">
+      <div className="relative flex h-full items-center gap-2 px-4 sm:gap-3 sm:px-6 lg:px-8">
         <button
           onClick={onOpenSidebar}
           className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white lg:hidden"
@@ -51,8 +99,8 @@ export default function TopBar({
             </div>
 
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
-                ErgonX Demo Institution
+              <p className="truncate text-sm font-semibold text-white">
+                {institution?.name ?? "No active institution"}
               </p>
 
               <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
@@ -65,22 +113,54 @@ export default function TopBar({
         <div className="flex-1" />
 
         {searchOpen ? (
-          <div className="flex h-10 w-[220px] items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 dark:border-slate-700 dark:bg-slate-800 sm:w-[300px]">
+          <div className="absolute left-1/2 flex h-11 w-[min(42vw,560px)] -translate-x-1/2 items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-4 shadow-lg sm:w-[min(48vw,620px)]">
             <Search className="h-4 w-4 shrink-0 text-slate-400" />
 
             <input
               autoFocus
               placeholder="Search employees, payroll, leave..."
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
               className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
             />
 
             <button
-              onClick={() => setSearchOpen(false)}
+              onClick={closeSearch}
               className="text-slate-400 hover:text-slate-700 dark:hover:text-white"
               aria-label="Close search"
             >
               <X className="h-4 w-4" />
             </button>
+
+            {(searchQuery.trim().length >= 2 || searchLoading || searchError) && (
+              <div className="absolute left-0 top-14 w-full overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-2xl">
+                {searchLoading && <p className="px-4 py-3 text-sm text-slate-400">Searching…</p>}
+                {searchError && <p className="px-4 py-3 text-sm text-red-300">{searchError}</p>}
+                {!searchLoading && !searchError && searchResults.length === 0 && (
+                  <p className="px-4 py-3 text-sm text-slate-400">No results found.</p>
+                )}
+                {!searchLoading && searchResults.map((result) => (
+                  <button
+                    key={`${result.type}-${result.id}`}
+                    type="button"
+                    onClick={() => {
+                      router.push(result.route_hint);
+                      closeSearch();
+                    }}
+                    className="flex w-full items-center gap-3 border-b border-slate-800 px-4 py-3 text-left last:border-0 hover:bg-slate-800"
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800 text-[10px] font-semibold text-slate-300">
+                      {result.type.slice(0, 2)}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium text-white">{result.title}</span>
+                      <span className="block truncate text-xs text-slate-400">{result.subtitle || result.reference || result.module}</span>
+                    </span>
+                    <span className="shrink-0 text-[10px] font-medium text-slate-500">{result.status.replaceAll("_", " ")}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         ) : (
           <button

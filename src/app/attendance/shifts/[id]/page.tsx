@@ -1,488 +1,379 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import {
   ArrowLeft,
   Clock3,
-  Edit3,
-  MapPin,
-  Users,
-  CalendarDays,
-  Building2,
+  Moon,
   ShieldCheck,
-  MoreHorizontal,
-  CheckCircle2,
+  Timer,
+  Users,
 } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
+import ErrorState from "@/components/ui/ErrorState";
+import EmptyState from "@/components/ui/EmptyState";
+import {
+  attendanceApi,
+  employeesApi,
+  schedulingApi,
+} from "@/lib/api";
+import { useApiResource } from "@/lib/useApiResource";
+import { MAX_PAGE_SIZE } from "@/types/api";
+import type {
+  ScheduleAssignment,
+  Shift,
+  WorkSchedule,
+} from "@/types/attendance";
+import type { Employee } from "@/types/hr";
+import { EM_DASH, formatDate, humanizeEnum } from "@/lib/format";
 
-type Employee = {
-  id: string;
-  name: string;
-  employeeNumber: string;
-  department: string;
-  location: string;
-  status: string;
-};
-
-const shift = {
-  id: "shift-001",
-  name: "Morning Shift",
-  code: "MS-001",
-  type: "DAY",
-  status: "ACTIVE",
-  startTime: "08:00",
-  endTime: "17:00",
-  breakDuration: 60,
-  department: "Information Technology",
-  location: "Head Office",
-  workingDays: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-  description:
-    "Standard daytime shift for employees assigned to the Information Technology department.",
-  gracePeriod: 15,
-  overtimeEnabled: true,
-  autoAttendance: true,
-  lateAfter: "08:15",
-  earlyDepartureBefore: "16:45",
-};
-
-const employees: Employee[] = [
-  {
-    id: "EMP-001",
-    name: "Kwame Mensah",
-    employeeNumber: "EMP-1001",
-    department: "Information Technology",
-    location: "Head Office",
-    status: "ACTIVE",
-  },
-  {
-    id: "EMP-002",
-    name: "Ama Boateng",
-    employeeNumber: "EMP-1002",
-    department: "Information Technology",
-    location: "Head Office",
-    status: "ACTIVE",
-  },
-  {
-    id: "EMP-003",
-    name: "Daniel Owusu",
-    employeeNumber: "EMP-1003",
-    department: "Information Technology",
-    location: "Head Office",
-    status: "ACTIVE",
-  },
-  {
-    id: "EMP-004",
-    name: "Abena Asante",
-    employeeNumber: "EMP-1004",
-    department: "Information Technology",
-    location: "Head Office",
-    status: "ACTIVE",
-  },
-];
-
-const activity = [
-  {
-    action: "Shift updated",
-    description: "Working hours were updated from 08:00–16:00 to 08:00–17:00.",
-    user: "ErgonX Administrator",
-    date: "08 Sep 2026, 10:42",
-  },
-  {
-    action: "Employee assigned",
-    description: "Ama Boateng was assigned to this shift.",
-    user: "HR Administrator",
-    date: "05 Sep 2026, 14:18",
-  },
-  {
-    action: "Shift created",
-    description: "Morning Shift was created.",
-    user: "ErgonX Administrator",
-    date: "01 Sep 2026, 09:00",
-  },
-];
+interface ShiftDetail {
+  shift: Shift;
+  /** Work schedules that use this shift as their fixed shift. */
+  schedules: WorkSchedule[];
+  assignments: ScheduleAssignment[];
+  employees: Map<string, Employee>;
+}
 
 export default function ShiftDetailPage() {
-  const [showMenu, setShowMenu] = useState(false);
+  const params = useParams<{ id: string }>();
+  const id = params?.id ?? "";
 
-  const workingHours = useMemo(() => {
-    const start = Number(shift.startTime.split(":")[0]) * 60;
-    const startMinutes = start + Number(shift.startTime.split(":")[1]);
+  const load = useCallback(async (): Promise<ShiftDetail> => {
+    const shift = await schedulingApi.getShift(id);
 
-    const end = Number(shift.endTime.split(":")[0]) * 60;
-    const endMinutes = end + Number(shift.endTime.split(":")[1]);
+    const allSchedules = await schedulingApi
+      .listWorkSchedules({ page_size: MAX_PAGE_SIZE })
+      .then((page) => page.results)
+      .catch(() => [] as WorkSchedule[]);
 
-    const totalMinutes = endMinutes - startMinutes - shift.breakDuration;
+    // Work schedules expose no `fixed_shift` filter, so the link is resolved
+    // from the schedule list.
+    const schedules = allSchedules.filter(
+      (schedule) => schedule.fixed_shift === id,
+    );
 
-    return `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`;
-  }, []);
+    const scheduleIds = new Set(schedules.map((schedule) => schedule.id));
+
+    const assignments = await schedulingApi
+      .listScheduleAssignments({
+        page_size: MAX_PAGE_SIZE,
+        is_current: true,
+      })
+      .then((page) =>
+        page.results.filter((assignment) =>
+          scheduleIds.has(assignment.work_schedule),
+        ),
+      )
+      .catch(() => [] as ScheduleAssignment[]);
+
+    const employees = await employeesApi
+      .loadEmployeeIndex()
+      .then((index) => index.byId)
+      .catch(() => new Map<string, Employee>());
+
+    return { shift, schedules, assignments, employees };
+  }, [id]);
+
+  const { data, loading, error, reload } = useApiResource(load);
+
+  if (loading && !data) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="text-center">
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-slate-900" />
+          <p className="mt-4 text-sm text-slate-500">Loading shift...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <>
+        <PageHeader
+          title="Shift"
+          description="Shift configuration and assigned employees."
+          actions={<BackLink />}
+        />
+
+        <div className="mt-6">
+          <ErrorState
+            message={error ?? "This shift could not be loaded."}
+            onRetry={reload}
+          />
+        </div>
+      </>
+    );
+  }
+
+  const { shift, schedules, assignments, employees } = data;
+
+  const time = (value: string) => value.slice(0, 5);
 
   return (
-    <main className="space-y-6">
+    <div className="space-y-6">
       <PageHeader
         title={shift.name}
-        description="View shift configuration, attendance rules and assigned employees."
-        actions={
-          <div className="flex items-center gap-2">
-            <Link
-              href="/attendance/shifts"
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back to Shifts
-            </Link>
-
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setShowMenu((value) => !value)}
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                aria-label="More actions"
-              >
-                <MoreHorizontal className="h-4 w-4" />
-              </button>
-
-              {showMenu && (
-                <div className="absolute right-0 top-12 z-20 w-44 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
-                  <button
-                    type="button"
-                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
-                    onClick={() => setShowMenu(false)}
-                  >
-                    <Edit3 className="h-4 w-4" />
-                    Edit Shift
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        }
+        description={`Shift code ${shift.code}`}
+        actions={<BackLink />}
       />
 
-      {/* Shift summary */}
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCard
+          title="Start"
+          value={time(shift.start_time)}
           icon={<Clock3 className="h-5 w-5" />}
-          label="Working Hours"
-          value={workingHours}
-          detail={`${shift.startTime} – ${shift.endTime}`}
         />
 
         <SummaryCard
+          title="End"
+          value={time(shift.end_time)}
+          icon={shift.crosses_midnight ? <Moon className="h-5 w-5" /> : <Clock3 className="h-5 w-5" />}
+        />
+
+        <SummaryCard
+          title="Scheduled"
+          value={attendanceApi.formatMinutes(shift.scheduled_minutes)}
+          icon={<Timer className="h-5 w-5" />}
+        />
+
+        <SummaryCard
+          title="Assigned"
+          value={String(assignments.length)}
           icon={<Users className="h-5 w-5" />}
-          label="Assigned Employees"
-          value={String(employees.length)}
-          detail="Active employees"
-        />
-
-        <SummaryCard
-          icon={<CalendarDays className="h-5 w-5" />}
-          label="Working Days"
-          value={String(shift.workingDays.length)}
-          detail="Monday to Friday"
-        />
-
-        <SummaryCard
-          icon={<ShieldCheck className="h-5 w-5" />}
-          label="Status"
-          value="Active"
-          detail="Currently in use"
         />
       </section>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        {/* Main content */}
-        <div className="space-y-6 xl:col-span-2">
-          {/* Overview */}
-          <section className="rounded-xl border border-slate-200 bg-white">
-            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-              <div>
-                <h2 className="text-base font-semibold text-slate-900">
-                  Shift Overview
-                </h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  Core configuration for this shift.
-                </p>
-              </div>
-
-              <StatusBadge status={shift.status} />
-            </div>
-
-            <div className="grid grid-cols-1 gap-5 p-5 sm:grid-cols-2">
-              <InfoItem label="Shift Name" value={shift.name} />
-              <InfoItem label="Shift Code" value={shift.code} />
-              <InfoItem label="Shift Type" value="Day Shift" />
-              <InfoItem label="Start Time" value={shift.startTime} />
-              <InfoItem label="End Time" value={shift.endTime} />
-              <InfoItem
-                label="Break Duration"
-                value={`${shift.breakDuration} minutes`}
-              />
-              <InfoItem label="Working Duration" value={workingHours} />
-              <InfoItem label="Status" value="Active" />
-            </div>
-
-            <div className="border-t border-slate-200 px-5 py-4">
-              <p className="text-sm font-medium text-slate-700">
-                Description
-              </p>
-              <p className="mt-1 text-sm leading-6 text-slate-500">
-                {shift.description}
-              </p>
-            </div>
-          </section>
-
-          {/* Assignment */}
-          <section className="rounded-xl border border-slate-200 bg-white">
-            <div className="border-b border-slate-200 px-5 py-4">
-              <h2 className="text-base font-semibold text-slate-900">
-                Assignment
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Organisational context for this shift.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 gap-5 p-5 sm:grid-cols-2">
-              <div className="flex items-start gap-3">
-                <div className="rounded-lg bg-slate-100 p-2">
-                  <Building2 className="h-5 w-5 text-slate-600" />
-                </div>
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                    Department
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-slate-900">
-                    {shift.department}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3">
-                <div className="rounded-lg bg-slate-100 p-2">
-                  <MapPin className="h-5 w-5 text-slate-600" />
-                </div>
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                    Location
-                  </p>
-                  <p className="mt-1 text-sm font-medium text-slate-900">
-                    {shift.location}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Working days */}
-          <section className="rounded-xl border border-slate-200 bg-white">
-            <div className="border-b border-slate-200 px-5 py-4">
-              <h2 className="text-base font-semibold text-slate-900">
-                Working Days
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Days on which this shift is scheduled.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-2 p-5">
-              {shift.workingDays.map((day) => (
-                <span
-                  key={day}
-                  className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700"
-                >
-                  {day}
-                </span>
-              ))}
-            </div>
-          </section>
-
-          {/* Attendance rules */}
-          <section className="rounded-xl border border-slate-200 bg-white">
-            <div className="border-b border-slate-200 px-5 py-4">
-              <h2 className="text-base font-semibold text-slate-900">
-                Attendance Rules
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Rules applied when attendance is recorded against this shift.
-              </p>
-            </div>
-
-            <div className="divide-y divide-slate-100">
-              <RuleRow
-                label="Grace Period"
-                value={`${shift.gracePeriod} minutes`}
-              />
-              <RuleRow label="Late After" value={shift.lateAfter} />
-              <RuleRow
-                label="Early Departure Before"
-                value={shift.earlyDepartureBefore}
-              />
-              <RuleRow
-                label="Automatic Attendance"
-                value={shift.autoAttendance ? "Enabled" : "Disabled"}
-              />
-              <RuleRow
-                label="Overtime"
-                value={shift.overtimeEnabled ? "Enabled" : "Disabled"}
-              />
-            </div>
-          </section>
-        </div>
-
-        {/* Sidebar */}
-        <aside className="space-y-6">
-          {/* Quick edit */}
-          <section className="rounded-xl border border-slate-200 bg-white p-5">
+      <div className="grid gap-6 lg:grid-cols-2">
+        <section className="rounded-xl border border-slate-200 bg-white">
+          <div className="border-b border-slate-200 px-5 py-4">
             <h2 className="text-base font-semibold text-slate-900">
-              Shift Actions
+              Shift Configuration
             </h2>
+          </div>
 
-            <button
-              type="button"
-              className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
-            >
-              <Edit3 className="h-4 w-4" />
-              Edit Shift
-            </button>
-          </section>
+          <dl className="divide-y divide-slate-100">
+            <RuleRow label="Start time" value={time(shift.start_time)} />
+            <RuleRow label="End time" value={time(shift.end_time)} />
+            <RuleRow
+              label="Crosses midnight"
+              value={shift.crosses_midnight ? "Yes" : "No"}
+            />
+            <RuleRow
+              label="Break"
+              value={attendanceApi.formatMinutes(shift.break_minutes)}
+            />
+            <RuleRow
+              label="Grace period"
+              value={attendanceApi.formatMinutes(shift.grace_period_minutes)}
+            />
+            <RuleRow
+              label="Scheduled hours"
+              value={attendanceApi.formatMinutes(shift.scheduled_minutes)}
+            />
+            <RuleRow
+              label="Status"
+              value={shift.is_active ? "Active" : "Inactive"}
+            />
+          </dl>
+        </section>
 
-          {/* Assigned employees */}
-          <section className="rounded-xl border border-slate-200 bg-white">
-            <div className="border-b border-slate-200 px-5 py-4">
-              <h2 className="text-base font-semibold text-slate-900">
-                Assigned Employees
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                {employees.length} employees assigned.
-              </p>
+        <section className="rounded-xl border border-slate-200 bg-white">
+          <div className="border-b border-slate-200 px-5 py-4">
+            <h2 className="text-base font-semibold text-slate-900">
+              Work Schedules
+            </h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Schedules that use this shift as their fixed shift.
+            </p>
+          </div>
+
+          {schedules.length === 0 ? (
+            <div className="p-5">
+              <EmptyState
+                title="Not used by any schedule"
+                description="No fixed work schedule currently references this shift."
+              />
             </div>
-
+          ) : (
             <div className="divide-y divide-slate-100">
-              {employees.map((employee) => (
-                <div key={employee.id} className="px-5 py-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-medium text-slate-900">
-                        {employee.name}
-                      </p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {employee.employeeNumber}
-                      </p>
-                    </div>
-
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+              {schedules.map((schedule) => (
+                <Link
+                  key={schedule.id}
+                  href={`/attendance/schedules/${schedule.id}`}
+                  className="flex items-center justify-between px-5 py-4 transition hover:bg-slate-50"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-slate-900">
+                      {schedule.name}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {schedule.code} · {humanizeEnum(schedule.schedule_type)} ·
+                      from {formatDate(schedule.effective_from)}
+                    </p>
                   </div>
 
-                  <p className="mt-2 text-xs text-slate-500">
-                    {employee.department} · {employee.location}
-                  </p>
-                </div>
+                  <StatusBadge
+                    status={schedule.is_active ? "ACTIVE" : "INACTIVE"}
+                  />
+                </Link>
               ))}
             </div>
-          </section>
-
-          {/* Recent activity */}
-          <section className="rounded-xl border border-slate-200 bg-white">
-            <div className="border-b border-slate-200 px-5 py-4">
-              <h2 className="text-base font-semibold text-slate-900">
-                Recent Activity
-              </h2>
-            </div>
-
-            <div className="divide-y divide-slate-100">
-              {activity.map((item) => (
-                <div key={`${item.action}-${item.date}`} className="px-5 py-4">
-                  <p className="text-sm font-medium text-slate-900">
-                    {item.action}
-                  </p>
-                  <p className="mt-1 text-xs leading-5 text-slate-500">
-                    {item.description}
-                  </p>
-                  <p className="mt-2 text-[11px] text-slate-400">
-                    {item.user} · {item.date}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </section>
-        </aside>
+          )}
+        </section>
       </div>
+
+      <section className="rounded-xl border border-slate-200 bg-white">
+        <div className="border-b border-slate-200 px-5 py-4">
+          <h2 className="text-base font-semibold text-slate-900">
+            Assigned Employees
+          </h2>
+          <p className="mt-1 text-xs text-slate-500">
+            Employees whose current schedule assignment resolves to this shift.
+          </p>
+        </div>
+
+        {assignments.length === 0 ? (
+          <div className="p-5">
+            <EmptyState
+              title="No employees assigned"
+              description="No current schedule assignment resolves to this shift."
+            />
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[700px] text-left">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50">
+                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Employee
+                  </th>
+                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Effective From
+                  </th>
+                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Effective To
+                  </th>
+                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Current
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-slate-100">
+                {assignments.map((assignment) => {
+                  const employee = employees.get(assignment.employee);
+
+                  return (
+                    <tr key={assignment.id}>
+                      <td className="px-5 py-4">
+                        {employee ? (
+                          <Link
+                            href={`/hr/employees/${employee.id}`}
+                            className="font-medium text-slate-900 hover:underline"
+                          >
+                            {employeesApi.employeeDisplayName(employee)}
+                          </Link>
+                        ) : (
+                          <span className="text-slate-500">{EM_DASH}</span>
+                        )}
+
+                        <p className="mt-1 text-xs text-slate-500">
+                          {employee?.employee_number ?? EM_DASH}
+                        </p>
+                      </td>
+
+                      <td className="px-5 py-4 text-sm text-slate-700">
+                        {formatDate(assignment.effective_from)}
+                      </td>
+
+                      <td className="px-5 py-4 text-sm text-slate-700">
+                        {assignment.effective_to
+                          ? formatDate(assignment.effective_to)
+                          : EM_DASH}
+                      </td>
+
+                      <td className="px-5 py-4">
+                        <StatusBadge
+                          status={assignment.is_current ? "ACTIVE" : "INACTIVE"}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       <section className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4">
         <div className="flex items-start gap-3">
           <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-slate-600" />
+
           <div>
             <p className="text-sm font-semibold text-slate-800">
-              Attendance and historical integrity
+              Schedule-aware attendance
             </p>
+
             <p className="mt-1 text-sm leading-6 text-slate-600">
-              Changes to this shift should not alter historical attendance
-              records that were already recorded against previous shift
-              configurations.
+              Clock events resolve the employee&apos;s effective schedule and
+              are classified against this shift&apos;s start time and grace
+              period. Lateness, early departure and overtime are all derived by
+              the backend.
             </p>
           </div>
         </div>
       </section>
-    </main>
+    </div>
+  );
+}
+
+function BackLink() {
+  return (
+    <Link
+      href="/attendance/shifts"
+      className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+    >
+      <ArrowLeft size={16} />
+      Back to Shifts
+    </Link>
   );
 }
 
 function SummaryCard({
-  icon,
-  label,
+  title,
   value,
-  detail,
+  icon,
 }: {
-  icon: React.ReactNode;
-  label: string;
+  title: string;
   value: string;
-  detail: string;
+  icon: React.ReactNode;
 }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-5">
-      <div className="flex items-center gap-3">
-        <div className="rounded-lg bg-slate-100 p-2 text-slate-600">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-slate-500">{title}</p>
+
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
           {icon}
-        </div>
-        <p className="text-sm font-medium text-slate-500">{label}</p>
+        </span>
       </div>
 
-      <p className="mt-4 text-2xl font-semibold text-slate-900">{value}</p>
-      <p className="mt-1 text-xs text-slate-500">{detail}</p>
+      <p className="mt-3 text-2xl font-bold text-slate-900">{value}</p>
     </div>
   );
 }
 
-function InfoItem({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
+function RuleRow({ label, value }: { label: string; value: string }) {
   return (
-    <div>
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-        {label}
-      </p>
-      <p className="mt-1 text-sm font-medium text-slate-900">{value}</p>
-    </div>
-  );
-}
-
-function RuleRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-4 px-5 py-4">
-      <span className="text-sm text-slate-600">{label}</span>
-      <span className="text-sm font-medium text-slate-900">{value}</span>
+    <div className="flex items-center justify-between px-5 py-3.5">
+      <dt className="text-sm text-slate-600">{label}</dt>
+      <dd className="text-sm font-medium text-slate-900">{value}</dd>
     </div>
   );
 }

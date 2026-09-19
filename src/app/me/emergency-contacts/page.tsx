@@ -1,0 +1,15 @@
+"use client";
+
+import { FormEvent, useEffect, useState } from "react";
+import { Plus, Phone, Trash2 } from "lucide-react";
+import { employeesApi, getApiErrorMessage } from "@/lib/api";
+import type { EmergencyContact } from "@/types/hr";
+
+export default function EmergencyContactsPage() {
+  const [items, setItems] = useState<EmergencyContact[]>([]); const [name, setName] = useState(""); const [relationship, setRelationship] = useState(""); const [phone, setPhone] = useState(""); const [error, setError] = useState<string | null>(null);
+  const load = () => employeesApi.listMyEmergencyContacts().then(setItems).catch((caught) => setError(getApiErrorMessage(caught)));
+  useEffect(() => { void load(); }, []);
+  async function add(event: FormEvent) { event.preventDefault(); try { await employeesApi.createMyEmergencyContact({ full_name: name, relationship, phone, is_primary: items.length === 0 }); setName(""); setRelationship(""); setPhone(""); load(); } catch (caught) { setError(getApiErrorMessage(caught)); } }
+  return <div className="mx-auto max-w-4xl space-y-6"><section className="rounded-2xl bg-slate-950 px-7 py-8 text-white shadow-lg"><p className="text-sm font-semibold text-sky-300">EMPLOYEE SELF-SERVICE</p><h1 className="mt-2 text-3xl font-bold">Emergency contacts</h1><p className="mt-2 text-slate-300">People HR can contact if there is an emergency.</p></section>{error && <p className="rounded-xl bg-rose-50 p-4 text-rose-700">{error}</p>}<div className="grid gap-4 md:grid-cols-2">{items.map((item) => <article key={item.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex justify-between"><div><h2 className="font-semibold text-slate-950">{item.full_name}</h2><p className="text-sm text-slate-500">{item.relationship}{item.is_primary ? " · Primary" : ""}</p></div><button onClick={async () => { await employeesApi.deleteMyEmergencyContact(item.id); load(); }} className="text-slate-400 hover:text-rose-600" aria-label="Remove contact"><Trash2 className="h-4 w-4" /></button></div><p className="mt-4 flex items-center gap-2 text-sm text-slate-700"><Phone className="h-4 w-4" />{item.phone}</p></article>)}</div><form onSubmit={add} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"><h2 className="font-semibold text-slate-950">Add an emergency contact</h2><div className="mt-4 grid gap-4 md:grid-cols-3"><Input value={name} onChange={setName} placeholder="Full name" /><Input value={relationship} onChange={setRelationship} placeholder="Relationship" /><Input value={phone} onChange={setPhone} placeholder="Phone number" /></div><button className="mt-4 inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 font-semibold text-white"><Plus className="h-4 w-4" />Add contact</button></form></div>;
+}
+function Input({ value, onChange, placeholder }: { value: string; onChange: (value: string) => void; placeholder: string }) { return <input required value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="h-11 rounded-xl border border-slate-200 px-3" />; }

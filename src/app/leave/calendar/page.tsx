@@ -1,6 +1,6 @@
-﻿"use client";
+"use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ChevronLeft,
@@ -9,64 +9,19 @@ import {
   Users,
 } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
+import ErrorState from "@/components/ui/ErrorState";
+import {
+  employeesApi,
+  getApiErrorMessage,
+  leaveApi,
+  organizationApi,
+} from "@/lib/api";
+import { MAX_PAGE_SIZE } from "@/types/api";
+import type { Department, Employee, Employment } from "@/types/hr";
+import type { LeaveRequest, LeaveType } from "@/types/leave";
+import { toISODate } from "@/lib/format";
 
-type LeaveEvent = {
-  id: string;
-  employee: string;
-  department: string;
-  type: string;
-  start: string;
-  end: string;
-  status: "APPROVED" | "PENDING";
-};
-
-const leaveEvents: LeaveEvent[] = [
-  {
-    id: "LR-001",
-    employee: "Ama Mensah",
-    department: "Finance",
-    type: "Annual Leave",
-    start: "2026-09-07",
-    end: "2026-09-11",
-    status: "APPROVED",
-  },
-  {
-    id: "LR-002",
-    employee: "Kwame Asante",
-    department: "Human Resources",
-    type: "Sick Leave",
-    start: "2026-09-09",
-    end: "2026-09-10",
-    status: "APPROVED",
-  },
-  {
-    id: "LR-003",
-    employee: "Akosua Boateng",
-    department: "IT",
-    type: "Annual Leave",
-    start: "2026-09-14",
-    end: "2026-09-18",
-    status: "APPROVED",
-  },
-  {
-    id: "LR-004",
-    employee: "Daniel Owusu",
-    department: "Operations",
-    type: "Personal Leave",
-    start: "2026-09-16",
-    end: "2026-09-17",
-    status: "PENDING",
-  },
-  {
-    id: "LR-005",
-    employee: "Michael Osei",
-    department: "Finance",
-    type: "Annual Leave",
-    start: "2026-09-21",
-    end: "2026-09-25",
-    status: "APPROVED",
-  },
-];
+const ALL = "ALL";
 
 const monthNames = [
   "January",
@@ -84,10 +39,6 @@ const monthNames = [
 ];
 
 const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-function formatDate(date: Date) {
-  return date.toISOString().split("T")[0];
-}
 
 function isDateInRange(date: string, start: string, end: string) {
   return date >= start && date <= end;
@@ -136,37 +87,151 @@ function getMonthDays(year: number, month: number) {
   return cells;
 }
 
+interface CalendarReference {
+  employees: Map<string, Employee>;
+  employments: Map<string, Employment>;
+  departments: Department[];
+  leaveTypes: LeaveType[];
+}
+
+const emptyReference: CalendarReference = {
+  employees: new Map(),
+  employments: new Map(),
+  departments: [],
+  leaveTypes: [],
+};
+
 export default function LeaveCalendarPage() {
-  const today = new Date();
+  const today = useMemo(() => new Date(), []);
 
   const [currentDate, setCurrentDate] = useState(
-    new Date(today.getFullYear(), today.getMonth(), 1)
+    () => new Date(today.getFullYear(), today.getMonth(), 1),
   );
 
-  const [department, setDepartment] = useState("All Departments");
-  const [leaveType, setLeaveType] = useState("All Types");
+  const [department, setDepartment] = useState(ALL);
+  const [leaveType, setLeaveType] = useState(ALL);
+
+  const [events, setEvents] = useState<LeaveRequest[]>([]);
+  const [reference, setReference] = useState<CalendarReference>(emptyReference);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
 
-  const days = useMemo(
-    () => getMonthDays(year, month),
-    [year, month]
-  );
+  const days = useMemo(() => getMonthDays(year, month), [year, month]);
 
+  // The visible grid spans six weeks, so the request covers the whole grid
+  // rather than just the calendar month.
+  const rangeStart = days.length > 0 ? toISODate(days[0].date) : "";
+  const rangeEnd = days.length > 0 ? toISODate(days[days.length - 1].date) : "";
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadReference() {
+      try {
+        const [employeeIndex, employmentIndex, departments, types] =
+          await Promise.all([
+            employeesApi.loadEmployeeIndex(),
+            employeesApi.loadCurrentEmploymentIndex(),
+            organizationApi.listDepartments({
+              page_size: MAX_PAGE_SIZE,
+              ordering: "name",
+            }),
+            leaveApi.listLeaveTypes({
+              page_size: MAX_PAGE_SIZE,
+              ordering: "name",
+            }),
+          ]);
+
+        if (!active) {
+          return;
+        }
+
+        setReference({
+          employees: employeeIndex.byId,
+          employments: employmentIndex.byEmployee,
+          departments: departments.results,
+          leaveTypes: types.results,
+        });
+      } catch {
+        if (active) {
+          setReference(emptyReference);
+        }
+      }
+    }
+
+    loadReference();
+
+    return () => {
+      active = false;
+    };
+  }, [reloadToken]);
+
+  useEffect(() => {
+    if (!rangeStart || !rangeEnd) {
+      return;
+    }
+
+    let active = true;
+
+    async function loadCalendar() {
+      setLoading(true);
+      setError(null);
+
+      try {
+        // The calendar action returns PENDING and APPROVED requests
+        // overlapping the range.
+        const result = await leaveApi.getLeaveCalendar({
+          date_from: rangeStart,
+          date_to: rangeEnd,
+          page_size: MAX_PAGE_SIZE,
+          leave_type: leaveType === ALL ? undefined : leaveType,
+        });
+
+        if (active) {
+          setEvents(result.results);
+        }
+      } catch (caught) {
+        if (active) {
+          setError(getApiErrorMessage(caught));
+          setEvents([]);
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadCalendar();
+
+    return () => {
+      active = false;
+    };
+  }, [rangeStart, rangeEnd, leaveType, reloadToken]);
+
+  /**
+   * Leave requests carry no department. It is resolved through the employee's
+   * current employment record, so this filter is applied client-side.
+   */
   const filteredEvents = useMemo(() => {
-    return leaveEvents.filter((event) => {
-      const departmentMatch =
-        department === "All Departments" ||
-        event.department === department;
+    if (department === ALL) {
+      return events;
+    }
 
-      const leaveTypeMatch =
-        leaveType === "All Types" ||
-        event.type === leaveType;
+    return events.filter(
+      (event) =>
+        reference.employments.get(event.employee)?.department === department,
+    );
+  }, [events, department, reference.employments]);
 
-      return departmentMatch && leaveTypeMatch;
-    });
-  }, [department, leaveType]);
+  const leaveTypeNames = useMemo(
+    () => new Map(reference.leaveTypes.map((type) => [type.id, type.name])),
+    [reference.leaveTypes],
+  );
 
   const previousMonth = () => {
     setCurrentDate(new Date(year, month - 1, 1));
@@ -179,6 +244,12 @@ export default function LeaveCalendarPage() {
   const goToToday = () => {
     setCurrentDate(new Date(today.getFullYear(), today.getMonth(), 1));
   };
+
+  const retry = useCallback(() => {
+    setReloadToken((token) => token + 1);
+  }, []);
+
+  const todayString = toISODate(today);
 
   return (
     <div className="space-y-6">
@@ -218,33 +289,46 @@ export default function LeaveCalendarPage() {
               {monthNames[month]} {year}
             </h2>
           </div>
+
+          {loading && (
+            <span className="text-xs text-slate-400">Loading...</span>
+          )}
         </div>
 
         <div className="flex flex-wrap gap-3">
           <select
             value={department}
-            onChange={(e) => setDepartment(e.target.value)}
+            onChange={(event) => setDepartment(event.target.value)}
+            aria-label="Filter by department"
             className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-slate-400"
           >
-            <option>All Departments</option>
-            <option>Finance</option>
-            <option>Human Resources</option>
-            <option>IT</option>
-            <option>Operations</option>
+            <option value={ALL}>All Departments</option>
+
+            {reference.departments.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
+            ))}
           </select>
 
           <select
             value={leaveType}
-            onChange={(e) => setLeaveType(e.target.value)}
+            onChange={(event) => setLeaveType(event.target.value)}
+            aria-label="Filter by leave type"
             className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-slate-400"
           >
-            <option>All Types</option>
-            <option>Annual Leave</option>
-            <option>Sick Leave</option>
-            <option>Personal Leave</option>
+            <option value={ALL}>All Types</option>
+
+            {reference.leaveTypes.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
+            ))}
           </select>
         </div>
       </div>
+
+      {error && <ErrorState message={error} onRetry={retry} />}
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50">
@@ -260,14 +344,13 @@ export default function LeaveCalendarPage() {
 
         <div className="grid grid-cols-7">
           {days.map(({ date, currentMonth }, index) => {
-            const dateString = formatDate(date);
+            const dateString = toISODate(date);
 
             const dayEvents = filteredEvents.filter((event) =>
-              isDateInRange(dateString, event.start, event.end)
+              isDateInRange(dateString, event.start_date, event.end_date),
             );
 
-            const isToday =
-              dateString === formatDate(today);
+            const isToday = dateString === todayString;
 
             return (
               <div
@@ -297,24 +380,30 @@ export default function LeaveCalendarPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  {dayEvents.map((event) => (
-                    <Link
-                      key={event.id}
-                      href={`/leave/requests/${event.id}`}
-                      className={`block rounded-md border px-2 py-1.5 text-left transition hover:shadow-sm ${
-                        event.status === "APPROVED"
-                          ? "border-slate-200 bg-slate-50"
-                          : "border-amber-200 bg-amber-50"
-                      }`}
-                    >
-                      <p className="truncate text-xs font-semibold text-slate-800">
-                        {event.employee}
-                      </p>
-                      <p className="truncate text-[11px] text-slate-500">
-                        {event.type}
-                      </p>
-                    </Link>
-                  ))}
+                  {dayEvents.map((event) => {
+                    const employee = reference.employees.get(event.employee);
+
+                    return (
+                      <Link
+                        key={event.id}
+                        href={`/leave/requests/${event.id}`}
+                        className={`block rounded-md border px-2 py-1.5 text-left transition hover:shadow-sm ${
+                          event.status === "APPROVED"
+                            ? "border-slate-200 bg-slate-50"
+                            : "border-amber-200 bg-amber-50"
+                        }`}
+                      >
+                        <p className="truncate text-xs font-semibold text-slate-800">
+                          {employee
+                            ? employeesApi.employeeDisplayName(employee)
+                            : "Employee"}
+                        </p>
+                        <p className="truncate text-[11px] text-slate-500">
+                          {leaveTypeNames.get(event.leave_type) ?? "Leave"}
+                        </p>
+                      </Link>
+                    );
+                  })}
                 </div>
               </div>
             );

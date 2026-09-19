@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   BriefcaseBusiness,
@@ -21,8 +21,20 @@ import {
 } from "lucide-react";
 
 import StatusBadge from "@/components/ui/StatusBadge";
+import ErrorState from "@/components/ui/ErrorState";
+import LoadingState from "@/components/ui/LoadingState";
+import { employeesApi, getApiErrorMessage, organizationApi } from "@/lib/api";
+import type { OrganizationLookups } from "@/lib/api/organization";
+import type {
+  EmergencyContact as ApiEmergencyContact,
+  EmployeeLifecycle,
+  Employee as ApiEmployee,
+  Employment,
+} from "@/types/hr";
 
-interface Employee {
+interface EmployeeView {
+  id: string;
+  employmentId: string;
   employeeNumber: string;
   firstName: string;
   middleName: string;
@@ -40,36 +52,97 @@ interface Employee {
   manager: string;
 }
 
-const initialEmployee: Employee = {
-  employeeNumber: "EMP-0001",
-  firstName: "Kwame",
-  middleName: "Mensah",
-  lastName: "Asante",
-  email: "kwame.asante@example.com",
-  phone: "+233 24 000 0000",
-  gender: "Male",
-  status: "ACTIVE",
-  hireDate: "2025-01-12",
-  employmentType: "Full Time",
-  department: "Information Technology",
-  position: "IT Officer",
-  grade: "Grade 6",
-  location: "Accra",
-  manager: "Director of IT",
+interface EmploymentChangeForm {
+  department: string;
+  position: string;
+  grade: string;
+  location: string;
+  employmentType: string;
+  effectiveDate: string;
+}
+
+interface EmergencyContactView {
+  id: string;
+  name: string;
+  relationship: string;
+  phone: string;
+  email: string;
+  address: string;
+  primary: boolean;
+}
+
+function toEmergencyContactView(contact: ApiEmergencyContact): EmergencyContactView {
+  return {
+    id: contact.id,
+    name: contact.full_name,
+    relationship: contact.relationship,
+    phone: contact.phone,
+    email: contact.email,
+    address: contact.address,
+    primary: contact.is_primary,
+  };
+}
+
+const emptyLookups: OrganizationLookups = {
+  departments: [],
+  positions: [],
+  grades: [],
+  locations: [],
+};
+
+function labelFor(
+  items: Array<{ id: string; name?: string; title?: string }>,
+  id: string | null,
+): string {
+  if (!id) {
+    return "Not assigned";
+  }
+
+  const item = items.find((candidate) => candidate.id === id);
+  return item?.name ?? item?.title ?? "Not assigned";
+}
+
+function toEmployeeView(
+  employee: ApiEmployee,
+  employment: Employment | undefined,
+  lookups: OrganizationLookups,
+): EmployeeView {
+  return {
+    id: employee.id,
+    employmentId: employment?.id ?? "",
+    employeeNumber: employee.employee_number,
+    firstName: employee.first_name,
+    middleName: employee.middle_name,
+    lastName: employee.last_name,
+    email: employee.work_email || employee.personal_email,
+    phone: employee.phone,
+    gender: employee.gender
+      .toLowerCase()
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (letter) => letter.toUpperCase()),
+    status: employee.status,
+    hireDate: employee.hire_date,
+    employmentType: employment?.employment_type ?? "Not assigned",
+    department: labelFor(lookups.departments, employment?.department ?? null),
+    position: labelFor(lookups.positions, employment?.position ?? null),
+    grade: labelFor(lookups.grades, employment?.grade ?? null),
+    location: labelFor(lookups.locations, employment?.location ?? null),
+    manager: "Not assigned",
+  };
 };
 
 
 const tabs = [
-  "Overview",
-  "Current Employment",
-  "Employment History",
-  "Documents",
-  "Emergency Contacts",
-  "Onboarding / Offboarding",
-  "Leave",
-  "Attendance",
-  "Compensation",
-  "Payroll",
+  { label: "Overview", href: "#overview" },
+  { label: "Current Employment", href: "#current-employment" },
+  { label: "Employment History", href: "#employment-history" },
+  { label: "Documents", href: "#documents" },
+  { label: "Emergency Contacts", href: "#emergency-contacts" },
+  { label: "Onboarding / Offboarding", href: "#onboarding-offboarding" },
+  { label: "Leave", href: "#leave" },
+  { label: "Attendance", href: "#attendance" },
+  { label: "Compensation", href: "#compensation" },
+  { label: "Payroll", href: "#payroll" },
 ];
 
 function InfoItem({
@@ -163,19 +236,58 @@ function SelectField({
   );
 }
 
+function LookupSelect({
+  label,
+  value,
+  options,
+  onChange,
+  required = false,
+}: {
+  label: string;
+  value: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (value: string) => void;
+  required?: boolean;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1.5 block text-sm font-medium text-slate-700">
+        {label}
+        {required && <span className="ml-1 text-red-500">*</span>}
+      </span>
+
+      <select
+        value={value}
+        required={required}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
+      >
+        <option value="">Select {label.toLowerCase()}</option>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function SectionCard({
+  id,
   title,
   description,
   action,
   children,
 }: {
+  id?: string;
   title: string;
   description?: string;
   action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white">
+    <section id={id} className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white">
       <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
         <div className="min-w-0">
           <h2 className="text-base font-semibold text-slate-900">{title}</h2>
@@ -198,30 +310,106 @@ function SectionCard({
 }
 
 export default function EmployeeDetailPage() {
+  const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const editMode = searchParams.get("edit") === "true";
-  const [employee, setEmployee] = useState<Employee>(initialEmployee);
-  const [formData, setFormData] = useState<Employee>(initialEmployee);
+  const [employee, setEmployee] = useState<EmployeeView | null>(null);
+  const [formData, setFormData] = useState<EmployeeView | null>(null);
+  const [employmentHistory, setEmploymentHistory] = useState<Employment[]>([]);
+  const [lookups, setLookups] = useState<OrganizationLookups>(emptyLookups);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(editMode);
   const [showSaveConfirmation, setShowSaveConfirmation] = useState(false);
   const [savedMessage, setSavedMessage] = useState("");
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [showEmploymentChange, setShowEmploymentChange] = useState(false);
+  const [isRehire, setIsRehire] = useState(false);
+  const [employmentChange, setEmploymentChange] =
+    useState<EmploymentChangeForm | null>(null);
+  const [changingEmployment, setChangingEmployment] = useState(false);
+  const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContactView[]>([]);
+  const [showEmergencyForm, setShowEmergencyForm] = useState(false);
+  const [editingEmergencyId, setEditingEmergencyId] = useState<string | null>(null);
+  const [emergencyForm, setEmergencyForm] = useState({
+    name: "",
+    relationship: "",
+    phone: "",
+    email: "",
+    address: "",
+    primary: false,
+  });
+  const [lifecycle, setLifecycle] = useState<EmployeeLifecycle | null>(null);
+  const [lifecycleSaving, setLifecycleSaving] = useState(false);
 
-  const updateField = (field: keyof Employee, value: string) => {
+  const updateField = (field: keyof EmployeeView, value: string) => {
     setFormData((current) => ({
-      ...current,
+      ...(current as EmployeeView),
       [field]: value,
     }));
   };
 
+  useEffect(() => {
+    let active = true;
+
+    async function loadEmployee() {
+      setLoading(true);
+      setLoadError(null);
+
+      try {
+        const [record, history, referenceData, contacts, lifecycleData] = await Promise.all([
+          employeesApi.getEmployee(params.id),
+          employeesApi.listEmploymentHistory(params.id),
+          organizationApi.loadOrganizationLookups(),
+          employeesApi.listEmergencyContacts(params.id),
+          employeesApi.getEmployeeLifecycle(params.id),
+        ]);
+        const currentEmployment = history.results.find(
+          (employment) => employment.is_current,
+        );
+
+        if (!active) {
+          return;
+        }
+
+        const view = toEmployeeView(record, currentEmployment, referenceData);
+        setEmployee(view);
+        setFormData(view);
+        setEmploymentHistory(history.results);
+        setLookups(referenceData);
+        setEmergencyContacts(contacts.results.map(toEmergencyContactView));
+        setLifecycle(lifecycleData);
+      } catch (caught) {
+        if (active) {
+          setLoadError(getApiErrorMessage(caught));
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadEmployee();
+
+    return () => {
+      active = false;
+    };
+  }, [params.id]);
+
   const startEditing = () => {
+    if (!employee) return;
     setFormData(employee);
     setSavedMessage("");
+    setSaveError(null);
     setIsEditing(true);
   };
 
   const cancelEditing = () => {
     setFormData(employee);
     setSavedMessage("");
+    setSaveError(null);
     setShowSaveConfirmation(false);
     setIsEditing(false);
   };
@@ -231,40 +419,129 @@ export default function EmployeeDetailPage() {
     setShowSaveConfirmation(true);
   };
 
-  const confirmSave = () => {
-    setEmployee(formData);
-    setShowSaveConfirmation(false);
-    setIsEditing(false);
-    setSavedMessage(
-      "Employee details saved in development mode. Backend integration is pending."
+  const confirmSave = async () => {
+    if (!formData || saving) return;
+
+    setSaving(true);
+
+    try {
+      const updated = await employeesApi.updateEmployee(formData.id, {
+        employee_number: formData.employeeNumber.trim(),
+        first_name: formData.firstName.trim(),
+        middle_name: formData.middleName.trim(),
+        last_name: formData.lastName.trim(),
+        work_email: formData.email.trim(),
+        phone: formData.phone.trim(),
+        gender: formData.gender
+          .toUpperCase()
+          .replace(/\s+/g, "_"),
+        hire_date: formData.hireDate,
+      });
+      const currentEmployment = employmentHistory.find(
+        (employment) => employment.is_current,
+      );
+      const view = toEmployeeView(updated, currentEmployment, lookups);
+
+      setEmployee(view);
+      setFormData(view);
+      setShowSaveConfirmation(false);
+      setIsEditing(false);
+      setSavedMessage("Employee profile details saved.");
+    } catch (caught) {
+      setShowSaveConfirmation(false);
+      setSaveError(getApiErrorMessage(caught));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const currentEmployment = employmentHistory.find(
+    (employment) => employment.is_current,
+  );
+
+  const openEmploymentChange = () => {
+    setSavedMessage("");
+    setSaveError(null);
+    setEmploymentChange({
+      department: currentEmployment?.department ?? "",
+      position: currentEmployment?.position ?? "",
+      grade: currentEmployment?.grade ?? "",
+      location: currentEmployment?.location ?? "",
+      employmentType: currentEmployment?.employment_type ?? "",
+      effectiveDate: "",
+    });
+    setIsRehire(employee?.status === "TERMINATED" || employee?.status === "INACTIVE");
+    setShowEmploymentChange(true);
+  };
+
+  const updateEmploymentChange = (
+    field: keyof EmploymentChangeForm,
+    value: string,
+  ) => {
+    setEmploymentChange((current) =>
+      current ? { ...current, [field]: value } : current,
     );
   };
 
-;
-;
-  const [emergencyContacts, setEmergencyContacts] = useState<
-    {
-      id: string;
-      name: string;
-      relationship: string;
-      phone: string;
-      email: string;
-      address: string;
-    primary: boolean;
-    }[]
-  >([]);
+  const saveEmploymentChange = async () => {
+    if (!employee || !employmentChange || changingEmployment) {
+      return;
+    }
 
-  const [showEmergencyForm, setShowEmergencyForm] = useState(false);
-  const [editingEmergencyId, setEditingEmergencyId] = useState<string | null>(null);
+    if (
+      !employmentChange.grade ||
+      !employmentChange.location ||
+      !employmentChange.employmentType ||
+      !employmentChange.effectiveDate
+      || (isRehire && (!employmentChange.department || !employmentChange.position))
+    ) {
+      setSaveError(
+        "Effective date, department, position, grade, location, and employment type are required for rehire.",
+      );
+      return;
+    }
 
-  const [emergencyForm, setEmergencyForm] = useState({
-    name: "",
-    relationship: "",
-    phone: "",
-    email: "",
-    address: "",
-    primary: false,
-  });
+    setChangingEmployment(true);
+    setSaveError(null);
+
+    try {
+      const created = isRehire ? (await employeesApi.rehireEmployee(employee.id, {
+        department_id: employmentChange.department,
+        position_id: employmentChange.position,
+        grade_id: employmentChange.grade,
+        location_id: employmentChange.location,
+        employment_type: employmentChange.employmentType,
+        staff_category: currentEmployment?.staff_category ?? "OTHER",
+        start_date: employmentChange.effectiveDate,
+      })).employment : await employeesApi.createEmployment({
+        employee: employee.id,
+        department: employmentChange.department || null,
+        position: employmentChange.position || null,
+        grade: employmentChange.grade,
+        location: employmentChange.location,
+        employment_type: employmentChange.employmentType,
+        reports_to: currentEmployment?.reports_to ?? null,
+        staff_category: currentEmployment?.staff_category ?? "OTHER",
+        start_date: employmentChange.effectiveDate,
+      });
+      const [profile, history] = await Promise.all([
+        employeesApi.getEmployee(employee.id),
+        employeesApi.listEmploymentHistory(employee.id),
+      ]);
+      const view = toEmployeeView(profile, created, lookups);
+
+      setEmploymentHistory(history.results);
+      setEmployee(view);
+      setFormData(view);
+      setShowEmploymentChange(false);
+      setEmploymentChange(null);
+      setSavedMessage(isRehire ? "Employee rehired and onboarding started." : "Employment assignment changed and prior history preserved.");
+    } catch (caught) {
+      setSaveError(getApiErrorMessage(caught));
+    } finally {
+      setChangingEmployment(false);
+    }
+  };
 
   const resetEmergencyForm = () => {
     setEmergencyForm({
@@ -307,40 +584,44 @@ export default function EmployeeDetailPage() {
     setShowEmergencyForm(true);
   };
 
-  const saveEmergencyContact = () => {
+  const saveEmergencyContact = async () => {
     if (
       !emergencyForm.name.trim() ||
       !emergencyForm.relationship.trim() ||
-      !emergencyForm.phone.trim()
+      !emergencyForm.phone.trim() ||
+      !employee
     ) {
       return;
     }
 
-    if (editingEmergencyId) {
-      setEmergencyContacts((contacts) =>
-        contacts.map((contact) =>
-          contact.id === editingEmergencyId
-            ? {
-                ...contact,
-                ...emergencyForm,
-              }
-            : contact
-        )
-      );
-    } else {
-      setEmergencyContacts((contacts) => [
-        ...contacts,
-        {
-          id: `emergency-${Date.now()}`,
-          ...emergencyForm,
-        },
-      ]);
-    }
+    setSaveError(null);
+    try {
+      const payload = {
+        employee: employee.id,
+        full_name: emergencyForm.name.trim(),
+        relationship: emergencyForm.relationship.trim(),
+        phone: emergencyForm.phone.trim(),
+        email: emergencyForm.email.trim(),
+        address: emergencyForm.address.trim(),
+        is_primary: emergencyForm.primary,
+      };
 
-    resetEmergencyForm();
+      if (editingEmergencyId) {
+        await employeesApi.updateEmergencyContact(editingEmergencyId, payload);
+      } else {
+        await employeesApi.createEmergencyContact(payload);
+      }
+
+      const contacts = await employeesApi.listEmergencyContacts(employee.id);
+      setEmergencyContacts(contacts.results.map(toEmergencyContactView));
+      resetEmergencyForm();
+      setSavedMessage("Emergency contact saved.");
+    } catch (caught) {
+      setSaveError(getApiErrorMessage(caught));
+    }
   };
 
-  const deleteEmergencyContact = (id: string) => {
+  const deleteEmergencyContact = async (id: string) => {
     if (
       !window.confirm(
         "Are you sure you want to delete this emergency contact?"
@@ -349,10 +630,69 @@ export default function EmployeeDetailPage() {
       return;
     }
 
-    setEmergencyContacts((contacts) =>
-      contacts.filter((contact) => contact.id !== id)
-    );
+    try {
+      await employeesApi.deleteEmergencyContact(id);
+      setEmergencyContacts((contacts) => contacts.filter((contact) => contact.id !== id));
+      setSavedMessage("Emergency contact removed.");
+    } catch (caught) {
+      setSaveError(getApiErrorMessage(caught));
+    }
   };
+
+  const runLifecycleAction = async (
+    action: "onboarding-start" | "onboarding-complete" | "offboarding-start" | "offboarding-complete",
+  ) => {
+    if (!employee || lifecycleSaving) return;
+
+    const isOffboardingCompletion = action === "offboarding-complete";
+    if (isOffboardingCompletion && !window.confirm("Complete offboarding? This ends the employee's current employment and deactivates their membership in this institution.")) {
+      return;
+    }
+
+    setLifecycleSaving(true);
+    setSaveError(null);
+    try {
+      if (action === "onboarding-start") await employeesApi.startEmployeeOnboarding(employee.id);
+      if (action === "onboarding-complete") await employeesApi.completeEmployeeOnboarding(employee.id);
+      if (action === "offboarding-start") await employeesApi.startEmployeeOffboarding(employee.id);
+      if (action === "offboarding-complete") await employeesApi.completeEmployeeOffboarding(employee.id);
+
+      const [nextLifecycle, nextEmployee, history] = await Promise.all([
+        employeesApi.getEmployeeLifecycle(employee.id),
+        employeesApi.getEmployee(employee.id),
+        employeesApi.listEmploymentHistory(employee.id),
+      ]);
+      const current = history.results.find((employment) => employment.is_current);
+      const view = toEmployeeView(nextEmployee, current, lookups);
+      setLifecycle(nextLifecycle);
+      setEmploymentHistory(history.results);
+      setEmployee(view);
+      setFormData(view);
+      setSavedMessage("Employee lifecycle updated.");
+    } catch (caught) {
+      setSaveError(getApiErrorMessage(caught));
+    } finally {
+      setLifecycleSaving(false);
+    }
+  };
+
+  if (loading) {
+    return <LoadingState />;
+  }
+
+  if (loadError) {
+    return (
+      <ErrorState
+        title="Unable to load employee"
+        message={loadError}
+      />
+    );
+  }
+
+  if (!employee || !formData) {
+    return <ErrorState message="The employee record could not be found." />;
+  }
+
   return (
     <div className="space-y-6">
       <Link
@@ -366,6 +706,123 @@ export default function EmployeeDetailPage() {
       {savedMessage && (
         <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
           {savedMessage}
+        </div>
+      )}
+
+      {saveError && (
+        <ErrorState title="Unable to save employee" message={saveError} />
+      )}
+
+      {showEmploymentChange && employmentChange && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-semibold text-slate-900">
+              Change Employment Assignment
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              This creates a new current employment record from the effective
+              date. The backend closes the prior assignment and retains the
+              complete history.
+            </p>
+
+            <div className="mt-6 grid gap-5 sm:grid-cols-2">
+              <Field
+                label="Effective Date"
+                type="date"
+                value={employmentChange.effectiveDate}
+                required
+                onChange={(value) => updateEmploymentChange("effectiveDate", value)}
+              />
+
+              <LookupSelect
+                label="Employment Type"
+                value={employmentChange.employmentType}
+                required
+                options={[
+                  { value: "PERMANENT", label: "Permanent" },
+                  { value: "CONTRACT", label: "Contract" },
+                  { value: "TEMPORARY", label: "Temporary" },
+                  { value: "INTERN", label: "Intern" },
+                  { value: "CASUAL", label: "Casual" },
+                ]}
+                onChange={(value) => updateEmploymentChange("employmentType", value)}
+              />
+
+              <LookupSelect
+                label="Department"
+                value={employmentChange.department}
+                options={lookups.departments.map((department) => ({
+                  value: department.id,
+                  label: department.name,
+                }))}
+                onChange={(value) => {
+                  updateEmploymentChange("department", value);
+                  updateEmploymentChange("position", "");
+                }}
+              />
+
+              <LookupSelect
+                label="Position"
+                value={employmentChange.position}
+                options={lookups.positions
+                  .filter(
+                    (position) =>
+                      !employmentChange.department ||
+                      position.department === employmentChange.department,
+                  )
+                  .map((position) => ({
+                    value: position.id,
+                    label: position.title,
+                  }))}
+                onChange={(value) => updateEmploymentChange("position", value)}
+              />
+
+              <LookupSelect
+                label="Grade"
+                value={employmentChange.grade}
+                required
+                options={lookups.grades.map((grade) => ({
+                  value: grade.id,
+                  label: grade.name,
+                }))}
+                onChange={(value) => updateEmploymentChange("grade", value)}
+              />
+
+              <LookupSelect
+                label="Location"
+                value={employmentChange.location}
+                required
+                options={lookups.locations.map((location) => ({
+                  value: location.id,
+                  label: location.name,
+                }))}
+                onChange={(value) => updateEmploymentChange("location", value)}
+              />
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3 border-t border-slate-200 pt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEmploymentChange(false);
+                  setEmploymentChange(null);
+                }}
+                disabled={changingEmployment}
+                className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void saveEmploymentChange()}
+                disabled={changingEmployment}
+                className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+              >
+                <Save className="h-4 w-4" />
+                {changingEmployment ? "Saving..." : "Confirm Change"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -427,22 +884,23 @@ export default function EmployeeDetailPage() {
           <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white">
             <div className="flex min-w-max">
               {tabs.map((tab, index) => (
-                <button
-                  key={tab}
-                  type="button"
+                <a
+                  key={tab.label}
+                  href={tab.href}
                   className={`border-b-2 px-5 py-4 text-sm font-medium ${
                     index === 0
                       ? "border-slate-900 text-slate-900"
                       : "border-transparent text-slate-500 hover:text-slate-900"
                   }`}
                 >
-                  {tab}
-                </button>
+                  {tab.label}
+                </a>
               ))}
             </div>
           </div>
 
           <SectionCard
+            id="overview"
             title="Personal Information"
             description="Basic employee profile information."
           >
@@ -479,8 +937,19 @@ export default function EmployeeDetailPage() {
           </SectionCard>
 
           <SectionCard
+            id="current-employment"
             title="Current Employment"
             description="The employee's current employment assignment."
+            action={
+              <button
+                type="button"
+                onClick={openEmploymentChange}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                <BriefcaseBusiness className="h-4 w-4" />
+                Change Assignment
+              </button>
+            }
           >
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <InfoItem
@@ -531,6 +1000,7 @@ export default function EmployeeDetailPage() {
           </SectionCard>
 
           <SectionCard
+            id="employment-history"
             title="Employment History"
             description="Historical employment assignments are preserved and are not overwritten."
           >
@@ -548,22 +1018,47 @@ export default function EmployeeDetailPage() {
                 </thead>
 
                 <tbody>
-                  <tr>
-                    <td className="px-4 py-4">{employee.department}</td>
-                    <td className="px-4 py-4">{employee.position}</td>
-                    <td className="px-4 py-4">{employee.grade}</td>
-                    <td className="px-4 py-4">{employee.location}</td>
-                    <td className="px-4 py-4">
-                      {new Date(employee.hireDate).toLocaleDateString("en-GB")}
-                    </td>
-                    <td className="px-4 py-4 text-slate-500">Current</td>
-                  </tr>
+                  {employmentHistory.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-6 text-center text-slate-500">
+                        No employment history is available.
+                      </td>
+                    </tr>
+                  ) : (
+                    employmentHistory.map((employment) => (
+                      <tr key={employment.id} className="border-b border-slate-100">
+                        <td className="px-4 py-4">
+                          {labelFor(lookups.departments, employment.department)}
+                        </td>
+                        <td className="px-4 py-4">
+                          {labelFor(lookups.positions, employment.position)}
+                        </td>
+                        <td className="px-4 py-4">
+                          {labelFor(lookups.grades, employment.grade)}
+                        </td>
+                        <td className="px-4 py-4">
+                          {labelFor(lookups.locations, employment.location)}
+                        </td>
+                        <td className="px-4 py-4">
+                          {new Date(employment.start_date).toLocaleDateString("en-GB")}
+                        </td>
+                        <td className="px-4 py-4 text-slate-500">
+                          {employment.is_current
+                            ? "Current"
+                            : employment.end_date
+                              ? new Date(employment.end_date).toLocaleDateString("en-GB")
+                              : "Not recorded"}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
           </SectionCard>
 
           <SectionCard
+            id="documents"
             title="Documents"
             description="Employee documents will appear here when available."
           >
@@ -581,6 +1076,7 @@ export default function EmployeeDetailPage() {
           </SectionCard>
 
           <SectionCard
+            id="emergency-contacts"
             title="Emergency Contacts"
             description="Emergency contact records for this employee."
             action={
@@ -623,6 +1119,24 @@ export default function EmployeeDetailPage() {
                         }))
                       }
                       placeholder="Enter full name"
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                      Address
+                    </label>
+
+                    <input
+                      value={emergencyForm.address}
+                      onChange={(event) =>
+                        setEmergencyForm((current) => ({
+                          ...current,
+                          address: event.target.value,
+                        }))
+                      }
+                      placeholder="Optional residential address"
                       className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-slate-500 focus:ring-2 focus:ring-slate-100"
                     />
                   </div>
@@ -713,7 +1227,7 @@ export default function EmployeeDetailPage() {
 
                   <button
                     type="button"
-                    onClick={saveEmergencyContact}
+                    onClick={() => void saveEmergencyContact()}
                     className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
                   >
                     {editingEmergencyId ? "Save Changes" : "Add Contact"}
@@ -772,7 +1286,7 @@ export default function EmployeeDetailPage() {
 
                         <button
                           type="button"
-                          onClick={() => deleteEmergencyContact(contact.id)}
+                          onClick={() => void deleteEmergencyContact(contact.id)}
                           className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -807,8 +1321,9 @@ export default function EmployeeDetailPage() {
           </SectionCard>
 
           <SectionCard
+            id="onboarding-offboarding"
             title="Onboarding / Offboarding"
-            description="Employee lifecycle information."
+            description="Lifecycle transitions are completed by the backend and cannot be edited directly."
           >
             <div className="grid gap-4 md:grid-cols-2">
               <div className="rounded-xl border border-slate-200 bg-white p-5">
@@ -818,12 +1333,10 @@ export default function EmployeeDetailPage() {
                       Onboarding
                     </h3>
 
-                    <p className="mt-1 text-sm text-slate-500">
-                      Basic onboarding status for this employee.
-                    </p>
+                    <p className="mt-1 text-sm text-slate-500">Activate the onboarding workflow once employment is ready.</p>
                   </div>
 
-                  <StatusBadge status="APPROVED" />
+                  <StatusBadge status={lifecycle?.onboarding?.status ?? "NOT_STARTED"} />
                 </div>
 
                 <div className="mt-5 border-t border-slate-100 pt-4">
@@ -832,8 +1345,13 @@ export default function EmployeeDetailPage() {
                   </p>
 
                   <p className="mt-1 text-sm font-medium text-slate-900">
-                    Completed
+                    {(lifecycle?.onboarding?.status ?? "NOT_STARTED").replaceAll("_", " ")}
                   </p>
+                  {lifecycle?.onboarding?.notes && <p className="mt-2 text-sm text-amber-700">{lifecycle.onboarding.notes}</p>}
+                  <div className="mt-4 flex gap-2">
+                    {lifecycle?.onboarding?.status !== "COMPLETED" && <button type="button" onClick={() => void runLifecycleAction("onboarding-start")} disabled={lifecycleSaving} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50">Start</button>}
+                    {lifecycle?.onboarding?.status !== "COMPLETED" && <button type="button" onClick={() => void runLifecycleAction("onboarding-complete")} disabled={lifecycleSaving} className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50">Complete</button>}
+                  </div>
                 </div>
               </div>
 
@@ -844,12 +1362,10 @@ export default function EmployeeDetailPage() {
                       Offboarding
                     </h3>
 
-                    <p className="mt-1 text-sm text-slate-500">
-                      Basic offboarding status for this employee.
-                    </p>
+                    <p className="mt-1 text-sm text-slate-500">Start before the employee&apos;s final working day; completion is irreversible.</p>
                   </div>
 
-                  <StatusBadge status="PENDING" />
+                  <StatusBadge status={lifecycle?.offboarding?.status ?? "NOT_STARTED"} />
                 </div>
 
                 <div className="mt-5 border-t border-slate-100 pt-4">
@@ -858,22 +1374,22 @@ export default function EmployeeDetailPage() {
                   </p>
 
                   <p className="mt-1 text-sm font-medium text-slate-900">
-                    Not Started
+                    {(lifecycle?.offboarding?.status ?? "NOT_STARTED").replaceAll("_", " ")}
                   </p>
+                  {lifecycle?.offboarding?.notes && <p className="mt-2 text-sm text-amber-700">{lifecycle.offboarding.notes}</p>}
+                  <div className="mt-4 flex gap-2">
+                    {(employee.status === "TERMINATED" || employee.status === "INACTIVE") && <button type="button" onClick={openEmploymentChange} disabled={lifecycleSaving} className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50">Rehire</button>}
+                    {lifecycle?.offboarding?.status !== "COMPLETED" && <button type="button" onClick={() => void runLifecycleAction("offboarding-start")} disabled={lifecycleSaving} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50">Start</button>}
+                    {lifecycle?.offboarding?.status !== "COMPLETED" && <button type="button" onClick={() => void runLifecycleAction("offboarding-complete")} disabled={lifecycleSaving} className="rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">Complete</button>}
+                  </div>
                 </div>
               </div>
-            </div>
-
-            <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
-              <p className="text-sm text-slate-600">
-                Onboarding and offboarding lifecycle actions will be connected
-                to the backend when the corresponding API contract is available.
-              </p>
             </div>
           </SectionCard>
 
           <div className="grid gap-6 lg:grid-cols-3">
             <SectionCard
+              id="leave"
               title="Leave"
               description="Leave information for this employee."
             >
@@ -909,13 +1425,13 @@ export default function EmployeeDetailPage() {
               </div>
             </SectionCard>
 
-            <SectionCard title="Attendance">
+            <SectionCard id="attendance" title="Attendance">
               <p className="text-sm text-slate-500">
                 Attendance information will be displayed when available.
               </p>
             </SectionCard>
 
-            <SectionCard title="Compensation">
+            <SectionCard id="compensation" title="Compensation">
               <p className="text-sm text-slate-500">
                 Compensation information is permission-protected.
               </p>
@@ -923,6 +1439,7 @@ export default function EmployeeDetailPage() {
           </div>
 
           <SectionCard
+            id="payroll"
             title="Payroll"
             description="Employee payroll information."
           >
@@ -990,7 +1507,7 @@ export default function EmployeeDetailPage() {
                 label="Gender"
                 value={formData.gender}
                 required
-                options={["Male", "Female"]}
+                options={["Male", "Female", "Other", "Prefer Not To Say"]}
                 onChange={(value) => updateField("gender", value)}
               />
             </div>
@@ -1050,43 +1567,14 @@ export default function EmployeeDetailPage() {
 
           <SectionCard
             title="Current Employment Assignment"
-            description="Update the employee's current assignment. Historical assignments remain preserved."
+            description="Employment assignments are effective-dated and cannot be overwritten from this profile form."
           >
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              <Field
-                label="Department"
-                value={formData.department}
-                required
-                onChange={(value) => updateField("department", value)}
-              />
-
-              <Field
-                label="Position"
-                value={formData.position}
-                required
-                onChange={(value) => updateField("position", value)}
-              />
-
-              <Field
-                label="Grade"
-                value={formData.grade}
-                required
-                onChange={(value) => updateField("grade", value)}
-              />
-
-              <Field
-                label="Location"
-                value={formData.location}
-                required
-                onChange={(value) => updateField("location", value)}
-              />
-
-              <Field
-                label="Manager"
-                value={formData.manager}
-                required
-                onChange={(value) => updateField("manager", value)}
-              />
+            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+              Emergency-contact and lifecycle changes are currently session-only in the frontend. They will not be retained after a refresh until the backend exposes the corresponding endpoints.
+            </div>
+            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
+              Save profile changes first, then use Change Assignment on the
+              profile to create an effective-dated employment change safely.
             </div>
           </SectionCard>
 
@@ -1132,11 +1620,12 @@ export default function EmployeeDetailPage() {
 
                   <button
                     type="button"
-                    onClick={confirmSave}
+                    onClick={() => void confirmSave()}
+                    disabled={saving}
                     className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
                   >
                     <Save className="h-4 w-4" />
-                    Confirm Save
+                    {saving ? "Saving..." : "Confirm Save"}
                   </button>
                 </div>
               </div>
@@ -1145,11 +1634,6 @@ export default function EmployeeDetailPage() {
         </form>
       )}
 
-      <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
-        <strong>Development mode:</strong> Employee editing currently uses
-        local mock state. The backend update endpoint will be connected once
-        the backend API contract is confirmed.
-      </div>
     </div>
   );
 }

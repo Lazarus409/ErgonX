@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   CalendarDays,
@@ -15,245 +15,343 @@ import {
 } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
+import ErrorState from "@/components/ui/ErrorState";
+import {
+  attendanceApi,
+  employeesApi,
+  getApiErrorMessage,
+  organizationApi,
+} from "@/lib/api";
+import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, emptyPage } from "@/types/api";
+import type { PaginatedData } from "@/types/api";
+import type {
+  AttendanceAdjustment,
+  AttendanceRecord,
+} from "@/types/attendance";
+import type { Department, Employee, Employment } from "@/types/hr";
+import { EM_DASH, formatDate, formatDateTime, formatNumber } from "@/lib/format";
 
-type Adjustment = {
-  id: string;
-  employee: string;
-  employeeNumber: string;
-  department: string;
-  date: string;
-  originalCheckIn: string;
-  originalCheckOut: string;
-  requestedCheckIn: string;
-  requestedCheckOut: string;
-  reason: string;
-  submittedBy: string;
-  submittedDate: string;
-  status: string;
+const ALL = "ALL";
+const SEARCH_DEBOUNCE_MS = 350;
+
+type ReviewAction = "APPROVE" | "REJECT";
+
+interface Reference {
+  employees: Map<string, Employee>;
+  employments: Map<string, Employment>;
+  departments: Department[];
+  attendance: Map<string, AttendanceRecord>;
+}
+
+const emptyReference: Reference = {
+  employees: new Map(),
+  employments: new Map(),
+  departments: [],
+  attendance: new Map(),
 };
 
-const initialAdjustments: Adjustment[] = [
-  {
-    id: "ADJ-001",
-    employee: "Kwame Mensah",
-    employeeNumber: "EMP-1001",
-    department: "Information Technology",
-    date: "11 Sep 2026",
-    originalCheckIn: "08:42",
-    originalCheckOut: "17:02",
-    requestedCheckIn: "08:05",
-    requestedCheckOut: "17:02",
-    reason: "Biometric device did not capture the initial check-in.",
-    submittedBy: "Kwame Mensah",
-    submittedDate: "11 Sep 2026, 10:14",
-    status: "PENDING",
-  },
-  {
-    id: "ADJ-002",
-    employee: "Ama Boateng",
-    employeeNumber: "EMP-1002",
-    department: "Human Resources",
-    date: "10 Sep 2026",
-    originalCheckIn: "08:11",
-    originalCheckOut: "-",
-    requestedCheckIn: "08:09",
-    requestedCheckOut: "17:04",
-    reason: "Check-out was not recorded by the attendance device.",
-    submittedBy: "Ama Boateng",
-    submittedDate: "10 Sep 2026, 18:21",
-    status: "PENDING",
-  },
-  {
-    id: "ADJ-003",
-    employee: "Daniel Owusu",
-    employeeNumber: "EMP-1003",
-    department: "Finance",
-    date: "09 Sep 2026",
-    originalCheckIn: "09:24",
-    originalCheckOut: "17:15",
-    requestedCheckIn: "08:56",
-    requestedCheckOut: "17:15",
-    reason: "Device recorded the attendance several minutes after arrival.",
-    submittedBy: "Daniel Owusu",
-    submittedDate: "09 Sep 2026, 18:02",
-    status: "APPROVED",
-  },
-  {
-    id: "ADJ-004",
-    employee: "Abena Asante",
-    employeeNumber: "EMP-1004",
-    department: "Administration",
-    date: "08 Sep 2026",
-    originalCheckIn: "08:03",
-    originalCheckOut: "16:20",
-    requestedCheckIn: "08:03",
-    requestedCheckOut: "17:00",
-    reason: "Attendance record did not capture the full working period.",
-    submittedBy: "Abena Asante",
-    submittedDate: "08 Sep 2026, 17:40",
-    status: "REJECTED",
-  },
-  {
-    id: "ADJ-005",
-    employee: "Michael Osei",
-    employeeNumber: "EMP-1005",
-    department: "Operations",
-    date: "07 Sep 2026",
-    originalCheckIn: "08:15",
-    originalCheckOut: "17:00",
-    requestedCheckIn: "08:00",
-    requestedCheckOut: "17:00",
-    reason: "Network interruption affected attendance capture.",
-    submittedBy: "Michael Osei",
-    submittedDate: "07 Sep 2026, 17:30",
-    status: "APPROVED",
-  },
-];
+/**
+ * `old_values` and `proposed_values` are free-form JSON limited by the backend
+ * to `check_in`, `check_out` and `notes`. Datetimes arrive as ISO strings.
+ */
+function adjustmentTime(values: Record<string, unknown>, key: string): string {
+  const value = values?.[key];
+
+  if (value === null || value === undefined || value === "") {
+    return EM_DASH;
+  }
+
+  const parsed = new Date(String(value));
+
+  if (Number.isNaN(parsed.getTime())) {
+    return String(value);
+  }
+
+  return parsed.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 export default function AttendanceAdjustmentsPage() {
-  const [adjustments, setAdjustments] =
-    useState<Adjustment[]>(initialAdjustments);
+  const [data, setData] = useState<PaginatedData<AttendanceAdjustment>>(() =>
+    emptyPage<AttendanceAdjustment>(),
+  );
+  const [reference, setReference] = useState<Reference>(emptyReference);
+  const [totals, setTotals] = useState<{
+    pending: number;
+    approved: number;
+    rejected: number;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
 
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("ALL");
-  const [departmentFilter, setDepartmentFilter] = useState("ALL");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState(ALL);
+  const [departmentFilter, setDepartmentFilter] = useState(ALL);
+  const [page, setPage] = useState(1);
 
-  const [selectedAdjustment, setSelectedAdjustment] =
-    useState<Adjustment | null>(null);
+  const [selected, setSelected] = useState<AttendanceAdjustment | null>(null);
+  const [reviewAction, setReviewAction] = useState<ReviewAction | null>(null);
+  const [reviewRunning, setReviewRunning] = useState(false);
+  const [reviewError, setReviewError] = useState("");
 
-  const [reviewAction, setReviewAction] =
-    useState<"APPROVE" | "REJECT" | null>(null);
+  const requestRef = useRef(0);
 
-  const [reviewReason, setReviewReason] = useState("");
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search.trim().toLowerCase());
+    }, SEARCH_DEBOUNCE_MS);
 
-  const departments = useMemo(() => {
-    return Array.from(
-      new Set(adjustments.map((item) => item.department))
-    );
-  }, [adjustments]);
+    return () => window.clearTimeout(timer);
+  }, [search]);
 
+  useEffect(() => {
+    let active = true;
+
+    async function loadReference() {
+      try {
+        const [
+          employeeIndex,
+          employmentIndex,
+          departments,
+          pending,
+          approved,
+          rejected,
+        ] = await Promise.all([
+          employeesApi.loadEmployeeIndex(),
+          employeesApi.loadCurrentEmploymentIndex(),
+          organizationApi.listDepartments({
+            page_size: MAX_PAGE_SIZE,
+            ordering: "name",
+          }),
+          attendanceApi
+            .listAttendanceAdjustments({ status: "PENDING", page_size: 1 })
+            .then((result) => result.count),
+          attendanceApi
+            .listAttendanceAdjustments({ status: "APPROVED", page_size: 1 })
+            .then((result) => result.count),
+          attendanceApi
+            .listAttendanceAdjustments({ status: "REJECTED", page_size: 1 })
+            .then((result) => result.count),
+        ]);
+
+        if (!active) {
+          return;
+        }
+
+        setReference((current) => ({
+          ...current,
+          employees: employeeIndex.byId,
+          employments: employmentIndex.byEmployee,
+          departments: departments.results,
+        }));
+
+        setTotals({ pending, approved, rejected });
+      } catch {
+        if (active) {
+          setTotals(null);
+        }
+      }
+    }
+
+    loadReference();
+
+    return () => {
+      active = false;
+    };
+  }, [reloadToken]);
+
+  useEffect(() => {
+    const requestId = requestRef.current + 1;
+    requestRef.current = requestId;
+
+    let active = true;
+
+    async function loadAdjustments() {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const result = await attendanceApi.listAttendanceAdjustments({
+          page,
+          page_size: DEFAULT_PAGE_SIZE,
+          ordering: "-created_at",
+          status: statusFilter === ALL ? undefined : statusFilter,
+        });
+
+        if (!active || requestRef.current !== requestId) {
+          return;
+        }
+
+        setData(result);
+
+        const attendanceIds = Array.from(
+          new Set(result.results.map((item) => item.attendance_record)),
+        );
+
+        const records = await Promise.all(
+          attendanceIds.map((id) =>
+            attendanceApi.getAttendanceRecord(id).catch(() => null),
+          ),
+        );
+
+        if (!active || requestRef.current !== requestId) {
+          return;
+        }
+
+        setReference((current) => {
+          const next = new Map(current.attendance);
+
+          for (const record of records) {
+            if (record) {
+              next.set(record.id, record);
+            }
+          }
+
+          return { ...current, attendance: next };
+        });
+      } catch (caught) {
+        if (!active || requestRef.current !== requestId) {
+          return;
+        }
+
+        setError(getApiErrorMessage(caught));
+        setData(emptyPage<AttendanceAdjustment>());
+      } finally {
+        if (active && requestRef.current === requestId) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadAdjustments();
+
+    return () => {
+      active = false;
+    };
+  }, [page, statusFilter, reloadToken]);
+
+  const reload = useCallback(() => {
+    setReloadToken((token) => token + 1);
+  }, []);
+
+  const describe = useCallback(
+    (adjustment: AttendanceAdjustment) => {
+      const attendance = reference.attendance.get(adjustment.attendance_record);
+      const employee = attendance
+        ? reference.employees.get(attendance.employee)
+        : undefined;
+      const employment = attendance
+        ? reference.employments.get(attendance.employee)
+        : undefined;
+
+      return {
+        name: employee ? employeesApi.employeeDisplayName(employee) : EM_DASH,
+        number: employee?.employee_number ?? EM_DASH,
+        departmentId: employment?.department ?? null,
+        department:
+          reference.departments.find(
+            (item) => item.id === employment?.department,
+          )?.name ?? EM_DASH,
+        date: attendance ? formatDate(attendance.attendance_date) : EM_DASH,
+      };
+    },
+    [reference],
+  );
+
+  /** The endpoint filters on attendance_record, requested_by and status only. */
   const filteredAdjustments = useMemo(() => {
-    const query = search.toLowerCase().trim();
+    return data.results.filter((adjustment) => {
+      const info = describe(adjustment);
 
-    return adjustments.filter((item) => {
       const matchesSearch =
-        !query ||
-        item.employee.toLowerCase().includes(query) ||
-        item.employeeNumber.toLowerCase().includes(query) ||
-        item.id.toLowerCase().includes(query);
-
-      const matchesStatus =
-        statusFilter === "ALL" ||
-        item.status === statusFilter;
+        !debouncedSearch ||
+        info.name.toLowerCase().includes(debouncedSearch) ||
+        info.number.toLowerCase().includes(debouncedSearch);
 
       const matchesDepartment =
-        departmentFilter === "ALL" ||
-        item.department === departmentFilter;
+        departmentFilter === ALL || info.departmentId === departmentFilter;
 
-      return (
-        matchesSearch &&
-        matchesStatus &&
-        matchesDepartment
-      );
+      return matchesSearch && matchesDepartment;
     });
-  }, [
-    adjustments,
-    search,
-    statusFilter,
-    departmentFilter,
-  ]);
+  }, [data.results, debouncedSearch, departmentFilter, describe]);
 
-  const pendingCount = adjustments.filter(
-    (item) => item.status === "PENDING"
-  ).length;
-
-  const approvedCount = adjustments.filter(
-    (item) => item.status === "APPROVED"
-  ).length;
-
-  const rejectedCount = adjustments.filter(
-    (item) => item.status === "REJECTED"
-  ).length;
-
-  function openReview(item: Adjustment) {
-    setSelectedAdjustment(item);
+  const openReview = (adjustment: AttendanceAdjustment) => {
+    setSelected(adjustment);
     setReviewAction(null);
-    setReviewReason("");
-  }
+    setReviewError("");
+  };
 
-  function closeReview() {
-    setSelectedAdjustment(null);
+  const closeReview = () => {
+    setSelected(null);
     setReviewAction(null);
-    setReviewReason("");
-  }
+    setReviewError("");
+  };
 
-  function submitReview() {
-    if (!selectedAdjustment || !reviewAction) {
+  const submitReview = useCallback(async () => {
+    if (!selected || !reviewAction) {
       return;
     }
 
-    if (reviewAction === "REJECT" && !reviewReason.trim()) {
-      return;
+    setReviewRunning(true);
+    setReviewError("");
+
+    try {
+      // Approving applies the proposed values to the attendance record,
+      // recalculates the derived minutes and re-syncs overtime — all in the
+      // backend service.
+      if (reviewAction === "APPROVE") {
+        await attendanceApi.approveAdjustment(selected.id);
+      } else {
+        await attendanceApi.rejectAdjustment(selected.id);
+      }
+
+      closeReview();
+      reload();
+    } catch (caught) {
+      setReviewError(getApiErrorMessage(caught));
+    } finally {
+      setReviewRunning(false);
     }
+  }, [selected, reviewAction, reload]);
 
-    const newStatus =
-      reviewAction === "APPROVE"
-        ? "APPROVED"
-        : "REJECTED";
-
-    setAdjustments((current) =>
-      current.map((item) =>
-        item.id === selectedAdjustment.id
-          ? {
-              ...item,
-              status: newStatus,
-            }
-          : item
-      )
-    );
-
-    closeReview();
-  }
+  const totalPages = Math.max(1, Math.ceil(data.count / DEFAULT_PAGE_SIZE));
 
   return (
     <main className="space-y-6">
       <PageHeader
         title="Attendance Adjustments"
-        description="Review and manage requests to correct attendance records."
+        description="Review requested corrections to attendance records."
       />
 
-      {/* Summary */}
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard
-          icon={<Clock3 className="h-5 w-5" />}
-          label="Total Requests"
-          value={String(adjustments.length)}
-          detail="Attendance adjustments"
-        />
+      {error && <ErrorState message={error} onRetry={reload} />}
 
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <SummaryCard
           icon={<AlertCircle className="h-5 w-5" />}
           label="Pending"
-          value={String(pendingCount)}
+          value={totals ? formatNumber(totals.pending) : EM_DASH}
           detail="Awaiting review"
         />
 
         <SummaryCard
           icon={<CheckCircle2 className="h-5 w-5" />}
           label="Approved"
-          value={String(approvedCount)}
+          value={totals ? formatNumber(totals.approved) : EM_DASH}
           detail="Approved requests"
         />
 
         <SummaryCard
           icon={<XCircle className="h-5 w-5" />}
           label="Rejected"
-          value={String(rejectedCount)}
+          value={totals ? formatNumber(totals.rejected) : EM_DASH}
           detail="Rejected requests"
         />
       </section>
 
-      {/* Filters */}
       <section className="rounded-xl border border-slate-200 bg-white p-4">
         <div className="flex flex-col gap-3 lg:flex-row">
           <div className="relative flex-1">
@@ -261,38 +359,38 @@ export default function AttendanceAdjustmentsPage() {
 
             <input
               value={search}
-              onChange={(event) =>
-                setSearch(event.target.value)
-              }
-              placeholder="Search employee, employee number or request ID..."
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search employee or employee number..."
               className="w-full rounded-lg border border-slate-200 py-2.5 pl-10 pr-3 text-sm outline-none focus:border-slate-400"
             />
           </div>
 
           <select
             value={departmentFilter}
-            onChange={(event) =>
-              setDepartmentFilter(event.target.value)
-            }
+            onChange={(event) => setDepartmentFilter(event.target.value)}
+            aria-label="Filter by department"
             className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none"
           >
-            <option value="ALL">All Departments</option>
+            <option value={ALL}>All Departments</option>
 
-            {departments.map((department) => (
-              <option key={department} value={department}>
-                {department}
+            {reference.departments.map((department) => (
+              <option key={department.id} value={department.id}>
+                {department.name}
               </option>
             ))}
           </select>
 
           <select
             value={statusFilter}
-            onChange={(event) =>
-              setStatusFilter(event.target.value)
-            }
+            onChange={(event) => {
+              setStatusFilter(event.target.value);
+              setPage(1);
+            }}
+            aria-label="Filter by status"
             className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none"
           >
-            <option value="ALL">All Statuses</option>
+            <option value={ALL}>All Statuses</option>
+            <option value="DRAFT">Draft</option>
             <option value="PENDING">Pending</option>
             <option value="APPROVED">Approved</option>
             <option value="REJECTED">Rejected</option>
@@ -302,8 +400,9 @@ export default function AttendanceAdjustmentsPage() {
             type="button"
             onClick={() => {
               setSearch("");
-              setStatusFilter("ALL");
-              setDepartmentFilter("ALL");
+              setStatusFilter(ALL);
+              setDepartmentFilter(ALL);
+              setPage(1);
             }}
             className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
           >
@@ -313,36 +412,29 @@ export default function AttendanceAdjustmentsPage() {
         </div>
       </section>
 
-      {/* Desktop table */}
-      <section className="hidden overflow-hidden rounded-xl border border-slate-200 bg-white lg:block">
+      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         <div className="overflow-x-auto">
-          <table className="w-full text-left">
+          <table className="w-full min-w-[900px] text-left">
             <thead className="border-b border-slate-200 bg-slate-50">
               <tr>
                 <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Employee
                 </th>
-
                 <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Date
                 </th>
-
                 <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Original
                 </th>
-
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Proposed
+                </th>
                 <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Requested
                 </th>
-
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Reason
-                </th>
-
                 <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Status
                 </th>
-
                 <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Action
                 </th>
@@ -350,85 +442,69 @@ export default function AttendanceAdjustmentsPage() {
             </thead>
 
             <tbody className="divide-y divide-slate-100">
-              {filteredAdjustments.map((item) => (
-                <tr
-                  key={item.id}
-                  className="hover:bg-slate-50"
-                >
-                  <td className="px-5 py-4">
-                    <p className="font-medium text-slate-900">
-                      {item.employee}
-                    </p>
+              {filteredAdjustments.map((adjustment) => {
+                const info = describe(adjustment);
 
-                    <p className="mt-1 text-xs text-slate-500">
-                      {item.employeeNumber} · {item.department}
-                    </p>
-                  </td>
+                return (
+                  <tr key={adjustment.id} className="hover:bg-slate-50">
+                    <td className="px-5 py-4">
+                      <p className="font-medium text-slate-900">{info.name}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {info.number} · {info.department}
+                      </p>
+                    </td>
 
-                  <td className="px-5 py-4">
-                    <div className="flex items-center gap-2 text-sm text-slate-700">
-                      <CalendarDays className="h-4 w-4 text-slate-400" />
-                      {item.date}
-                    </div>
-                  </td>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-2 text-sm text-slate-700">
+                        <CalendarDays className="h-4 w-4 text-slate-400" />
+                        {info.date}
+                      </div>
+                    </td>
 
-                  <td className="px-5 py-4">
-                    <p className="text-sm text-slate-700">
-                      In: {item.originalCheckIn}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Out: {item.originalCheckOut}
-                    </p>
-                  </td>
+                    <td className="px-5 py-4 text-sm text-slate-700">
+                      {adjustmentTime(adjustment.old_values, "check_in")} –{" "}
+                      {adjustmentTime(adjustment.old_values, "check_out")}
+                    </td>
 
-                  <td className="px-5 py-4">
-                    <p className="text-sm font-medium text-slate-700">
-                      In: {item.requestedCheckIn}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Out: {item.requestedCheckOut}
-                    </p>
-                  </td>
+                    <td className="px-5 py-4 text-sm font-medium text-slate-900">
+                      {adjustmentTime(adjustment.proposed_values, "check_in")} –{" "}
+                      {adjustmentTime(adjustment.proposed_values, "check_out")}
+                    </td>
 
-                  <td className="max-w-xs px-5 py-4">
-                    <p className="truncate text-sm text-slate-600">
-                      {item.reason}
-                    </p>
-                  </td>
+                    <td className="px-5 py-4 text-sm text-slate-700">
+                      {formatDateTime(adjustment.created_at)}
+                    </td>
 
-                  <td className="px-5 py-4">
-                    <StatusBadge status={item.status} />
-                  </td>
+                    <td className="px-5 py-4">
+                      <StatusBadge status={adjustment.status} />
+                    </td>
 
-                  <td className="px-5 py-4">
-                    <div className="flex justify-end">
+                    <td className="px-5 py-4 text-right">
                       <button
                         type="button"
-                        onClick={() => openReview(item)}
-                        className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                        onClick={() => openReview(adjustment)}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
                       >
                         <Eye className="h-4 w-4" />
                         Review
                       </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                  </tr>
+                );
+              })}
 
               {filteredAdjustments.length === 0 && (
                 <tr>
-                  <td
-                    colSpan={7}
-                    className="px-5 py-12 text-center"
-                  >
-                    <Clock3 className="mx-auto h-8 w-8 text-slate-400" />
-
-                    <p className="mt-3 font-medium text-slate-900">
-                      No adjustments found
+                  <td colSpan={7} className="px-5 py-12 text-center">
+                    <p className="text-sm font-medium text-slate-700">
+                      {loading
+                        ? "Loading adjustments..."
+                        : "No attendance adjustments found"}
                     </p>
-
                     <p className="mt-1 text-sm text-slate-500">
-                      Try changing your search or filters.
+                      {loading
+                        ? "Please wait."
+                        : "No correction requests match these filters."}
                     </p>
                   </td>
                 </tr>
@@ -436,87 +512,40 @@ export default function AttendanceAdjustmentsPage() {
             </tbody>
           </table>
         </div>
-      </section>
 
-      {/* Mobile */}
-      <section className="space-y-3 lg:hidden">
-        {filteredAdjustments.map((item) => (
-          <div
-            key={item.id}
-            className="rounded-xl border border-slate-200 bg-white p-4"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="font-semibold text-slate-900">
-                  {item.employee}
-                </p>
+        <div className="flex items-center justify-between border-t border-slate-200 px-5 py-3">
+          <p className="text-xs text-slate-500">
+            Page {page} of {totalPages} · {data.count} records
+          </p>
 
-                <p className="mt-1 text-xs text-slate-500">
-                  {item.employeeNumber}
-                </p>
-              </div>
-
-              <StatusBadge status={item.status} />
-            </div>
-
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <Info
-                label="Date"
-                value={item.date}
-              />
-
-              <Info
-                label="Department"
-                value={item.department}
-              />
-
-              <Info
-                label="Original"
-                value={`${item.originalCheckIn} – ${item.originalCheckOut}`}
-              />
-
-              <Info
-                label="Requested"
-                value={`${item.requestedCheckIn} – ${item.requestedCheckOut}`}
-              />
-            </div>
-
-            <p className="mt-4 text-sm leading-5 text-slate-600">
-              {item.reason}
-            </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              disabled={loading || !data.previous}
+              className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+            >
+              Previous
+            </button>
 
             <button
               type="button"
-              onClick={() => openReview(item)}
-              className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-700"
+              onClick={() => setPage((current) => current + 1)}
+              disabled={loading || !data.next}
+              className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
             >
-              <Eye className="h-4 w-4" />
-              Review Adjustment
+              Next
             </button>
           </div>
-        ))}
-
-        {filteredAdjustments.length === 0 && (
-          <div className="rounded-xl border border-dashed border-slate-300 p-10 text-center">
-            <Clock3 className="mx-auto h-8 w-8 text-slate-400" />
-
-            <p className="mt-3 font-medium text-slate-900">
-              No adjustments found
-            </p>
-          </div>
-        )}
+        </div>
       </section>
 
       {/* Review modal */}
-      {selectedAdjustment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-xl">
-            <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4">
+      {selected && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-xl">
+            <div className="sticky top-0 flex items-start justify-between border-b border-slate-200 bg-white px-5 py-4">
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                  {selectedAdjustment.id}
-                </p>
-
                 <h2 className="mt-1 text-lg font-semibold text-slate-900">
                   Review Attendance Adjustment
                 </h2>
@@ -529,14 +558,21 @@ export default function AttendanceAdjustmentsPage() {
               <button
                 type="button"
                 onClick={closeReview}
+                disabled={reviewRunning}
                 className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                aria-label="Close"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             <div className="space-y-5 p-5">
-              {/* Employee */}
+              {reviewError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {reviewError}
+                </div>
+              )}
+
               <section className="rounded-xl border border-slate-200 p-4">
                 <div className="flex items-start gap-3">
                   <div className="rounded-lg bg-slate-100 p-2">
@@ -545,18 +581,18 @@ export default function AttendanceAdjustmentsPage() {
 
                   <div>
                     <p className="font-semibold text-slate-900">
-                      {selectedAdjustment.employee}
+                      {describe(selected).name}
                     </p>
 
                     <p className="mt-1 text-sm text-slate-500">
-                      {selectedAdjustment.employeeNumber} ·{" "}
-                      {selectedAdjustment.department}
+                      {describe(selected).number} ·{" "}
+                      {describe(selected).department} ·{" "}
+                      {describe(selected).date}
                     </p>
                   </div>
                 </div>
               </section>
 
-              {/* Comparison */}
               <section>
                 <h3 className="text-sm font-semibold text-slate-900">
                   Attendance Comparison
@@ -565,56 +601,51 @@ export default function AttendanceAdjustmentsPage() {
                 <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <ComparisonCard
                     title="Original Record"
-                    checkIn={selectedAdjustment.originalCheckIn}
-                    checkOut={selectedAdjustment.originalCheckOut}
+                    checkIn={adjustmentTime(selected.old_values, "check_in")}
+                    checkOut={adjustmentTime(selected.old_values, "check_out")}
                   />
 
                   <ComparisonCard
                     title="Requested Record"
-                    checkIn={selectedAdjustment.requestedCheckIn}
-                    checkOut={selectedAdjustment.requestedCheckOut}
+                    checkIn={adjustmentTime(
+                      selected.proposed_values,
+                      "check_in",
+                    )}
+                    checkOut={adjustmentTime(
+                      selected.proposed_values,
+                      "check_out",
+                    )}
                     highlight
                   />
                 </div>
               </section>
 
-              {/* Reason */}
               <section className="rounded-xl bg-slate-50 p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                   Reason
                 </p>
 
                 <p className="mt-2 text-sm leading-6 text-slate-700">
-                  {selectedAdjustment.reason}
+                  {selected.reason || EM_DASH}
                 </p>
 
                 <p className="mt-3 text-xs text-slate-500">
-                  Submitted by {selectedAdjustment.submittedBy} on{" "}
-                  {selectedAdjustment.submittedDate}
+                  Requested on {formatDateTime(selected.created_at)}
                 </p>
               </section>
 
-              {/* Current status */}
               <div className="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-3">
-                <span className="text-sm text-slate-600">
-                  Current status
-                </span>
+                <span className="text-sm text-slate-600">Current status</span>
 
-                <StatusBadge
-                  status={selectedAdjustment.status}
-                />
+                <StatusBadge status={selected.status} />
               </div>
 
-              {/* Review controls */}
-              {selectedAdjustment.status === "PENDING" && (
+              {selected.status === "PENDING" ? (
                 <section className="space-y-4 border-t border-slate-200 pt-5">
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      onClick={() => {
-                        setReviewAction("APPROVE");
-                        setReviewReason("");
-                      }}
+                      onClick={() => setReviewAction("APPROVE")}
                       className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-medium ${
                         reviewAction === "APPROVE"
                           ? "bg-emerald-600 text-white"
@@ -639,47 +670,45 @@ export default function AttendanceAdjustmentsPage() {
                     </button>
                   </div>
 
-                  {reviewAction === "REJECT" && (
-                    <div>
-                      <label className="text-sm font-medium text-slate-700">
-                        Rejection Reason
-                      </label>
+                  {reviewAction === "APPROVE" && (
+                    <p className="rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-600">
+                      Approving applies the proposed values to the attendance
+                      record, recalculates worked, late and overtime minutes,
+                      and re-syncs the related overtime record.
+                    </p>
+                  )}
 
-                      <textarea
-                        value={reviewReason}
-                        onChange={(event) =>
-                          setReviewReason(event.target.value)
-                        }
-                        rows={3}
-                        placeholder="Provide a reason for rejecting this adjustment..."
-                        className="mt-2 w-full resize-none rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
-                      />
-                    </div>
+                  {/*
+                    The decision endpoints accept no payload, so no rejection
+                    comment can be recorded against an adjustment.
+                  */}
+                  {reviewAction === "REJECT" && (
+                    <p className="rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-600">
+                      The attendance record is left unchanged. The API records
+                      no rejection comment for adjustments.
+                    </p>
                   )}
 
                   {reviewAction && (
                     <button
                       type="button"
                       onClick={submitReview}
-                      disabled={
-                        reviewAction === "REJECT" &&
-                        !reviewReason.trim()
-                      }
+                      disabled={reviewRunning}
                       className="w-full rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      Confirm{" "}
-                      {reviewAction === "APPROVE"
-                        ? "Approval"
-                        : "Rejection"}
+                      {reviewRunning
+                        ? "Processing..."
+                        : `Confirm ${
+                            reviewAction === "APPROVE"
+                              ? "Approval"
+                              : "Rejection"
+                          }`}
                     </button>
                   )}
                 </section>
-              )}
-
-              {selectedAdjustment.status !== "PENDING" && (
+              ) : (
                 <div className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">
-                  This adjustment has already been processed and is
-                  read-only.
+                  This adjustment has already been processed and is read-only.
                 </div>
               )}
             </div>
@@ -687,7 +716,6 @@ export default function AttendanceAdjustmentsPage() {
         </div>
       )}
 
-      {/* Integrity note */}
       <section className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4">
         <div className="flex items-start gap-3">
           <Clock3 className="mt-0.5 h-5 w-5 shrink-0 text-slate-600" />
@@ -698,9 +726,9 @@ export default function AttendanceAdjustmentsPage() {
             </p>
 
             <p className="mt-1 text-sm leading-6 text-slate-600">
-              An approved adjustment represents a controlled correction
-              to an attendance record. Historical records should remain
-              auditable rather than being silently overwritten.
+              An approved adjustment represents a controlled correction to an
+              attendance record. The original values are retained on the
+              adjustment so the change stays auditable.
             </p>
           </div>
         </div>
@@ -723,42 +751,14 @@ function SummaryCard({
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-5">
       <div className="flex items-center gap-3">
-        <div className="rounded-lg bg-slate-100 p-2 text-slate-600">
-          {icon}
-        </div>
+        <div className="rounded-lg bg-slate-100 p-2 text-slate-600">{icon}</div>
 
-        <p className="text-sm font-medium text-slate-500">
-          {label}
-        </p>
+        <p className="text-sm font-medium text-slate-500">{label}</p>
       </div>
 
-      <p className="mt-4 text-2xl font-semibold text-slate-900">
-        {value}
-      </p>
+      <p className="mt-4 text-2xl font-semibold text-slate-900">{value}</p>
 
-      <p className="mt-1 text-xs text-slate-500">
-        {detail}
-      </p>
-    </div>
-  );
-}
-
-function Info({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}) {
-  return (
-    <div>
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
-        {label}
-      </p>
-
-      <p className="mt-1 text-sm font-medium text-slate-900">
-        {value}
-      </p>
+      <p className="mt-1 text-xs text-slate-500">{detail}</p>
     </div>
   );
 }
@@ -789,9 +789,7 @@ function ComparisonCard({
       <div className="mt-4 grid grid-cols-2 gap-4">
         <div>
           <p className="text-xs text-slate-500">Check-in</p>
-          <p className="mt-1 text-lg font-semibold text-slate-900">
-            {checkIn}
-          </p>
+          <p className="mt-1 text-lg font-semibold text-slate-900">{checkIn}</p>
         </div>
 
         <div>

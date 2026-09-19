@@ -1,70 +1,32 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { Plus, Search, X } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import ErrorState from "@/components/ui/ErrorState";
 import PageHeader from "@/components/ui/PageHeader";
+import StatusBadge from "@/components/ui/StatusBadge";
+import { accountingApi, getApiErrorMessage } from "@/lib/api";
+import { formatAmount, formatDate } from "@/lib/format";
+import { useApiResource } from "@/lib/useApiResource";
+import type { Invoice } from "@/types/accounting";
+import { MAX_PAGE_SIZE } from "@/types/api";
 
-const invoices = [
-  ["INV-2026-110", "ABC University", "GHS 85,000", "PAID"],
-  ["INV-2026-111", "North Campus Services", "GHS 42,500", "ISSUED"],
-  ["INV-2026-112", "Student Services Unit", "GHS 18,200", "OVERDUE"],
-];
+type Line = { description: string; income_account: string; quantity: string; unit_price: string };
+type Form = { customer: string; invoice_number: string; invoice_date: string; due_date: string; currency: string; accounting_period: string; external_tax_reference: string; lines: Line[] };
+const dateToday = () => new Date().toISOString().slice(0, 10);
+const newLine = (): Line => ({ description: "", income_account: "", quantity: "1", unit_price: "" });
+const newForm = (): Form => ({ customer: "", invoice_number: "", invoice_date: dateToday(), due_date: dateToday(), currency: "", accounting_period: "", external_tax_reference: "", lines: [newLine()] });
 
 export default function ReceivablesPage() {
-  return (
-    <main className="space-y-6">
-      <PageHeader
-        title="Accounts Receivable"
-        description="Manage customers, invoices, receipts and payment status."
-        actions={
-          <button className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white">
-            <Plus className="h-4 w-4" />
-            Create Invoice
-          </button>
-        }
-      />
-
-      <div className="grid gap-4 sm:grid-cols-3">
-        {[
-          ["Outstanding", "GHS 218,400"],
-          ["Collected This Month", "GHS 132,500"],
-          ["Overdue", "GHS 31,200"],
-        ].map(([label, value]) => (
-          <div key={label} className="rounded-2xl border bg-white p-5">
-            <p className="text-sm text-slate-500">{label}</p>
-            <p className="mt-2 text-2xl font-bold">{value}</p>
-          </div>
-        ))}
-      </div>
-
-      <section className="rounded-2xl border bg-white p-5">
-        <h2 className="font-semibold">Invoices</h2>
-        <div className="mt-5 overflow-x-auto">
-          <table className="w-full min-w-[700px] text-sm">
-            <thead>
-              <tr className="border-b text-left text-xs uppercase text-slate-500">
-                <th className="pb-3">Invoice</th>
-                <th className="pb-3">Customer</th>
-                <th className="pb-3">Amount</th>
-                <th className="pb-3">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {invoices.map(([invoice, customer, amount, status]) => (
-                <tr key={invoice} className="border-b last:border-0">
-                  <td className="py-4 font-medium">{invoice}</td>
-                  <td className="py-4">{customer}</td>
-                  <td className="py-4 font-semibold">{amount}</td>
-                  <td className="py-4">
-                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold">
-                      {status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </main>
-  );
+  const [search, setSearch] = useState(""); const [status, setStatus] = useState("ALL"); const [open, setOpen] = useState(false); const [form, setForm] = useState<Form>(newForm); const [formError, setFormError] = useState(""); const [saving, setSaving] = useState(false); const [pending, setPending] = useState<{ invoice: Invoice; action: "issue" | "void" } | null>(null); const [acting, setActing] = useState(false); const [actionError, setActionError] = useState("");
+  const load = useCallback(() => Promise.all([accountingApi.listInvoices({ page_size: MAX_PAGE_SIZE, status: status === "ALL" ? undefined : status, ordering: "-invoice_date" }), accountingApi.listCustomers({ page_size: MAX_PAGE_SIZE, is_active: true }), accountingApi.listAccounts({ page_size: MAX_PAGE_SIZE, account_type: "REVENUE", is_active: true, is_postable: true, ordering: "code" }), accountingApi.listAccountingPeriods({ page_size: MAX_PAGE_SIZE, status: "OPEN", ordering: "start_date" })]), [status]);
+  const { data, loading, error, reload } = useApiResource(load); const invoices = useMemo(() => data?.[0].results ?? [], [data]); const customers = useMemo(() => data?.[1].results ?? [], [data]); const accounts = useMemo(() => data?.[2].results ?? [], [data]); const periods = useMemo(() => data?.[3].results ?? [], [data]); const customerNames = useMemo(() => new Map(customers.map((customer) => [customer.id, customer.name])), [customers]); const filtered = useMemo(() => { const query = search.trim().toLowerCase(); return invoices.filter((invoice) => !query || invoice.invoice_number.toLowerCase().includes(query) || (customerNames.get(invoice.customer) ?? invoice.customer).toLowerCase().includes(query)); }, [invoices, search, customerNames]);
+  const save = async () => { if (!form.customer || !form.invoice_number.trim() || !form.invoice_date || !form.due_date || !form.currency.trim() || !form.accounting_period || form.lines.some((line) => !line.description.trim() || !line.income_account || !line.quantity || !line.unit_price)) { setFormError("Complete the invoice header and every line before saving."); return; } setSaving(true); setFormError(""); try { await accountingApi.createInvoice({ ...form, invoice_number: form.invoice_number.trim(), currency: form.currency.trim().toUpperCase(), external_tax_reference: form.external_tax_reference.trim() || null, lines: form.lines.map((line) => ({ ...line, description: line.description.trim() })) }); setOpen(false); reload(); } catch (caught) { setFormError(getApiErrorMessage(caught)); } finally { setSaving(false); } };
+  const act = async () => { if (!pending) return; setActing(true); setActionError(""); try { await (pending.action === "issue" ? accountingApi.issueInvoice(pending.invoice.id) : accountingApi.voidInvoice(pending.invoice.id)); setPending(null); reload(); } catch (caught) { setPending(null); setActionError(getApiErrorMessage(caught)); } finally { setActing(false); } };
+  return <main className="space-y-6"><PageHeader title="Accounts Receivable" description="Manage customers, invoices, receipts and payment status." actions={<button type="button" onClick={() => { setForm(newForm()); setFormError(""); setOpen(true); }} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white"><Plus className="h-4 w-4" />Create Invoice</button>} />{error && <ErrorState message={error} onRetry={reload} />}{actionError && <p className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{actionError}</p>}<div className="grid gap-4 sm:grid-cols-3"><Metric label="Invoices" value={String(data?.[0].count ?? 0)} /><Metric label="Draft" value={String(invoices.filter((item) => item.status === "DRAFT").length)} /><Metric label="Issued" value={String(invoices.filter((item) => item.status === "ISSUED").length)} /></div><section className="rounded-2xl border bg-white p-5"><div className="flex flex-col gap-3 sm:flex-row"><div className="relative flex-1"><Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search customer or invoice number..." className="w-full rounded-xl border py-2.5 pl-10 pr-4 text-sm" /></div><select value={status} onChange={(event) => setStatus(event.target.value)} className="rounded-xl border px-3 text-sm"><option value="ALL">All statuses</option><option value="DRAFT">Draft</option><option value="ISSUED">Issued</option><option value="PART_PAID">Part paid</option><option value="PAID">Paid</option><option value="VOID">Void</option></select></div><h2 className="mt-5 font-semibold">Invoices</h2><div className="mt-5 overflow-x-auto"><table className="w-full min-w-[800px] text-sm"><thead><tr className="border-b text-left text-xs uppercase text-slate-500"><th className="pb-3">Invoice</th><th className="pb-3">Customer</th><th className="pb-3">Invoice Date</th><th className="pb-3">Amount</th><th className="pb-3">Status</th><th className="pb-3">Actions</th></tr></thead><tbody>{filtered.map((invoice) => <tr key={invoice.id} className="border-b last:border-0"><td className="py-4 font-medium">{invoice.invoice_number}</td><td className="py-4">{customerNames.get(invoice.customer) ?? invoice.customer}</td><td className="py-4">{formatDate(invoice.invoice_date)}</td><td className="py-4 font-semibold">{formatAmount(invoice.total_amount, invoice.currency)}</td><td className="py-4"><StatusBadge status={invoice.status} /></td><td className="py-4">{invoice.status === "DRAFT" && <div className="flex gap-2"><button type="button" onClick={() => { setActionError(""); setPending({ invoice, action: "issue" }); }} className="rounded-lg border px-3 py-2 text-xs font-semibold">Issue</button><button type="button" onClick={() => { setActionError(""); setPending({ invoice, action: "void" }); }} className="rounded-lg border px-3 py-2 text-xs font-semibold">Void</button></div>}</td></tr>)}</tbody></table>{loading && <p className="py-10 text-center text-sm text-slate-500">Loading invoices...</p>}{!loading && !filtered.length && <p className="py-10 text-center text-sm text-slate-500">No invoices found.</p>}</div><p className="mt-5 text-xs text-slate-500">Invoice totals and issuance status are controlled by the backend. Receipt allocation is not shown because no allocation API is exposed.</p></section>{open && <InvoiceModal form={form} customers={customers} accounts={accounts} periods={periods} error={formError} saving={saving} onChange={setForm} onClose={() => setOpen(false)} onSave={() => void save()} />}{pending && <ConfirmDialog open title={pending.action === "issue" ? "Issue invoice" : "Void invoice"} description={pending.action === "issue" ? "The backend will create and post the controlled AR journal." : "Void this draft invoice. This cannot be undone."} confirmLabel={pending.action === "issue" ? "Issue" : "Void"} destructive={pending.action === "void"} loading={acting} onCancel={() => setPending(null)} onConfirm={() => void act()} />}</main>;
 }
+
+function InvoiceModal({ form, customers, accounts, periods, error, saving, onChange, onClose, onSave }: { form: Form; customers: Array<{ id: string; name: string; customer_code: string }>; accounts: Array<{ id: string; code: string; name: string }>; periods: Array<{ id: string; name: string }>; error: string; saving: boolean; onChange: (form: Form) => void; onClose: () => void; onSave: () => void }) { const setLine = (index: number, change: Partial<Line>) => onChange({ ...form, lines: form.lines.map((line, item) => item === index ? { ...line, ...change } : line) }); return <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-4"><div className="mx-auto my-8 w-full max-w-4xl rounded-2xl bg-white shadow-xl"><div className="flex items-center justify-between border-b p-5"><div><h2 className="text-lg font-bold">Create Invoice</h2><p className="text-sm text-slate-500">Save a draft first; issuing uses the backend workflow action.</p></div><button type="button" onClick={onClose} disabled={saving} aria-label="Close invoice form"><X size={19} /></button></div>{error && <p className="mx-5 mt-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}<div className="grid gap-4 p-5 sm:grid-cols-2"><Label text="Customer"><select value={form.customer} onChange={(event) => onChange({ ...form, customer: event.target.value })} className="w-full rounded border p-2"><option value="">Select customer</option>{customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.customer_code} — {customer.name}</option>)}</select></Label><Label text="Invoice number"><input value={form.invoice_number} onChange={(event) => onChange({ ...form, invoice_number: event.target.value })} className="w-full rounded border p-2" /></Label><Label text="Invoice date"><input type="date" value={form.invoice_date} onChange={(event) => onChange({ ...form, invoice_date: event.target.value })} className="w-full rounded border p-2" /></Label><Label text="Due date"><input type="date" value={form.due_date} onChange={(event) => onChange({ ...form, due_date: event.target.value })} className="w-full rounded border p-2" /></Label><Label text="Currency"><input value={form.currency} onChange={(event) => onChange({ ...form, currency: event.target.value.toUpperCase() })} maxLength={3} placeholder="e.g. GHS" className="w-full rounded border p-2" /></Label><Label text="Open accounting period"><select value={form.accounting_period} onChange={(event) => onChange({ ...form, accounting_period: event.target.value })} className="w-full rounded border p-2"><option value="">Select period</option>{periods.map((period) => <option key={period.id} value={period.id}>{period.name}</option>)}</select></Label><Label text="External tax reference (optional)"><input value={form.external_tax_reference} onChange={(event) => onChange({ ...form, external_tax_reference: event.target.value })} className="w-full rounded border p-2" /></Label></div><div className="border-t px-5 pb-5 pt-4"><div className="flex items-center justify-between"><div><h3 className="font-semibold">Invoice lines</h3><p className="text-sm text-slate-500">Tax is applied only when the backend has an applicable configured rule.</p></div><button type="button" onClick={() => onChange({ ...form, lines: [...form.lines, newLine()] })} className="rounded-lg border px-3 py-2 text-xs font-semibold">Add line</button></div><div className="mt-4 space-y-3">{form.lines.map((line, index) => <div key={index} className="grid gap-3 rounded-xl border p-3 md:grid-cols-[minmax(0,1fr)_minmax(180px,1fr)_110px_130px_auto]"><input value={line.description} onChange={(event) => setLine(index, { description: event.target.value })} placeholder="Description" className="rounded border p-2 text-sm" /><select value={line.income_account} onChange={(event) => setLine(index, { income_account: event.target.value })} className="rounded border p-2 text-sm"><option value="">Revenue account</option>{accounts.map((account) => <option key={account.id} value={account.id}>{account.code} — {account.name}</option>)}</select><input type="number" min="0.0001" step="0.0001" value={line.quantity} onChange={(event) => setLine(index, { quantity: event.target.value })} placeholder="Quantity" className="rounded border p-2 text-sm" /><input type="number" min="0" step="0.0001" value={line.unit_price} onChange={(event) => setLine(index, { unit_price: event.target.value })} placeholder="Unit price" className="rounded border p-2 text-sm" /><button type="button" disabled={form.lines.length === 1} onClick={() => onChange({ ...form, lines: form.lines.filter((_, item) => item !== index) })} className="rounded border px-3 text-xs font-semibold disabled:opacity-40">Remove</button></div>)}</div></div><div className="flex justify-end gap-3 border-t p-5"><button type="button" onClick={onClose} disabled={saving} className="rounded border px-4 py-2">Cancel</button><button type="button" onClick={onSave} disabled={saving} className="rounded bg-slate-900 px-4 py-2 text-white disabled:opacity-50">{saving ? "Saving..." : "Create Draft"}</button></div></div></div>; }
+function Label({ text, children }: { text: string; children: React.ReactNode }) { return <label className="space-y-1"><span className="text-sm font-medium">{text}</span>{children}</label>; }
+function Metric({ label, value }: { label: string; value: string }) { return <div className="rounded-2xl border bg-white p-5"><p className="text-sm text-slate-500">{label}</p><p className="mt-2 text-2xl font-bold">{value}</p></div>; }

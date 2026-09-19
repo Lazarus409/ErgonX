@@ -1,150 +1,24 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, Plus, Search } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { Plus, Search, X } from "lucide-react";
+import ErrorState from "@/components/ui/ErrorState";
 import PageHeader from "@/components/ui/PageHeader";
+import StatusBadge from "@/components/ui/StatusBadge";
+import { accountingApi, getApiErrorMessage } from "@/lib/api";
+import { useApiResource } from "@/lib/useApiResource";
+import { MAX_PAGE_SIZE } from "@/types/api";
+import type { AccountType, NormalBalance } from "@/types/accounting";
 
-type Account = {
-  code: string;
-  name: string;
-  type: string;
-  parent?: string;
-  balance: string;
-  status: "ACTIVE" | "INACTIVE";
-};
-
-const initialAccounts: Account[] = [
-  { code: "1000", name: "Assets", type: "ASSET", balance: "GHS 842,500", status: "ACTIVE" },
-  { code: "1100", name: "Cash and Bank", type: "ASSET", parent: "1000", balance: "GHS 842,500", status: "ACTIVE" },
-  { code: "1110", name: "Main Bank Account", type: "ASSET", parent: "1100", balance: "GHS 710,200", status: "ACTIVE" },
-  { code: "1120", name: "Petty Cash", type: "ASSET", parent: "1100", balance: "GHS 132,300", status: "ACTIVE" },
-  { code: "1200", name: "Accounts Receivable", type: "ASSET", parent: "1000", balance: "GHS 218,400", status: "ACTIVE" },
-  { code: "2000", name: "Liabilities", type: "LIABILITY", balance: "GHS 143,750", status: "ACTIVE" },
-  { code: "2100", name: "Accounts Payable", type: "LIABILITY", parent: "2000", balance: "GHS 143,750", status: "ACTIVE" },
-  { code: "3000", name: "Equity", type: "EQUITY", balance: "GHS 2.1M", status: "ACTIVE" },
-  { code: "4000", name: "Revenue", type: "REVENUE", balance: "GHS 1.84M", status: "ACTIVE" },
-  { code: "5000", name: "Expenses", type: "EXPENSE", balance: "GHS 1.21M", status: "ACTIVE" },
-];
+type AccountForm = { code: string; name: string; account_type: AccountType; parent: string; normal_balance: NormalBalance; is_postable: boolean; is_active: boolean };
+const emptyForm: AccountForm = { code: "", name: "", account_type: "EXPENSE", parent: "", normal_balance: "DEBIT", is_postable: true, is_active: true };
 
 export default function ChartOfAccountsPage() {
-  const [accounts, setAccounts] = useState(initialAccounts);
-  const [search, setSearch] = useState("");
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({
-    "1000": true,
-    "1100": true,
-    "2000": true,
-  });
-
-  const visible = useMemo(
-    () =>
-      accounts.filter((account) =>
-        `${account.code} ${account.name} ${account.type}`
-          .toLowerCase()
-          .includes(search.toLowerCase())
-      ),
-    [accounts, search]
-  );
-
-  const addAccount = () => {
-    const code = window.prompt("Account code");
-    const name = window.prompt("Account name");
-
-    if (!code || !name) return;
-
-    setAccounts((current) => [
-      ...current,
-      {
-        code,
-        name,
-        type: "EXPENSE",
-        balance: "GHS 0",
-        status: "ACTIVE",
-      },
-    ]);
-  };
-
-  return (
-    <main className="space-y-6">
-      <PageHeader
-        title="Chart of Accounts"
-        description="Manage accounts and their hierarchy for the active institution."
-        actions={
-          <button
-            onClick={addAccount}
-            className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white"
-          >
-            <Plus className="h-4 w-4" />
-            New Account
-          </button>
-        }
-      />
-
-      <section className="rounded-2xl border bg-white p-5">
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search accounts..."
-            className="w-full rounded-xl border py-2.5 pl-10 pr-4 text-sm outline-none focus:ring-2 focus:ring-slate-200"
-          />
-        </div>
-
-        <div className="mt-5 overflow-x-auto">
-          <table className="w-full min-w-[700px] text-sm">
-            <thead>
-              <tr className="border-b text-left text-xs uppercase text-slate-500">
-                <th className="pb-3">Account</th>
-                <th className="pb-3">Type</th>
-                <th className="pb-3">Balance</th>
-                <th className="pb-3">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visible.map((account) => {
-                const hasChildren = accounts.some((item) => item.parent === account.code);
-                const indent = account.parent ? "pl-10" : "pl-2";
-
-                return (
-                  <tr key={account.code} className="border-b last:border-0">
-                    <td className={`py-4 ${indent}`}>
-                      <div className="flex items-center gap-2">
-                        {hasChildren ? (
-                          <button
-                            onClick={() =>
-                              setExpanded((current) => ({
-                                ...current,
-                                [account.code]: !current[account.code],
-                              }))
-                            }
-                          >
-                            {expanded[account.code] ? (
-                              <ChevronDown className="h-4 w-4" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4" />
-                            )}
-                          </button>
-                        ) : (
-                          <span className="w-4" />
-                        )}
-                        <span className="font-medium">{account.code}</span>
-                        <span>{account.name}</span>
-                      </div>
-                    </td>
-                    <td className="py-4">{account.type}</td>
-                    <td className="py-4 font-medium">{account.balance}</td>
-                    <td className="py-4">
-                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium">
-                        {account.status}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </main>
-  );
+  const [search, setSearch] = useState(""); const [modalOpen, setModalOpen] = useState(false); const [form, setForm] = useState<AccountForm>(emptyForm); const [saving, setSaving] = useState(false); const [formError, setFormError] = useState("");
+  const load = useCallback(() => accountingApi.listAccounts({ page_size: MAX_PAGE_SIZE, ordering: "code" }), []); const { data, loading, error, reload } = useApiResource(load); const accounts = useMemo(() => data?.results ?? [], [data]); const visible = useMemo(() => { const query = search.trim().toLowerCase(); return accounts.filter((account) => !query || `${account.code} ${account.name} ${account.account_type}`.toLowerCase().includes(query)); }, [accounts, search]);
+  const parents = useMemo(() => accounts.filter((account) => !account.is_postable), [accounts]);
+  const create = async () => { if (!form.code.trim() || !form.name.trim()) { setFormError("Code and account name are required."); return; } setSaving(true); setFormError(""); try { await accountingApi.createAccount({ ...form, code: form.code.trim().toUpperCase(), name: form.name.trim(), parent: form.parent || null }); setModalOpen(false); reload(); } catch (caught) { setFormError(getApiErrorMessage(caught)); } finally { setSaving(false); } };
+  return <main className="space-y-6"><PageHeader title="Chart of Accounts" description="Manage account hierarchy and posting controls for the active institution." actions={<button type="button" onClick={() => { setForm(emptyForm); setFormError(""); setModalOpen(true); }} className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white"><Plus className="h-4 w-4" />New Account</button>} />{error && <ErrorState message={error} onRetry={reload} />}<section className="rounded-2xl border bg-white p-5"><div className="relative max-w-md"><Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search accounts..." className="w-full rounded-xl border py-2.5 pl-10 pr-4 text-sm" /></div><div className="mt-5 overflow-x-auto"><table className="w-full min-w-[700px] text-sm"><thead><tr className="border-b text-left text-xs uppercase text-slate-500"><th className="pb-3">Account</th><th className="pb-3">Type</th><th className="pb-3">Normal balance</th><th className="pb-3">Posting</th><th className="pb-3">Status</th></tr></thead><tbody>{visible.map((account) => <tr key={account.id} className="border-b last:border-0"><td className="py-4"><span className="font-medium">{account.code}</span><span className="ml-3">{account.name}</span>{account.parent && <p className="ml-12 mt-1 text-xs text-slate-500">Parent: {accounts.find((item) => item.id === account.parent)?.code ?? account.parent}</p>}</td><td className="py-4">{account.account_type}</td><td className="py-4">{account.normal_balance}</td><td className="py-4">{account.is_postable ? "Postable" : "Header"}</td><td className="py-4"><StatusBadge status={account.is_active ? "ACTIVE" : "INACTIVE"} /></td></tr>)}</tbody></table>{loading && <p className="py-10 text-center text-sm text-slate-500">Loading accounts...</p>}{!loading && !visible.length && <p className="py-10 text-center text-sm text-slate-500">No accounts found.</p>}</div></section>{modalOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><div className="w-full max-w-xl rounded-2xl bg-white shadow-xl"><div className="flex items-center justify-between border-b p-5"><div><h2 className="text-lg font-bold">New Account</h2><p className="text-sm text-slate-500">Account creation is validated by the backend.</p></div><button type="button" onClick={() => setModalOpen(false)}><X size={19} /></button></div>{formError && <p className="mx-5 mt-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{formError}</p>}<div className="grid gap-4 p-5 sm:grid-cols-2"><Field label="Code"><input value={form.code} onChange={(event) => setForm({ ...form, code: event.target.value.toUpperCase() })} className="w-full rounded border p-2" /></Field><Field label="Name"><input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} className="w-full rounded border p-2" /></Field><Field label="Account type"><select value={form.account_type} onChange={(event) => setForm({ ...form, account_type: event.target.value as AccountType })} className="w-full rounded border p-2">{["ASSET", "LIABILITY", "EQUITY", "REVENUE", "EXPENSE"].map((item) => <option key={item}>{item}</option>)}</select></Field><Field label="Normal balance"><select value={form.normal_balance} onChange={(event) => setForm({ ...form, normal_balance: event.target.value as NormalBalance })} className="w-full rounded border p-2"><option value="DEBIT">Debit</option><option value="CREDIT">Credit</option></select></Field><Field label="Parent account"><select value={form.parent} onChange={(event) => setForm({ ...form, parent: event.target.value })} className="w-full rounded border p-2"><option value="">No parent</option>{parents.map((account) => <option key={account.id} value={account.id}>{account.code} — {account.name}</option>)}</select></Field><div className="space-y-2 pt-6"><Toggle label="Postable account" checked={form.is_postable} onChange={(is_postable) => setForm({ ...form, is_postable })} /><Toggle label="Active" checked={form.is_active} onChange={(is_active) => setForm({ ...form, is_active })} /></div></div><div className="flex justify-end gap-3 border-t p-5"><button type="button" onClick={() => setModalOpen(false)} className="rounded border px-4 py-2">Cancel</button><button type="button" onClick={() => void create()} disabled={saving} className="rounded bg-slate-900 px-4 py-2 text-white disabled:opacity-50">{saving ? "Saving..." : "Create Account"}</button></div></div></div>}</main>;
 }
+function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label><span className="mb-1 block text-sm font-medium">{label}</span>{children}</label>; }
+function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) { return <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />{label}</label>; }

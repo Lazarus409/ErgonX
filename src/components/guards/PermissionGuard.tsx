@@ -38,13 +38,16 @@ export default function PermissionGuard({
 
   const userPermissions = user.permissions || [];
 
+  // The development bypass user holds the "*" wildcard. Real institution
+  // roles return explicit permission codes such as "employee.view".
+  const hasWildcard = userPermissions.includes("*");
+
+  const granted = (item: string) =>
+    hasWildcard || userPermissions.includes(item);
+
   const allowed = requireAll
-    ? required.every((item) =>
-        userPermissions.includes(item)
-      )
-    : required.some((item) =>
-        userPermissions.includes(item)
-      );
+    ? required.every(granted)
+    : required.some(granted);
 
   if (!allowed) {
     return (

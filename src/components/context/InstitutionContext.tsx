@@ -1,54 +1,57 @@
 "use client";
 
-import { createContext, useContext } from "react";
+import { createContext, useContext, useMemo } from "react";
 
-const DEV_INSTITUTION = {
-  id: "dev-institution",
-  name: "ErgonX Demo Institution",
-  code: "DEMO",
-  enabledModules: [
-    "HR",
-    "LEAVE",
-    "ATTENDANCE",
-    "PAYROLL",
-    "ACCOUNTING",
-    "REPORTS",
-    "RECRUITMENT",
-  ],
-};
+import { useAuth } from "@/components/guards/AuthProvider";
+import { hasModule as moduleEnabled } from "@/types/institutions";
+import type { SessionInstitution } from "@/types/auth";
 
+/**
+ * Tenant context for screens.
+ *
+ * Derives from the session held by `AuthProvider`, so it follows the
+ * development bypass institution until a real login replaces it. The tenant
+ * selector actually sent to the backend (`X-Institution-ID`) is owned by the
+ * API client, not by this context.
+ */
 interface InstitutionContextValue {
-  institution: typeof DEV_INSTITUTION;
-  activeInstitution: typeof DEV_INSTITUTION;
-  institutionId: string;
+  institution: SessionInstitution | null;
+  activeInstitution: SessionInstitution | null;
+  institutionId: string | null;
   enabledModules: string[];
+  /** Accepts both `HR` and the backend code `CORE_HR`. */
   hasModule: (module: string) => boolean;
 }
 
 const InstitutionContext = createContext<InstitutionContextValue>({
-  institution: DEV_INSTITUTION,
-  activeInstitution: DEV_INSTITUTION,
-  institutionId: DEV_INSTITUTION.id,
-  enabledModules: DEV_INSTITUTION.enabledModules,
-  hasModule: (module: string) =>
-    DEV_INSTITUTION.enabledModules.includes(module),
+  institution: null,
+  activeInstitution: null,
+  institutionId: null,
+  enabledModules: [],
+  hasModule: () => false,
 });
+
 export default function InstitutionProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const { institution } = useAuth();
+
+  const value = useMemo<InstitutionContextValue>(() => {
+    const enabledModules = institution?.enabledModules ?? [];
+
+    return {
+      institution,
+      activeInstitution: institution,
+      institutionId: institution?.id ?? null,
+      enabledModules,
+      hasModule: (module: string) => moduleEnabled(enabledModules, module),
+    };
+  }, [institution]);
+
   return (
-    <InstitutionContext.Provider
-      value={{
-        institution: DEV_INSTITUTION,
-        activeInstitution: DEV_INSTITUTION,
-        institutionId: DEV_INSTITUTION.id,
-        enabledModules: DEV_INSTITUTION.enabledModules,
-        hasModule: (module: string) =>
-          DEV_INSTITUTION.enabledModules.includes(module),
-      }}
-    >
+    <InstitutionContext.Provider value={value}>
       {children}
     </InstitutionContext.Provider>
   );

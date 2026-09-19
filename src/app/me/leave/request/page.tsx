@@ -1,31 +1,71 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, CalendarDays } from "lucide-react";
 import Link from "next/link";
 
 import PageHeader from "@/components/ui/PageHeader";
-
-const leaveTypes = [
-  "Annual Leave",
-  "Sick Leave",
-  "Maternity Leave",
-  "Paternity Leave",
-  "Study Leave",
-  "Unpaid Leave",
-];
+import EmptyState from "@/components/ui/EmptyState";
+import {
+  employeesApi,
+  getApiErrorMessage,
+  leaveApi,
+} from "@/lib/api";
+import { MAX_PAGE_SIZE } from "@/types/api";
+import type { Employee } from "@/types/hr";
+import type { LeaveType } from "@/types/leave";
 
 export default function RequestLeavePage() {
-  const [leaveType, setLeaveType] =
-    useState("Annual Leave");
+  const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
+  const [employee, setEmployee] = useState<Employee | null>(null);
+  const [referenceLoading, setReferenceLoading] = useState(true);
+
+  const [leaveType, setLeaveType] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
-  const [submitted, setSubmitted] =
-    useState(false);
+  const [saving, setSaving] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
-  function calculateDays() {
+  useEffect(() => {
+    let active = true;
+
+    async function loadReference() {
+      setReferenceLoading(true);
+
+      try {
+        const [types, linkedEmployee] = await Promise.all([
+          leaveApi
+            .listLeaveTypes({ page_size: MAX_PAGE_SIZE, ordering: "name" })
+            .then((page) => page.results.filter((type) => type.is_active))
+            .catch(() => [] as LeaveType[]),
+          employeesApi.getCurrentEmployee(),
+        ]);
+
+        if (!active) {
+          return;
+        }
+
+        setLeaveTypes(types);
+        setEmployee(linkedEmployee);
+        setLeaveType(types[0]?.id ?? "");
+      } finally {
+        if (active) {
+          setReferenceLoading(false);
+        }
+      }
+    }
+
+    loadReference();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  /** Calendar-day span. The backend validates it against the leave policy. */
+  const calculateDays = useCallback(() => {
     if (!startDate || !endDate) {
       return 0;
     }
@@ -33,39 +73,62 @@ export default function RequestLeavePage() {
     const start = new Date(`${startDate}T00:00:00`);
     const end = new Date(`${endDate}T00:00:00`);
 
-    const difference =
-      end.getTime() - start.getTime();
+    const difference = end.getTime() - start.getTime();
 
     if (difference < 0) {
       return 0;
     }
 
-    return (
-      Math.floor(
-        difference / (1000 * 60 * 60 * 24)
-      ) + 1
-    );
-  }
+    return Math.floor(difference / (1000 * 60 * 60 * 24)) + 1;
+  }, [startDate, endDate]);
 
-  function submitRequest() {
+  const submitRequest = useCallback(async () => {
     setError("");
 
+    if (!employee) {
+      setError(
+        "Your account is not linked to an employee record, so leave cannot be requested.",
+      );
+      return;
+    }
+
     if (!leaveType || !startDate || !endDate) {
-      setError(
-        "Please complete all required fields."
-      );
+      setError("Please complete all required fields.");
       return;
     }
 
-    if (calculateDays() <= 0) {
-      setError(
-        "The end date must be on or after the start date."
-      );
+    const days = calculateDays();
+
+    if (days <= 0) {
+      setError("The end date must be on or after the start date.");
       return;
     }
 
-    setSubmitted(true);
-  }
+    setSaving(true);
+
+    try {
+      // Creating a request leaves it in DRAFT; submitting moves it into the
+      // approval workflow. Both steps are backend transitions.
+      const created = await leaveApi.createLeaveRequest({
+        employee: employee.id,
+        leave_type: leaveType,
+        start_date: startDate,
+        end_date: endDate,
+        requested_days: days,
+        reason,
+      });
+
+      await leaveApi.submitLeaveRequest(created.id);
+
+      setSubmitted(true);
+    } catch (caught) {
+      // Policy eligibility, insufficient balance and the cross-year split
+      // rule are all enforced by the backend and reported here.
+      setError(getApiErrorMessage(caught));
+    } finally {
+      setSaving(false);
+    }
+  }, [employee, leaveType, startDate, endDate, reason, calculateDays]);
 
   if (submitted) {
     return (
@@ -85,8 +148,8 @@ export default function RequestLeavePage() {
           </h2>
 
           <p className="mt-2 text-sm text-green-800">
-            Your request is now pending approval. You can
-            monitor its status from your My Leave page.
+            Your request is now pending approval. You can monitor its status
+            from your My Leave page.
           </p>
 
           <Link
@@ -99,6 +162,8 @@ export default function RequestLeavePage() {
       </>
     );
   }
+
+  const days = calculateDays();
 
   return (
     <>
@@ -116,7 +181,14 @@ export default function RequestLeavePage() {
         }
       />
 
-      <div className="mt-6 max-w-3xl">
+      <div className="mt-6 max-w-3xl space-y-4">
+        {!referenceLoading && !employee && (
+          <EmptyState
+            title="No employee record linked"
+            description="Your account is not linked to an employee record in this institution, so a leave request cannot be raised for you."
+          />
+        )}
+
         <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-200 px-6 py-5">
             <h2 className="text-base font-semibold text-slate-900">
@@ -136,20 +208,29 @@ export default function RequestLeavePage() {
             )}
 
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-slate-700">
+              <label
+                htmlFor="leave-type"
+                className="mb-1.5 block text-sm font-medium text-slate-700"
+              >
                 Leave Type
               </label>
 
               <select
+                id="leave-type"
                 value={leaveType}
-                onChange={(event) =>
-                  setLeaveType(event.target.value)
-                }
-                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400 sm:max-w-md"
+                onChange={(event) => setLeaveType(event.target.value)}
+                disabled={referenceLoading || leaveTypes.length === 0}
+                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400 disabled:bg-slate-50 sm:max-w-md"
               >
+                {referenceLoading && <option value="">Loading...</option>}
+
+                {!referenceLoading && leaveTypes.length === 0 && (
+                  <option value="">No leave types configured</option>
+                )}
+
                 {leaveTypes.map((type) => (
-                  <option key={type} value={type}>
-                    {type}
+                  <option key={type.id} value={type.id}>
+                    {type.name}
                   </option>
                 ))}
               </select>
@@ -157,31 +238,35 @@ export default function RequestLeavePage() {
 
             <div className="grid gap-5 sm:grid-cols-2">
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                <label
+                  htmlFor="start-date"
+                  className="mb-1.5 block text-sm font-medium text-slate-700"
+                >
                   Start Date
                 </label>
 
                 <input
+                  id="start-date"
                   type="date"
                   value={startDate}
-                  onChange={(event) =>
-                    setStartDate(event.target.value)
-                  }
+                  onChange={(event) => setStartDate(event.target.value)}
                   className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
                 />
               </div>
 
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                <label
+                  htmlFor="end-date"
+                  className="mb-1.5 block text-sm font-medium text-slate-700"
+                >
                   End Date
                 </label>
 
                 <input
+                  id="end-date"
                   type="date"
                   value={endDate}
-                  onChange={(event) =>
-                    setEndDate(event.target.value)
-                  }
+                  onChange={(event) => setEndDate(event.target.value)}
                   className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
                 />
               </div>
@@ -189,33 +274,29 @@ export default function RequestLeavePage() {
 
             {startDate && endDate && (
               <div className="flex items-center gap-3 rounded-lg bg-slate-50 p-4">
-                <CalendarDays
-                  size={19}
-                  className="text-slate-500"
-                />
+                <CalendarDays size={19} className="text-slate-500" />
 
                 <p className="text-sm text-slate-700">
                   Requested duration:{" "}
                   <span className="font-semibold text-slate-950">
-                    {calculateDays()} day
-                    {calculateDays() === 1
-                      ? ""
-                      : "s"}
+                    {days} day{days === 1 ? "" : "s"}
                   </span>
                 </p>
               </div>
             )}
 
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-slate-700">
+              <label
+                htmlFor="leave-reason"
+                className="mb-1.5 block text-sm font-medium text-slate-700"
+              >
                 Reason
               </label>
 
               <textarea
+                id="leave-reason"
                 value={reason}
-                onChange={(event) =>
-                  setReason(event.target.value)
-                }
+                onChange={(event) => setReason(event.target.value)}
                 rows={5}
                 placeholder="Provide a reason for your leave request..."
                 className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
@@ -227,20 +308,13 @@ export default function RequestLeavePage() {
             <button
               type="button"
               onClick={submitRequest}
-              className="rounded-lg bg-slate-950 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
+              disabled={saving || referenceLoading || !employee}
+              className="rounded-lg bg-slate-950 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Submit Leave Request
+              {saving ? "Submitting..." : "Submit Leave Request"}
             </button>
           </div>
         </section>
-
-        <div className="mt-4 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-3">
-          <p className="text-xs text-slate-500">
-            Development mode: submission is currently local
-            mock behaviour. The backend request endpoint will
-            be connected when the API contract is available.
-          </p>
-        </div>
       </div>
     </>
   );

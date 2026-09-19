@@ -14,40 +14,86 @@ import {
   UserX,
 } from "lucide-react";
 import Link from "next/link";
+import { useCallback } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import KPIStatCard from "@/components/ui/KPIStatCard";
 import StatusBadge from "@/components/ui/StatusBadge";
+import ErrorState from "@/components/ui/ErrorState";
+import {
+  attendanceApi,
+  dashboardsApi,
+  schedulingApi,
+} from "@/lib/api";
+import { useApiResource } from "@/lib/useApiResource";
+import { MAX_PAGE_SIZE } from "@/types/api";
+import type { AttendanceDashboard } from "@/types/dashboards";
+import { EM_DASH, formatNumber } from "@/lib/format";
 
-const attendanceTrend = [
-  { day: "Mon", present: 91, absent: 5, late: 4 },
-  { day: "Tue", present: 94, absent: 3, late: 3 },
-  { day: "Wed", present: 89, absent: 7, late: 4 },
-  { day: "Thu", present: 96, absent: 2, late: 2 },
-  { day: "Fri", present: 92, absent: 4, late: 4 },
-  { day: "Sat", present: 78, absent: 15, late: 7 },
-  { day: "Sun", present: 64, absent: 27, late: 9 },
-];
+/** Only the envelope `count` is needed for these reads. */
+const COUNT_ONLY = { page_size: 1 } as const;
 
-const departmentAttendance = [
-  { department: "Human Resources", rate: 96 },
-  { department: "Finance", rate: 93 },
-  { department: "IT", rate: 91 },
-  { department: "Operations", rate: 87 },
-  { department: "Administration", rate: 95 },
-];
-
-const overtimeTrend = [
-  { day: "Mon", hours: 12 },
-  { day: "Tue", hours: 18 },
-  { day: "Wed", hours: 15 },
-  { day: "Thu", hours: 23 },
-  { day: "Fri", hours: 19 },
-  { day: "Sat", hours: 31 },
-  { day: "Sun", hours: 8 },
-];
+interface AttendanceOverview {
+  today: AttendanceDashboard;
+  onLeave: number | null;
+  scheduledToday: number | null;
+  activeShifts: number | null;
+  overtimePending: number | null;
+  adjustmentsPending: number | null;
+}
 
 export default function AttendanceDashboardPage() {
-  const maxOvertime = Math.max(...overtimeTrend.map((item) => item.hours));
+  const load = useCallback(async (): Promise<AttendanceOverview> => {
+    const [
+      today,
+      leave,
+      assignments,
+      shifts,
+      overtime,
+      adjustments,
+    ] = await Promise.all([
+      dashboardsApi.getAttendanceDashboard(),
+      dashboardsApi
+        .getLeaveDashboard()
+        .then((rollup) => rollup.currently_on_leave)
+        .catch(() => null),
+      schedulingApi
+        .listScheduleAssignments({ is_current: true, ...COUNT_ONLY })
+        .then((page) => page.count)
+        .catch(() => null),
+      // Shifts expose no `is_active` filter, so active ones are counted from
+      // a single page of results.
+      schedulingApi
+        .listShifts({ page_size: MAX_PAGE_SIZE })
+        .then(
+          (page) => page.results.filter((shift) => shift.is_active).length,
+        )
+        .catch(() => null),
+      attendanceApi
+        .listOvertimeRecords({ status: "PENDING", ...COUNT_ONLY })
+        .then((page) => page.count)
+        .catch(() => null),
+      attendanceApi
+        .listAttendanceAdjustments({ status: "PENDING", ...COUNT_ONLY })
+        .then((page) => page.count)
+        .catch(() => null),
+    ]);
+
+    return {
+      today,
+      onLeave: leave,
+      scheduledToday: assignments,
+      activeShifts: shifts,
+      overtimePending: overtime,
+      adjustmentsPending: adjustments,
+    };
+  }, []);
+
+  const { data, loading, error, reload } = useApiResource(load);
+
+  const placeholder = loading ? "…" : EM_DASH;
+
+  const value = (count: number | null | undefined): string =>
+    count === null || count === undefined ? placeholder : formatNumber(count);
 
   return (
     <div className="space-y-6">
@@ -75,6 +121,8 @@ export default function AttendanceDashboardPage() {
         }
       />
 
+      {error && <ErrorState message={error} onRetry={reload} />}
+
       <div className="rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -88,7 +136,7 @@ export default function AttendanceDashboardPage() {
 
           <div className="flex items-center gap-2 text-sm text-slate-500">
             <Clock3 className="h-4 w-4" />
-            Updated today
+            {loading ? "Refreshing..." : "Updated today"}
           </div>
         </div>
       </div>
@@ -96,130 +144,92 @@ export default function AttendanceDashboardPage() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <KPIStatCard
           title="Present Today"
-          value="428"
+          value={value(data?.today.present)}
           icon={<UserCheck className="h-5 w-5" />}
-          trend="+4.2%"
-          trendDirection="up"
         />
 
         <KPIStatCard
           title="Absent Today"
-          value="24"
+          value={value(data?.today.absent)}
           icon={<UserX className="h-5 w-5" />}
-          trend="-8.1%"
-          trendDirection="up"
         />
 
         <KPIStatCard
           title="Late Today"
-          value="17"
+          value={value(data?.today.late)}
           icon={<Clock3 className="h-5 w-5" />}
-          trend="-3.4%"
-          trendDirection="up"
         />
 
         <KPIStatCard
           title="Currently on Leave"
-          value="31"
+          value={value(data?.onLeave)}
           icon={<CalendarDays className="h-5 w-5" />}
         />
 
         <KPIStatCard
           title="Scheduled Today"
-          value="452"
+          value={value(data?.scheduledToday)}
+          subtitle="Current schedule assignments"
           icon={<Users className="h-5 w-5" />}
         />
 
         <KPIStatCard
           title="Active Shifts"
-          value="12"
+          value={value(data?.activeShifts)}
           icon={<Activity className="h-5 w-5" />}
         />
 
+        {/*
+          Night-shift and flexible-work headcounts have no backing endpoint.
+          Substituting a different metric under these labels would misreport
+          them, so they stay blank.
+        */}
         <KPIStatCard
           title="Night Shift"
-          value="46"
+          value={EM_DASH}
+          subtitle="Not reported by the API"
           icon={<Moon className="h-5 w-5" />}
         />
 
         <KPIStatCard
           title="Flexible Work"
-          value="38"
+          value={EM_DASH}
+          subtitle="Not reported by the API"
           icon={<Settings2 className="h-5 w-5" />}
         />
 
         <KPIStatCard
           title="Overtime Pending"
-          value="14"
+          value={value(data?.overtimePending)}
           icon={<Timer className="h-5 w-5" />}
-          trend="+2"
-          trendDirection="down"
         />
 
         <KPIStatCard
           title="Adjustments Pending"
-          value="9"
+          value={value(data?.adjustmentsPending)}
           icon={<AlertTriangle className="h-5 w-5" />}
         />
       </div>
 
+      {/*
+        The attendance rollup is a single-day snapshot. Multi-day trends and
+        per-department rates are not exposed, and deriving them in the browser
+        would mean paging raw attendance records and reporting figures that
+        silently truncate. These three panels stay as placeholders.
+      */}
       <div className="grid gap-6 xl:grid-cols-3">
         <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm xl:col-span-2">
-          <div className="mb-6 flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-semibold text-slate-900">
-                Attendance Trend
-              </h2>
-              <p className="mt-1 text-xs text-slate-500">
-                Seven-day attendance pattern.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-3 text-xs text-slate-500">
-              <span className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-slate-900" />
-                Present
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-slate-300" />
-                Absent
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-slate-500" />
-                Late
-              </span>
-            </div>
+          <div className="mb-6">
+            <h2 className="text-base font-semibold text-slate-900">
+              Attendance Trend
+            </h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Seven-day attendance pattern.
+            </p>
           </div>
 
-          <div className="flex h-64 items-end gap-3 border-b border-slate-200 px-2">
-            {attendanceTrend.map((item) => (
-              <div
-                key={item.day}
-                className="flex h-full flex-1 flex-col justify-end gap-2"
-              >
-                <div className="flex h-full items-end justify-center gap-1">
-                  <div
-                    title={`${item.day}: ${item.present}% present`}
-                    className="w-1/3 rounded-t bg-slate-900"
-                    style={{ height: `${item.present}%` }}
-                  />
-                  <div
-                    title={`${item.day}: ${item.absent}% absent`}
-                    className="w-1/3 rounded-t bg-slate-300"
-                    style={{ height: `${item.absent * 3}%` }}
-                  />
-                  <div
-                    title={`${item.day}: ${item.late}% late`}
-                    className="w-1/3 rounded-t bg-slate-500"
-                    style={{ height: `${item.late * 5}%` }}
-                  />
-                </div>
-
-                <span className="pb-2 text-center text-xs text-slate-500">
-                  {item.day}
-                </span>
-              </div>
-            ))}
+          <div className="flex h-64 items-center justify-center rounded-lg border border-dashed border-slate-200 text-sm text-slate-500">
+            Multi-day attendance trends are not yet reported by the API.
           </div>
         </section>
 
@@ -233,26 +243,8 @@ export default function AttendanceDashboardPage() {
             </p>
           </div>
 
-          <div className="space-y-5">
-            {departmentAttendance.map((item) => (
-              <div key={item.department}>
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <span className="truncate text-sm text-slate-700">
-                    {item.department}
-                  </span>
-                  <span className="text-sm font-semibold text-slate-900">
-                    {item.rate}%
-                  </span>
-                </div>
-
-                <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                  <div
-                    className="h-full rounded-full bg-slate-900"
-                    style={{ width: `${item.rate}%` }}
-                  />
-                </div>
-              </div>
-            ))}
+          <div className="flex h-64 items-center justify-center rounded-lg border border-dashed border-slate-200 px-4 text-center text-sm text-slate-500">
+            Per-department attendance rates are not yet reported by the API.
           </div>
         </section>
       </div>
@@ -262,10 +254,10 @@ export default function AttendanceDashboardPage() {
           <div className="mb-6 flex items-center justify-between">
             <div>
               <h2 className="text-base font-semibold text-slate-900">
-                Overtime Trend
+                Overtime Today
               </h2>
               <p className="mt-1 text-xs text-slate-500">
-                Pending and recorded overtime hours.
+                Overtime minutes recorded across today&apos;s attendance.
               </p>
             </div>
 
@@ -277,27 +269,16 @@ export default function AttendanceDashboardPage() {
             </Link>
           </div>
 
-          <div className="flex h-52 items-end gap-3 border-b border-slate-200 px-2">
-            {overtimeTrend.map((item) => (
-              <div
-                key={item.day}
-                className="flex h-full flex-1 flex-col justify-end gap-2"
-              >
-                <div className="flex h-full items-end">
-                  <div
-                    title={`${item.hours} overtime hours`}
-                    className="w-full rounded-t bg-slate-700"
-                    style={{
-                      height: `${(item.hours / maxOvertime) * 100}%`,
-                    }}
-                  />
-                </div>
-
-                <span className="pb-2 text-center text-xs text-slate-500">
-                  {item.day}
-                </span>
-              </div>
-            ))}
+          <div className="rounded-lg bg-slate-50 p-5">
+            <p className="text-xs text-slate-500">Recorded today</p>
+            <p className="mt-2 text-3xl font-semibold text-slate-900">
+              {data
+                ? attendanceApi.formatMinutes(data.today.overtime_minutes)
+                : placeholder}
+            </p>
+            <p className="mt-2 text-xs text-slate-500">
+              Only approved overtime is consumed by Payroll.
+            </p>
           </div>
         </section>
 
@@ -325,7 +306,8 @@ export default function AttendanceDashboardPage() {
                   Overtime awaiting approval
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
-                  14 overtime records require review.
+                  {value(data?.overtimePending)} overtime records require
+                  review.
                 </p>
               </div>
               <StatusBadge status="PENDING" />
@@ -340,7 +322,8 @@ export default function AttendanceDashboardPage() {
                   Attendance adjustments
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
-                  9 correction requests require review.
+                  {value(data?.adjustmentsPending)} correction requests require
+                  review.
                 </p>
               </div>
               <StatusBadge status="PENDING" />

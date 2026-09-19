@@ -1,176 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { Search, FileText, Download } from "lucide-react";
-import { useMemo, useState } from "react";
+import { FileText, Search } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import ErrorState from "@/components/ui/ErrorState";
 import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
-
-const payslips = [
-  {
-    id: "ps-001",
-    employee: "Kwame Mensah",
-    employeeNumber: "EMP-001",
-    period: "August 2026",
-    gross: "GHS 8,500.00",
-    deductions: "GHS 1,620.00",
-    net: "GHS 6,880.00",
-    status: "FINALIZED",
-  },
-  {
-    id: "ps-002",
-    employee: "Ama Owusu",
-    employeeNumber: "EMP-002",
-    period: "August 2026",
-    gross: "GHS 7,800.00",
-    deductions: "GHS 1,430.00",
-    net: "GHS 6,370.00",
-    status: "FINALIZED",
-  },
-  {
-    id: "ps-003",
-    employee: "Daniel Asare",
-    employeeNumber: "EMP-003",
-    period: "August 2026",
-    gross: "GHS 6,400.00",
-    deductions: "GHS 1,120.00",
-    net: "GHS 5,280.00",
-    status: "FINALIZED",
-  },
-];
+import { employeesApi, payrollApi } from "@/lib/api";
+import { EM_DASH, formatAmount, formatDate } from "@/lib/format";
+import { useApiResource } from "@/lib/useApiResource";
+import { MAX_PAGE_SIZE } from "@/types/api";
 
 export default function PayrollPayslipsPage() {
   const [search, setSearch] = useState("");
-
-  const filtered = useMemo(() => {
-    const query = search.toLowerCase().trim();
-
-    return payslips.filter(
-      (item) =>
-        !query ||
-        item.employee.toLowerCase().includes(query) ||
-        item.employeeNumber.toLowerCase().includes(query) ||
-        item.period.toLowerCase().includes(query),
-    );
-  }, [search]);
-
-  return (
-    <main className="space-y-6 p-4 md:p-6">
-      <PageHeader
-        title="Payslips"
-        description="View employee payslips generated from completed payroll runs."
-      />
-
-      <section className="rounded-xl border bg-white">
-        <div className="border-b p-4">
-          <div className="relative">
-            <Search
-              size={18}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-            />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search employee or payroll period..."
-              className="w-full rounded-lg border px-10 py-2.5 text-sm"
-            />
-          </div>
-        </div>
-
-        <div className="hidden overflow-x-auto md:block">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-              <tr>
-                <th className="px-4 py-3">Employee</th>
-                <th className="px-4 py-3">Period</th>
-                <th className="px-4 py-3">Gross</th>
-                <th className="px-4 py-3">Deductions</th>
-                <th className="px-4 py-3">Net Pay</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-
-            <tbody className="divide-y">
-              {filtered.map((item) => (
-                <tr key={item.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-4">
-                    <p className="font-medium">{item.employee}</p>
-                    <p className="text-xs text-slate-500">
-                      {item.employeeNumber}
-                    </p>
-                  </td>
-                  <td className="px-4 py-4">{item.period}</td>
-                  <td className="px-4 py-4">{item.gross}</td>
-                  <td className="px-4 py-4">{item.deductions}</td>
-                  <td className="px-4 py-4 font-semibold">{item.net}</td>
-                  <td className="px-4 py-4">
-                    <StatusBadge status={item.status} />
-                  </td>
-                  <td className="px-4 py-4">
-                    <div className="flex justify-end gap-2">
-                      <Link
-                        href={`/payroll/payslips/${item.id}`}
-                        className="rounded-lg border p-2 hover:bg-slate-100"
-                        title="View payslip"
-                      >
-                        <FileText size={16} />
-                      </Link>
-
-                      <button
-                        className="rounded-lg border p-2 text-slate-500 hover:bg-slate-100"
-                        title="Download reference"
-                        onClick={() =>
-                          window.alert(
-                            "Document download will use the backend document reference when connected.",
-                          )
-                        }
-                      >
-                        <Download size={16} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="divide-y md:hidden">
-          {filtered.map((item) => (
-            <div key={item.id} className="space-y-3 p-4">
-              <div className="flex justify-between gap-3">
-                <div>
-                  <p className="font-semibold">{item.employee}</p>
-                  <p className="text-xs text-slate-500">
-                    {item.employeeNumber} · {item.period}
-                  </p>
-                </div>
-                <StatusBadge status={item.status} />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 text-xs text-slate-500">
-                <span>Gross: {item.gross}</span>
-                <span>Deductions: {item.deductions}</span>
-                <span className="font-semibold">Net: {item.net}</span>
-              </div>
-
-              <Link
-                href={`/payroll/payslips/${item.id}`}
-                className="block rounded-lg border px-3 py-2 text-center text-sm font-medium"
-              >
-                View Payslip
-              </Link>
-            </div>
-          ))}
-        </div>
-
-        {!filtered.length && (
-          <div className="p-10 text-center text-sm text-slate-500">
-            No payslips found.
-          </div>
-        )}
-      </section>
-    </main>
-  );
+  const load = useCallback(async () => Promise.all([payrollApi.listPayslips({ page_size: MAX_PAGE_SIZE, ordering: "-generated_at" }), payrollApi.listPayrollRecords({ page_size: MAX_PAGE_SIZE }), payrollApi.listPayrollRuns({ page_size: MAX_PAGE_SIZE }), payrollApi.listPayrollPeriods({ page_size: MAX_PAGE_SIZE }), employeesApi.loadEmployeeIndex()]), []);
+  const { data, loading, error, reload } = useApiResource(load);
+  const rows = useMemo(() => { if (!data) return []; const [payslips, records, runs, periods, employees] = data; const recordById = new Map(records.results.map((item) => [item.id, item])); const runById = new Map(runs.results.map((item) => [item.id, item])); const periodById = new Map(periods.results.map((item) => [item.id, item])); return payslips.results.map((item) => { const record = recordById.get(item.payroll_record); const run = record ? runById.get(record.payroll_run) : undefined; const employee = record ? employees.byId.get(record.employee) : undefined; return { payslip: item, record, employeeName: employee ? employeesApi.employeeDisplayName(employee) : EM_DASH, employeeNumber: employee?.employee_number ?? EM_DASH, period: run ? periodById.get(run.payroll_period)?.name ?? EM_DASH : EM_DASH }; }); }, [data]);
+  const filtered = useMemo(() => { const query = search.trim().toLowerCase(); return rows.filter((row) => !query || row.employeeName.toLowerCase().includes(query) || row.employeeNumber.toLowerCase().includes(query) || row.period.toLowerCase().includes(query)); }, [rows, search]);
+  return <main className="space-y-6 p-4 md:p-6"><PageHeader title="Payslips" description="View employee payslips generated from completed payroll runs." />{error && <ErrorState message={error} onRetry={reload} />}<section className="rounded-xl border bg-white"><div className="border-b p-4"><div className="relative"><Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search employee or payroll period..." className="w-full rounded-lg border px-10 py-2.5 text-sm" /></div></div><div className="overflow-x-auto"><table className="w-full min-w-[820px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Employee</th><th className="px-4 py-3">Period</th><th className="px-4 py-3">Gross</th><th className="px-4 py-3">Deductions</th><th className="px-4 py-3">Net Pay</th><th className="px-4 py-3">Generated</th><th className="px-4 py-3 text-right">Actions</th></tr></thead><tbody className="divide-y">{filtered.map((row) => <tr key={row.payslip.id} className="hover:bg-slate-50"><td className="px-4 py-4"><p className="font-medium">{row.employeeName}</p><p className="text-xs text-slate-500">{row.employeeNumber}</p></td><td className="px-4 py-4">{row.period}</td><td className="px-4 py-4">{formatAmount(row.payslip.payload.gross_pay, row.payslip.payload.currency)}</td><td className="px-4 py-4">{formatAmount(row.payslip.payload.total_deductions, row.payslip.payload.currency)}</td><td className="px-4 py-4 font-semibold">{formatAmount(row.payslip.payload.net_pay, row.payslip.payload.currency)}</td><td className="px-4 py-4"><StatusBadge status="FINALIZED" /><p className="mt-1 text-xs text-slate-500">{formatDate(row.payslip.generated_at)}</p></td><td className="px-4 py-4 text-right"><Link href={`/payroll/payslips/${row.payslip.id}`} className="inline-flex rounded-lg border p-2 hover:bg-slate-100" title="View payslip"><FileText size={16} /></Link></td></tr>)}</tbody></table>{loading && <p className="p-10 text-center text-sm text-slate-500">Loading payslips...</p>}{!loading && !filtered.length && <p className="p-10 text-center text-sm text-slate-500">No payslips found.</p>}</div></section></main>;
 }

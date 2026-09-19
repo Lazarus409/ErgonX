@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Search,
   X,
@@ -13,186 +13,195 @@ import {
 import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
 import EmptyState from "@/components/ui/EmptyState";
+import ErrorState from "@/components/ui/ErrorState";
+import { employeesApi, getApiErrorMessage, leaveApi } from "@/lib/api";
+import { DEFAULT_PAGE_SIZE, emptyPage } from "@/types/api";
+import type { PaginatedData } from "@/types/api";
+import type { Employee } from "@/types/hr";
+import type { LeaveRequest, LeaveType } from "@/types/leave";
+import { EM_DASH, formatDate, formatNumber } from "@/lib/format";
 
-type LeaveStatus =
-  | "PENDING"
-  | "APPROVED"
-  | "REJECTED"
-  | "CANCELLED";
+const ALL = "ALL";
+const SEARCH_DEBOUNCE_MS = 350;
 
-type LeaveRequest = {
-  id: string;
-  employee: string;
-  employeeId: string;
-  leaveType: string;
-  startDate: string;
-  endDate: string;
-  days: number;
-  status: LeaveStatus;
-  reason: string;
-  submittedAt: string;
-};
-
-const requests: LeaveRequest[] = [
-  {
-    id: "LR-0001",
-    employee: "Kwame Mensah",
-    employeeId: "EMP-001",
-    leaveType: "Annual Leave",
-    startDate: "2026-09-21",
-    endDate: "2026-09-25",
-    days: 5,
-    status: "PENDING",
-    reason: "Annual vacation",
-    submittedAt: "2026-09-10",
-  },
-  {
-    id: "LR-0002",
-    employee: "Ama Boateng",
-    employeeId: "EMP-002",
-    leaveType: "Sick Leave",
-    startDate: "2026-09-14",
-    endDate: "2026-09-15",
-    days: 2,
-    status: "APPROVED",
-    reason: "Medical appointment",
-    submittedAt: "2026-09-12",
-  },
-  {
-    id: "LR-0003",
-    employee: "Daniel Owusu",
-    employeeId: "EMP-003",
-    leaveType: "Annual Leave",
-    startDate: "2026-10-05",
-    endDate: "2026-10-09",
-    days: 5,
-    status: "PENDING",
-    reason: "Personal vacation",
-    submittedAt: "2026-09-11",
-  },
-  {
-    id: "LR-0004",
-    employee: "Akosua Asante",
-    employeeId: "EMP-004",
-    leaveType: "Maternity Leave",
-    startDate: "2026-10-12",
-    endDate: "2026-12-04",
-    days: 40,
-    status: "APPROVED",
-    reason: "Maternity leave",
-    submittedAt: "2026-09-05",
-  },
-  {
-    id: "LR-0005",
-    employee: "Kofi Addo",
-    employeeId: "EMP-005",
-    leaveType: "Annual Leave",
-    startDate: "2026-08-17",
-    endDate: "2026-08-21",
-    days: 5,
-    status: "REJECTED",
-    reason: "Department staffing constraints",
-    submittedAt: "2026-08-08",
-  },
-];
-
-const leaveTypes = [
-  "Annual Leave",
-  "Sick Leave",
-  "Maternity Leave",
-  "Paternity Leave",
-  "Study Leave",
-  "Unpaid Leave",
-];
-
-function formatDate(date: string) {
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(`${date}T00:00:00`));
+interface StatusTotals {
+  total: number;
+  pending: number;
+  approved: number;
+  rejected: number;
 }
 
 export default function LeaveRequestsPage() {
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("ALL");
-  const [leaveType, setLeaveType] = useState("ALL");
-  const [employee, setEmployee] = useState("ALL");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [status, setStatus] = useState(ALL);
+  const [leaveType, setLeaveType] = useState(ALL);
+  const [employee, setEmployee] = useState(ALL);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [page, setPage] = useState(1);
 
-  const employees = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          requests.map(
-            (request) => request.employee
-          )
-        )
-      ),
-    []
+  const [data, setData] = useState<PaginatedData<LeaveRequest>>(() =>
+    emptyPage<LeaveRequest>(),
   );
+  const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [totals, setTotals] = useState<StatusTotals | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
 
-  const filteredRequests = useMemo(() => {
-    return requests.filter((request) => {
-      const matchesSearch =
-        !search ||
-        request.employee
-          .toLowerCase()
-          .includes(search.toLowerCase()) ||
-        request.employeeId
-          .toLowerCase()
-          .includes(search.toLowerCase()) ||
-        request.leaveType
-          .toLowerCase()
-          .includes(search.toLowerCase());
+  const requestRef = useRef(0);
 
-      const matchesStatus =
-        status === "ALL" ||
-        request.status === status;
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(search.trim());
+      setPage(1);
+    }, SEARCH_DEBOUNCE_MS);
 
-      const matchesType =
-        leaveType === "ALL" ||
-        request.leaveType === leaveType;
+    return () => window.clearTimeout(timer);
+  }, [search]);
 
-      const matchesEmployee =
-        employee === "ALL" ||
-        request.employee === employee;
+  // Filter options and the unfiltered status totals shown in the summary row.
+  useEffect(() => {
+    let active = true;
 
-      const matchesFrom =
-        !dateFrom ||
-        request.startDate >= dateFrom;
+    async function loadReferenceData() {
+      try {
+        const [types, employeeIndex, all, pending, approved, rejected] =
+          await Promise.all([
+            leaveApi.listLeaveTypes({ page_size: 100, ordering: "name" }),
+            employeesApi.loadEmployeeIndex(),
+            // page_size 1: only the envelope `count` is needed.
+            leaveApi.listLeaveRequests({ page_size: 1 }),
+            leaveApi.listLeaveRequests({ page_size: 1, status: "PENDING" }),
+            leaveApi.listLeaveRequests({ page_size: 1, status: "APPROVED" }),
+            leaveApi.listLeaveRequests({ page_size: 1, status: "REJECTED" }),
+          ]);
 
-      const matchesTo =
-        !dateTo ||
-        request.endDate <= dateTo;
+        if (!active) {
+          return;
+        }
 
-      return (
-        matchesSearch &&
-        matchesStatus &&
-        matchesType &&
-        matchesEmployee &&
-        matchesFrom &&
-        matchesTo
-      );
-    });
+        setLeaveTypes(types.results);
+        setEmployees(Array.from(employeeIndex.byId.values()));
+        setTotals({
+          total: all.count,
+          pending: pending.count,
+          approved: approved.count,
+          rejected: rejected.count,
+        });
+      } catch {
+        if (active) {
+          setLeaveTypes([]);
+          setEmployees([]);
+          setTotals(null);
+        }
+      }
+    }
+
+    loadReferenceData();
+
+    return () => {
+      active = false;
+    };
+  }, [reloadToken]);
+
+  useEffect(() => {
+    const requestId = requestRef.current + 1;
+    requestRef.current = requestId;
+
+    let active = true;
+
+    async function loadRequests() {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const result = await leaveApi.listLeaveRequests({
+          page,
+          page_size: DEFAULT_PAGE_SIZE,
+          ordering: "-start_date",
+          search: debouncedSearch || undefined,
+          status: status === ALL ? undefined : status,
+          leave_type: leaveType === ALL ? undefined : leaveType,
+          employee: employee === ALL ? undefined : employee,
+          start_date: startDate || undefined,
+          end_date: endDate || undefined,
+        });
+
+        if (!active || requestRef.current !== requestId) {
+          return;
+        }
+
+        setData(result);
+      } catch (caught) {
+        if (!active || requestRef.current !== requestId) {
+          return;
+        }
+
+        setError(getApiErrorMessage(caught));
+        setData(emptyPage<LeaveRequest>());
+      } finally {
+        if (active && requestRef.current === requestId) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadRequests();
+
+    return () => {
+      active = false;
+    };
   }, [
-    search,
+    page,
+    debouncedSearch,
     status,
     leaveType,
     employee,
-    dateFrom,
-    dateTo,
+    startDate,
+    endDate,
+    reloadToken,
   ]);
 
-  function resetFilters() {
+  const employeeNames = useMemo(
+    () =>
+      new Map(
+        employees.map((item) => [
+          item.id,
+          employeesApi.employeeDisplayName(item),
+        ]),
+      ),
+    [employees],
+  );
+
+  const employeeNumbers = useMemo(
+    () => new Map(employees.map((item) => [item.id, item.employee_number])),
+    [employees],
+  );
+
+  const leaveTypeNames = useMemo(
+    () => new Map(leaveTypes.map((item) => [item.id, item.name])),
+    [leaveTypes],
+  );
+
+  const resetFilters = useCallback(() => {
     setSearch("");
-    setStatus("ALL");
-    setLeaveType("ALL");
-    setEmployee("ALL");
-    setDateFrom("");
-    setDateTo("");
-  }
+    setStatus(ALL);
+    setLeaveType(ALL);
+    setEmployee(ALL);
+    setStartDate("");
+    setEndDate("");
+    setPage(1);
+  }, []);
+
+  const retry = useCallback(() => {
+    setReloadToken((token) => token + 1);
+  }, []);
+
+  const requests = data.results;
+  const summaryPlaceholder = totals === null ? EM_DASH : null;
 
   return (
     <>
@@ -209,7 +218,7 @@ export default function LeaveRequestsPage() {
               Total Requests
             </p>
             <p className="mt-2 text-2xl font-semibold text-slate-950">
-              {requests.length}
+              {summaryPlaceholder ?? formatNumber(totals?.total)}
             </p>
           </div>
 
@@ -218,12 +227,7 @@ export default function LeaveRequestsPage() {
               Pending
             </p>
             <p className="mt-2 text-2xl font-semibold text-amber-900">
-              {
-                requests.filter(
-                  (request) =>
-                    request.status === "PENDING"
-                ).length
-              }
+              {summaryPlaceholder ?? formatNumber(totals?.pending)}
             </p>
           </div>
 
@@ -232,12 +236,7 @@ export default function LeaveRequestsPage() {
               Approved
             </p>
             <p className="mt-2 text-2xl font-semibold text-green-900">
-              {
-                requests.filter(
-                  (request) =>
-                    request.status === "APPROVED"
-                ).length
-              }
+              {summaryPlaceholder ?? formatNumber(totals?.approved)}
             </p>
           </div>
 
@@ -246,12 +245,7 @@ export default function LeaveRequestsPage() {
               Rejected
             </p>
             <p className="mt-2 text-2xl font-semibold text-red-900">
-              {
-                requests.filter(
-                  (request) =>
-                    request.status === "REJECTED"
-                ).length
-              }
+              {summaryPlaceholder ?? formatNumber(totals?.rejected)}
             </p>
           </div>
         </div>
@@ -268,70 +262,58 @@ export default function LeaveRequestsPage() {
               <input
                 type="text"
                 value={search}
-                onChange={(event) =>
-                  setSearch(event.target.value)
-                }
-                placeholder="Search employee or request..."
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search employee name or number..."
                 className="w-full rounded-lg border border-slate-200 py-2.5 pl-10 pr-3 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
               />
             </div>
 
             <select
               value={status}
-              onChange={(event) =>
-                setStatus(event.target.value)
-              }
+              onChange={(event) => {
+                setStatus(event.target.value);
+                setPage(1);
+              }}
               className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
             >
-              <option value="ALL">
-                All statuses
-              </option>
-              <option value="PENDING">
-                Pending
-              </option>
-              <option value="APPROVED">
-                Approved
-              </option>
-              <option value="REJECTED">
-                Rejected
-              </option>
-              <option value="CANCELLED">
-                Cancelled
-              </option>
+              <option value={ALL}>All statuses</option>
+              <option value="DRAFT">Draft</option>
+              <option value="PENDING">Pending</option>
+              <option value="APPROVED">Approved</option>
+              <option value="REJECTED">Rejected</option>
+              <option value="CANCELLED">Cancelled</option>
             </select>
 
             <select
               value={leaveType}
-              onChange={(event) =>
-                setLeaveType(event.target.value)
-              }
+              onChange={(event) => {
+                setLeaveType(event.target.value);
+                setPage(1);
+              }}
               className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
             >
-              <option value="ALL">
-                All leave types
-              </option>
+              <option value={ALL}>All leave types</option>
 
               {leaveTypes.map((type) => (
-                <option key={type} value={type}>
-                  {type}
+                <option key={type.id} value={type.id}>
+                  {type.name}
                 </option>
               ))}
             </select>
 
             <select
               value={employee}
-              onChange={(event) =>
-                setEmployee(event.target.value)
-              }
+              onChange={(event) => {
+                setEmployee(event.target.value);
+                setPage(1);
+              }}
               className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
             >
-              <option value="ALL">
-                All employees
-              </option>
+              <option value={ALL}>All employees</option>
 
-              {employees.map((name) => (
-                <option key={name} value={name}>
-                  {name}
+              {employees.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {employeesApi.employeeDisplayName(item)}
                 </option>
               ))}
             </select>
@@ -346,33 +328,48 @@ export default function LeaveRequestsPage() {
             </button>
           </div>
 
+          {/*
+            The list endpoint filters `start_date` and `end_date` by exact
+            match; it exposes no range lookup, so these are exact-date filters
+            rather than a from/to window.
+          */}
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-500">
-                From date
+              <label
+                htmlFor="filter-start-date"
+                className="mb-1.5 block text-xs font-medium text-slate-500"
+              >
+                Start date
               </label>
 
               <input
+                id="filter-start-date"
                 type="date"
-                value={dateFrom}
-                onChange={(event) =>
-                  setDateFrom(event.target.value)
-                }
+                value={startDate}
+                onChange={(event) => {
+                  setStartDate(event.target.value);
+                  setPage(1);
+                }}
                 className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
               />
             </div>
 
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-slate-500">
-                To date
+              <label
+                htmlFor="filter-end-date"
+                className="mb-1.5 block text-xs font-medium text-slate-500"
+              >
+                End date
               </label>
 
               <input
+                id="filter-end-date"
                 type="date"
-                value={dateTo}
-                onChange={(event) =>
-                  setDateTo(event.target.value)
-                }
+                value={endDate}
+                onChange={(event) => {
+                  setEndDate(event.target.value);
+                  setPage(1);
+                }}
                 className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
               />
             </div>
@@ -387,12 +384,23 @@ export default function LeaveRequestsPage() {
             </h2>
 
             <p className="mt-1 text-xs text-slate-500">
-              Review submitted requests and take authorised
-              workflow actions.
+              Review submitted requests and take authorised workflow actions.
             </p>
           </div>
 
-          {filteredRequests.length === 0 ? (
+          {error ? (
+            <div className="p-8">
+              <ErrorState message={error} onRetry={retry} />
+            </div>
+          ) : loading ? (
+            <div className="flex min-h-56 flex-col items-center justify-center p-8 text-center">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-slate-900" />
+
+              <p className="mt-4 text-sm text-slate-500">
+                Loading leave requests...
+              </p>
+            </div>
+          ) : requests.length === 0 ? (
             <div className="p-8">
               <EmptyState
                 title="No leave requests found"
@@ -432,162 +440,138 @@ export default function LeaveRequestsPage() {
                   </thead>
 
                   <tbody>
-                    {filteredRequests.map(
-                      (request) => (
-                        <tr
-                          key={request.id}
-                          className="border-b border-slate-100 last:border-0"
-                        >
-                          <td className="px-5 py-4">
-                            <Link
-                              href={`/leave/requests/${request.id}`}
-                              className="font-medium text-slate-900 hover:underline"
-                            >
-                              {request.employee}
-                            </Link>
+                    {requests.map((request) => (
+                      <tr
+                        key={request.id}
+                        className="border-b border-slate-100 last:border-0"
+                      >
+                        <td className="px-5 py-4">
+                          <Link
+                            href={`/leave/requests/${request.id}`}
+                            className="font-medium text-slate-900 hover:underline"
+                          >
+                            {employeeNames.get(request.employee) ?? EM_DASH}
+                          </Link>
 
-                            <p className="mt-0.5 text-xs text-slate-400">
-                              {request.employeeId}
-                            </p>
-                          </td>
+                          <p className="mt-0.5 text-xs text-slate-400">
+                            {employeeNumbers.get(request.employee) ?? EM_DASH}
+                          </p>
+                        </td>
 
-                          <td className="px-5 py-4 text-sm text-slate-600">
-                            {request.leaveType}
-                          </td>
+                        <td className="px-5 py-4 text-sm text-slate-600">
+                          {leaveTypeNames.get(request.leave_type) ?? EM_DASH}
+                        </td>
 
-                          <td className="px-5 py-4 text-sm text-slate-600">
-                            {formatDate(
-                              request.startDate
-                            )}{" "}
-                            -{" "}
-                            {formatDate(
-                              request.endDate
-                            )}
-                          </td>
+                        <td className="px-5 py-4 text-sm text-slate-600">
+                          {formatDate(request.start_date)} -{" "}
+                          {formatDate(request.end_date)}
+                        </td>
 
-                          <td className="px-5 py-4 text-sm font-medium text-slate-800">
-                            {request.days}
-                          </td>
+                        <td className="px-5 py-4 text-sm font-medium text-slate-800">
+                          {formatNumber(request.requested_days)}
+                        </td>
 
-                          <td className="px-5 py-4">
-                            <StatusBadge
-                              status={request.status}
-                            />
-                          </td>
+                        <td className="px-5 py-4">
+                          <StatusBadge status={request.status} />
+                        </td>
 
-                          <td className="px-5 py-4 text-right">
-                            <Link
-                              href={`/leave/requests/${request.id}`}
-                              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                            >
-                              <Eye size={14} />
-                              Review
-                            </Link>
-                          </td>
-                        </tr>
-                      )
-                    )}
+                        <td className="px-5 py-4 text-right">
+                          <Link
+                            href={`/leave/requests/${request.id}`}
+                            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                          >
+                            <Eye size={14} />
+                            Review
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
 
               {/* Mobile */}
               <div className="divide-y divide-slate-100 md:hidden">
-                {filteredRequests.map(
-                  (request) => (
-                    <div
-                      key={request.id}
-                      className="p-4"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <Link
-                            href={`/leave/requests/${request.id}`}
-                            className="font-medium text-slate-900"
-                          >
-                            {request.employee}
-                          </Link>
+                {requests.map((request) => (
+                  <div key={request.id} className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <Link
+                          href={`/leave/requests/${request.id}`}
+                          className="font-medium text-slate-900"
+                        >
+                          {employeeNames.get(request.employee) ?? EM_DASH}
+                        </Link>
 
-                          <p className="mt-0.5 text-xs text-slate-400">
-                            {request.employeeId}
-                          </p>
-                        </div>
-
-                        <StatusBadge
-                          status={request.status}
-                        />
+                        <p className="mt-0.5 text-xs text-slate-400">
+                          {employeeNumbers.get(request.employee) ?? EM_DASH}
+                        </p>
                       </div>
 
-                      <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                        <div>
-                          <p className="text-xs text-slate-400">
-                            Leave Type
-                          </p>
-                          <p className="mt-1 text-slate-700">
-                            {request.leaveType}
-                          </p>
-                        </div>
-
-                        <div>
-                          <p className="text-xs text-slate-400">
-                            Days
-                          </p>
-                          <p className="mt-1 text-slate-700">
-                            {request.days}
-                          </p>
-                        </div>
-
-                        <div className="col-span-2">
-                          <p className="text-xs text-slate-400">
-                            Period
-                          </p>
-                          <p className="mt-1 text-slate-700">
-                            {formatDate(
-                              request.startDate
-                            )}{" "}
-                            -{" "}
-                            {formatDate(
-                              request.endDate
-                            )}
-                          </p>
-                        </div>
-                      </div>
-
-                      <Link
-                        href={`/leave/requests/${request.id}`}
-                        className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-slate-800"
-                      >
-                        <Eye size={15} />
-                        Review request
-                      </Link>
+                      <StatusBadge status={request.status} />
                     </div>
-                  )
-                )}
+
+                    <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <p className="text-xs text-slate-400">Leave Type</p>
+                        <p className="mt-1 text-slate-700">
+                          {leaveTypeNames.get(request.leave_type) ?? EM_DASH}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-xs text-slate-400">Days</p>
+                        <p className="mt-1 text-slate-700">
+                          {formatNumber(request.requested_days)}
+                        </p>
+                      </div>
+
+                      <div className="col-span-2">
+                        <p className="text-xs text-slate-400">Period</p>
+                        <p className="mt-1 text-slate-700">
+                          {formatDate(request.start_date)} -{" "}
+                          {formatDate(request.end_date)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <Link
+                      href={`/leave/requests/${request.id}`}
+                      className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-slate-800"
+                    >
+                      <Eye size={15} />
+                      Review request
+                    </Link>
+                  </div>
+                ))}
               </div>
 
               <div className="flex items-center justify-between border-t border-slate-200 px-5 py-3">
                 <p className="text-xs text-slate-500">
-                  Showing {filteredRequests.length} of{" "}
-                  {requests.length}
+                  Showing {requests.length} of {data.count}
                 </p>
 
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
-                    disabled
-                    className="rounded-md border border-slate-200 p-1.5 text-slate-300"
+                    onClick={() => setPage((current) => Math.max(1, current - 1))}
+                    disabled={loading || !data.previous}
+                    aria-label="Previous page"
+                    className="rounded-md border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent"
                   >
                     <ChevronLeft size={16} />
                   </button>
 
                   <span className="px-2 text-xs font-medium text-slate-600">
-                    1
+                    {page}
                   </span>
 
                   <button
                     type="button"
-                    disabled
-                    className="rounded-md border border-slate-200 p-1.5 text-slate-300"
+                    onClick={() => setPage((current) => current + 1)}
+                    disabled={loading || !data.next}
+                    aria-label="Next page"
+                    className="rounded-md border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent"
                   >
                     <ChevronRight size={16} />
                   </button>
@@ -596,14 +580,6 @@ export default function LeaveRequestsPage() {
             </>
           )}
         </section>
-
-        <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-3">
-          <p className="text-xs text-slate-500">
-            Development mode: Leave request data is currently
-            mocked. Backend integration will connect this
-            management screen to the approved Leave APIs.
-          </p>
-        </div>
       </div>
     </>
   );

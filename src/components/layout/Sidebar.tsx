@@ -13,6 +13,8 @@ import {
   navigation,
   selfServiceNavigation,
 } from "@/components/navigation/navigation";
+import { useAuth } from "@/components/guards/AuthProvider";
+import { hasModule } from "@/types/institutions";
 
 interface SidebarProps {
   collapsed: boolean;
@@ -28,33 +30,34 @@ export default function Sidebar({
   onMobileClose,
 }: SidebarProps) {
   const pathname = usePathname();
-
-  const userRole = "INSTITUTION_ADMIN";
-
-  const enabledModules = [
-    "HR",
-    "LEAVE",
-    "ATTENDANCE",
-    "PAYROLL",
-    "ACCOUNTING",
-    "REPORTS",
-    "RECRUITMENT",
-  ];
+  const { user, institution } = useAuth();
 
   const hasAccess = (item: {
     module?: string;
     roles?: string[];
+    permission?: string;
+    excludedRoles?: string[];
+    allowedRoles?: string[];
   }) => {
+    if (item.allowedRoles && !item.allowedRoles.includes(user?.role ?? "")) {
+      return false;
+    }
+
+    if (item.excludedRoles?.includes(user?.role ?? "")) {
+      return false;
+    }
+
     if (
       item.module &&
-      !enabledModules.includes(item.module)
+      !hasModule(institution?.enabledModules, item.module)
     ) {
       return false;
     }
 
     if (
-      item.roles &&
-      !item.roles.includes(userRole)
+      item.permission &&
+      !user?.permissions.includes("*") &&
+      !user?.permissions.includes(item.permission)
     ) {
       return false;
     }
@@ -69,6 +72,10 @@ export default function Sidebar({
     selfServiceNavigation.filter(hasAccess);
 
   const isActive = (href: string) => {
+    if (href === "/") {
+      return pathname === "/";
+    }
+
     if (href === "/dashboard") {
       return pathname === "/dashboard";
     }
@@ -121,7 +128,7 @@ export default function Sidebar({
           `}
         >
           <Link
-            href="/dashboard"
+            href="/"
             onClick={closeMobile}
             className="flex min-w-0 items-center"
           >
@@ -300,7 +307,7 @@ export default function Sidebar({
             `}
             title={
               collapsed
-                ? "ErgonX Demo Institution"
+              ? institution?.name
                 : undefined
             }
           >
@@ -315,11 +322,11 @@ export default function Sidebar({
             {!collapsed && (
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-slate-900">
-                  ErgonX Demo Institution
+                  {institution?.name}
                 </p>
 
                 <p className="truncate text-xs text-slate-500">
-                  DEMO
+                  {institution?.code}
                 </p>
               </div>
             )}

@@ -1,82 +1,37 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import {
-  Clock3,
-  Edit3,
-  Plus,
-  CalendarDays,
-  Search,
-  X,
-} from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Clock3, Edit3, Plus, Search, X } from "lucide-react";
+import StatusBadge from "@/components/ui/StatusBadge";
+import ErrorState from "@/components/ui/ErrorState";
+import EmptyState from "@/components/ui/EmptyState";
+import { attendanceApi, getApiErrorMessage, schedulingApi } from "@/lib/api";
+import { MAX_PAGE_SIZE } from "@/types/api";
+import type { FlexibleWorkRule } from "@/types/attendance";
+import { EM_DASH } from "@/lib/format";
 
-type FlexibleRule = {
-  id: number;
-  name: string;
-  code: string;
-  earliestStart: string;
-  latestStart: string;
-  earliestEnd: string;
-  latestEnd: string;
-  requiredMinutes: number;
-  coreStart?: string;
-  coreEnd?: string;
-  effectiveFrom: string;
-  effectiveTo?: string;
-  employees: number;
-  status: "ACTIVE" | "INACTIVE";
-};
+const ALL = "ALL";
 
-const initialRules: FlexibleRule[] = [
-  {
-    id: 1,
-    name: "Standard Flexible Work",
-    code: "FLEX-STD",
-    earliestStart: "07:00",
-    latestStart: "10:00",
-    earliestEnd: "15:00",
-    latestEnd: "19:00",
-    requiredMinutes: 480,
-    coreStart: "10:00",
-    coreEnd: "15:00",
-    effectiveFrom: "01 Jan 2026",
-    employees: 18,
-    status: "ACTIVE",
-  },
-  {
-    id: 2,
-    name: "Management Flexible Rule",
-    code: "FLEX-MGT",
-    earliestStart: "07:30",
-    latestStart: "09:30",
-    earliestEnd: "16:00",
-    latestEnd: "18:30",
-    requiredMinutes: 450,
-    coreStart: "09:30",
-    coreEnd: "16:00",
-    effectiveFrom: "01 Mar 2026",
-    employees: 7,
-    status: "ACTIVE",
-  },
-];
-
-const formatMinutes = (minutes: number) => {
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-
-  return `${hours}h ${mins}m`;
-};
+/** `HH:MM:SS` or null from the API; `HH:MM` or "" in the form. */
+function toInputTime(value: string | null): string {
+  return value ? value.slice(0, 5) : "";
+}
 
 export default function FlexibleWorkPage() {
-  const [rules, setRules] = useState(initialRules);
+  const [rules, setRules] = useState<FlexibleWorkRule[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
+
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("ALL");
+  const [status, setStatus] = useState(ALL);
 
   const [showEditor, setShowEditor] = useState(false);
-  const [editing, setEditing] = useState<FlexibleRule | null>(null);
+  const [editing, setEditing] = useState<FlexibleWorkRule | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState("");
 
   const [name, setName] = useState("");
-  const [code, setCode] = useState("");
   const [earliestStart, setEarliestStart] = useState("07:00");
   const [latestStart, setLatestStart] = useState("10:00");
   const [earliestEnd, setEarliestEnd] = useState("15:00");
@@ -86,19 +41,56 @@ export default function FlexibleWorkPage() {
   const [hasCoreHours, setHasCoreHours] = useState(true);
   const [coreStart, setCoreStart] = useState("10:00");
   const [coreEnd, setCoreEnd] = useState("15:00");
-  const [effectiveFrom, setEffectiveFrom] = useState("2026-09-13");
-  const [effectiveTo, setEffectiveTo] = useState("");
+  const [isActive, setIsActive] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+
+    async function load() {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const result = await schedulingApi.listFlexibleWorkRules({
+          page_size: MAX_PAGE_SIZE,
+          ordering: "name",
+        });
+
+        if (active) {
+          setRules(result.results);
+        }
+      } catch (caught) {
+        if (active) {
+          setError(getApiErrorMessage(caught));
+          setRules([]);
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    load();
+
+    return () => {
+      active = false;
+    };
+  }, [reloadToken]);
+
+  const reload = useCallback(() => {
+    setReloadToken((token) => token + 1);
+  }, []);
 
   const filteredRules = useMemo(() => {
+    const value = search.trim().toLowerCase();
+
     return rules.filter((rule) => {
-      const matchesSearch =
-        !search ||
-        `${rule.name} ${rule.code}`
-          .toLowerCase()
-          .includes(search.toLowerCase());
+      const matchesSearch = !value || rule.name.toLowerCase().includes(value);
 
       const matchesStatus =
-        status === "ALL" || rule.status === status;
+        status === ALL ||
+        (status === "ACTIVE" ? rule.is_active : !rule.is_active);
 
       return matchesSearch && matchesStatus;
     });
@@ -106,8 +98,8 @@ export default function FlexibleWorkPage() {
 
   const openNew = () => {
     setEditing(null);
+    setFormError("");
     setName("");
-    setCode("");
     setEarliestStart("07:00");
     setLatestStart("10:00");
     setEarliestEnd("15:00");
@@ -117,101 +109,91 @@ export default function FlexibleWorkPage() {
     setHasCoreHours(true);
     setCoreStart("10:00");
     setCoreEnd("15:00");
-    setEffectiveFrom("2026-09-13");
-    setEffectiveTo("");
+    setIsActive(true);
     setShowEditor(true);
   };
 
-  const openEdit = (rule: FlexibleRule) => {
+  const openEdit = (rule: FlexibleWorkRule) => {
     setEditing(rule);
+    setFormError("");
     setName(rule.name);
-    setCode(rule.code);
-    setEarliestStart(rule.earliestStart);
-    setLatestStart(rule.latestStart);
-    setEarliestEnd(rule.earliestEnd);
-    setLatestEnd(rule.latestEnd);
-
-    setRequiredHours(String(Math.floor(rule.requiredMinutes / 60)));
-    setRequiredMinutes(String(rule.requiredMinutes % 60));
-
-    setHasCoreHours(Boolean(rule.coreStart && rule.coreEnd));
-    setCoreStart(rule.coreStart ?? "10:00");
-    setCoreEnd(rule.coreEnd ?? "15:00");
-
-    setEffectiveFrom("2026-09-13");
-    setEffectiveTo("");
+    setEarliestStart(toInputTime(rule.earliest_start));
+    setLatestStart(toInputTime(rule.latest_start));
+    setEarliestEnd(toInputTime(rule.earliest_end));
+    setLatestEnd(toInputTime(rule.latest_end));
+    setRequiredHours(String(Math.floor(rule.required_minutes / 60)));
+    setRequiredMinutes(String(rule.required_minutes % 60));
+    setHasCoreHours(Boolean(rule.core_start && rule.core_end));
+    setCoreStart(toInputTime(rule.core_start) || "10:00");
+    setCoreEnd(toInputTime(rule.core_end) || "15:00");
+    setIsActive(rule.is_active);
     setShowEditor(true);
   };
 
-  const saveRule = () => {
-    if (!name.trim() || !code.trim()) return;
-
-    const totalMinutes =
-      Number(requiredHours || 0) * 60 +
-      Number(requiredMinutes || 0);
-
-    if (totalMinutes <= 0) return;
-
-    const formattedEffectiveFrom = new Date(
-      effectiveFrom
-    ).toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-
-    const formattedEffectiveTo = effectiveTo
-      ? new Date(effectiveTo).toLocaleDateString("en-GB", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        })
-      : undefined;
-
-    if (editing) {
-      setRules((current) =>
-        current.map((rule) =>
-          rule.id === editing.id
-            ? {
-                ...rule,
-                name: name.trim(),
-                code: code.trim(),
-                earliestStart,
-                latestStart,
-                earliestEnd,
-                latestEnd,
-                requiredMinutes: totalMinutes,
-                coreStart: hasCoreHours ? coreStart : undefined,
-                coreEnd: hasCoreHours ? coreEnd : undefined,
-                effectiveFrom: formattedEffectiveFrom,
-                effectiveTo: formattedEffectiveTo,
-              }
-            : rule
-        )
-      );
-    } else {
-      setRules((current) => [
-        ...current,
-        {
-          id: Date.now(),
-          name: name.trim(),
-          code: code.trim(),
-          earliestStart,
-          latestStart,
-          earliestEnd,
-          latestEnd,
-          requiredMinutes: totalMinutes,
-          coreStart: hasCoreHours ? coreStart : undefined,
-          coreEnd: hasCoreHours ? coreEnd : undefined,
-          effectiveFrom: formattedEffectiveFrom,
-          effectiveTo: formattedEffectiveTo,
-          employees: 0,
-          status: "ACTIVE",
-        },
-      ]);
+  const saveRule = useCallback(async () => {
+    if (!name.trim()) {
+      setFormError("Rule name is required.");
+      return;
     }
 
-    setShowEditor(false);
+    const totalMinutes =
+      Number(requiredHours || 0) * 60 + Number(requiredMinutes || 0);
+
+    if (totalMinutes <= 0) {
+      setFormError("Required working time must be greater than zero.");
+      return;
+    }
+
+    setSaving(true);
+    setFormError("");
+
+    const payload: Partial<FlexibleWorkRule> = {
+      name: name.trim(),
+      earliest_start: earliestStart || null,
+      latest_start: latestStart || null,
+      earliest_end: earliestEnd || null,
+      latest_end: latestEnd || null,
+      required_minutes: totalMinutes,
+      core_start: hasCoreHours ? coreStart : null,
+      core_end: hasCoreHours ? coreEnd : null,
+      is_active: isActive,
+    };
+
+    try {
+      if (editing) {
+        await schedulingApi.updateFlexibleWorkRule(editing.id, payload);
+      } else {
+        await schedulingApi.createFlexibleWorkRule(payload);
+      }
+
+      setShowEditor(false);
+      reload();
+    } catch (caught) {
+      setFormError(getApiErrorMessage(caught));
+    } finally {
+      setSaving(false);
+    }
+  }, [
+    name,
+    requiredHours,
+    requiredMinutes,
+    earliestStart,
+    latestStart,
+    earliestEnd,
+    latestEnd,
+    hasCoreHours,
+    coreStart,
+    coreEnd,
+    isActive,
+    editing,
+    reload,
+  ]);
+
+  const window = (from: string | null, to: string | null) => {
+    const start = toInputTime(from);
+    const end = toInputTime(to);
+
+    return start || end ? `${start || EM_DASH} – ${end || EM_DASH}` : EM_DASH;
   };
 
   return (
@@ -219,7 +201,7 @@ export default function FlexibleWorkPage() {
       <section className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <p className="text-sm font-medium text-slate-500">
-            Attendance & Scheduling
+            Attendance &amp; Scheduling
           </p>
 
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
@@ -237,521 +219,304 @@ export default function FlexibleWorkPage() {
           onClick={openNew}
           className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"
         >
-          <Plus size={17} />
-          New Flexible Rule
+          <Plus className="h-4 w-4" />
+          New Rule
         </button>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-slate-500">Flexible Rules</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900">
-            {rules.length}
-          </p>
-        </div>
+      {error && <ErrorState message={error} onRetry={reload} />}
 
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-slate-500">Active Rules</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900">
-            {rules.filter((rule) => rule.status === "ACTIVE").length}
-          </p>
-        </div>
-
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-slate-500">Employees Assigned</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900">
-            {rules.reduce((sum, rule) => sum + rule.employees, 0)}
-          </p>
-        </div>
-      </section>
-
-      <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-col gap-3 border-b border-slate-200 p-4 md:flex-row">
+      <section className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="flex flex-col gap-3 sm:flex-row">
           <div className="relative flex-1">
-            <Search
-              size={17}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-            />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
 
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search flexible work rules..."
-              className="w-full rounded-lg border border-slate-300 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-slate-500"
+              className="w-full rounded-lg border border-slate-200 py-2.5 pl-10 pr-3 text-sm outline-none focus:border-slate-400"
             />
           </div>
 
           <select
             value={status}
             onChange={(event) => setStatus(event.target.value)}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none"
+            aria-label="Filter by status"
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none"
           >
-            <option value="ALL">All statuses</option>
+            <option value={ALL}>All Statuses</option>
             <option value="ACTIVE">Active</option>
             <option value="INACTIVE">Inactive</option>
           </select>
         </div>
-
-        <div className="hidden overflow-x-auto md:block">
-          <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-5 py-3 font-medium">Rule</th>
-                <th className="px-5 py-3 font-medium">Start Window</th>
-                <th className="px-5 py-3 font-medium">End Window</th>
-                <th className="px-5 py-3 font-medium">Required Time</th>
-                <th className="px-5 py-3 font-medium">Core Hours</th>
-                <th className="px-5 py-3 font-medium">Employees</th>
-                <th className="px-5 py-3 font-medium">Status</th>
-                <th className="px-5 py-3 font-medium">Action</th>
-              </tr>
-            </thead>
-
-            <tbody className="divide-y divide-slate-100">
-              {filteredRules.map((rule) => (
-                <tr key={rule.id} className="hover:bg-slate-50">
-                  <td className="px-5 py-4">
-                    <p className="font-medium text-slate-900">{rule.name}</p>
-                    <p className="text-xs text-slate-500">{rule.code}</p>
-                  </td>
-
-                  <td className="px-5 py-4 text-slate-600">
-                    {rule.earliestStart} - {rule.latestStart}
-                  </td>
-
-                  <td className="px-5 py-4 text-slate-600">
-                    {rule.earliestEnd} - {rule.latestEnd}
-                  </td>
-
-                  <td className="px-5 py-4 text-slate-600">
-                    {formatMinutes(rule.requiredMinutes)}
-                  </td>
-
-                  <td className="px-5 py-4 text-slate-600">
-                    {rule.coreStart && rule.coreEnd
-                      ? `${rule.coreStart} - ${rule.coreEnd}`
-                      : "Not configured"}
-                  </td>
-
-                  <td className="px-5 py-4 text-slate-600">
-                    {rule.employees}
-                  </td>
-
-                  <td className="px-5 py-4">
-                    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
-                      {rule.status}
-                    </span>
-                  </td>
-
-                  <td className="px-5 py-4">
-                    <button
-                      type="button"
-                      onClick={() => openEdit(rule)}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                    >
-                      <Edit3 size={14} />
-                      Edit
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="divide-y divide-slate-100 md:hidden">
-          {filteredRules.map((rule) => (
-            <div key={rule.id} className="space-y-4 p-5">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="font-semibold text-slate-900">{rule.name}</p>
-                  <p className="mt-1 text-xs text-slate-500">{rule.code}</p>
-                </div>
-
-                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
-                  {rule.status}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-xs text-slate-500">Start Window</p>
-                  <p className="mt-1 text-slate-700">
-                    {rule.earliestStart} - {rule.latestStart}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-xs text-slate-500">End Window</p>
-                  <p className="mt-1 text-slate-700">
-                    {rule.earliestEnd} - {rule.latestEnd}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-xs text-slate-500">Required Time</p>
-                  <p className="mt-1 text-slate-700">
-                    {formatMinutes(rule.requiredMinutes)}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-xs text-slate-500">Employees</p>
-                  <p className="mt-1 text-slate-700">{rule.employees}</p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => openEdit(rule)}
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700"
-              >
-                <Edit3 size={15} />
-                Edit Rule
-              </button>
-            </div>
-          ))}
-        </div>
       </section>
 
-      {showEditor && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 p-4">
-          <div className="mx-auto my-8 w-full max-w-4xl rounded-xl bg-white shadow-xl">
-            <div className="flex items-start justify-between gap-4 border-b border-slate-200 p-5">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900">
-                  {editing ? "Edit Flexible Work Rule" : "New Flexible Work Rule"}
-                </h2>
+      {filteredRules.length === 0 ? (
+        <EmptyState
+          title={loading ? "Loading rules..." : "No flexible work rules"}
+          description={
+            loading
+              ? "Please wait."
+              : "Create a rule to define a flexible working window."
+          }
+        />
+      ) : (
+        <section className="grid gap-4 lg:grid-cols-2">
+          {filteredRules.map((rule) => (
+            <article
+              key={rule.id}
+              className="rounded-xl border border-slate-200 bg-white p-5"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-semibold text-slate-900">
+                    {rule.name}
+                  </h2>
 
-                <p className="mt-1 text-sm text-slate-500">
-                  Configure the permitted work windows and required working time.
-                </p>
+                  <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                    <Clock3 className="h-3.5 w-3.5" />
+                    Requires{" "}
+                    {attendanceApi.formatMinutes(rule.required_minutes)} per day
+                  </p>
+                </div>
+
+                <StatusBadge status={rule.is_active ? "ACTIVE" : "INACTIVE"} />
               </div>
 
+              <dl className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-4 text-sm">
+                <Detail
+                  label="Start window"
+                  value={window(rule.earliest_start, rule.latest_start)}
+                />
+                <Detail
+                  label="End window"
+                  value={window(rule.earliest_end, rule.latest_end)}
+                />
+                <Detail
+                  label="Core hours"
+                  value={
+                    rule.core_start && rule.core_end
+                      ? window(rule.core_start, rule.core_end)
+                      : "None"
+                  }
+                />
+                <Detail
+                  label="Required"
+                  value={attendanceApi.formatMinutes(rule.required_minutes)}
+                />
+              </dl>
+
+              <div className="mt-4 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => openEdit(rule)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  <Edit3 className="h-4 w-4" />
+                  Edit
+                </button>
+              </div>
+            </article>
+          ))}
+        </section>
+      )}
+
+      {showEditor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-xl">
+            <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
+              <h2 className="text-lg font-semibold text-slate-900">
+                {editing ? "Edit Flexible Work Rule" : "New Flexible Work Rule"}
+              </h2>
+
               <button
-                type="button"
                 onClick={() => setShowEditor(false)}
+                disabled={saving}
                 className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Close"
               >
-                <X size={18} />
+                <X className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="space-y-6 p-5">
-              <section>
-                <h3 className="font-semibold text-slate-900">
-                  Rule Details
-                </h3>
-
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="text-xs font-medium text-slate-600">
-                      Rule Name
-                    </label>
-
-                    <input
-                      value={name}
-                      onChange={(event) => setName(event.target.value)}
-                      placeholder="e.g. Standard Flexible Work"
-                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-slate-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-medium text-slate-600">
-                      Rule Code
-                    </label>
-
-                    <input
-                      value={code}
-                      onChange={(event) => setCode(event.target.value)}
-                      placeholder="e.g. FLEX-STD"
-                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-slate-500"
-                    />
-                  </div>
+            <div className="space-y-5 p-6">
+              {formError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {formError}
                 </div>
-              </section>
+              )}
 
-              <section>
-                <div className="flex items-center gap-2">
-                  <Clock3 size={18} className="text-slate-600" />
+              {/*
+                The backend rule has no code or effective dates; scheduling
+                effectivity is held on the work schedule that references it.
+              */}
+              <label className="block space-y-1.5">
+                <span className="text-sm font-medium text-slate-700">
+                  Rule Name
+                </span>
+                <input
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="e.g. Standard Flexible Work"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                />
+              </label>
 
-                  <div>
-                    <h3 className="font-semibold text-slate-900">
-                      Flexible Time Windows
-                    </h3>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <TimeField
+                  label="Earliest Start"
+                  value={earliestStart}
+                  onChange={setEarliestStart}
+                />
+                <TimeField
+                  label="Latest Start"
+                  value={latestStart}
+                  onChange={setLatestStart}
+                />
+                <TimeField
+                  label="Earliest End"
+                  value={earliestEnd}
+                  onChange={setEarliestEnd}
+                />
+                <TimeField
+                  label="Latest End"
+                  value={latestEnd}
+                  onChange={setLatestEnd}
+                />
+              </div>
 
-                    <p className="mt-1 text-sm text-slate-500">
-                      Define the earliest and latest permitted start and end times.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                  <div>
-                    <label className="text-xs font-medium text-slate-600">
-                      Earliest Start
-                    </label>
-                    <input
-                      type="time"
-                      value={earliestStart}
-                      onChange={(event) => setEarliestStart(event.target.value)}
-                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-medium text-slate-600">
-                      Latest Start
-                    </label>
-                    <input
-                      type="time"
-                      value={latestStart}
-                      onChange={(event) => setLatestStart(event.target.value)}
-                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-medium text-slate-600">
-                      Earliest End
-                    </label>
-                    <input
-                      type="time"
-                      value={earliestEnd}
-                      onChange={(event) => setEarliestEnd(event.target.value)}
-                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-medium text-slate-600">
-                      Latest End
-                    </label>
-                    <input
-                      type="time"
-                      value={latestEnd}
-                      onChange={(event) => setLatestEnd(event.target.value)}
-                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
-                    />
-                  </div>
-                </div>
-              </section>
-
-              <section>
-                <h3 className="font-semibold text-slate-900">
+              <fieldset className="space-y-1.5">
+                <legend className="text-sm font-medium text-slate-700">
                   Required Working Time
-                </h3>
+                </legend>
 
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="text-xs font-medium text-slate-600">
-                      Required Hours
-                    </label>
+                <div className="flex gap-3">
+                  <label className="flex-1">
+                    <span className="sr-only">Hours</span>
                     <input
                       type="number"
                       min="0"
                       value={requiredHours}
                       onChange={(event) => setRequiredHours(event.target.value)}
-                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+                      placeholder="Hours"
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
                     />
-                  </div>
+                  </label>
 
-                  <div>
-                    <label className="text-xs font-medium text-slate-600">
-                      Additional Minutes
-                    </label>
+                  <label className="flex-1">
+                    <span className="sr-only">Minutes</span>
                     <input
                       type="number"
                       min="0"
                       max="59"
                       value={requiredMinutes}
-                      onChange={(event) => setRequiredMinutes(event.target.value)}
-                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
+                      onChange={(event) =>
+                        setRequiredMinutes(event.target.value)
+                      }
+                      placeholder="Minutes"
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
                     />
-                  </div>
+                  </label>
                 </div>
-              </section>
+              </fieldset>
 
-              <section className="rounded-xl border border-slate-200 p-4">
-                <div className="flex items-start gap-3">
-                  <input
-                    id="core-hours"
-                    type="checkbox"
-                    checked={hasCoreHours}
-                    onChange={(event) => setHasCoreHours(event.target.checked)}
-                    className="mt-1"
+              <label className="flex items-center gap-3 rounded-lg border border-slate-200 p-3">
+                <input
+                  type="checkbox"
+                  checked={hasCoreHours}
+                  onChange={(event) => setHasCoreHours(event.target.checked)}
+                  className="h-4 w-4"
+                />
+                <span>
+                  <span className="block text-sm font-medium text-slate-700">
+                    Core hours
+                  </span>
+                  <span className="block text-xs text-slate-500">
+                    Employees must be present during this window.
+                  </span>
+                </span>
+              </label>
+
+              {hasCoreHours && (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <TimeField
+                    label="Core Start"
+                    value={coreStart}
+                    onChange={setCoreStart}
                   />
-
-                  <div>
-                    <label
-                      htmlFor="core-hours"
-                      className="font-semibold text-slate-900"
-                    >
-                      Enable Core Hours
-                    </label>
-
-                    <p className="mt-1 text-sm text-slate-500">
-                      Optional period when employees are expected to be available.
-                    </p>
-                  </div>
+                  <TimeField
+                    label="Core End"
+                    value={coreEnd}
+                    onChange={setCoreEnd}
+                  />
                 </div>
+              )}
 
-                {hasCoreHours && (
-                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <label className="text-xs font-medium text-slate-600">
-                        Core Start
-                      </label>
-
-                      <input
-                        type="time"
-                        value={coreStart}
-                        onChange={(event) => setCoreStart(event.target.value)}
-                        className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-medium text-slate-600">
-                        Core End
-                      </label>
-
-                      <input
-                        type="time"
-                        value={coreEnd}
-                        onChange={(event) => setCoreEnd(event.target.value)}
-                        className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
-                      />
-                    </div>
-                  </div>
-                )}
-              </section>
-
-              <section>
-                <div className="flex items-center gap-2">
-                  <CalendarDays size={18} className="text-slate-600" />
-
-                  <div>
-                    <h3 className="font-semibold text-slate-900">
-                      Effective Dates
-                    </h3>
-
-                    <p className="mt-1 text-sm text-slate-500">
-                      Define when this flexible work rule applies.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="text-xs font-medium text-slate-600">
-                      Effective From
-                    </label>
-
-                    <input
-                      type="date"
-                      value={effectiveFrom}
-                      onChange={(event) => setEffectiveFrom(event.target.value)}
-                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-medium text-slate-600">
-                      Effective To
-                    </label>
-
-                    <input
-                      type="date"
-                      value={effectiveTo}
-                      onChange={(event) => setEffectiveTo(event.target.value)}
-                      className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm"
-                    />
-
-                    <p className="mt-1 text-xs text-slate-500">
-                      Leave blank when there is no configured end date.
-                    </p>
-                  </div>
-                </div>
-              </section>
-
-              <section className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                <p className="font-medium text-slate-900">Rule Preview</p>
-
-                <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  <div>
-                    <p className="text-xs text-slate-500">Start Window</p>
-                    <p className="mt-1 text-sm font-medium text-slate-900">
-                      {earliestStart} - {latestStart}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-xs text-slate-500">End Window</p>
-                    <p className="mt-1 text-sm font-medium text-slate-900">
-                      {earliestEnd} - {latestEnd}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-xs text-slate-500">Required Time</p>
-                    <p className="mt-1 text-sm font-medium text-slate-900">
-                      {formatMinutes(
-                        Number(requiredHours || 0) * 60 +
-                          Number(requiredMinutes || 0)
-                      )}
-                    </p>
-                  </div>
-
-                  <div>
-                    <p className="text-xs text-slate-500">Core Hours</p>
-                    <p className="mt-1 text-sm font-medium text-slate-900">
-                      {hasCoreHours
-                        ? `${coreStart} - ${coreEnd}`
-                        : "Not configured"}
-                    </p>
-                  </div>
-                </div>
-              </section>
+              <label className="flex items-center gap-3 rounded-lg border border-slate-200 p-3">
+                <input
+                  type="checkbox"
+                  checked={isActive}
+                  onChange={(event) => setIsActive(event.target.checked)}
+                  className="h-4 w-4"
+                />
+                <span className="text-sm font-medium text-slate-700">
+                  Active
+                </span>
+              </label>
             </div>
 
-            <div className="flex flex-col-reverse gap-2 border-t border-slate-200 p-5 sm:flex-row sm:justify-end">
+            <div className="sticky bottom-0 flex justify-end gap-3 border-t border-slate-200 bg-white px-6 py-4">
               <button
-                type="button"
                 onClick={() => setShowEditor(false)}
-                className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                disabled={saving}
+                className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
               >
                 Cancel
               </button>
 
               <button
-                type="button"
-                disabled={
-                  !name.trim() ||
-                  !code.trim() ||
-                  Number(requiredHours || 0) * 60 +
-                    Number(requiredMinutes || 0) <=
-                    0
-                }
                 onClick={saveRule}
-                className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={saving || !name.trim()}
+                className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Save Flexible Rule
+                {saving ? "Saving..." : editing ? "Save Changes" : "Create Rule"}
               </button>
             </div>
           </div>
         </div>
       )}
-
-      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-        <p className="font-medium">Development mode</p>
-        <p className="mt-1">
-          Flexible work rules currently use local demo data. Final persistence,
-          validation, employee assignment, schedule evaluation, and attendance
-          calculations will be controlled by the backend.
-        </p>
-      </div>
     </main>
+  );
+}
+
+function Detail({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-xs text-slate-500">{label}</dt>
+      <dd className="mt-1 font-medium text-slate-800">{value}</dd>
+    </div>
+  );
+}
+
+function TimeField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="space-y-1.5">
+      <span className="text-sm font-medium text-slate-700">{label}</span>
+      <input
+        type="time"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+      />
+    </label>
   );
 }

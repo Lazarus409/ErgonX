@@ -1,3 +1,10 @@
+/**
+ * Session-shaped types used by the app shell and guards.
+ *
+ * These are the browser's view of the signed-in user. The raw API shapes live
+ * in `@/types/institutions` and `@/lib/api/auth`.
+ */
+
 export type UserRole =
   | "INSTITUTION_ADMIN"
   | "HR_ADMIN"
@@ -7,27 +14,46 @@ export type UserRole =
   | "FINANCE_MANAGER"
   | "AUDITOR";
 
-export interface Institution {
+export interface SessionInstitution {
   id: string;
   name: string;
   code: string;
+  /**
+   * Enabled backend module codes (`CORE_HR`, `LEAVE`, ...). The development
+   * bypass uses the short label `HR`; compare with `hasModule` from
+   * `@/types/institutions` rather than a direct `includes`.
+   */
   enabledModules: string[];
 }
 
-export interface User {
+export interface SessionUser {
   id: string;
   email: string;
   firstName: string;
   lastName: string;
   role: UserRole | string;
   institutionId: string;
+  /** Permission codes, or `["*"]` for the development bypass user. */
   permissions: string[];
-  institution?: Institution;
+  isPlatformAdmin?: boolean;
+  institution?: SessionInstitution;
 }
 
 export interface AuthState {
-  user: User | null;
-  institution: Institution | null;
+  user: SessionUser | null;
+  institution: SessionInstitution | null;
   isAuthenticated: boolean;
   loading: boolean;
 }
+
+export interface SessionBootstrap {
+  onboardingReady: boolean;
+  onboardingStatus: string;
+  defaultLanding: string;
+  availableDashboards: string[];
+  roleCode?: string;
+}
+
+/** Retained for existing imports. */
+export type Institution = SessionInstitution;
+export type User = SessionUser;

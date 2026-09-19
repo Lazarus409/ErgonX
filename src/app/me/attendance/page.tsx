@@ -1,82 +1,62 @@
-﻿"use client";
+"use client";
 
-import { useMemo, useState } from "react";
-import Link from "next/link";
+import { useCallback, useMemo, useState } from "react";
 import {
   CalendarDays,
-  CheckCircle2,
   Clock3,
   LogIn,
   LogOut,
-  MapPin,
   PencilLine,
   Timer,
+  X,
 } from "lucide-react";
+import StatusBadge from "@/components/ui/StatusBadge";
+import ErrorState from "@/components/ui/ErrorState";
+import EmptyState from "@/components/ui/EmptyState";
+import {
+  attendanceApi,
+  employeesApi,
+  getApiErrorMessage,
+} from "@/lib/api";
+import { useApiResource } from "@/lib/useApiResource";
+import type { AttendanceRecord } from "@/types/attendance";
+import type { Employee } from "@/types/hr";
+import { EM_DASH, formatDate, toISODate } from "@/lib/format";
 
-type AttendanceStatus = "PRESENT" | "LATE" | "ABSENT" | "ON_LEAVE";
+const HISTORY_LIMIT = 30;
 
-type AttendanceRecord = {
-  date: string;
-  day: string;
-  scheduled: string;
-  checkIn: string;
-  checkOut: string;
-  hours: string;
-  status: AttendanceStatus;
-};
+interface MyAttendance {
+  employee: Employee | null;
+  today: AttendanceRecord | null;
+  history: AttendanceRecord[];
+}
 
-const attendanceHistory: AttendanceRecord[] = [
-  {
-    date: "12 Sep 2026",
-    day: "Saturday",
-    scheduled: "08:00 - 17:00",
-    checkIn: "07:56",
-    checkOut: "17:04",
-    hours: "8h 38m",
-    status: "PRESENT",
-  },
-  {
-    date: "11 Sep 2026",
-    day: "Friday",
-    scheduled: "08:00 - 17:00",
-    checkIn: "08:12",
-    checkOut: "17:01",
-    hours: "8h 34m",
-    status: "LATE",
-  },
-  {
-    date: "10 Sep 2026",
-    day: "Thursday",
-    scheduled: "08:00 - 17:00",
-    checkIn: "07:59",
-    checkOut: "17:00",
-    hours: "8h 31m",
-    status: "PRESENT",
-  },
-  {
-    date: "09 Sep 2026",
-    day: "Wednesday",
-    scheduled: "08:00 - 17:00",
-    checkIn: "08:03",
-    checkOut: "17:08",
-    hours: "8h 41m",
-    status: "PRESENT",
-  },
-];
+function clockTime(value: string | null): string {
+  if (!value) {
+    return EM_DASH;
+  }
 
-const statusClasses: Record<AttendanceStatus, string> = {
-  PRESENT: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  LATE: "bg-amber-50 text-amber-700 border-amber-200",
-  ABSENT: "bg-red-50 text-red-700 border-red-200",
-  ON_LEAVE: "bg-blue-50 text-blue-700 border-blue-200",
-};
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return parsed.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 export default function MyAttendancePage() {
-  const [clockedIn, setClockedIn] = useState(true);
-  const [checkIn, setCheckIn] = useState("07:56");
-  const [checkOut, setCheckOut] = useState("--");
+  const [actionRunning, setActionRunning] = useState(false);
+  const [actionError, setActionError] = useState("");
+
   const [showAdjustment, setShowAdjustment] = useState(false);
   const [adjustmentReason, setAdjustmentReason] = useState("");
+  const [adjustmentSubmitted, setAdjustmentSubmitted] = useState(false);
+
+  const todayIso = useMemo(() => toISODate(new Date()), []);
 
   const todayLabel = useMemo(
     () =>
@@ -86,24 +66,104 @@ export default function MyAttendancePage() {
         month: "short",
         year: "numeric",
       }).format(new Date()),
-    []
+    [],
   );
 
-  const handleClockAction = () => {
-    const now = new Date().toLocaleTimeString("en-GB", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+  const load = useCallback(async (): Promise<MyAttendance> => {
+    const employee = await employeesApi.getCurrentEmployee();
 
-    if (clockedIn) {
-      setCheckOut(now);
-      setClockedIn(false);
-    } else {
-      setCheckIn(now);
-      setCheckOut("--");
-      setClockedIn(true);
+    if (!employee) {
+      return { employee: null, today: null, history: [] };
     }
-  };
+
+    const history = await attendanceApi
+      .listAttendanceRecords({
+        employee: employee.id,
+        page_size: HISTORY_LIMIT,
+        ordering: "-attendance_date",
+      })
+      .then((page) => page.results)
+      .catch(() => [] as AttendanceRecord[]);
+
+    const today =
+      history.find((record) => record.attendance_date === todayIso) ?? null;
+
+    return { employee, today, history };
+  }, [todayIso]);
+
+  const { data, loading, error, reload } = useApiResource(load);
+
+  const employee = data?.employee ?? null;
+  const today = data?.today ?? null;
+
+  const clockedIn = today?.check_in !== null && today?.check_out === null;
+  const clockedOut = Boolean(today?.check_out);
+
+  /**
+   * Clock-in and clock-out are backend actions. The backend resolves the
+   * effective schedule, classifies lateness and refuses a clock-in during
+   * approved leave.
+   */
+  const handleClockAction = useCallback(async () => {
+    if (!employee) {
+      return;
+    }
+
+    setActionRunning(true);
+    setActionError("");
+
+    try {
+      if (today && clockedIn) {
+        await attendanceApi.clockOut(today.id);
+      } else {
+        await attendanceApi.clockIn({
+          employee: employee.id,
+          source: "WEB",
+        });
+      }
+
+      reload();
+    } catch (caught) {
+      setActionError(getApiErrorMessage(caught));
+    } finally {
+      setActionRunning(false);
+    }
+  }, [employee, today, clockedIn, reload]);
+
+  const submitAdjustment = useCallback(async () => {
+    if (!today) {
+      return;
+    }
+
+    if (!adjustmentReason.trim()) {
+      setActionError("A reason is required for an adjustment request.");
+      return;
+    }
+
+    setActionRunning(true);
+    setActionError("");
+
+    try {
+      // A self-service request records the reason against the unchanged
+      // times; a reviewer proposes the corrected values.
+      await attendanceApi.createAttendanceAdjustment({
+        attendance_record: today.id,
+        reason: adjustmentReason.trim(),
+        proposed_values: { notes: adjustmentReason.trim() },
+      });
+
+      setShowAdjustment(false);
+      setAdjustmentReason("");
+      setAdjustmentSubmitted(true);
+      reload();
+    } catch (caught) {
+      setActionError(getApiErrorMessage(caught));
+    } finally {
+      setActionRunning(false);
+    }
+  }, [today, adjustmentReason, reload]);
+
+  const history = data?.history ?? [];
 
   return (
     <main className="space-y-6">
@@ -117,452 +177,320 @@ export default function MyAttendancePage() {
             My Attendance
           </h1>
 
-          <p className="mt-1 text-sm text-slate-600">
-            View your attendance, schedule, clock in or out, and request
-            adjustments.
-          </p>
+          <p className="mt-1 text-sm text-slate-600">{todayLabel}</p>
         </div>
 
-        <button
-          type="button"
-          onClick={handleClockAction}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 md:w-auto"
-        >
-          {clockedIn ? <LogOut size={17} /> : <LogIn size={17} />}
-          {clockedIn ? "Clock Out" : "Clock In"}
-        </button>
+        {employee && (
+          <button
+            type="button"
+            onClick={handleClockAction}
+            disabled={actionRunning || clockedOut}
+            className={`inline-flex items-center justify-center gap-2 rounded-lg px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60 ${
+              clockedIn
+                ? "bg-red-600 hover:bg-red-700"
+                : "bg-slate-900 hover:bg-slate-800"
+            }`}
+          >
+            {clockedIn ? (
+              <LogOut className="h-4 w-4" />
+            ) : (
+              <LogIn className="h-4 w-4" />
+            )}
+            {actionRunning
+              ? "Working..."
+              : clockedOut
+                ? "Clocked out for today"
+                : clockedIn
+                  ? "Clock Out"
+                  : "Clock In"}
+          </button>
+        )}
       </section>
+
+      {error && <ErrorState message={error} onRetry={reload} />}
+
+      {actionError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {actionError}
+        </div>
+      )}
+
+      {adjustmentSubmitted && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          Your adjustment request has been submitted for approval.
+        </div>
+      )}
+
+      {!loading && !error && data && !employee && (
+        <EmptyState
+          title="No employee record linked"
+          description="Your account is not linked to an employee record in this institution, so attendance cannot be recorded for you."
+        />
+      )}
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-slate-500">Today</span>
-            <CheckCircle2 size={19} className="text-emerald-600" />
-          </div>
+        <StatCard
+          icon={<LogIn className="h-5 w-5" />}
+          label="Check In"
+          value={loading ? "…" : clockTime(today?.check_in ?? null)}
+        />
 
-          <p className="mt-3 text-xl font-semibold text-slate-900">
-            Present
-          </p>
+        <StatCard
+          icon={<LogOut className="h-5 w-5" />}
+          label="Check Out"
+          value={loading ? "…" : clockTime(today?.check_out ?? null)}
+        />
 
-          <p className="mt-1 text-xs text-slate-500">{todayLabel}</p>
-        </div>
+        <StatCard
+          icon={<Timer className="h-5 w-5" />}
+          label="Worked Today"
+          value={
+            loading
+              ? "…"
+              : attendanceApi.formatMinutes(today?.worked_minutes ?? 0)
+          }
+        />
 
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-slate-500">Check In</span>
-            <LogIn size={19} className="text-slate-600" />
-          </div>
-
-          <p className="mt-3 text-xl font-semibold text-slate-900">
-            {checkIn}
-          </p>
-
-          <p className="mt-1 text-xs text-slate-500">
-            Today&apos;s recorded time
-          </p>
-        </div>
-
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-slate-500">Check Out</span>
-            <LogOut size={19} className="text-slate-600" />
-          </div>
-
-          <p className="mt-3 text-xl font-semibold text-slate-900">
-            {checkOut}
-          </p>
-
-          <p className="mt-1 text-xs text-slate-500">
-            Today&apos;s recorded time
-          </p>
-        </div>
-
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-slate-500">Schedule</span>
-            <CalendarDays size={19} className="text-slate-600" />
-          </div>
-
-          <p className="mt-3 text-xl font-semibold text-slate-900">
-            08:00 - 17:00
-          </p>
-
-          <p className="mt-1 text-xs text-slate-500">
-            Standard work schedule
-          </p>
-        </div>
+        <StatCard
+          icon={<Clock3 className="h-5 w-5" />}
+          label="Overtime Today"
+          value={
+            loading
+              ? "…"
+              : attendanceApi.formatMinutes(today?.overtime_minutes ?? 0)
+          }
+        />
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[1.4fr_0.9fr]">
-        <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 p-5">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="font-semibold text-slate-900">
-                  Today&apos;s Schedule
-                </h2>
-
-                <p className="mt-1 text-sm text-slate-500">
-                  Your assigned work schedule for today.
-                </p>
-              </div>
-
-              <Clock3 size={20} className="text-slate-500" />
-            </div>
-          </div>
-
-          <div className="grid gap-4 p-5 sm:grid-cols-2">
-            <div className="rounded-lg bg-slate-50 p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                Schedule
-              </p>
-
-              <p className="mt-2 font-semibold text-slate-900">
-                Standard Workday
-              </p>
-
-              <p className="mt-1 text-sm text-slate-600">
-                Fixed schedule
-              </p>
-            </div>
-
-            <div className="rounded-lg bg-slate-50 p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                Working Hours
-              </p>
-
-              <p className="mt-2 font-semibold text-slate-900">
-                08:00 - 17:00
-              </p>
-
-              <p className="mt-1 text-sm text-slate-600">
-                Monday - Friday
-              </p>
-            </div>
-
-            <div className="rounded-lg bg-slate-50 p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                Break
-              </p>
-
-              <p className="mt-2 font-semibold text-slate-900">
-                1 hour
-              </p>
-
-              <p className="mt-1 text-sm text-slate-600">
-                Scheduled break period
-              </p>
-            </div>
-
-            <div className="rounded-lg bg-slate-50 p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                Work Location
-              </p>
-
-              <p className="mt-2 flex items-center gap-2 font-semibold text-slate-900">
-                <MapPin size={16} />
-                Main Office
-              </p>
-
-              <p className="mt-1 text-sm text-slate-600">
-                Assigned work location
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 p-5">
-            <h2 className="font-semibold text-slate-900">
-              Attendance Actions
-            </h2>
+      <section className="rounded-xl border border-slate-200 bg-white">
+        <div className="flex flex-col gap-3 border-b border-slate-200 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="font-semibold text-slate-900">Today</h2>
 
             <p className="mt-1 text-sm text-slate-500">
-              Manage your own attendance records.
+              {today
+                ? `Status recorded as ${today.status.toLowerCase().replace("_", " ")}.`
+                : "No attendance has been recorded for today."}
             </p>
           </div>
 
-          <div className="space-y-3 p-5">
-            <button
-              type="button"
-              onClick={handleClockAction}
-              className="flex w-full items-center justify-between rounded-lg border border-slate-200 p-4 text-left transition hover:bg-slate-50"
-            >
-              <span>
-                <span className="block text-sm font-semibold text-slate-900">
-                  {clockedIn ? "Clock out" : "Clock in"}
-                </span>
+          {today && (
+            <div className="flex items-center gap-3">
+              <StatusBadge status={today.status} />
 
-                <span className="mt-1 block text-xs text-slate-500">
-                  {clockedIn
-                    ? "End your current attendance session."
-                    : "Start your attendance session."}
-                </span>
-              </span>
-
-              {clockedIn ? <LogOut size={18} /> : <LogIn size={18} />}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setShowAdjustment(true)}
-              className="flex w-full items-center justify-between rounded-lg border border-slate-200 p-4 text-left transition hover:bg-slate-50"
-            >
-              <span>
-                <span className="block text-sm font-semibold text-slate-900">
-                  Request adjustment
-                </span>
-
-                <span className="mt-1 block text-xs text-slate-500">
-                  Request a correction to your attendance record.
-                </span>
-              </span>
-
-              <PencilLine size={18} />
-            </button>
-
-            <Link
-              href="/me/leave"
-              className="flex w-full items-center justify-between rounded-lg border border-slate-200 p-4 text-left transition hover:bg-slate-50"
-            >
-              <span>
-                <span className="block text-sm font-semibold text-slate-900">
-                  View leave
-                </span>
-
-                <span className="mt-1 block text-xs text-slate-500">
-                  Review your leave requests and balances.
-                </span>
-              </span>
-
-              <CalendarDays size={18} />
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 p-5">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="font-semibold text-slate-900">
-                Recent Attendance
-              </h2>
-
-              <p className="mt-1 text-sm text-slate-500">
-                Your recent attendance records.
-              </p>
-            </div>
-
-            <Timer size={20} className="text-slate-500" />
-          </div>
-        </div>
-
-        <div className="hidden overflow-x-auto md:block">
-          <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-5 py-3 font-medium">Date</th>
-                <th className="px-5 py-3 font-medium">Schedule</th>
-                <th className="px-5 py-3 font-medium">Check In</th>
-                <th className="px-5 py-3 font-medium">Check Out</th>
-                <th className="px-5 py-3 font-medium">Hours</th>
-                <th className="px-5 py-3 font-medium">Status</th>
-              </tr>
-            </thead>
-
-            <tbody className="divide-y divide-slate-100">
-              {attendanceHistory.map((record) => (
-                <tr key={record.date} className="hover:bg-slate-50">
-                  <td className="px-5 py-4">
-                    <p className="font-medium text-slate-900">
-                      {record.date}
-                    </p>
-                    <p className="text-xs text-slate-500">{record.day}</p>
-                  </td>
-
-                  <td className="px-5 py-4 text-slate-600">
-                    {record.scheduled}
-                  </td>
-
-                  <td className="px-5 py-4 text-slate-600">
-                    {record.checkIn}
-                  </td>
-
-                  <td className="px-5 py-4 text-slate-600">
-                    {record.checkOut}
-                  </td>
-
-                  <td className="px-5 py-4 text-slate-600">
-                    {record.hours}
-                  </td>
-
-                  <td className="px-5 py-4">
-                    <span
-                      className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${statusClasses[record.status]}`}
-                    >
-                      {record.status.replace("_", " ")}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="divide-y divide-slate-100 md:hidden">
-          {attendanceHistory.map((record) => (
-            <div key={record.date} className="space-y-3 p-5">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="font-medium text-slate-900">
-                    {record.date}
-                  </p>
-
-                  <p className="text-xs text-slate-500">
-                    {record.day}
-                  </p>
-                </div>
-
-                <span
-                  className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${statusClasses[record.status]}`}
-                >
-                  {record.status.replace("_", " ")}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div>
-                  <p className="text-xs text-slate-500">Schedule</p>
-                  <p className="mt-1 text-slate-700">
-                    {record.scheduled}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-xs text-slate-500">Hours</p>
-                  <p className="mt-1 text-slate-700">
-                    {record.hours}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-xs text-slate-500">Check In</p>
-                  <p className="mt-1 text-slate-700">
-                    {record.checkIn}
-                  </p>
-                </div>
-
-                <div>
-                  <p className="text-xs text-slate-500">Check Out</p>
-                  <p className="mt-1 text-slate-700">
-                    {record.checkOut}
-                  </p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {showAdjustment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
-          <div className="w-full max-w-lg rounded-xl bg-white shadow-xl">
-            <div className="border-b border-slate-200 p-5">
-              <h2 className="font-semibold text-slate-900">
-                Request Attendance Adjustment
-              </h2>
-
-              <p className="mt-1 text-sm text-slate-500">
-                Submit a reason for the requested correction. Approval remains
-                with the authorised reviewer.
-              </p>
-            </div>
-
-            <div className="space-y-4 p-5">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="text-xs font-medium text-slate-600">
-                    Date
-                  </label>
-
-                  <input
-                    value="13 Sep 2026"
-                    readOnly
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600 outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-medium text-slate-600">
-                    Current Check In
-                  </label>
-
-                  <input
-                    value={checkIn}
-                    readOnly
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600 outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-medium text-slate-600">
-                  Reason
-                </label>
-
-                <textarea
-                  value={adjustmentReason}
-                  onChange={(event) =>
-                    setAdjustmentReason(event.target.value)
-                  }
-                  rows={4}
-                  placeholder="Explain why an adjustment is required..."
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-500"
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-col-reverse gap-2 border-t border-slate-200 p-5 sm:flex-row sm:justify-end">
               <button
                 type="button"
                 onClick={() => {
-                  setShowAdjustment(false);
-                  setAdjustmentReason("");
+                  setActionError("");
+                  setAdjustmentSubmitted(false);
+                  setShowAdjustment(true);
                 }}
-                className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                <PencilLine className="h-4 w-4" />
+                Request correction
+              </button>
+            </div>
+          )}
+        </div>
+
+        {today && (
+          <dl className="grid gap-4 p-5 sm:grid-cols-3">
+            <Detail
+              label="Late"
+              value={attendanceApi.formatMinutes(today.late_minutes)}
+            />
+            <Detail
+              label="Early departure"
+              value={attendanceApi.formatMinutes(
+                today.early_departure_minutes,
+              )}
+            />
+            <Detail label="Source" value={today.source} />
+          </dl>
+        )}
+      </section>
+
+      <section className="rounded-xl border border-slate-200 bg-white">
+        <div className="border-b border-slate-200 p-5">
+          <h2 className="font-semibold text-slate-900">Attendance History</h2>
+
+          <p className="mt-1 text-sm text-slate-500">
+            Your most recent attendance records.
+          </p>
+        </div>
+
+        {loading ? (
+          <p className="p-5 text-sm text-slate-500">Loading attendance...</p>
+        ) : history.length === 0 ? (
+          <p className="p-5 text-sm text-slate-500">
+            No attendance records found.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[700px] text-left">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50">
+                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Date
+                  </th>
+                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Check In
+                  </th>
+                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Check Out
+                  </th>
+                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Worked
+                  </th>
+                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Status
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-slate-100">
+                {history.map((record) => (
+                  <tr key={record.id}>
+                    <td className="px-5 py-4">
+                      <p className="text-sm font-medium text-slate-900">
+                        {formatDate(record.attendance_date)}
+                      </p>
+                    </td>
+
+                    <td className="px-5 py-4 text-sm text-slate-700">
+                      {clockTime(record.check_in)}
+                    </td>
+
+                    <td className="px-5 py-4 text-sm text-slate-700">
+                      {clockTime(record.check_out)}
+                    </td>
+
+                    <td className="px-5 py-4 text-sm text-slate-700">
+                      {attendanceApi.formatMinutes(record.worked_minutes)}
+                    </td>
+
+                    <td className="px-5 py-4">
+                      <StatusBadge status={record.status} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {showAdjustment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <h2 className="text-lg font-semibold text-slate-900">
+                Request Attendance Correction
+              </h2>
+
+              <button
+                onClick={() => setShowAdjustment(false)}
+                disabled={actionRunning}
+                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 p-6">
+              {actionError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {actionError}
+                </div>
+              )}
+
+              <div className="rounded-lg bg-slate-50 p-4 text-sm">
+                <p className="flex items-center gap-2 font-medium text-slate-900">
+                  <CalendarDays className="h-4 w-4 text-slate-400" />
+                  {today ? formatDate(today.attendance_date) : EM_DASH}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {clockTime(today?.check_in ?? null)} –{" "}
+                  {clockTime(today?.check_out ?? null)}
+                </p>
+              </div>
+
+              <label className="block space-y-1.5">
+                <span className="text-sm font-medium text-slate-700">
+                  Reason
+                </span>
+                <textarea
+                  value={adjustmentReason}
+                  onChange={(event) => setAdjustmentReason(event.target.value)}
+                  rows={4}
+                  placeholder="Explain what needs correcting on this record..."
+                  className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                />
+              </label>
+
+              <p className="text-xs leading-5 text-slate-500">
+                An approver reviews the request and applies the corrected
+                times. Attendance records cannot be edited directly.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-slate-200 px-6 py-4">
+              <button
+                onClick={() => setShowAdjustment(false)}
+                disabled={actionRunning}
+                className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
               >
                 Cancel
               </button>
 
               <button
-                type="button"
-                disabled={!adjustmentReason.trim()}
-                onClick={() => {
-                  setShowAdjustment(false);
-                  setAdjustmentReason("");
-                  window.alert(
-                    "Demo: attendance adjustment request submitted."
-                  );
-                }}
-                className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={submitAdjustment}
+                disabled={actionRunning || !adjustmentReason.trim()}
+                className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Submit Request
+                {actionRunning ? "Submitting..." : "Submit Request"}
               </button>
             </div>
           </div>
         </div>
       )}
-
-      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-        <p className="font-medium">Development mode</p>
-
-        <p className="mt-1">
-          Clock in/out and attendance values on this screen are local demo
-          interactions. In the final integration, attendance records and
-          calculations will be controlled by the backend.
-        </p>
-      </div>
     </main>
+  );
+}
+
+function StatCard({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-5">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-slate-500">{label}</p>
+
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+          {icon}
+        </span>
+      </div>
+
+      <p className="mt-3 text-2xl font-bold text-slate-900">{value}</p>
+    </div>
+  );
+}
+
+function Detail({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">
+        {label}
+      </dt>
+      <dd className="mt-1 text-sm font-medium text-slate-900">{value}</dd>
+    </div>
   );
 }

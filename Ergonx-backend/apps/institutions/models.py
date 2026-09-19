@@ -156,6 +156,36 @@ class InstitutionMembership(TenantOwnedModel):
         return f"{self.user} @ {self.institution}"
 
 
+class InstitutionInvitation(TenantOwnedModel):
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        ACCEPTED = "ACCEPTED", "Accepted"
+        EXPIRED = "EXPIRED", "Expired"
+        REVOKED = "REVOKED", "Revoked"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="invitations")
+    email = models.EmailField()
+    role = models.ForeignKey(Role, on_delete=models.PROTECT, related_name="invitations")
+    # Present only for employee self-service invitations.  Keeping the link on
+    # the invitation makes acceptance unambiguous and prevents an accepted
+    # account from being attached to the wrong employee record.
+    employee = models.ForeignKey(
+        "employees.Employee",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="self_service_invitations",
+    )
+    token_hash = models.CharField(max_length=128, unique=True)
+    invited_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="institution_invitations")
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    expires_at = models.DateTimeField()
+    accepted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [models.Index(fields=("institution", "email", "status"))]
+
+
 class InstitutionModule(TenantOwnedModel):
     class ModuleCode(models.TextChoices):
         CORE_HR = "CORE_HR", "Core HR"
@@ -283,6 +313,9 @@ class InstitutionOnboardingStep(TenantOwnedModel):
     blocker_code = models.CharField(max_length=100, blank=True)
     blocker_message = models.TextField(blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
+    # Distinguishes a deliberate administrator deferral from a step that was
+    # automatically skipped because its module was disabled.
+    is_admin_skipped = models.BooleanField(default=False)
 
     class Meta:
         ordering = ("sequence", "created_at")

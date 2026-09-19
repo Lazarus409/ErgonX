@@ -2,6 +2,7 @@
 
 Employee lifecycle actions are server-owned:
 
+- `GET /api/v1/employees/{id}/lifecycle/`
 - `POST /api/v1/employees/{id}/onboarding/start/`
 - `POST /api/v1/employees/{id}/onboarding/complete/`
 - `POST /api/v1/employees/{id}/offboarding/start/` (optional `last_working_day`, `reason`, `notes`)

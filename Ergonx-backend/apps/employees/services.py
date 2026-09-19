@@ -5,7 +5,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.audit.services import record_audit_event
-from apps.employees.models import Employee, EmployeeOffboarding, EmployeeOnboarding, Employment
+from apps.employees.models import EmergencyContact, Employee, EmployeeOffboarding, EmployeeOnboarding, Employment
 from apps.institutions.models import InstitutionMembership
 from apps.institutions.services import update_membership
 
@@ -59,6 +59,43 @@ def change_current_employment(*, institution, employee, start_date, **values):
     employment.full_clean()
     employment.save()
     return employment
+
+
+@transaction.atomic
+def save_emergency_contact(*, institution, employee, instance=None, **values):
+    """Creates or updates one tenant-scoped emergency contact safely.
+
+    The database permits one primary contact per employee. Demoting the
+    previous primary inside this transaction makes the API convenient for the
+    profile UI without weakening that invariant or exposing cross-tenant data.
+    """
+    locked_employee = Employee.objects.select_for_update().get(pk=employee.pk)
+    if locked_employee.institution_id != institution.id:
+        raise ValidationError({"employee": "Employee belongs to another institution."})
+
+    contact = instance or EmergencyContact(
+        institution=institution,
+        employee=locked_employee,
+    )
+    for field, value in values.items():
+        setattr(contact, field, value)
+    contact.institution = institution
+    contact.employee = locked_employee
+
+    if contact.is_primary:
+        list(
+            EmergencyContact.objects.select_for_update()
+            .filter(employee=locked_employee, is_primary=True)
+            .exclude(pk=contact.pk)
+        )
+        EmergencyContact.objects.filter(
+            employee=locked_employee,
+            is_primary=True,
+        ).exclude(pk=contact.pk).update(is_primary=False)
+
+    contact.full_clean()
+    contact.save()
+    return contact
 
 
 @transaction.atomic
@@ -161,3 +198,26 @@ def complete_employee_offboarding(*, institution, employee, actor):
     offboarding.save(update_fields=("status", "completed_at", "last_working_day", "updated_at"))
     record_audit_event(actor=actor, institution=institution, entity=offboarding, action="employee.offboarding.completed")
     return offboarding
+
+
+@transaction.atomic
+def rehire_employee(*, institution, employee, actor, department, position, grade, location, employment_type, staff_category, start_date):
+    locked_employee = Employee.objects.select_for_update().get(pk=employee.pk)
+    if locked_employee.institution_id != institution.id:
+        raise ValidationError({"employee": "Employee belongs to another institution."})
+    if locked_employee.status not in (Employee.Status.TERMINATED, Employee.Status.INACTIVE):
+        raise ValidationError({"employee": "Only terminated or inactive employees can be rehired."})
+    if Employment.objects.select_for_update().filter(employee=locked_employee, is_current=True).exists():
+        raise ValidationError({"employee": "Employee already has a current employment record."})
+    employment = Employment(institution=institution, employee=locked_employee, department=department, position=position, grade=grade, location=location, employment_type=employment_type, staff_category=staff_category, start_date=start_date, status=Employment.Status.ACTIVE, is_current=True)
+    employment.full_clean()
+    employment.save()
+    locked_employee.status = Employee.Status.ACTIVE
+    locked_employee.save(update_fields=("status", "updated_at"))
+    if locked_employee.user_id:
+        membership = InstitutionMembership.objects.filter(institution=institution, user=locked_employee.user).first()
+        if membership and membership.status == InstitutionMembership.Status.INACTIVE:
+            update_membership(membership=membership, institution=institution, actor=actor, status=InstitutionMembership.Status.INVITED)
+    onboarding = EmployeeOnboarding.objects.create(institution=institution, employee=locked_employee, status=EmployeeOnboarding.Status.IN_PROGRESS, started_at=timezone.now(), notes="Rehire onboarding started.")
+    record_audit_event(actor=actor, institution=institution, entity=employment, action="employee.rehired", metadata={"employee_id": str(locked_employee.id), "start_date": str(start_date)})
+    return employment, onboarding

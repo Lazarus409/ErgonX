@@ -201,6 +201,7 @@ class EmergencyContact(TenantOwnedModel):
     phone = models.CharField(max_length=30)
     alternate_phone = models.CharField(max_length=30, blank=True)
     email = models.EmailField(blank=True)
+    address = models.CharField(max_length=300, blank=True)
     is_primary = models.BooleanField(default=False)
 
     class Meta:

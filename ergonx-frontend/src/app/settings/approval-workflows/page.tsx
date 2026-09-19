@@ -1,0 +1,10 @@
+"use client";
+import { useCallback } from "react";
+import EmptyState from "@/components/ui/EmptyState";
+import ErrorState from "@/components/ui/ErrorState";
+import LoadingState from "@/components/ui/LoadingState";
+import PageHeader from "@/components/ui/PageHeader";
+import StatusBadge from "@/components/ui/StatusBadge";
+import { workflowsApi } from "@/lib/api";
+import { useApiResource } from "@/lib/useApiResource";
+export default function ApprovalWorkflowSettingsPage() { const load = useCallback(() => workflowsApi.listApprovalWorkflows(), []); const { data, loading, error, reload } = useApiResource(load); if (loading) return <LoadingState />; if (error || !data) return <ErrorState message={error ?? "You may not have permission to view approval workflows."} onRetry={reload} />; return <div className="space-y-6"><PageHeader title="Approval Workflows" description="Review institution approval workflow definitions. Creation and step configuration can follow once the workflow setup experience is specified." /><div className="rounded-2xl border border-slate-200 bg-white">{data.results.length === 0 ? <EmptyState title="No approval workflows" description="Configured workflows will appear here." /> : <div className="divide-y divide-slate-100">{data.results.map((workflow) => <div key={workflow.id} className="flex items-center gap-4 p-5"><div className="min-w-0 flex-1"><p className="font-medium text-slate-950">{workflow.name}</p><p className="mt-1 text-sm text-slate-500">{workflow.workflow_type} · {workflow.entity_type}</p></div><StatusBadge status={workflow.is_active ? "ACTIVE" : "INACTIVE"} /></div>)}</div>}</div></div>; }

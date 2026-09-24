@@ -17,6 +17,7 @@ import type {
   HrDashboard,
   LeaveDashboard,
   PayrollDashboard,
+  RecruitmentDashboard,
 } from "@/types/dashboards";
 
 export async function getExecutiveDashboard(): Promise<ExecutiveDashboard> {
@@ -38,6 +39,8 @@ export async function getAttendanceDashboard(): Promise<AttendanceDashboard> {
 export async function getPayrollDashboard(): Promise<PayrollDashboard> {
   return apiGet<PayrollDashboard>("/dashboards/payroll/");
 }
+
+export async function getRecruitmentDashboard(): Promise<RecruitmentDashboard> { return apiGet<RecruitmentDashboard>("/dashboards/recruitment/"); }
 
 /** Used by the accounting dashboard screen. */
 export async function getFinanceDashboard(): Promise<FinanceDashboard> {

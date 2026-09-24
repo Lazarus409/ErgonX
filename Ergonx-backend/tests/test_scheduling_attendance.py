@@ -17,7 +17,7 @@ from apps.attendance.services import (
     request_adjustment,
 )
 from apps.employees.models import Employment
-from apps.institutions.models import InstitutionModule
+from apps.institutions.models import InstitutionModule, UserActivityEvent
 from apps.leave.models import LeaveRequest, LeaveType
 from apps.scheduling.models import (
     FlexibleWorkRule,
@@ -384,6 +384,12 @@ def test_schedule_aware_attendance_and_approval_flow(
         reason="Clock-in correction",
         proposed_values={"check_in": "2026-09-14T09:00:00+00:00"},
     )
+    assert UserActivityEvent.objects.filter(
+        institution=institution,
+        user=employee_user,
+        activity_code="attendance.adjust",
+        entity_id=adjustment.id,
+    ).count() == 1
     adjustment = decide_adjustment(
         adjustment=adjustment, actor=hr, approve=True
     )

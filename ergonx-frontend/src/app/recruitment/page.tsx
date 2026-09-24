@@ -4,6 +4,7 @@ import { BriefcaseBusiness, CalendarDays, ClipboardCheck, FileText, Handshake, U
 import PageHeader from "@/components/ui/PageHeader";
 
 const areas = [
+  { title: "Recruitment Dashboard", description: "Review open jobs, applications, interviews, offers, and pipeline distribution.", href: "/recruitment/dashboard", icon: BriefcaseBusiness },
   { title: "Job Postings", description: "Create, publish, close, and monitor open roles.", href: "/recruitment/job-postings", icon: BriefcaseBusiness },
   { title: "Candidates", description: "Maintain candidate records and recruitment sources.", href: "/recruitment/candidates", icon: UsersRound },
   { title: "Recruitment Pipeline", description: "See application volume by the server-defined hiring stage.", href: "/recruitment/pipeline", icon: Workflow },

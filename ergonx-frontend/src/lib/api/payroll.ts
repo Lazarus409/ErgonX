@@ -3,6 +3,7 @@
 import { apiAction, apiDelete, apiGet, apiGetList, apiPatch, apiPost } from "./client";
 import type { ListParams, PaginatedData } from "@/types/api";
 import type {
+  EmployeePayrollProfile,
   PayrollPeriod,
   Payslip,
   PayrollConfiguration,
@@ -37,6 +38,10 @@ export async function createPayrollConfiguration(payload: Omit<PayrollConfigurat
 export async function updatePayrollConfiguration(id: string, payload: Partial<Omit<PayrollConfiguration, "id" | "configured_at">>): Promise<PayrollConfiguration> { return apiPatch<PayrollConfiguration, typeof payload>(`/payroll-configurations/${id}/`, payload); }
 export async function listContributionRules(params?: ListParams & { preset_version?: string }): Promise<PaginatedData<ContributionRule>> { return apiGetList<ContributionRule>("/contribution-rules/", params); }
 export async function listStatutoryThresholds(params?: ListParams & { preset_version?: string }): Promise<PaginatedData<StatutoryThreshold>> { return apiGetList<StatutoryThreshold>("/statutory-thresholds/", params); }
+export type EmployeePayrollProfilePayload = Pick<EmployeePayrollProfile, "employee" | "tax_residency" | "tax_identification_number">;
+export async function listEmployeePayrollProfiles(params?: ListParams & { employee?: string; tax_residency?: string }): Promise<PaginatedData<EmployeePayrollProfile>> { return apiGetList<EmployeePayrollProfile>("/employee-payroll-profiles/", params); }
+export async function createEmployeePayrollProfile(payload: EmployeePayrollProfilePayload): Promise<EmployeePayrollProfile> { return apiPost<EmployeePayrollProfile, EmployeePayrollProfilePayload>("/employee-payroll-profiles/", payload); }
+export async function updateEmployeePayrollProfile(id: string, payload: Partial<EmployeePayrollProfilePayload>): Promise<EmployeePayrollProfile> { return apiPatch<EmployeePayrollProfile, Partial<EmployeePayrollProfilePayload>>(`/employee-payroll-profiles/${id}/`, payload); }
 
 export async function createPayrollPeriod(payload: {
   name: string;

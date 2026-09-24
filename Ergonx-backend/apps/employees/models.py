@@ -23,12 +23,12 @@ class Employee(TenantOwnedModel):
     institution = models.ForeignKey(
         Institution, on_delete=models.CASCADE, related_name="employees"
     )
-    user = models.OneToOneField(
+    user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         null=True,
         blank=True,
-        related_name="employee_profile",
+        related_name="employee_profiles",
     )
     employee_number = models.CharField(max_length=50)
     first_name = models.CharField(max_length=100)
@@ -37,6 +37,7 @@ class Employee(TenantOwnedModel):
     personal_email = models.EmailField(blank=True)
     work_email = models.EmailField(blank=True)
     phone = models.CharField(max_length=30, blank=True)
+    avatar_key = models.CharField(max_length=40, blank=True, default="")
     date_of_birth = models.DateField(null=True, blank=True)
     gender = models.CharField(
         max_length=20,

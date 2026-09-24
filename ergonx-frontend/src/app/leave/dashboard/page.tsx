@@ -135,56 +135,22 @@ export default function LeaveDashboardPage() {
         />
       </div>
 
-      {/* Institution-wide utilisation and balance totals await dedicated API endpoints. */}
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-xl border border-slate-200 bg-white p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-500">
-                Leave Utilisation
-              </p>
-
-              <p className="mt-2 text-3xl font-semibold text-slate-900">
-                {EM_DASH}
-              </p>
-            </div>
-
-            <div className="rounded-lg bg-slate-100 p-3">
-              <CalendarDays className="h-5 w-5 text-slate-600" />
-            </div>
-          </div>
-
-          <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100" />
-
-          <p className="mt-2 text-xs text-slate-500">
-            Institution-wide utilisation is not yet reported by the API.
-          </p>
+          <h2 className="font-semibold text-slate-900">Monthly leave activity</h2>
+          <p className="mt-1 text-sm text-slate-500">Approved leave starting in each of the last six calendar months.</p>
+          <MonthlyLeaveTrend points={data?.rollup.monthly_approved_leave ?? []} loading={loading} />
         </section>
 
         <section className="rounded-xl border border-slate-200 bg-white p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-slate-500">
-                Balance Summary
-              </p>
-
-              <p className="mt-2 text-3xl font-semibold text-slate-900">
-                {EM_DASH}
-              </p>
-            </div>
-
-            <div className="rounded-lg bg-slate-100 p-3">
-              <ClipboardList className="h-5 w-5 text-slate-600" />
-            </div>
-          </div>
-
-          <p className="mt-5 text-xs text-slate-500">
-            Per-employee balances are available on the employee leave screens.
-            An institution-wide total is not yet reported by the API.
-          </p>
+          <h2 className="font-semibold text-slate-900">Approved leave by type</h2>
+          <p className="mt-1 text-sm text-slate-500">Approved request volume and requested days by leave type.</p>
+          <LeaveTypeDistribution items={data?.rollup.by_leave_type ?? []} loading={loading} />
         </section>
 
       </div>
+
+      <LeaveBalanceUtilisation summary={data?.rollup.balance_utilisation} loading={loading} />
 
       <section className="rounded-xl border border-slate-200 bg-white">
         <div className="flex flex-col gap-3 border-b border-slate-200 p-5 sm:flex-row sm:items-center sm:justify-between">
@@ -283,3 +249,7 @@ export default function LeaveDashboardPage() {
     </main>
   );
 }
+
+function MonthlyLeaveTrend({ points, loading }: { points: LeaveDashboard["monthly_approved_leave"]; loading: boolean }) { if (loading) return <p className="flex h-48 items-center justify-center text-sm text-slate-500">Loading leave activity…</p>; const maximum = Math.max(...points.map((point) => Number(point.requested_days)), 1); return <div className="mt-6 flex h-48 items-end gap-3" aria-label="Approved leave days by month">{points.map((point) => <div key={point.month} className="flex min-w-0 flex-1 flex-col justify-end gap-2"><span className="text-center text-xs font-medium text-slate-600">{formatNumber(Number(point.requested_days))}</span><div className="rounded-t-lg bg-gradient-to-t from-teal-600 to-cyan-300" style={{ height: `${Math.max((Number(point.requested_days) / maximum) * 100, Number(point.requested_days) ? 4 : 2)}%` }} title={`${point.request_count} approved requests, ${point.requested_days} requested days`} /><span className="text-center text-[10px] text-slate-500">{new Intl.DateTimeFormat(undefined, { month: "short" }).format(new Date(`${point.month}T00:00:00`))}</span></div>)}</div>; }
+function LeaveTypeDistribution({ items, loading }: { items: LeaveDashboard["by_leave_type"]; loading: boolean }) { if (loading) return <p className="flex h-48 items-center justify-center text-sm text-slate-500">Loading leave distribution…</p>; if (!items.length) return <p className="flex h-48 items-center justify-center text-center text-sm text-slate-500">No approved leave is available yet.</p>; const maximum = Math.max(...items.map((item) => Number(item.requested_days)), 1); return <div className="mt-6 space-y-4">{items.map((item) => <div key={item.leave_type__name}><div className="mb-1.5 flex justify-between gap-3 text-sm"><span className="truncate text-slate-600">{item.leave_type__name}</span><span className="font-semibold text-slate-950">{formatNumber(Number(item.requested_days))} days</span></div><div className="h-2.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-teal-500" style={{ width: `${Math.max((Number(item.requested_days) / maximum) * 100, 3)}%` }} /></div><p className="mt-1 text-xs text-slate-500">{formatNumber(item.request_count)} approved requests</p></div>)}</div>; }
+function LeaveBalanceUtilisation({ summary, loading }: { summary: LeaveDashboard["balance_utilisation"] | undefined; loading: boolean }) { if (loading) return <section className="rounded-xl border border-slate-200 bg-white p-5"><h2 className="font-semibold text-slate-900">Leave balance utilisation</h2><p className="mt-5 text-sm text-slate-500">Loading current-year balances…</p></section>; if (!summary || Number(summary.entitlement_days) <= 0) return <section className="rounded-xl border border-slate-200 bg-white p-5"><h2 className="font-semibold text-slate-900">Leave balance utilisation</h2><p className="mt-1 text-sm text-slate-500">Current-year granted balance used across employee leave balances.</p><p className="mt-5 text-sm text-slate-500">No positive current-year leave entitlement is available to calculate utilisation.</p></section>; const percentage = Number(summary.utilisation_percent); return <section className="rounded-xl border border-slate-200 bg-white p-5"><div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-end"><div><h2 className="font-semibold text-slate-900">Leave balance utilisation</h2><p className="mt-1 text-sm text-slate-500">Current-year granted balance used across employee leave balances.</p></div><span className="text-xs text-slate-500">{summary.year}</span></div><div className="mt-6 grid gap-4 sm:grid-cols-3"><div><p className="text-xs uppercase tracking-wide text-slate-500">Entitlement</p><p className="mt-1 text-2xl font-semibold text-slate-950">{formatNumber(Number(summary.entitlement_days))} days</p></div><div><p className="text-xs uppercase tracking-wide text-slate-500">Used</p><p className="mt-1 text-2xl font-semibold text-teal-700">{formatNumber(Number(summary.used_days))} days</p></div><div><p className="text-xs uppercase tracking-wide text-slate-500">Available</p><p className="mt-1 text-2xl font-semibold text-slate-950">{formatNumber(Number(summary.available_days))} days</p></div></div><div className="mt-5"><div className="mb-2 flex justify-between gap-3 text-sm"><span className="text-slate-600">Utilisation</span><span className="font-semibold text-slate-950">{formatNumber(percentage)}%</span></div><div className="h-3 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-gradient-to-r from-teal-600 to-cyan-400" style={{ width: `${Math.min(Math.max(percentage, 0), 100)}%` }} /></div></div></section>; }

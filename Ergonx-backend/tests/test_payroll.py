@@ -20,7 +20,7 @@ from apps.accounting.models import (
 from apps.accounting.services import approve_journal, generate_payroll_journal, post_journal, submit_journal
 from apps.documents.models import Document
 from apps.employees.models import Employment
-from apps.institutions.models import InstitutionModule, Permission
+from apps.institutions.models import InstitutionModule, Permission, UserActivityEvent
 from apps.payroll.models import (
     ComplianceDeadline,
     ContributionRule,
@@ -575,6 +575,12 @@ def test_generic_payroll_calculation_lifecycle_snapshot_and_immutability(
         idempotency_key="sept-2026-v1",
     )
     assert retry.id == run.id
+    assert UserActivityEvent.objects.filter(
+        institution=institution,
+        user=hr,
+        activity_code="payroll.prepare",
+        entity_id=run.id,
+    ).count() == 1
     assert run.statutory_snapshot["version"]["version_code"] == "TEST-2026.1"
     assert run.statutory_snapshot["relief_definitions"][0]["code"] == "TRAINING"
     assert run.statutory_snapshot["compliance_deadlines"][0]["code"] == "PAYE_RETURN"
@@ -614,6 +620,16 @@ def test_generic_payroll_calculation_lifecycle_snapshot_and_immutability(
     assert payslip_response.status_code == 200
     assert payslip_response.data["payload"]["net_pay"] == "2550.00"
     assert len(payslip_response.data["payload"]["items"]) == 4
+    assert payslip_response.data["payroll_period"] == {
+        "id": str(period.id),
+        "name": period.name,
+        "start_date": period.start_date.isoformat(),
+        "end_date": period.end_date.isoformat(),
+        "pay_date": period.pay_date.isoformat(),
+        "status": period.status,
+        "created_at": payslip_response.data["payroll_period"]["created_at"],
+        "updated_at": payslip_response.data["payroll_period"]["updated_at"],
+    }
 
     payslip = record.payslip
     document = Document.objects.create(
@@ -783,6 +799,16 @@ def test_only_approved_overtime_and_adjustments_feed_calculation(
         "after": {"status": PayrollAdjustment.Status.APPLIED},
         "payroll_run_id": str(run.id),
     }
+    assert UserActivityEvent.objects.filter(
+        institution=institution,
+        entity_id=adjustment.id,
+        activity_code="payroll.adjustment",
+    ).count() == 2
+    assert UserActivityEvent.objects.filter(
+        institution=institution,
+        entity_id=adjustment.id,
+        activity_code="payroll.adjustment.review",
+    ).count() == 1
 
 
 def test_progressive_tax_bands_are_calculated_in_sequence(

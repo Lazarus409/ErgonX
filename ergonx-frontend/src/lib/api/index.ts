@@ -21,6 +21,7 @@ export {
   apiGetList,
   apiPatch,
   apiPost,
+  apiPostMultipart,
   apiPut,
   buildParams,
   clearAuthTokens,
@@ -30,6 +31,7 @@ export {
   getApiErrorMessage,
   getInstitutionId,
   getRefreshToken,
+  hasSessionHint,
   fetchAllPages,
   isApiRequestError,
   isInstitutionSelector,
@@ -40,8 +42,10 @@ export {
 } from "./client";
 
 export * as attendanceApi from "./attendance";
+export * as auditApi from "./audit";
 export * as accountingApi from "./accounting";
 export * as authApi from "./auth";
+export { beginMFASetup, confirmMFASetup, disableMFA, getMFAStatus, setMFAMethod } from "./auth";
 export * as dashboardsApi from "./dashboards";
 export * as employeesApi from "./employees";
 export * as institutionsApi from "./institutions";
@@ -55,3 +59,5 @@ export * as schedulingApi from "./scheduling";
 export * as searchApi from "./search";
 export * as workflowsApi from "./workflows";
 export * as operationsApi from "./operations";
+export * as notificationsApi from "./notifications";
+export * as imagesApi from "./images";

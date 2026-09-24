@@ -10,10 +10,12 @@ import {
   employeesApi,
   getApiErrorMessage,
   leaveApi,
+  operationsApi,
 } from "@/lib/api";
 import { MAX_PAGE_SIZE } from "@/types/api";
 import type { Employee } from "@/types/hr";
 import type { LeaveType } from "@/types/leave";
+import type { DocumentRecord } from "@/types/operations";
 
 export default function RequestLeavePage() {
   const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
@@ -24,6 +26,9 @@ export default function RequestLeavePage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [reason, setReason] = useState("");
+  const [attachment, setAttachment] = useState<DocumentRecord | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -97,6 +102,12 @@ export default function RequestLeavePage() {
       return;
     }
 
+    const selectedLeaveType = leaveTypes.find((type) => type.id === leaveType);
+    if (selectedLeaveType?.requires_attachment && !attachment) {
+      setError("A supporting document is required for this leave type.");
+      return;
+    }
+
     const days = calculateDays();
 
     if (days <= 0) {
@@ -116,6 +127,7 @@ export default function RequestLeavePage() {
         end_date: endDate,
         requested_days: days,
         reason,
+        attachment: attachment?.id ?? null,
       });
 
       await leaveApi.submitLeaveRequest(created.id);
@@ -128,7 +140,31 @@ export default function RequestLeavePage() {
     } finally {
       setSaving(false);
     }
-  }, [employee, leaveType, startDate, endDate, reason, calculateDays]);
+  }, [employee, leaveType, leaveTypes, startDate, endDate, reason, attachment, calculateDays]);
+
+  const selectedLeaveType = leaveTypes.find((type) => type.id === leaveType);
+  const selectAttachment = async (file: File | undefined) => {
+    if (!file) return;
+    setError("");
+    if (!["application/pdf", "image/jpeg", "image/png"].includes(file.type)) {
+      setError("Supporting documents must be PDF, JPEG, or PNG files.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setError("Supporting documents must be 10 MB or smaller.");
+      return;
+    }
+    setUploading(true);
+    setUploadProgress(0);
+    try {
+      const uploaded = await operationsApi.uploadDocument(file, { category: "LEAVE_SUPPORTING", classification: "CONFIDENTIAL" }, setUploadProgress);
+      setAttachment(uploaded);
+    } catch (caught) {
+      setError(getApiErrorMessage(caught));
+    } finally {
+      setUploading(false);
+    }
+  };
 
   if (submitted) {
     return (
@@ -234,6 +270,15 @@ export default function RequestLeavePage() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <label htmlFor="leave-supporting-document" className="mb-1.5 block text-sm font-medium text-slate-700">
+                Supporting Document{selectedLeaveType?.requires_attachment ? " *" : " (optional)"}
+              </label>
+              <p className="mb-2 text-xs text-slate-500">PDF, JPEG, or PNG up to 10 MB. The document is stored in your institution&apos;s protected document area.</p>
+              {attachment ? <div className="flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm"><span className="min-w-0 truncate text-emerald-900">{attachment.original_filename}</span><button type="button" onClick={() => setAttachment(null)} className="shrink-0 font-medium text-emerald-800 underline">Remove</button></div> : <input id="leave-supporting-document" type="file" accept="application/pdf,image/jpeg,image/png" onChange={(event) => void selectAttachment(event.target.files?.[0])} disabled={uploading} className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm" />}
+              {uploading && <div className="mt-2" aria-live="polite"><div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full bg-sky-600 transition-all" style={{ width: `${uploadProgress}%` }} /></div><p className="mt-1 text-xs text-slate-500">Uploading… {uploadProgress}%</p></div>}
             </div>
 
             <div className="grid gap-5 sm:grid-cols-2">

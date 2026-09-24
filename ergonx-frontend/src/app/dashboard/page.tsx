@@ -6,137 +6,63 @@ import { useCallback } from "react";
 import ErrorState from "@/components/ui/ErrorState";
 import { dashboardsApi } from "@/lib/api";
 import { useApiResource } from "@/lib/useApiResource";
+import { EM_DASH, formatAmount, formatDate, formatNumber } from "@/lib/format";
 import { useAuth } from "@/components/guards/AuthProvider";
-import { EM_DASH, formatAmount, formatNumber } from "@/lib/format";
+import { hasModule } from "@/types/institutions";
 
 /**
- * Executive dashboard.
- *
- * Reads `GET /api/v1/dashboards/executive/`, which requires the
- * `dashboard.executive.view` permission. Every figure shown here comes from
- * that single response; nothing is derived in the browser.
+ * Organization-wide dashboard. Every metric and chart is sourced from the
+ * tenant-scoped executive rollup; no demo values are manufactured here.
  */
 export default function DashboardPage() {
-  const { user } = useAuth();
   const load = useCallback(() => dashboardsApi.getExecutiveDashboard(), []);
   const { data, loading, error, reload } = useApiResource(load);
-
+  const { institution } = useAuth();
+  const enabled = (module: string) => hasModule(institution?.enabledModules, module);
   const placeholder = loading ? "…" : EM_DASH;
-
   const stats = [
-    {
-      title: "Workforce",
-      value: data ? formatNumber(data.total_employees) : placeholder,
-      description: "Total employee records",
-      icon: Users,
-    },
-    {
-      title: "Active Employees",
-      value: data ? formatNumber(data.active_employees) : placeholder,
-      description: "Currently active",
-      icon: UserCheck,
-    },
-    {
-      title: "Leave",
-      value: data ? formatNumber(data.pending_leave_requests) : placeholder,
-      description: "Pending requests",
-      icon: CalendarDays,
-    },
-    {
-      title: "Payroll",
-      value: data ? formatAmount(data.payroll_cost) : placeholder,
-      description: "Finalized gross pay",
-      icon: WalletCards,
-    },
-  ];
+    { title: "Workforce", value: data ? formatNumber(data.total_employees) : placeholder, description: "Total employee records", icon: Users },
+    { title: "Active employees", value: data ? formatNumber(data.active_employees) : placeholder, description: "Currently active", icon: UserCheck },
+    { title: "Pending leave", value: data ? formatNumber(data.pending_leave_requests) : placeholder, description: "Awaiting a decision", icon: CalendarDays },
+    { title: "Finalized payroll", value: data ? formatAmount(data.payroll_cost) : placeholder, description: "Gross pay across finalized runs", icon: WalletCards },
+  ].filter((stat) => stat.title === "Workforce" || (stat.title === "Active employees" ? enabled("HR") : stat.title === "Pending leave" ? enabled("LEAVE") : enabled("PAYROLL")));
+  const statusTotal = data?.by_status.reduce((total, item) => total + item.count, 0) ?? 0;
 
-  return (
-    <div className="space-y-8">
-      <section className="rounded-2xl bg-slate-950 p-6 text-white sm:p-8"><p className="text-sm font-medium text-slate-300">Executive dashboard</p><h2 className="mt-2 text-3xl font-semibold tracking-tight">Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, {user?.firstName ?? "there"}.</h2><p className="mt-2 text-sm text-slate-300">Monitor workforce, attendance, leave, payroll, and financial activity across your institution.</p></section>
+  return <div className="mx-auto max-w-7xl space-y-6">
+    <section className="overflow-hidden rounded-2xl bg-slate-950 px-6 py-7 text-white shadow-sm sm:px-8">
+      <p className="text-sm font-medium text-sky-200">{data?.executive_title ?? "Executive"} dashboard</p>
+      <div className="mt-2 flex flex-col justify-between gap-3 sm:flex-row sm:items-end"><div><h1 className="text-3xl font-semibold tracking-tight">Organization overview</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">A live, institution-wide view of workforce, payroll, attendance, approvals, and financial exposure.</p></div><span className="inline-flex w-fit items-center rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-slate-200">{loading ? "Refreshing data" : "Live tenant data"}</span></div>
+    </section>
 
-      {error && <ErrorState message={error} onRetry={reload} />}
+    {error && <ErrorState title="Unable to load executive dashboard" message={error} onRetry={reload} />}
 
-      {/* KPI cards */}
-      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-        {stats.map((stat) => {
-          const Icon = stat.icon;
+    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Key performance indicators">
+      {stats.map((stat) => { const Icon = stat.icon; return <article key={stat.title} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100"><Icon size={19} className="text-slate-700" /></span><span className="text-xs text-slate-400">{loading ? "Loading" : "Current"}</span></div><p className="mt-5 text-sm font-medium text-slate-500">{stat.title}</p><p className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">{stat.value}</p><p className="mt-1 text-xs text-slate-400">{stat.description}</p></article>; })}
+    </section>
 
-          return (
-            <div
-              key={stat.title}
-              className="rounded-xl border border-slate-200 bg-white p-5"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
-                  <Icon size={19} className="text-slate-700" />
-                </div>
+    {enabled("ACCOUNTING") && <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Financial summary"><ExecutiveMetric label="Revenue" value={(data?.profit_and_loss_trend ?? []).at(-1)?.income} currency={data?.currency} tone="text-emerald-700" /><ExecutiveMetric label="Expenses" value={(data?.profit_and_loss_trend ?? []).at(-1)?.expenses} currency={data?.currency} tone="text-rose-700" /><ExecutiveMetric label="Net result" value={(data?.profit_and_loss_trend ?? []).at(-1)?.net_income} currency={data?.currency} tone="text-indigo-700" /><ExecutiveMetric label="Net cash movement" value={(data?.cash_flow_trend ?? []).at(-1)?.net_movement} currency={data?.currency} tone="text-sky-700" /></section>}
 
-                <span className="text-xs text-slate-400">
-                  {loading ? "Loading" : "Live data"}
-                </span>
-              </div>
+    {enabled("PAYROLL") && <section className="grid gap-5 xl:grid-cols-5">
+      <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm xl:col-span-3"><SectionHeading title="Payroll trend" description="Gross pay by finalized payroll period." />{data ? <PayrollBars points={data.payroll_by_period ?? []} /> : <LoadingCopy loading={loading} label="payroll trend" />}</article>
+      <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm xl:col-span-2"><SectionHeading title="Workforce composition" description="Employee records by current status." />{data ? <StatusBars items={data.by_status} total={statusTotal} /> : <LoadingCopy loading={loading} label="workforce composition" />}</article>
+    </section>}
 
-              <p className="mt-5 text-sm text-slate-500">{stat.title}</p>
+    <section className="grid gap-5 lg:grid-cols-2 xl:grid-cols-4">
+      {enabled("ATTENDANCE") && <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"><SectionHeading title="Attendance today" description="Recorded attendance for today." />{data?.attendance_today ? <div className="mt-5 grid grid-cols-2 gap-3"><SmallMetric label="Present" value={data.attendance_today.present} tone="bg-emerald-500" /><SmallMetric label="Late" value={data.attendance_today.late} tone="bg-amber-500" /><SmallMetric label="Absent" value={data.attendance_today.absent} tone="bg-rose-500" /><SmallMetric label="On leave" value={data.attendance_today.on_leave} tone="bg-sky-500" /></div> : <LoadingCopy loading={loading} label="attendance" />}</article>}
+      {enabled("ACCOUNTING") && <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"><SectionHeading title="Financial position" description="Outstanding operational balances and registered-bank ledger balance." />{data?.financial_position ? <dl className="mt-5 space-y-3"><ValueRow label="Bank balance" value={formatAmount(data.financial_position.bank_balance)} /><ValueRow label="Accounts receivable" value={formatAmount(data.financial_position.accounts_receivable)} /><ValueRow label="Accounts payable" value={formatAmount(data.financial_position.accounts_payable)} /><ValueRow label="Posted expenses" value={formatAmount(data.financial_position.posted_expenses)} /><ValueRow label="Active bank accounts" value={formatNumber(data.financial_position.registered_bank_accounts)} /></dl> : <LoadingCopy loading={loading} label="financial position" />}</article>}
+      <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"><SectionHeading title="Approvals requiring attention" description="Items waiting in governed workflows." />{data ? <dl className="mt-5 space-y-3"><ValueRow label="Leave requests" value={formatNumber(data.pending_leave_requests)} /><ValueRow label="Journal entries" value={formatNumber(data.pending_journals)} /></dl> : <LoadingCopy loading={loading} label="approvals" />}</article>
+      {enabled("RECRUITMENT") && <article className="rounded-2xl border border-violet-100 bg-white p-6 shadow-sm"><SectionHeading title="Recruitment activity" description="Live hiring activity across the institution." />{data?.recruitment_summary ? <dl className="mt-5 space-y-3"><ValueRow label="Open roles" value={formatNumber(data.recruitment_summary.open_jobs)} /><ValueRow label="Active candidates" value={formatNumber(data.recruitment_summary.active_candidates)} /><ValueRow label="Applications" value={formatNumber(data.recruitment_summary.applications)} /><ValueRow label="Scheduled interviews" value={formatNumber(data.recruitment_summary.scheduled_interviews)} /><ValueRow label="Offers extended" value={formatNumber(data.recruitment_summary.offers_extended)} /></dl> : <LoadingCopy loading={loading} label="recruitment activity" />}</article>}
+    </section>
 
-              <p className="mt-1 text-2xl font-semibold text-slate-950">
-                {stat.value}
-              </p>
-
-              <p className="mt-1 text-xs text-slate-400">{stat.description}</p>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Dashboard sections */}
-      <div className="grid gap-5 lg:grid-cols-2">
-        <section className="rounded-xl border border-slate-200 bg-white p-6">
-          <h3 className="font-semibold text-slate-950">
-            Approvals Requiring Attention
-          </h3>
-
-          {data ? (
-            <dl className="mt-4 space-y-3">
-              <div className="flex items-center justify-between rounded-lg bg-slate-50 px-4 py-3">
-                <dt className="text-sm text-slate-600">
-                  Leave requests pending approval
-                </dt>
-                <dd className="text-sm font-semibold text-slate-900">
-                  {formatNumber(data.pending_leave_requests)}
-                </dd>
-              </div>
-
-              <div className="flex items-center justify-between rounded-lg bg-slate-50 px-4 py-3">
-                <dt className="text-sm text-slate-600">
-                  Journals pending approval
-                </dt>
-                <dd className="text-sm font-semibold text-slate-900">
-                  {formatNumber(data.pending_journals)}
-                </dd>
-              </div>
-            </dl>
-          ) : (
-            <p className="mt-2 text-sm text-slate-500">
-              {loading
-                ? "Loading approval counts..."
-                : "Approval data is unavailable."}
-            </p>
-          )}
-        </section>
-
-        {/*
-          Compliance alerts have no executive-dashboard endpoint. Ghana
-          compliance reminders are exposed under the Accounting module and are
-          connected in a later phase, so this stays a placeholder.
-        */}
-        <section className="rounded-xl border border-slate-200 bg-white p-6">
-          <h3 className="font-semibold text-slate-950">Compliance Alerts</h3>
-
-          <p className="mt-2 text-sm text-slate-500">
-            Compliance alerts will appear here when available.
-          </p>
-        </section>
-      </div>
-    </div>
-  );
+    {enabled("ACCOUNTING") && <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><SectionHeading title="Financial performance" description="Compact monthly revenue, expenses, and net result from posted ledger entries." />{data ? <ExecutiveFinancialChart points={data.profit_and_loss_trend ?? []} currency={data.currency} /> : <LoadingCopy loading={loading} label="financial performance" />}</section>}
+  </div>;
 }
+
+function SectionHeading({ title, description }: { title: string; description: string }) { return <div><h2 className="font-semibold text-slate-950">{title}</h2><p className="mt-1 text-sm leading-5 text-slate-500">{description}</p></div>; }
+function LoadingCopy({ loading, label }: { loading: boolean; label: string }) { return <p className="mt-6 text-sm text-slate-500">{loading ? `Loading ${label}…` : `${label[0].toUpperCase()}${label.slice(1)} is unavailable.`}</p>; }
+function ValueRow({ label, value }: { label: string; value: string }) { return <div className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3"><dt className="text-sm text-slate-600">{label}</dt><dd className="text-sm font-semibold text-slate-950">{value}</dd></div>; }
+function SmallMetric({ label, value, tone }: { label: string; value: number; tone: string }) { return <div className="rounded-xl bg-slate-50 p-3"><span className={`block h-1.5 w-8 rounded-full ${tone}`} /><p className="mt-3 text-xl font-semibold text-slate-950">{formatNumber(value)}</p><p className="mt-1 text-xs text-slate-500">{label}</p></div>; }
+function StatusBars({ items, total }: { items: Array<{ status: string; count: number }>; total: number }) { if (!items.length) return <p className="mt-6 text-sm text-slate-500">No employee records are available yet.</p>; return <div className="mt-6 space-y-4">{items.map((item) => <div key={item.status}><div className="mb-1.5 flex justify-between text-sm"><span className="capitalize text-slate-600">{item.status.replaceAll("_", " ").toLowerCase()}</span><span className="font-semibold text-slate-900">{formatNumber(item.count)}</span></div><div className="h-2.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-sky-400" style={{ width: `${total ? Math.max((item.count / total) * 100, 2) : 0}%` }} /></div></div>)}</div>; }
+function PayrollBars({ points }: { points: Array<{ label: string; gross_pay: string | number }> }) { if (!points.length) return <p className="mt-6 text-sm text-slate-500">Finalized payroll runs will appear here once available.</p>; const maximum = Math.max(...points.map((point) => Number(point.gross_pay)), 1); return <div className="mt-7 flex h-52 items-end gap-3" aria-label="Finalized payroll gross pay by period">{points.map((point) => { const height = Math.max((Number(point.gross_pay) / maximum) * 100, 4); return <div key={point.label} className="flex min-w-0 flex-1 flex-col justify-end gap-2"><span className="truncate text-center text-xs font-medium text-slate-600" title={formatAmount(point.gross_pay)}>{formatAmount(point.gross_pay)}</span><div className="rounded-t-lg bg-gradient-to-t from-indigo-600 to-sky-400 transition-all" style={{ height: `${height}%` }} title={`${point.label}: ${formatAmount(point.gross_pay)}`} /><span className="truncate text-center text-xs text-slate-500" title={point.label}>{point.label}</span></div>; })}</div>; }
+function ExecutiveMetric({ label, value, currency, tone }: { label: string; value?: string | number; currency?: string; tone: string }) { return <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p><p className={`mt-2 text-xl font-semibold ${tone}`}>{value === undefined ? EM_DASH : formatAmount(value, currency)}</p><p className="mt-1 text-xs text-slate-400">Latest posted period</p></article>; }
+function ExecutiveFinancialChart({ points, currency }: { points: Array<{ month: string; income: string | number; expenses: string | number; net_income: string | number }>; currency?: string }) { if (!points.length) return <p className="mt-6 text-sm text-slate-500">Posted income or expense journals will appear here when available.</p>; const max = Math.max(...points.flatMap((item) => [Number(item.income), Number(item.expenses), Math.abs(Number(item.net_income))]), 1); return <div className="mt-5"><div className="flex h-44 items-end gap-2 overflow-x-auto rounded-xl bg-slate-50 p-4">{points.map((point) => <div key={point.month} className="flex min-w-[3.5rem] flex-1 items-end justify-center gap-1 self-stretch"><div className="w-3 rounded-t bg-emerald-500" style={{ height: `${Math.max(Number(point.income) / max * 100, 2)}%` }} title={`Revenue ${formatAmount(point.income, currency)}`} /><div className="w-3 rounded-t bg-rose-500" style={{ height: `${Math.max(Number(point.expenses) / max * 100, 2)}%` }} title={`Expenses ${formatAmount(point.expenses, currency)}`} /><div className={`w-3 rounded-t ${Number(point.net_income) >= 0 ? "bg-indigo-500" : "bg-amber-500"}`} style={{ height: `${Math.max(Math.abs(Number(point.net_income)) / max * 100, 2)}%` }} title={`Net result ${formatAmount(point.net_income, currency)}`} /></div>)}</div><div className="mt-2 flex justify-between gap-2 overflow-hidden text-xs text-slate-500">{points.map((point) => <span key={point.month} className="truncate">{formatDate(point.month)}</span>)}</div><div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-600"><span className="text-emerald-700">● Revenue</span><span className="text-rose-700">● Expenses</span><span className="text-indigo-700">● Net result</span></div></div>; }

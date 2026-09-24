@@ -10,7 +10,9 @@ from apps.institutions.models import (
     InstitutionOnboarding,
     InstitutionOnboardingStep,
     InstitutionSetting,
+    InstitutionInvitation,
 )
+from apps.institutions.catalogues import locale_catalogues
 
 
 class RoleSummarySerializer(serializers.ModelSerializer):
@@ -99,6 +101,8 @@ class InstitutionSerializer(serializers.ModelSerializer):
             "country",
             "currency",
             "timezone",
+            "institution_type",
+            "executive_title",
             "logo",
             "is_active",
         )
@@ -117,8 +121,33 @@ class InstitutionProfileUpdateSerializer(serializers.ModelSerializer):
             "country_code",
             "default_currency",
             "timezone",
+            "institution_type",
+            "executive_title",
             "logo",
         )
+
+    def validate(self, attrs):
+        """Accept only catalogue values while retaining a legacy stored value unchanged."""
+        catalogues = locale_catalogues()
+        valid_values = {
+            "country_code": {item["code"] for item in catalogues["countries"]},
+            "default_currency": {item["code"] for item in catalogues["currencies"]},
+            "timezone": {item["id"] for item in catalogues["timezones"]},
+        }
+        errors = {}
+        for field, allowed in valid_values.items():
+            value = attrs.get(field)
+            if value is None:
+                continue
+            if field != "timezone":
+                value = value.upper()
+                attrs[field] = value
+            existing_value = getattr(self.instance, field, None)
+            if value not in allowed and value != existing_value:
+                errors[field] = "Choose a value from the supported international catalogue."
+        if errors:
+            raise serializers.ValidationError(errors)
+        return attrs
 
 
 class InstitutionModuleSerializer(serializers.ModelSerializer):
@@ -186,7 +215,23 @@ class InvitationCreateSerializer(serializers.Serializer):
     expires_in_hours = serializers.IntegerField(required=False, default=168, min_value=1, max_value=720)
 
 
+class InstitutionInvitationSerializer(serializers.ModelSerializer):
+    role = RoleSummarySerializer(read_only=True)
+    invited_by_email = serializers.EmailField(source="invited_by.email", read_only=True)
+
+    class Meta:
+        model = InstitutionInvitation
+        fields = ("id", "email", "role", "status", "expires_at", "accepted_at", "invited_by_email", "created_at", "updated_at")
+        read_only_fields = fields
+
+
 class CurrentInstitutionSerializer(serializers.Serializer):
     institution = InstitutionSerializer()
     membership = MembershipSerializer()
     active_capabilities = serializers.ListField(child=serializers.CharField())
+
+
+class LocaleCataloguesSerializer(serializers.Serializer):
+    countries = serializers.ListField(child=serializers.DictField(), read_only=True)
+    currencies = serializers.ListField(child=serializers.DictField(), read_only=True)
+    timezones = serializers.ListField(child=serializers.DictField(), read_only=True)

@@ -79,12 +79,30 @@ export function formatAmount(
     return String(value);
   }
 
-  const formatted = numeric.toLocaleString("en-GB", {
+  const formatted = Math.abs(numeric).toLocaleString("en-GB", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
 
-  return currency ? `${currency} ${formatted}` : formatted;
+  if (!currency) {
+    return numeric < 0 ? `-${formatted}` : formatted;
+  }
+
+  // Keep one presentation contract for all monetary UI. The backend remains
+  // authoritative for the currency code; this map only controls its display
+  // symbol and falls back to the ISO code for an unknown currency.
+  const normalized = currency.toUpperCase();
+  const symbols: Record<string, string> = {
+    GHS: "GH₵",
+    USD: "$",
+    EUR: "€",
+    GBP: "£",
+    NGN: "₦",
+    KES: "KSh",
+  };
+  const symbol = symbols[normalized] ?? normalized;
+  const separator = symbol.length > 2 || normalized === "GHS" ? " " : "";
+  return `${numeric < 0 ? "-" : ""}${symbol}${separator}${formatted}`;
 }
 
 export function formatNumber(

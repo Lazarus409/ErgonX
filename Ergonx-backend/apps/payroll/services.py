@@ -12,6 +12,7 @@ from django.utils import timezone
 from apps.audit.services import record_audit_event
 from apps.notifications.models import Notification
 from apps.institutions.models import Institution
+from apps.institutions.services import record_user_activity
 from apps.payroll.calculation import calculate_employee_record, money
 from apps.payroll.models import (
     EmployeeTaxReliefClaim,
@@ -332,6 +333,14 @@ def create_payroll_run(*, institution, payroll_period, actor, idempotency_key):
         entity=run,
         action="payroll.run.created",
         metadata={"run_number": next_number, "idempotency_key": idempotency_key},
+    )
+    # Keep Home's resumable activity feed separate from the audit log. This
+    # runs inside the same transaction as the authoritative write.
+    record_user_activity(
+        actor=actor,
+        institution=institution,
+        activity_code="payroll.prepare",
+        entity=run,
     )
     return run
 
@@ -935,6 +944,12 @@ def create_payroll_adjustment(*, institution, actor, **values):
         entity=adjustment,
         action="payroll.adjustment.created",
     )
+    record_user_activity(
+        actor=actor,
+        institution=institution,
+        activity_code="payroll.adjustment",
+        entity=adjustment,
+    )
     return adjustment
 
 
@@ -972,6 +987,12 @@ def submit_payroll_adjustment(*, adjustment, actor):
             PayrollAdjustment.Status.DRAFT, PayrollAdjustment.Status.PENDING
         ),
     )
+    record_user_activity(
+        actor=actor,
+        institution=adjustment.institution,
+        activity_code="payroll.adjustment",
+        entity=adjustment,
+    )
     return adjustment
 
 
@@ -1002,6 +1023,12 @@ def decide_payroll_adjustment(*, adjustment, actor, approve):
         metadata=_status_change_metadata(
             PayrollAdjustment.Status.PENDING, decided_status
         ),
+    )
+    record_user_activity(
+        actor=actor,
+        institution=adjustment.institution,
+        activity_code="payroll.adjustment.review",
+        entity=adjustment,
     )
     return adjustment
 

@@ -12,6 +12,7 @@ import { apiGet, apiGetList, apiPatch, apiPost, apiPut, setInstitutionId } from 
 import type {
   CurrentInstitutionContext,
   InstitutionMembership,
+  InstitutionInvitation,
   InstitutionModule,
   InstitutionOnboarding,
   InstitutionRole,
@@ -25,6 +26,17 @@ export async function getCurrentInstitution(): Promise<CurrentInstitutionContext
   return apiGet<CurrentInstitutionContext>("/institutions/current/");
 }
 
+export interface LocaleCatalogues {
+  countries: Array<{ code: string; name: string; default_currency?: string }>;
+  currencies: Array<{ code: string; name: string; symbol: string }>;
+  timezones: Array<{ id: string; name: string }>;
+}
+
+/** ISO/IANA reference values owned by the backend, not handwritten UI lists. */
+export function getLocaleCatalogues(): Promise<LocaleCatalogues> {
+  return apiGet<LocaleCatalogues>("/institutions/locale-catalogues/");
+}
+
 export interface InstitutionProfilePayload {
   name?: string;
   email?: string;
@@ -33,6 +45,7 @@ export interface InstitutionProfilePayload {
   country_code?: string;
   default_currency?: string;
   timezone?: string;
+  institution_type?: string;
   logo?: string | null;
 }
 
@@ -194,6 +207,34 @@ export function inviteInstitutionMember(payload: MembershipInvitePayload): Promi
 
 export function createInvitationLink(payload: { email: string; role_id: string; expires_in_hours?: number }): Promise<{ id: string; email: string; expires_at: string; acceptance_token: string }> {
   return apiPost("/institutions/members/invite-link/", payload);
+}
+
+export interface InstitutionInvitationPayload {
+  email: string;
+  role_id: string;
+  expires_in_hours?: number;
+}
+
+export interface InvitationActionResult {
+  invitation: InstitutionInvitation;
+  acceptance_token: string;
+}
+
+/** Invitation records never expose their token; a token is only returned when newly created or reissued. */
+export function listInstitutionInvitations(): Promise<PaginatedData<InstitutionInvitation>> {
+  return apiGetList<InstitutionInvitation>("/institutions/invitations/", { ordering: "-created_at" });
+}
+
+export function createInstitutionInvitation(payload: InstitutionInvitationPayload): Promise<InvitationActionResult> {
+  return apiPost<InvitationActionResult, InstitutionInvitationPayload>("/institutions/invitations/", payload);
+}
+
+export function revokeInstitutionInvitation(id: string): Promise<InstitutionInvitation> {
+  return apiPost<InstitutionInvitation>(`/institutions/invitations/${id}/revoke/`);
+}
+
+export function resendInstitutionInvitation(id: string): Promise<InvitationActionResult> {
+  return apiPost<InvitationActionResult>(`/institutions/invitations/${id}/resend/`);
 }
 
 export function updateInstitutionMembership(id: string, payload: MembershipUpdatePayload): Promise<InstitutionMembership> {

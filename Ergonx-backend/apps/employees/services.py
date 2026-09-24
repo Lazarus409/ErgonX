@@ -8,6 +8,16 @@ from apps.audit.services import record_audit_event
 from apps.employees.models import EmergencyContact, Employee, EmployeeOffboarding, EmployeeOnboarding, Employment
 from apps.institutions.models import InstitutionMembership
 from apps.institutions.services import update_membership
+from common.exceptions import CodedValidationError
+
+
+def ensure_not_self_hr_mutation(*, actor, employee):
+    """Keep HR administration separate from employee self-service."""
+    if actor is not None and employee.user_id == actor.id:
+        raise CodedValidationError(
+            {"employee": "Use Profile, Preferences, Security, or other self-service tools for your own account."},
+            api_code="self_hr_record_edit_not_allowed",
+        )
 
 
 @transaction.atomic

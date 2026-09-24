@@ -14,42 +14,13 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/guards/AuthProvider";
 import { getApiErrorMessage } from "@/lib/api";
 import type { SessionBootstrap } from "@/types/auth";
-
-const dashboardLandingRoutes: Record<string, string> = {
-  executive: "/dashboard",
-  hr: "/hr/dashboard",
-  leave: "/leave/dashboard",
-  attendance: "/attendance/dashboard",
-  payroll: "/payroll/dashboard",
-  finance: "/accounting/dashboard",
-};
+import PasswordStrength from "@/components/ui/PasswordStrength";
 
 function resolvePostLoginHref(bootstrap: SessionBootstrap): string {
   if (bootstrap.defaultLanding === "PLATFORM") {
     return "/platform";
   }
-
-  const roleLanding: Record<string, string> = {
-    HR_ADMIN: "/hr",
-    FINANCE_MANAGER: "/accounting",
-    ACCOUNTANT: "/accounting",
-    AUDITOR: "/accounting",
-    DIRECTOR: "/dashboard",
-    EMPLOYEE: "/me",
-  };
-  const roleRoute = roleLanding[bootstrap.roleCode ?? ""];
-  if (roleRoute) {
-    return roleRoute;
-  }
-  if (bootstrap.defaultLanding !== "DASHBOARD") {
-    return "/";
-  }
-
-  return (
-    bootstrap.availableDashboards
-      .map((dashboard) => dashboardLandingRoutes[dashboard])
-      .find((route): route is string => Boolean(route)) ?? "/"
-  );
+  return "/";
 }
 
 export default function LoginPage() {
@@ -58,6 +29,9 @@ export default function LoginPage() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [mfaCode, setMfaCode] = useState("");
+  const [mfaRequired, setMfaRequired] = useState(false);
+  const [emailOtp, setEmailOtp] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -75,11 +49,14 @@ export default function LoginPage() {
 
     try {
       setLoading(true);
-      const bootstrap = await login(email, password);
+      const bootstrap = await login(email, password, mfaCode || undefined);
       const next = new URLSearchParams(window.location.search).get("next");
       router.replace(next?.startsWith("/") ? next : resolvePostLoginHref(bootstrap));
     } catch (err: unknown) {
-      setError(getApiErrorMessage(err));
+      const apiError = err as { code?: string };
+      if (apiError.code === "mfa_required") { setMfaRequired(true); setEmailOtp(false); setError("Enter the six-digit code from your authenticator app."); }
+      else if (apiError.code === "email_otp_required") { setMfaRequired(true); setEmailOtp(true); setError("Enter the six-digit verification code sent to your email."); }
+      else setError(getApiErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -93,6 +70,8 @@ export default function LoginPage() {
             {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-6 text-red-700">{error}</div>}
             <div><label htmlFor="email" className="mb-2 block text-sm font-semibold text-slate-800">Email address</label><div className="relative"><Mail className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" /><input id="email" required type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@organization.com" autoComplete="email" className="h-14 w-full rounded-xl border border-slate-200 bg-white pl-12 pr-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-sky-500 focus:ring-4 focus:ring-sky-100" /></div></div>
             <div><div className="mb-2 flex items-center justify-between"><label htmlFor="password" className="text-sm font-semibold text-slate-800">Password</label><Link href="/forgot-password" className="text-sm font-semibold text-sky-700 transition hover:text-sky-900">Forgot password?</Link></div><div className="relative"><LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" /><input id="password" required type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Enter your password" autoComplete="current-password" className="h-14 w-full rounded-xl border border-slate-200 bg-white pl-12 pr-12 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-sky-500 focus:ring-4 focus:ring-sky-100" /><button type="button" onClick={() => setShowPassword((visible) => !visible)} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-700" aria-label={showPassword ? "Hide password" : "Show password"}>{showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}</button></div></div>
+            <PasswordStrength value={password} />
+            {mfaRequired && <div><label htmlFor="mfa-code" className="mb-2 block text-sm font-semibold text-slate-800">{emailOtp ? "Email verification code" : "Authenticator code"}</label><input id="mfa-code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} required value={mfaCode} onChange={(event) => setMfaCode(event.target.value.replace(/\D/g, ""))} placeholder="000000" className="h-14 w-full rounded-xl border border-slate-200 bg-white px-4 text-center text-lg tracking-[0.4em] text-slate-950 outline-none focus:border-sky-500 focus:ring-4 focus:ring-sky-100" /></div>}
             <button type="submit" disabled={loading} className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-slate-950 text-sm font-semibold text-white shadow-[0_10px_20px_rgba(15,23,42,0.15)] transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60">{loading ? "Signing in…" : <>Sign in <ArrowRight className="h-4 w-4" /></>}</button>
           </form>
           <p className="mt-8 text-center text-sm text-slate-500">New to ErgonX? <Link href="/get-started" className="font-semibold text-slate-900 underline decoration-slate-300 underline-offset-4 transition hover:decoration-slate-900">Get started</Link></p>

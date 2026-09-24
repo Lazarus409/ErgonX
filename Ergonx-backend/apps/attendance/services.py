@@ -7,6 +7,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from apps.audit.services import record_audit_event
+from apps.institutions.services import record_user_activity
 from apps.attendance.models import AttendanceAdjustment, AttendanceRecord, OvertimeRecord
 from apps.employees.models import Employment
 from apps.institutions.models import InstitutionMembership
@@ -289,6 +290,12 @@ def request_adjustment(*, institution, attendance_record, actor, reason, propose
         institution=institution,
         entity=adjustment,
         action="attendance.adjustment.requested",
+    )
+    record_user_activity(
+        actor=actor,
+        institution=institution,
+        activity_code="attendance.adjust",
+        entity=adjustment,
     )
     return adjustment
 

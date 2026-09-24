@@ -2,66 +2,34 @@
 
 import Link from "next/link";
 import { useCallback } from "react";
-import { ArrowRight, CircleAlert, FileText, Plus, Receipt, TrendingDown, TrendingUp } from "lucide-react";
-
+import { FileText, Plus, Receipt, TrendingDown, TrendingUp, WalletCards } from "lucide-react";
 import ErrorState from "@/components/ui/ErrorState";
 import KPIStatCard from "@/components/ui/KPIStatCard";
 import PageHeader from "@/components/ui/PageHeader";
 import { dashboardsApi } from "@/lib/api";
-import { EM_DASH, formatAmount, formatNumber } from "@/lib/format";
+import { EM_DASH, formatAmount, formatDate, formatNumber } from "@/lib/format";
+import type { CashFlowPoint, FinanceDashboard, ProfitAndLossPoint } from "@/types/dashboards";
 import { useApiResource } from "@/lib/useApiResource";
 import { useAuth } from "@/components/guards/AuthProvider";
-
-const actions = [
-  ["New Journal", "/accounting/journals/new"],
-  ["New Vendor Bill", "/accounting/payables"],
-  ["Create Invoice", "/accounting/receivables"],
-  ["Record Payment", "/accounting/banking"],
-  ["Close Period", "/accounting/periods"],
-] as const;
+import { hasModule } from "@/types/institutions";
 
 export default function AccountingDashboard() {
-  const { user } = useAuth();
-  const load = useCallback(() => dashboardsApi.getFinanceDashboard(), []);
-  const { data, loading, error, reload } = useApiResource(load);
+  const { institution, user } = useAuth();
+  const can = (permission: string) => hasModule(institution?.enabledModules, "ACCOUNTING") && (user?.permissions.includes("*") || user?.permissions.includes(permission));
+  const { data, loading, error, reload } = useApiResource(useCallback(() => dashboardsApi.getFinanceDashboard(), []));
   const placeholder = loading ? "…" : EM_DASH;
-
-  return (
-    <main className="space-y-6">
-      <PageHeader
-        title="Accounting Dashboard"
-        description="Financial operations and items requiring attention."
-        actions={<Link href="/accounting/journals/new" className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"><Plus className="h-4 w-4" />New Journal</Link>}
-      />
-
-      <section className="rounded-2xl bg-slate-950 p-6 text-white sm:p-8"><p className="text-sm font-medium text-slate-300">Accounting workspace</p><h2 className="mt-2 text-3xl font-semibold tracking-tight">Good {new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, {user?.firstName ?? "there"}.</h2><p className="mt-2 text-sm text-slate-300">Review financial operations, approvals, and period controls that need your attention.</p></section>
-
-      {error && <ErrorState message={error} onRetry={reload} />}
-
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KPIStatCard title="Accounts Receivable" value={data ? formatAmount(data.accounts_receivable) : placeholder} icon={<TrendingUp className="h-5 w-5" />} />
-        <KPIStatCard title="Accounts Payable" value={data ? formatAmount(data.accounts_payable) : placeholder} icon={<TrendingDown className="h-5 w-5" />} />
-        <KPIStatCard title="Posted Expenses" value={data ? formatAmount(data.expenses) : placeholder} icon={<Receipt className="h-5 w-5" />} />
-        <KPIStatCard title="Pending Journals" value={data ? formatNumber(data.pending_journals) : placeholder} icon={<FileText className="h-5 w-5" />} />
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
-        <section className="rounded-2xl border bg-white p-5">
-          <div className="flex items-center justify-between"><div><h2 className="font-semibold text-slate-900">Financial Operations</h2><p className="text-sm text-slate-500">Tenant-scoped operational totals from the finance dashboard.</p></div><Link href="/accounting/reports" className="text-sm font-semibold text-slate-700">View reports</Link></div>
-          <dl className="mt-5 grid gap-3 sm:grid-cols-2">
-            <div className="rounded-xl bg-slate-50 p-4"><dt className="text-xs text-slate-500">Open receivables</dt><dd className="mt-1 text-xl font-semibold text-slate-900">{data ? formatAmount(data.accounts_receivable) : placeholder}</dd></div>
-            <div className="rounded-xl bg-slate-50 p-4"><dt className="text-xs text-slate-500">Open payables</dt><dd className="mt-1 text-xl font-semibold text-slate-900">{data ? formatAmount(data.accounts_payable) : placeholder}</dd></div>
-            <div className="rounded-xl bg-slate-50 p-4"><dt className="text-xs text-slate-500">Posted expenses</dt><dd className="mt-1 text-xl font-semibold text-slate-900">{data ? formatAmount(data.expenses) : placeholder}</dd></div>
-            <div className="rounded-xl bg-slate-50 p-4"><dt className="text-xs text-slate-500">Journals awaiting review</dt><dd className="mt-1 text-xl font-semibold text-slate-900">{data ? formatNumber(data.pending_journals) : placeholder}</dd></div>
-          </dl>
-        </section>
-
-        <section className="rounded-2xl border bg-white p-5"><h2 className="font-semibold text-slate-900">Quick Actions</h2><div className="mt-4 space-y-2">{actions.map(([label, href]) => <Link key={label} href={href} className="flex items-center justify-between rounded-xl border p-3 text-sm font-medium hover:bg-slate-50">{label}<ArrowRight className="h-4 w-4 text-slate-400" /></Link>)}</div></section>
-      </div>
-
-      <section className="rounded-2xl border bg-white p-5">
-        <div className="flex items-start gap-3"><CircleAlert className="mt-0.5 h-5 w-5 text-slate-500" /><div><h2 className="font-semibold text-slate-900">Journal and Compliance Detail</h2><p className="mt-1 text-sm text-slate-500">The finance dashboard does not expose recent-journal rows, bank/cash balances, revenue, profit/loss, or Ghana tax liabilities. These remain available only where supported by their dedicated screens and reports.</p></div></div>
-      </section>
-    </main>
-  );
+  return <main className="space-y-6"><PageHeader title="Accounting Dashboard" description="Detailed financial operations from posted ledger data." actions={can("journal.create") ? <Link href="/accounting/journals/new" className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"><Plus className="h-4 w-4" />New Journal</Link> : undefined} /><section className="rounded-2xl bg-slate-950 p-6 text-white sm:p-8"><p className="text-sm font-medium text-slate-300">Accounting workspace</p><h2 className="mt-2 text-3xl font-semibold tracking-tight">Financial operations overview</h2><p className="mt-2 text-sm text-slate-300">Posted-ledger performance, cash movement, aging, and period controls.</p></section>{error && <ErrorState message={error} onRetry={reload} />}<div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"><KPIStatCard title="Bank balance" value={data ? formatAmount(data.bank_balance, data.currency) : placeholder} icon={<WalletCards className="h-5 w-5" />} /><KPIStatCard title="Accounts Receivable" value={data ? formatAmount(data.accounts_receivable, data.currency) : placeholder} icon={<TrendingUp className="h-5 w-5" />} /><KPIStatCard title="Accounts Payable" value={data ? formatAmount(data.accounts_payable, data.currency) : placeholder} icon={<TrendingDown className="h-5 w-5" />} /><KPIStatCard title="Posted Expenses" value={data ? formatAmount(data.expenses, data.currency) : placeholder} icon={<Receipt className="h-5 w-5" />} /><KPIStatCard title="Pending Journals" value={data ? formatNumber(data.pending_journals) : placeholder} icon={<FileText className="h-5 w-5" />} /></div><div className="grid gap-5 xl:grid-cols-3"><AgingCard title="Receivable aging" items={data?.accounts_receivable_aging ?? []} loading={loading} currency={data?.currency} tone="bg-emerald-500" /><AgingCard title="Payable aging" items={data?.accounts_payable_aging ?? []} loading={loading} currency={data?.currency} tone="bg-amber-500" /><section className="rounded-2xl border bg-white p-6"><h2 className="font-semibold">Journal status</h2><p className="mt-1 text-sm text-slate-500">Tenant-scoped workflow status.</p>{loading ? <p className="mt-6 text-sm text-slate-500">Loading…</p> : data?.journals_by_status.map((item) => <div key={item.status} className="mt-3 flex justify-between rounded-xl bg-slate-50 px-4 py-3 text-sm"><span>{item.status.replaceAll("_", " ")}</span><strong>{formatNumber(item.count)}</strong></div>)}</section></div><ProfitAndLossChart data={data} loading={loading} /><CashFlowChart data={data} loading={loading} /></main>;
 }
+
+function AgingCard({ title, items, loading, currency, tone }: { title: string; items: Array<{ bucket: string; amount: string | number }>; loading: boolean; currency?: string; tone: string }) { const maximum = Math.max(...items.map((item) => Number(item.amount)), 1); return <section className="rounded-2xl border bg-white p-6"><h2 className="font-semibold">{title}</h2>{loading ? <p className="mt-6 text-sm text-slate-500">Loading aging…</p> : items.map((item) => <div key={item.bucket} className="mt-4"><div className="mb-1 flex justify-between gap-3 text-sm"><span className="text-slate-600">{item.bucket}</span><strong>{formatAmount(item.amount, currency)}</strong></div><div className="h-2 rounded-full bg-slate-100"><div className={`h-full rounded-full ${tone}`} style={{ width: `${Math.max(Number(item.amount) / maximum * 100, Number(item.amount) ? 3 : 0)}%` }} /></div></div>)}</section>; }
+
+function ProfitAndLossChart({ data, loading }: { data: FinanceDashboard | null; loading: boolean }) { const points = data?.profit_and_loss_trend ?? []; if (loading) return <ChartShell title="Profit and loss" subtitle="Monthly posted-ledger performance"><p className="text-sm text-slate-500">Loading posted-ledger history…</p></ChartShell>; const latest = points.at(-1); if (!points.length) return <ChartShell title="Profit and loss summary" subtitle="Income, expenses, and net result from posted journals"><p className="text-sm text-slate-500">Posted income or expense journals will appear here when available.</p></ChartShell>; return <ChartShell title={points.length > 1 ? "Profit and loss trend" : "Profit and loss summary"} subtitle="Monthly income, expenses, and net result from posted journals"><div className="grid gap-3 sm:grid-cols-3">{[["Income", latest?.income, "text-emerald-700"], ["Expenses", latest?.expenses, "text-rose-700"], ["Net result", latest?.net_income, Number(latest?.net_income) >= 0 ? "text-emerald-700" : "text-rose-700"]].map(([label, value, tone]) => <div key={String(label)} className="rounded-xl bg-slate-50 p-4"><p className="text-xs text-slate-500">{label}</p><p className={`mt-1 text-lg font-semibold ${tone}`}>{formatAmount(value, data?.currency)}</p></div>)}</div><LineChart points={points} currency={data?.currency} /></ChartShell>; }
+
+function CashFlowChart({ data, loading }: { data: FinanceDashboard | null; loading: boolean }) { const points = data?.cash_flow_trend ?? []; if (loading) return <ChartShell title="Bank cash movement" subtitle="Posted bank-ledger activity"><p className="text-sm text-slate-500">Loading cash history…</p></ChartShell>; const latest = points.at(-1); return <ChartShell title="Bank cash movement" subtitle="Posted bank-ledger activity for registered bank accounts"><div className="grid gap-3 sm:grid-cols-3">{[["Inflow", latest?.inflow, "text-emerald-700"], ["Outflow", latest?.outflow, "text-amber-700"], ["Net movement", latest?.net_movement, Number(latest?.net_movement) >= 0 ? "text-emerald-700" : "text-rose-700"]].map(([label, value, tone]) => <div key={String(label)} className="rounded-xl bg-slate-50 p-4"><p className="text-xs text-slate-500">{label}</p><p className={`mt-1 text-lg font-semibold ${tone}`}>{formatAmount(value, data?.currency)}</p></div>)}</div>{points.length ? <GroupedBars points={points} currency={data?.currency} /> : <p className="mt-6 text-sm text-slate-500">Post bank journals to see cash movement.</p>}</ChartShell>; }
+
+function ChartShell({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) { return <section className="rounded-2xl border bg-white p-5 sm:p-6"><div className="flex flex-wrap items-end justify-between gap-2"><div><h2 className="font-semibold">{title}</h2><p className="mt-1 text-sm text-slate-500">{subtitle}</p></div><span className="text-xs text-slate-500">Posted journals only</span></div><div className="mt-5">{children}</div></section>; }
+
+function LineChart({ points, currency }: { points: ProfitAndLossPoint[]; currency?: string }) { const values = points.flatMap((point) => [Number(point.income), Number(point.expenses), Number(point.net_income)]); const max = Math.max(...values, 1); const min = Math.min(...values, 0); const range = max - min || 1; const path = (key: "income" | "expenses" | "net_income") => points.map((point, index) => `${index ? "L" : "M"}${(index / Math.max(points.length - 1, 1)) * 100},${100 - ((Number(point[key]) - min) / range) * 100}`).join(" "); return <div className="mt-6"><div className="relative h-64 rounded-xl bg-slate-50 p-3"><svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-full w-full" role="img" aria-label="Monthly profit and loss chart"><line x1="0" x2="100" y1={100 - ((0 - min) / range) * 100} y2={100 - ((0 - min) / range) * 100} stroke="#cbd5e1" strokeDasharray="2 2" /><path d={path("income")} fill="none" stroke="#059669" strokeWidth="1.5" vectorEffect="non-scaling-stroke" /><path d={path("expenses")} fill="none" stroke="#e11d48" strokeWidth="1.5" vectorEffect="non-scaling-stroke" /><path d={path("net_income")} fill="none" stroke="#4f46e5" strokeWidth="1.5" vectorEffect="non-scaling-stroke" /></svg></div><Legend items={[["Income", "bg-emerald-600"], ["Expenses", "bg-rose-600"], ["Net result", "bg-indigo-600"]]} /><div className="mt-2 flex justify-between gap-2 overflow-hidden text-xs text-slate-500">{points.map((point) => <span key={point.month} className="truncate" title={formatDate(point.month)}>{formatDate(point.month)}</span>)}</div><p className="mt-2 text-xs text-slate-400">Values: {currency ?? "institution currency"}</p></div>; }
+
+function GroupedBars({ points, currency }: { points: CashFlowPoint[]; currency?: string }) { const max = Math.max(...points.flatMap((point) => [Number(point.inflow), Number(point.outflow)]), 1); return <div className="mt-6"><div className="flex h-64 items-end gap-2 overflow-x-auto rounded-xl bg-slate-50 p-4">{points.map((point) => <div key={point.month} className="flex min-w-[3.8rem] flex-1 items-end justify-center gap-1 self-stretch"><div className="w-4 self-end rounded-t bg-emerald-500" style={{ height: `${Math.max(Number(point.inflow) / max * 100, 2)}%` }} title={`Inflow ${formatAmount(point.inflow, currency)}`} /><div className="w-4 self-end rounded-t bg-amber-500" style={{ height: `${Math.max(Number(point.outflow) / max * 100, 2)}%` }} title={`Outflow ${formatAmount(point.outflow, currency)}`} /></div>)}</div><Legend items={[["Inflow", "bg-emerald-500"], ["Outflow", "bg-amber-500"]]} /><div className="mt-2 flex justify-between gap-2 overflow-hidden text-xs text-slate-500">{points.map((point) => <span key={point.month} className="truncate" title={formatDate(point.month)}>{formatDate(point.month)}</span>)}</div></div>; }
+function Legend({ items }: { items: Array<[string, string]> }) { return <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-600">{items.map(([label, tone]) => <span key={label} className="inline-flex items-center gap-1.5"><span className={`h-2.5 w-2.5 rounded-full ${tone}`} />{label}</span>)}</div>; }

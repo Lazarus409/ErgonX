@@ -1,0 +1,18 @@
+{
+  "name": "ErgonX Workforce & Financial Management",
+  "short_name": "ErgonX",
+  "description": "ErgonX workforce and financial management workspace.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#020617",
+  "icons": [
+    {
+      "src": "/ergonx-logo.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

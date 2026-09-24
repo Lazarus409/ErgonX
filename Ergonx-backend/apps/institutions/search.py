@@ -1,9 +1,11 @@
 from dataclasses import dataclass
 
-from django.db.models import Q
+from django.db.models import CharField, Q
+from django.db.models.functions import Cast
 
 from apps.accounting.models import Account, Invoice, JournalEntry, VendorBill
 from apps.employees.models import Employee
+from apps.leave.models import LeaveRequest
 from apps.payroll.models import PayrollRun
 from apps.recruitment.models import Candidate, JobPosting, Offer
 
@@ -68,11 +70,32 @@ def _offer_results(institution, query, limit):
 
 
 def _payroll_results(institution, query, limit):
-    rows = PayrollRun.objects.for_institution(institution).filter(
-        Q(status__iexact=query) | Q(payroll_period__name__icontains=query)
-    ).select_related("payroll_period").order_by("-started_at")[:limit]
+    filters = Q(status__iexact=query) | Q(payroll_period__name__icontains=query)
+    run_reference = query.upper().removeprefix("PR-")
+    if run_reference.isdigit():
+        filters |= Q(run_number=int(run_reference))
+    rows = PayrollRun.objects.for_institution(institution).filter(filters).select_related("payroll_period").order_by("-started_at")[:limit]
     return [
-        {"id": str(row.id), "reference": "", "title": f"Payroll: {row.payroll_period.name}", "subtitle": "Payroll run", "status": row.status, "updated_at": row.updated_at}
+        {"id": str(row.id), "reference": f"PR-{row.run_number}", "title": f"Payroll: {row.payroll_period.name}", "subtitle": "Payroll run", "status": row.status, "updated_at": row.updated_at}
+        for row in rows
+    ]
+
+
+def _leave_request_results(institution, query, limit):
+    filters = (
+        Q(employee__employee_number__icontains=query)
+        | Q(employee__first_name__icontains=query)
+        | Q(employee__last_name__icontains=query)
+        | Q(leave_type__code__icontains=query)
+        | Q(status__iexact=query)
+    )
+    queryset = LeaveRequest.objects.for_institution(institution)
+    if query.upper().startswith("LR-"):
+        queryset = queryset.annotate(search_id=Cast("id", output_field=CharField()))
+        filters |= Q(search_id__istartswith=query[3:])
+    rows = queryset.filter(filters).select_related("employee", "leave_type").order_by("-created_at")[:limit]
+    return [
+        {"id": str(row.id), "reference": f"LR-{str(row.id)[:8].upper()}", "title": f"{row.leave_type.name} — {row.employee.full_name}", "subtitle": "Leave request", "status": row.status, "updated_at": row.updated_at}
         for row in rows
     ]
 
@@ -123,6 +146,7 @@ SEARCH_PROVIDERS = (
     SearchProvider("CANDIDATE", "RECRUITMENT", "candidate.view", "/recruitment/candidates/{id}", _candidate_results),
     SearchProvider("OFFER", "RECRUITMENT", "offer.view", "/recruitment/offers/{id}", _offer_results),
     SearchProvider("PAYROLL_RUN", "PAYROLL", "payroll.view", "/payroll/runs/{id}", _payroll_results),
+    SearchProvider("LEAVE_REQUEST", "LEAVE", "leave.view", "/leave/requests/{id}", _leave_request_results),
     SearchProvider("ACCOUNT", "ACCOUNTING", "account.view", "/accounting/accounts/{id}", _account_results),
     SearchProvider("JOURNAL", "ACCOUNTING", "journal.view", "/accounting/journals/{id}", _journal_results),
     SearchProvider("INVOICE", "ACCOUNTING", "invoice.view", "/accounting/invoices/{id}", _invoice_results),

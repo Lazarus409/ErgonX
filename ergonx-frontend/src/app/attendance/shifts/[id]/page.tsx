@@ -4,7 +4,6 @@ import { useCallback } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
-  ArrowLeft,
   Clock3,
   Moon,
   ShieldCheck,
@@ -15,6 +14,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
 import ErrorState from "@/components/ui/ErrorState";
 import EmptyState from "@/components/ui/EmptyState";
+import BackNavigation from "@/components/ui/BackNavigation";
 import {
   attendanceApi,
   employeesApi,
@@ -334,15 +334,7 @@ export default function ShiftDetailPage() {
 }
 
 function BackLink() {
-  return (
-    <Link
-      href="/attendance/shifts"
-      className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-    >
-      <ArrowLeft size={16} />
-      Back to Shifts
-    </Link>
-  );
+  return <BackNavigation fallback="/attendance/shifts" label="Back to Shifts" />;
 }
 
 function SummaryCard({

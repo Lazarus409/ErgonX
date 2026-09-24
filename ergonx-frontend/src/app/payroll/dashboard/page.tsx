@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback } from "react";
-import { ArrowRight, CalendarDays, CheckCircle2, Clock3, FileText, Lock, PlayCircle, WalletCards } from "lucide-react";
+import { ArrowRight, CheckCircle2, Clock3, WalletCards } from "lucide-react";
 
 import ErrorState from "@/components/ui/ErrorState";
 import KPIStatCard from "@/components/ui/KPIStatCard";
@@ -14,12 +14,6 @@ import { useApiResource } from "@/lib/useApiResource";
 
 const workflow = ["DRAFT", "CALCULATING", "CALCULATED", "UNDER_REVIEW", "APPROVED", "FINALIZED"];
 
-const actions = [
-  { title: "Payroll runs", description: "View calculation and approval history.", href: "/payroll/runs", icon: PlayCircle },
-  { title: "Manage periods", description: "Open, close and review payroll periods.", href: "/payroll/periods", icon: CalendarDays },
-  { title: "Payroll configuration", description: "Review country and payroll setup.", href: "/payroll/configuration", icon: FileText },
-];
-
 export default function PayrollDashboardPage() {
   const load = useCallback(() => dashboardsApi.getPayrollDashboard(), []);
   const { data, loading, error, reload } = useApiResource(load);
@@ -28,15 +22,16 @@ export default function PayrollDashboardPage() {
   const latestIndex = latestStatus ? workflow.indexOf(latestStatus) : -1;
 
   return (
-    <main className="space-y-6 p-4 md:p-6">
+    <main className="space-y-6">
       <PageHeader title="Payroll Dashboard" description="Monitor payroll runs, approvals and finalisation." />
       {error && <ErrorState message={error} onRetry={reload} />}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KPIStatCard title="Latest Run" value={latestStatus ?? placeholder} icon={<PlayCircle size={20} />} />
-        <KPIStatCard title="Runs Awaiting Action" value={data ? formatNumber(data.pending_runs) : placeholder} icon={<Clock3 size={20} />} />
-        <KPIStatCard title="Finalized Gross Pay" value={data ? formatAmount(data.finalized_gross_pay) : placeholder} icon={<WalletCards size={20} />} />
-        <KPIStatCard title="Latest Run ID" value={data?.latest_run_id ?? placeholder} icon={<Lock size={20} />} />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <KPIStatCard title="Finalized gross pay" value={data ? formatAmount(data.finalized_gross_pay) : placeholder} subtitle="Across finalized payroll runs" icon={<WalletCards size={20} />} />
+        <KPIStatCard title="Finalized net pay" value={data ? formatAmount(data.finalized_net_pay) : placeholder} subtitle="Across finalized payroll runs" icon={<WalletCards size={20} />} />
+        <KPIStatCard title="Deductions" value={data ? formatAmount(data.finalized_deductions) : placeholder} subtitle="Across finalized payroll runs" icon={<WalletCards size={20} />} />
+        <KPIStatCard title="Employer contributions" value={data ? formatAmount(data.employer_contributions) : placeholder} subtitle="Across finalized payroll runs" icon={<WalletCards size={20} />} />
+        <KPIStatCard title="Runs awaiting action" value={data ? formatNumber(data.pending_runs) : placeholder} subtitle={latestStatus ? `Latest: ${latestStatus.replaceAll("_", " ")}` : "No payroll run"} icon={<Clock3 size={20} />} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-3">
@@ -56,12 +51,14 @@ export default function PayrollDashboardPage() {
         </section>
       </div>
 
-      <section className="rounded-xl border bg-white p-5">
-        <div className="flex items-center justify-between"><div><h2 className="font-semibold">Payroll Activity</h2><p className="text-sm text-slate-500">Recent run lists are available on the payroll-runs screen.</p></div><Link href="/payroll/runs" className="text-sm font-semibold hover:underline">View all</Link></div>
-        <p className="mt-5 rounded-lg bg-slate-50 p-4 text-sm text-slate-500">The dashboard API provides the latest run and aggregate counts; it does not expose a recent-runs feed or payroll breakdowns.</p>
+      <section className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
+        <PayrollTrend points={data?.payroll_by_period ?? []} loading={loading} />
+        <RunStatuses items={data?.runs_by_status ?? []} loading={loading} />
       </section>
 
-      <section><h2 className="mb-3 font-semibold">Quick Actions</h2><div className="grid gap-4 md:grid-cols-3">{actions.map((action) => { const Icon = action.icon; return <Link key={action.href} href={action.href} className="rounded-xl border bg-white p-5 transition hover:-translate-y-0.5 hover:shadow-sm"><Icon size={20} /><h3 className="mt-4 font-semibold">{action.title}</h3><p className="mt-1 text-sm text-slate-500">{action.description}</p></Link>; })}</div></section>
     </main>
   );
 }
+
+function PayrollTrend({ points, loading }: { points: Array<{ label: string; gross_pay: string | number; net_pay: string | number; total_deductions: string | number }>; loading: boolean }) { if (loading) return <section className="rounded-2xl border bg-white p-6"><p className="text-sm text-slate-500">Loading payroll trend…</p></section>; if (!points.length) return <section className="rounded-2xl border bg-white p-6"><h2 className="font-semibold">Payroll cost trend</h2><p className="mt-1 text-sm text-slate-500">Gross, net, and deductions will appear after a payroll run is finalized.</p></section>; const maximum = Math.max(...points.map((point) => Number(point.gross_pay)), 1); return <section className="rounded-2xl border bg-white p-6"><h2 className="font-semibold">Payroll cost trend</h2><p className="mt-1 text-sm text-slate-500">Gross payroll by finalized pay period.</p><div className="mt-7 flex h-52 items-end gap-3">{points.map((point) => <div key={point.label} className="flex min-w-0 flex-1 flex-col justify-end gap-2"><span className="truncate text-center text-xs font-medium text-slate-600">{formatAmount(point.gross_pay)}</span><div className="rounded-t-lg bg-gradient-to-t from-amber-600 to-amber-300" style={{ height: `${Math.max((Number(point.gross_pay) / maximum) * 100, 4)}%` }} title={`${point.label}: gross ${formatAmount(point.gross_pay)}, net ${formatAmount(point.net_pay)}, deductions ${formatAmount(point.total_deductions)}`} /><span className="truncate text-center text-xs text-slate-500">{point.label}</span></div>)}</div></section>; }
+function RunStatuses({ items, loading }: { items: Array<{ status: string; count: number }>; loading: boolean }) { if (loading) return <section className="rounded-2xl border bg-white p-6"><p className="text-sm text-slate-500">Loading payroll status…</p></section>; return <section className="rounded-2xl border bg-white p-6"><h2 className="font-semibold">Run status</h2><p className="mt-1 text-sm text-slate-500">Payroll runs grouped by current workflow status.</p>{items.length ? <div className="mt-6 space-y-3">{items.map((item) => <div key={item.status} className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3"><span className="text-sm text-slate-600">{item.status.replaceAll("_", " ")}</span><span className="font-semibold text-slate-950">{formatNumber(item.count)}</span></div>)}</div> : <p className="mt-6 text-sm text-slate-500">No payroll runs are available yet.</p>}</section>; }

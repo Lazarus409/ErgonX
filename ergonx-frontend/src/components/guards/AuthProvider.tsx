@@ -9,7 +9,7 @@ import {
   useState,
 } from "react";
 
-import { authApi, getAccessToken, institutionsApi } from "@/lib/api";
+import { authApi, hasSessionHint, institutionsApi } from "@/lib/api";
 import type { SessionBootstrap, SessionInstitution, SessionUser } from "@/types/auth";
 
 /* -------------------------------------------------------------------------- */
@@ -58,9 +58,11 @@ interface AuthContextValue {
   isLiveSession: boolean;
   isPlatformAdmin: boolean;
   bootstrap: SessionBootstrap | null;
-  login: (email: string, password: string) => Promise<SessionBootstrap>;
+  login: (email: string, password: string, mfaCode?: string) => Promise<SessionBootstrap>;
   logout: () => void;
   refreshSession: () => Promise<SessionBootstrap>;
+  /** Selects only an existing active membership, then refreshes all bootstrap-derived state. */
+  switchInstitution: (institutionId: string) => Promise<SessionBootstrap>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -141,10 +143,11 @@ export default function AuthProvider({
   const [bootstrap, setBootstrap] = useState<SessionBootstrap | null>(null);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
 
-  // Stays false so the bypass renders immediately and server and client agree
-  // on the first paint. A stored token is exchanged for a real session in the
-  // background.
-  const [loading, setLoading] = useState(false);
+  // In a live build, a protected route must wait for the cookie-backed
+  // session to hydrate before its route gate decides whether to redirect to
+  // sign-in. Starting in a loading state is also server/client consistent;
+  // the bypass remains immediately available when it is explicitly enabled.
+  const [loading, setLoading] = useState(!DEV_AUTH_BYPASS_ENABLED);
 
   const applyLiveSession = useCallback(async (): Promise<SessionBootstrap> => {
     try {
@@ -174,11 +177,19 @@ export default function AuthProvider({
   }, []);
 
   useEffect(() => {
-    if (!getAccessToken()) {
-      return;
-    }
-
     let active = true;
+
+    if (!hasSessionHint()) {
+      // Defer the state transition to the microtask queue. This keeps the
+      // no-session fast path while avoiding a synchronous effect update that
+      // causes cascading renders under the React hooks lint rule.
+      queueMicrotask(() => {
+        if (active) setLoading(false);
+      });
+      return () => {
+        active = false;
+      };
+    }
 
     async function hydrate() {
       try {
@@ -212,6 +223,10 @@ export default function AuthProvider({
             setBootstrap(null);
           }
         }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
       }
     }
 
@@ -223,11 +238,11 @@ export default function AuthProvider({
   }, []);
 
   const login = useCallback(
-    async (email: string, password: string) => {
+    async (email: string, password: string, mfaCode?: string) => {
       setLoading(true);
 
       try {
-        await authApi.login({ email, password });
+        await authApi.login({ email, password, mfa_code: mfaCode });
         return await applyLiveSession();
       } finally {
         setLoading(false);
@@ -246,6 +261,16 @@ export default function AuthProvider({
     setBootstrap(null);
   }, []);
 
+  const switchInstitution = useCallback(async (institutionId: string) => {
+    institutionsApi.selectInstitution(institutionId);
+    setLoading(true);
+    try {
+      return await applyLiveSession();
+    } finally {
+      setLoading(false);
+    }
+  }, [applyLiveSession]);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -258,8 +283,9 @@ export default function AuthProvider({
       login,
       logout,
       refreshSession: applyLiveSession,
+      switchInstitution,
     }),
-    [user, institution, loading, isLiveSession, isPlatformAdmin, bootstrap, login, logout, applyLiveSession],
+    [user, institution, loading, isLiveSession, isPlatformAdmin, bootstrap, login, logout, applyLiveSession, switchInstitution],
   );
 
   return (

@@ -1,3 +1,17 @@
 .env.production
 .env.production.local
 .env
+.coverage
+*.sqlite3
+*.log
+__pycache__/
+*.py[cod]
+.pytest_cache/
+venv/
+.venv/
+ergonx-frontend/node_modules/
+ergonx-frontend/.next/
+ergonx-frontend/tsconfig.tsbuildinfo
+ergonx-frontend/.playwright-cli/
+ergonx-frontend/output/
+.playwright-cli/

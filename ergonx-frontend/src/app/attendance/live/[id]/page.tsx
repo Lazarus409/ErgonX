@@ -4,7 +4,6 @@ import { useCallback, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
-  ArrowLeft,
   CalendarDays,
   Clock3,
   History,
@@ -17,6 +16,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
 import ErrorState from "@/components/ui/ErrorState";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import BackNavigation from "@/components/ui/BackNavigation";
 import {
   attendanceApi,
   employeesApi,
@@ -585,15 +585,7 @@ export default function AttendanceRecordDetailPage() {
 }
 
 function BackLink() {
-  return (
-    <Link
-      href="/attendance/live"
-      className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"
-    >
-      <ArrowLeft className="h-4 w-4" />
-      Back to Live Attendance
-    </Link>
-  );
+  return <BackNavigation fallback="/attendance/live" label="Back to Live Attendance" />;
 }
 
 function DetailItem({

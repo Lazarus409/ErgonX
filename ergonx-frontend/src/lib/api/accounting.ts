@@ -1,6 +1,6 @@
 import { apiAction, apiGet, apiGetList, apiPatch, apiPost } from "./client";
 import type { ListParams, PaginatedData } from "@/types/api";
-import type { Account, AccountingConfiguration, AccountingPeriod, AccountingSetupChoices, BankAccount, BankStatementLine, Customer, Expense, Invoice, InvoiceLine, JournalEntry, Payment, Receipt, TrialBalance, Vendor, VendorBill, VendorBillLine } from "@/types/accounting";
+import type { Account, AccountingConfiguration, AccountingConfigurationPayload, AccountingPeriod, AccountingPresetApplicationResult, AccountingSetupChoices, BalanceSheet, BankAccount, BankStatementLine, Customer, Expense, GhanaComplianceReminder, IncomeStatement, Invoice, InvoiceLine, JournalEntry, PayComponentAccountMapping, PayComponentAccountMappingPayload, PayrollAccountMappingTemplate, Payment, Receipt, TaxCode, TaxComponent, TrialBalance, Vendor, VendorBill, VendorBillLine, WithholdingRule } from "@/types/accounting";
 
 export type AccountPayload = Pick<Account, "code" | "name" | "account_type" | "parent" | "normal_balance" | "is_postable" | "is_active">;
 
@@ -85,5 +85,19 @@ export function createBankStatementLine(payload: BankStatementLinePayload): Prom
 export function matchBankStatementLine(id: string, journal_entry: string): Promise<BankStatementLine> { return apiPost<BankStatementLine, { journal_entry: string }>(`/bank-statement-lines/${id}/match/`, { journal_entry }); }
 export function unmatchBankStatementLine(id: string): Promise<BankStatementLine> { return apiAction<BankStatementLine>(`/bank-statement-lines/${id}/unmatch/`); }
 export function getTrialBalance(params?: { date_from?: string; date_to?: string }): Promise<TrialBalance> { return apiGet<TrialBalance>("/accounting-reports/trial-balance/", { params }); }
+export function getIncomeStatement(params?: { date_from?: string; date_to?: string }): Promise<IncomeStatement> { return apiGet<IncomeStatement>("/accounting-reports/income-statement/", { params }); }
+export function getBalanceSheet(params?: { as_of?: string }): Promise<BalanceSheet> { return apiGet<BalanceSheet>("/accounting-reports/balance-sheet/", { params }); }
 export function listAccountingConfigurations(): Promise<PaginatedData<AccountingConfiguration>> { return apiGetList<AccountingConfiguration>("/accounting-configurations/"); }
 export function getAccountingSetupChoices(): Promise<AccountingSetupChoices> { return apiGet<AccountingSetupChoices>("/accounting-configurations/choices/"); }
+export function createAccountingConfiguration(payload: AccountingConfigurationPayload): Promise<AccountingConfiguration> { return apiPost<AccountingConfiguration, AccountingConfigurationPayload>("/accounting-configurations/", payload); }
+export function updateAccountingConfiguration(id: string, payload: Partial<AccountingConfigurationPayload>): Promise<AccountingConfiguration> { return apiPatch<AccountingConfiguration, Partial<AccountingConfigurationPayload>>(`/accounting-configurations/${id}/`, payload); }
+export function applyAccountingPreset(id: string, payload: { base_currency: string; fiscal_year_start_month: number; coa_template?: string }): Promise<AccountingPresetApplicationResult> { return apiPost<AccountingPresetApplicationResult, typeof payload>(`/accounting-preset-versions/${id}/apply/`, payload); }
+export function listTaxCodes(params?: ListParams & { preset_version?: string; is_active?: boolean }): Promise<PaginatedData<TaxCode>> { return apiGetList<TaxCode>("/tax-codes/", params); }
+export function listTaxComponents(params?: ListParams & { tax_code?: string }): Promise<PaginatedData<TaxComponent>> { return apiGetList<TaxComponent>("/tax-components/", params); }
+export function listWithholdingRules(params?: ListParams & { preset_version?: string; is_vat_withholding_rule?: boolean }): Promise<PaginatedData<WithholdingRule>> { return apiGetList<WithholdingRule>("/withholding-rules/", params); }
+export function listGhanaComplianceReminders(params?: ListParams & { status?: GhanaComplianceReminder["status"] }): Promise<PaginatedData<GhanaComplianceReminder>> { return apiGetList<GhanaComplianceReminder>("/ghana-compliance-reminders/", params); }
+export function listPayrollAccountMappingTemplates(params?: ListParams & { accounting_preset_version?: string }): Promise<PaginatedData<PayrollAccountMappingTemplate>> { return apiGetList<PayrollAccountMappingTemplate>("/payroll-account-mapping-templates/", params); }
+export function listPayComponentAccountMappings(params?: ListParams & { pay_component?: string; is_active?: boolean }): Promise<PaginatedData<PayComponentAccountMapping>> { return apiGetList<PayComponentAccountMapping>("/pay-component-account-mappings/", params); }
+export function createPayComponentAccountMapping(payload: PayComponentAccountMappingPayload): Promise<PayComponentAccountMapping> { return apiPost<PayComponentAccountMapping, PayComponentAccountMappingPayload>("/pay-component-account-mappings/", payload); }
+export function updatePayComponentAccountMapping(id: string, payload: Partial<PayComponentAccountMappingPayload>): Promise<PayComponentAccountMapping> { return apiPatch<PayComponentAccountMapping, Partial<PayComponentAccountMappingPayload>>(`/pay-component-account-mappings/${id}/`, payload); }
+export function applyPayrollAccountMappingTemplates(effective_from: string): Promise<PayComponentAccountMapping[]> { return apiPost<PayComponentAccountMapping[], { effective_from: string }>("/pay-component-account-mappings/apply-templates/", { effective_from }); }

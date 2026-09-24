@@ -14,6 +14,7 @@ from apps.institutions.models import (
     ReferenceSequence,
     Role,
     InstitutionInvitation,
+    UserActivityEvent,
 )
 from apps.audit.services import record_audit_event
 from common.exceptions import CodedValidationError
@@ -131,6 +132,7 @@ PERMISSIONS = {
     "settings.roles.manage": "Manage custom roles and permissions",
     "settings.notifications.manage": "Manage notification settings",
     "settings.security.manage": "Manage institution security settings",
+    "audit.view": "View institution audit history",
     "onboarding.view": "View institution onboarding state",
     "onboarding.manage": "Manage institution onboarding",
     "job_posting.view": "View job postings",
@@ -295,12 +297,9 @@ ROLE_PERMISSION_CODES = {
         "settings.profile.manage_self",
         "institution.view",
         "payroll.view",
-        "payroll.approve",
-        "payroll.finalize",
+        "payroll.prepare",
         "payslip.view",
         "tax_relief.view",
-        "tax_relief.approve",
-        "dashboard.payroll.view",
         "account.view",
         "account.create",
         "account.update",
@@ -358,6 +357,8 @@ ROLE_PERMISSION_CODES = {
         "dashboard.executive.view",
         "dashboard.finance.view",
         "report.view",
+        "audit.view",
+        "approval_request.view",
     ),
 }
 
@@ -389,6 +390,26 @@ def _assert_active_actor(actor, institution):
         raise CodedValidationError(
             "Actor must have an active membership.", api_code="membership_inactive"
         )
+
+
+def record_user_activity(*, actor, institution, activity_code, entity=None):
+    """Record a tenant-scoped, resumable user action for the Home workspace.
+
+    This is intentionally an append-only experience event, not an audit-log
+    substitute. Call it inside the domain transaction after the authoritative
+    write succeeds so a rolled-back workflow never appears as recent work.
+    """
+    _assert_active_actor(actor, institution)
+    if entity is not None and getattr(entity, "institution_id", None) != institution.id:
+        raise ValidationError({"entity": "Activity entity must belong to the current institution."})
+    return UserActivityEvent.objects.create(
+        user=actor,
+        institution=institution,
+        activity_code=activity_code,
+        entity_type=entity._meta.label if entity is not None else "",
+        entity_id=entity.pk if entity is not None else None,
+        occurred_at=timezone.now(),
+    )
 
 
 def _validate_delegable_permissions(permission_codes):
@@ -979,3 +1000,17 @@ def create_invitation(*, email, institution, role, actor, expires_at, employee=N
     invitation = InstitutionInvitation.objects.create(institution=institution, email=normalized_email, role=role, employee=employee, token_hash=salted_hmac("institution-invitation", token).hexdigest(), invited_by=actor, expires_at=expires_at)
     record_audit_event(actor=actor, institution=institution, entity=invitation, action="access.invitation.created", metadata={"email": invitation.email, "role": role.code})
     return invitation, token
+
+
+@transaction.atomic
+def revoke_invitation(*, invitation, institution, actor):
+    """Revoke a pending invitation without changing any established membership."""
+    _assert_active_actor(actor, institution)
+    if invitation.institution_id != institution.id:
+        raise ValidationError({"invitation": "Invitation must belong to the current institution."})
+    if invitation.status != InstitutionInvitation.Status.PENDING:
+        raise CodedValidationError("Only pending invitations can be revoked.", api_code="invitation_not_pending")
+    invitation.status = InstitutionInvitation.Status.REVOKED
+    invitation.save(update_fields=("status", "updated_at"))
+    record_audit_event(actor=actor, institution=institution, entity=invitation, action="access.invitation.revoked", metadata={"email": invitation.email, "role": invitation.role.code})
+    return invitation

@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   X,
 } from "lucide-react";
 
@@ -14,6 +15,7 @@ import {
   selfServiceNavigation,
 } from "@/components/navigation/navigation";
 import { useAuth } from "@/components/guards/AuthProvider";
+import { useState } from "react";
 import { hasModule } from "@/types/institutions";
 
 interface SidebarProps {
@@ -31,22 +33,21 @@ export default function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   const { user, institution } = useAuth();
+  const permissions = user?.permissions ?? [];
+  const [expanded, setExpanded] = useState<string[]>([]);
 
   const hasAccess = (item: {
     module?: string;
-    roles?: string[];
     permission?: string;
-    excludedRoles?: string[];
-    allowedRoles?: string[];
+    anyPermissions?: string[];
+    selfService?: boolean;
   }) => {
-    if (item.allowedRoles && !item.allowedRoles.includes(user?.role ?? "")) {
+    const permissions = user?.permissions ?? [];
+    const hasPermission = (permission: string) => permissions.includes("*") || permissions.includes(permission);
+    const selfServiceEligible = ["leave.request", "attendance.clock", "payslip.view", "tax_relief.claim"].some(hasPermission);
+    if (item.selfService && !selfServiceEligible) {
       return false;
     }
-
-    if (item.excludedRoles?.includes(user?.role ?? "")) {
-      return false;
-    }
-
     if (
       item.module &&
       !hasModule(institution?.enabledModules, item.module)
@@ -56,9 +57,12 @@ export default function Sidebar({
 
     if (
       item.permission &&
-      !user?.permissions.includes("*") &&
-      !user?.permissions.includes(item.permission)
+      !hasPermission(item.permission)
     ) {
+      return false;
+    }
+
+    if (item.anyPermissions?.length && !item.anyPermissions.some(hasPermission)) {
       return false;
     }
 
@@ -192,9 +196,11 @@ export default function Sidebar({
               const Icon = item.icon;
               const active = isActive(item.href);
 
+              const childItems = item.children?.filter((child) => (!child.module || hasModule(institution?.enabledModules, child.module)) && (!child.permission || permissions.includes("*") || permissions.includes(child.permission)));
               return (
+                <div key={item.href}>
+                <div className={`flex items-center rounded-lg ${active ? "bg-slate-100 text-slate-900" : "text-slate-600"}`}>
                 <Link
-                  key={item.href}
                   href={item.href}
                   onClick={closeMobile}
                   title={
@@ -202,8 +208,7 @@ export default function Sidebar({
                       ? item.label
                       : undefined
                   }
-                  className={`
-                    group flex items-center rounded-lg
+                  className={`group flex-1 flex items-center rounded-lg
                     text-sm font-medium
                     transition-colors
                     ${
@@ -235,6 +240,10 @@ export default function Sidebar({
                     </span>
                   )}
                 </Link>
+                {!collapsed && childItems?.length ? <button type="button" onClick={() => setExpanded((items) => items.includes(item.href) ? items.filter((value) => value !== item.href) : [...items, item.href])} className="rounded-lg p-2 text-slate-400" aria-label={`Expand ${item.label}`}><ChevronDown className={`h-4 w-4 transition ${expanded.includes(item.href) ? "rotate-180" : ""}`} /></button> : null}
+                </div>
+                {!collapsed && childItems?.length && expanded.includes(item.href) && <div className="ml-8 mt-1 space-y-1">{childItems.map((child) => <Link key={child.href} href={child.href} onClick={closeMobile} className={`block rounded-lg px-3 py-2 text-xs font-medium ${isActive(child.href) ? "bg-sky-50 text-sky-800" : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"}`}>{child.label}</Link>)}</div>}
+                </div>
               );
             })}
           </div>

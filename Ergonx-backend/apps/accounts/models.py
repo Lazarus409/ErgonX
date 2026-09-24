@@ -27,6 +27,37 @@ class User(BaseModel, AbstractUser):
         return self.email
 
 
+class UserMFA(BaseModel):
+    """Optional authenticator-app MFA state for one account."""
+
+    class Method(models.TextChoices):
+        AUTHENTICATOR_APP = "AUTHENTICATOR_APP", "Authenticator app"
+        EMAIL_OTP = "EMAIL_OTP", "Email one-time code"
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="mfa")
+    secret = models.CharField(max_length=64)
+    method = models.CharField(max_length=24, choices=Method.choices, default=Method.AUTHENTICATOR_APP)
+    is_enabled = models.BooleanField(default=False)
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"MFA for {self.user.email}"
+
+
+class EmailOTPChallenge(BaseModel):
+    """Short-lived, one-time email MFA challenge; only a digest is persisted."""
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="email_otp_challenges")
+    code_digest = models.CharField(max_length=128)
+    expires_at = models.DateTimeField()
+    sent_at = models.DateTimeField()
+    attempts = models.PositiveSmallIntegerField(default=0)
+    consumed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [models.Index(fields=("user", "expires_at", "consumed_at"))]
+
+
 class InstitutionAdminInvitation(BaseModel):
     """A platform-issued invitation to establish a new tenant."""
 

@@ -1,103 +1,81 @@
 "use client";
 
+import { Building2, Pencil, Save } from "lucide-react";
 import { useCallback, useState } from "react";
+import Image from "next/image";
 
-import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import { useAuth } from "@/components/guards/AuthProvider";
 import ErrorState from "@/components/ui/ErrorState";
 import LoadingState from "@/components/ui/LoadingState";
 import PageHeader from "@/components/ui/PageHeader";
-import { getApiErrorMessage, institutionsApi } from "@/lib/api";
+import { getApiErrorMessage, imagesApi, institutionsApi } from "@/lib/api";
 import { useApiResource } from "@/lib/useApiResource";
-import type { InstitutionSetting } from "@/types/institutions";
 
-function valueToJson(value: unknown): string {
-  return JSON.stringify(value, null, 2);
+type FormValues = { name: string; email: string; phone: string; address: string; country_code: string; default_currency: string; timezone: string; institution_type: string; executive_title: string };
+const institutionTypes = [
+  { value: "PRIVATE", label: "Private / Commercial" },
+  { value: "SME", label: "SME" },
+  { value: "GOVERNMENT", label: "Government / Public Sector" },
+  { value: "NGO", label: "NGO / Nonprofit" },
+  { value: "EDUCATION", label: "Educational Institution" },
+  { value: "HEALTHCARE", label: "Healthcare Institution" },
+  { value: "OTHER", label: "Other" },
+];
+
+function formValues(context: Awaited<ReturnType<typeof institutionsApi.getCurrentInstitution>>): FormValues {
+  const item = context.institution;
+  return { name: item.name, email: item.email, phone: item.phone, address: item.address, country_code: item.country_code, default_currency: item.default_currency, timezone: item.timezone, institution_type: item.institution_type, executive_title: item.executive_title ?? "Executive" };
 }
 
 export default function InstitutionSettingsPage() {
-  const load = useCallback(() => institutionsApi.listInstitutionSettings(), []);
+  const { user, refreshSession } = useAuth();
+  const load = useCallback(async () => {
+    const [context, catalogues] = await Promise.all([institutionsApi.getCurrentInstitution(), institutionsApi.getLocaleCatalogues()]);
+    return { context, catalogues };
+  }, []);
   const { data, loading, error, reload } = useApiResource(load);
-  const [editing, setEditing] = useState<InstitutionSetting | null | undefined>(undefined);
-  const [key, setKey] = useState("");
-  const [value, setValue] = useState("{}");
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [confirming, setConfirming] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<FormValues | null>(null);
   const [saving, setSaving] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [logoId, setLogoId] = useState<string | null>(null);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoProgress, setLogoProgress] = useState(0);
+  const canManage = user?.permissions.includes("*") || user?.permissions.includes("settings.institution.manage");
+  const values = draft ?? (data ? formValues(data.context) : null);
 
-  const openCreate = () => {
-    setEditing(null);
-    setKey("");
-    setValue("{}");
-    setActionError(null);
+  const startEditing = () => { if (data) { setDraft(formValues(data.context)); setActionError(null); setEditing(true); } };
+  const update = <K extends keyof FormValues>(key: K, value: FormValues[K]) => setDraft((current) => ({ ...(current ?? formValues(data!.context)), [key]: value }));
+  const save = async () => {
+    if (!draft) return;
+    setSaving(true); setActionError(null);
+    try { await institutionsApi.updateCurrentInstitution(draft); await refreshSession(); setEditing(false); setDraft(null); await reload(); }
+    catch (caught) { setActionError(getApiErrorMessage(caught)); }
+    finally { setSaving(false); }
   };
-  const openEdit = (setting: InstitutionSetting) => {
-    setEditing(setting);
-    setKey(setting.key);
-    setValue(valueToJson(setting.value));
+  const uploadLogo = async (file: File | undefined) => {
+    if (!file || !canManage || !data) return;
     setActionError(null);
-  };
-  const requestSave = (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!key.trim()) {
-      setActionError("A setting key is required.");
+    if (!["image/jpeg", "image/png", "image/gif"].includes(file.type) || file.size > 5 * 1024 * 1024) {
+      setActionError("Institution logos must be JPEG, PNG, or GIF files no larger than 5 MB.");
       return;
     }
+    setLogoUploading(true); setLogoProgress(0);
     try {
-      JSON.parse(value);
-      setActionError(null);
-      setConfirming(true);
-    } catch {
-      setActionError("Setting value must be valid JSON.");
-    }
-  };
-  const save = async () => {
-    setSaving(true);
-    setActionError(null);
-    try {
-      await institutionsApi.saveInstitutionSetting(key.trim(), JSON.parse(value) as unknown);
-      setConfirming(false);
-      setEditing(undefined);
-      reload();
-    } catch (caught) {
-      setActionError(getApiErrorMessage(caught));
-      setConfirming(false);
-    } finally {
-      setSaving(false);
-    }
+      const image = await imagesApi.uploadImage(file, "INSTITUTION", data.context.institution.id, setLogoProgress);
+      setLogoId(image.id);
+    } catch (caught) { setActionError(getApiErrorMessage(caught)); }
+    finally { setLogoUploading(false); }
   };
 
   if (loading) return <LoadingState />;
-  if (error || !data) {
-    return <ErrorState message={error ?? "You may not have permission to view institution settings."} onRetry={reload} />;
-  }
-
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Institution Settings"
-        description="Only non-sensitive settings exposed by the backend are displayed. Editing requires institution-settings permission."
-      />
-
-      <div className="flex justify-end">
-        <button onClick={openCreate} className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">Add setting</button>
-      </div>
-
-      {editing !== undefined && (
-        <form onSubmit={requestSave} className="rounded-2xl border border-slate-200 bg-white p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div><h2 className="font-semibold text-slate-900">{editing ? `Edit ${editing.key}` : "Add institution setting"}</h2><p className="mt-1 text-sm text-slate-500">Values are sent as structured JSON and validated by the backend.</p></div>
-            <button type="button" onClick={() => setEditing(undefined)} className="text-sm font-medium text-slate-600">Cancel</button>
-          </div>
-          <label className="mt-5 block text-sm font-medium text-slate-700">Setting key<input value={key} disabled={Boolean(editing)} onChange={(event) => setKey(event.target.value)} placeholder="example.feature" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 disabled:bg-slate-100" /></label>
-          <label className="mt-4 block text-sm font-medium text-slate-700">JSON value<textarea value={value} onChange={(event) => setValue(event.target.value)} rows={8} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-mono text-sm" /></label>
-          {actionError && <p className="mt-3 text-sm text-red-600">{actionError}</p>}
-          <div className="mt-5 flex justify-end"><button className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white">Review changes</button></div>
-        </form>
-      )}
-
-      <div className="rounded-2xl border border-slate-200 bg-white"><div className="divide-y divide-slate-100">{data.length === 0 ? <p className="p-6 text-sm text-slate-500">No institution settings are available for your role.</p> : data.map((item) => <div key={item.id} className="flex items-start gap-4 p-5"><div className="min-w-0 flex-1"><p className="font-medium text-slate-900">{item.key}</p><pre className="mt-2 overflow-auto rounded-lg bg-slate-50 p-3 text-xs text-slate-600">{valueToJson(item.value)}</pre><p className="mt-2 text-xs text-slate-400">Updated {new Date(item.updated_at).toLocaleString()}</p></div><button onClick={() => openEdit(item)} className="shrink-0 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700">Edit</button></div>)}</div></div>
-
-      <ConfirmDialog open={confirming} title={editing ? "Update institution setting?" : "Add institution setting?"} description="This changes a non-sensitive setting for the selected institution. The backend remains authoritative for validation and access control." confirmLabel={editing ? "Update setting" : "Add setting"} loading={saving} onConfirm={() => void save()} onCancel={() => setConfirming(false)} />
-    </div>
-  );
+  if (error || !data || !values) return <ErrorState title="Unable to load institution settings" message={error ?? "Institution details are unavailable."} onRetry={reload} />;
+  const { institution } = data.context;
+  return <div className="mx-auto max-w-5xl space-y-6"><PageHeader title="Institution Settings" description="Identity and operational locale for the active institution." actions={canManage ? <button type="button" onClick={() => editing ? void save() : startEditing()} disabled={saving} className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60">{editing ? <Save size={16} /> : <Pencil size={16} />}{saving ? "Saving…" : editing ? "Save changes" : "Edit institution"}</button> : undefined} />
+    {actionError && <ErrorState title="Unable to save institution settings" message={actionError} onRetry={reload} />}
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><div className="flex gap-3"><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-700"><Building2 size={21} /></span><div><h2 className="font-semibold text-slate-950">{institution.name}</h2><p className="mt-1 text-sm text-slate-500">Institution code: {institution.code}</p></div></div><div className="mt-6 grid gap-5 sm:grid-cols-2"><Field label="Institution name" editing={editing}><input disabled={!editing} value={values.name} onChange={(event) => update("name", event.target.value)} /></Field><Field label="Institution type" editing={editing}><select disabled={!editing} value={values.institution_type} onChange={(event) => update("institution_type", event.target.value)}>{!institutionTypes.some((type) => type.value === values.institution_type) && <option value={values.institution_type}>{values.institution_type}</option>}{institutionTypes.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}</select></Field><Field label="Executive title" editing={editing}><input disabled={!editing} value={values.executive_title} onChange={(event) => update("executive_title", event.target.value)} placeholder="Executive" /></Field><Field label="Contact email" editing={editing}><input disabled={!editing} type="email" value={values.email} onChange={(event) => update("email", event.target.value)} /></Field><Field label="Phone" editing={editing}><input disabled={!editing} value={values.phone} onChange={(event) => update("phone", event.target.value)} /></Field><Field label="Address" editing={editing} wide><textarea disabled={!editing} rows={3} value={values.address} onChange={(event) => update("address", event.target.value)} /></Field></div><div className="mt-6 rounded-xl border border-slate-200 p-4"><p className="text-sm font-semibold text-slate-900">Institution logo</p><p className="mt-1 text-xs text-slate-500">Private tenant-scoped image, up to 5 MB.</p>{canManage && <input className="mt-3 block w-full text-sm" type="file" accept="image/jpeg,image/png,image/gif" disabled={logoUploading} onChange={(event) => void uploadLogo(event.target.files?.[0])} />}{logoUploading && <p className="mt-2 text-xs text-slate-500">Uploading… {logoProgress}%</p>}{logoId && <Image src={imagesApi.imageContentUrl(logoId)} alt="Institution logo preview" width={64} height={64} unoptimized className="mt-3 h-16 w-16 rounded-xl object-contain" />}</div></section>
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><h2 className="font-semibold text-slate-950">Locale and currency</h2><p className="mt-1 text-sm text-slate-500">Country, reporting currency, and time zone are intentionally independent choices.</p><div className="mt-6 grid gap-5 sm:grid-cols-3"><Field label="Country" editing={editing}><input disabled={!editing} list="countries" value={values.country_code} onChange={(event) => update("country_code", event.target.value.toUpperCase())} /><datalist id="countries">{data.catalogues.countries.map((item) => <option key={item.code} value={item.code}>{item.name}</option>)}</datalist></Field><Field label="Default currency" editing={editing}><input disabled={!editing} list="currencies" value={values.default_currency} onChange={(event) => update("default_currency", event.target.value.toUpperCase())} /><datalist id="currencies">{data.catalogues.currencies.map((item) => <option key={item.code} value={item.code}>{item.name} ({item.symbol})</option>)}</datalist></Field><Field label="Time zone" editing={editing}><input disabled={!editing} list="timezones" value={values.timezone} onChange={(event) => update("timezone", event.target.value)} /><datalist id="timezones">{data.catalogues.timezones.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</datalist></Field></div>{editing && (() => { const suggestion = data.catalogues.countries.find((item) => item.code === values.country_code)?.default_currency; return suggestion && suggestion !== values.default_currency ? <p className="mt-4 rounded-xl border border-sky-100 bg-sky-50 px-3 py-2 text-sm text-sky-900">Suggested currency for {values.country_code}: <strong>{suggestion}</strong>. <button type="button" onClick={() => update("default_currency", suggestion)} className="font-semibold underline">Use suggestion</button></p> : null; })()}{editing && <div className="mt-6 flex justify-end gap-3"><button type="button" onClick={() => { setEditing(false); setDraft(null); }} className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button><button type="button" disabled={saving} onClick={() => void save()} className="rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">Save changes</button></div>}</section>
+  </div>;
 }
+
+function Field({ label, editing, wide = false, children }: { label: string; editing: boolean; wide?: boolean; children: React.ReactNode }) { return <label className={`block text-sm font-medium text-slate-700 ${wide ? "sm:col-span-2" : ""}`}><span>{label}</span><span className="mt-1.5 block [&>input]:w-full [&>input]:rounded-xl [&>input]:border [&>input]:border-slate-200 [&>input]:bg-slate-50 [&>input]:px-3 [&>input]:py-2.5 [&>input]:text-sm [&>input:disabled]:cursor-default [&>input:disabled]:border-transparent [&>input:disabled]:bg-slate-50 [&>select]:w-full [&>select]:rounded-xl [&>select]:border [&>select]:border-slate-200 [&>select]:bg-slate-50 [&>select]:px-3 [&>select]:py-2.5 [&>select]:text-sm [&>select:disabled]:cursor-default [&>select:disabled]:border-transparent [&>textarea]:w-full [&>textarea]:rounded-xl [&>textarea]:border [&>textarea]:border-slate-200 [&>textarea]:bg-slate-50 [&>textarea]:px-3 [&>textarea]:py-2.5 [&>textarea]:text-sm [&>textarea:disabled]:cursor-default [&>textarea:disabled]:border-transparent">{children}</span>{!editing && <span className="sr-only">Read only</span>}</label>; }

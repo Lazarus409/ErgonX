@@ -179,6 +179,10 @@ All catalog endpoints require `payroll.view`. They are globally defined system/c
 | GET | `payslips/` | List payslips, self-scoped for Employee role | `payslip.view` | `payroll_record`, `generated_at`, `ordering` | — | Paginated `Payslip[]` | tenant/module/permission denial |
 | GET | `payslips/{id}/` | Retrieve payslip and immutable payload | `payslip.view` | — | — | `Payslip` | not found or hidden by self scope |
 
+`Payslip` includes a server-owned `payroll_period` summary with `id`, `name`,
+`start_date`, `end_date`, `pay_date`, and `status`. The frontend must render
+this returned summary and must not infer a period from a label or local date.
+
 ## Example payloads
 
 ### Request data shapes

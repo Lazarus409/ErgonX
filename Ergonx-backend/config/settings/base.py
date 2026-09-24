@@ -2,8 +2,15 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
+from corsheaders.defaults import default_headers
+from dotenv import load_dotenv
+
 
 BASE_DIR = Path(__file__).resolve().parents[2]
+# Local development settings come from the ignored project `.env` file. Existing
+# process environment variables take precedence, which keeps container and
+# production deployments explicitly configured by their runtime environment.
+load_dotenv(BASE_DIR / ".env")
 
 SECRET_KEY = os.environ.get(
     "DJANGO_SECRET_KEY", "unsafe-development-only-key-change-before-production"
@@ -57,6 +64,7 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
+    "common.security.ApiContentSecurityPolicyMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "apps.audit.middleware.AuditRequestContextMiddleware",
@@ -164,6 +172,7 @@ CORS_ALLOWED_ORIGINS = [
     if origin.strip()
 ]
 CORS_ALLOW_CREDENTIALS = os.environ.get("CORS_ALLOW_CREDENTIALS", "false").lower() == "true"
+CORS_ALLOW_HEADERS = (*default_headers, "x-institution-id")
 
 # Outbound email remains disabled until SMTP has been explicitly configured.
 # This prevents local/demo environments from accidentally sending real emails.

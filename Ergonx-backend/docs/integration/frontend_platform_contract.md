@@ -2,7 +2,7 @@
 
 Contract version: 1.0  
 API version: v1  
-Implementation baseline: 2026-09-13
+Implementation baseline: 2026-09-21
 
 ## Scope
 
@@ -104,24 +104,33 @@ Default list pagination uses page-number pagination:
 - default page size 25;
 - maximum page size 100.
 
-## PWA Shell
+## PWA application-shell baseline
 
-The frontend is installable through:
+The active frontend is `ergonx-frontend/`. It provides a production-only
+installable shell: `/manifest.webmanifest` declares the standalone ErgonX app,
+`ServiceWorkerRegistration` registers `/sw.js`, and `/offline` is a static,
+honest reconnection fallback.
 
-- `frontend/public/manifest.webmanifest`;
-- `frontend/public/sw.js`;
-- `frontend/app/offline/page.tsx`;
-- `frontend/app/register-sw.tsx`.
+The worker pre-caches only the manifest, logo, and offline page, then
+runtime-caches only same-origin static script/style/font/image assets. It never
+caches navigation pages, `/api/` requests, report exports, JWTs,
+selected-institution values, or tenant data, and it never queues writes. An
+offline user sees the reconnection page rather than stale HR, payroll,
+attendance, leave, accounting, approval, import, export, or document data.
 
-Current PWA contract:
+## Browser session boundary
 
-- Cache only app-shell/static frontend assets.
-- Do not cache authenticated API responses.
-- Do not cache report export files.
-- Do not queue offline HR, payroll, attendance, leave, accounting, approval, import, export, or document writes.
-- Show the offline fallback page when navigation cannot reach the app shell.
+Browser calls use the same-origin `/api/v1/*` Next.js BFF route. Login and
+refresh responses are stripped of bearer tokens before reaching JavaScript;
+the BFF stores access and refresh tokens in `HttpOnly`, `SameSite=Lax` cookies
+and attaches the access token only when forwarding to Django. The browser keeps
+only a non-sensitive local session hint and selected institution UUID.
 
-Security note: the current browser implementation stores JWT access/refresh tokens and the selected institution UUID in local storage. This is tracked as `PWA-002` in `DEVELOPMENT_DISCREPANCIES_AND_LIMITATIONS.md`; production launch should either move to an HttpOnly-cookie/BFF design or explicitly harden and accept the local-storage token model.
+Unsafe proxy methods reject a supplied cross-origin `Origin` value. The proxy
+does not cache API responses, and its own logout route clears both token
+cookies. HTTPS deployments receive `Secure` cookies; local HTTP loopback is
+supported for development. CSP and related headers remain defence in depth,
+not a replacement for server-side authorization.
 
 ## Dashboard Contract
 
@@ -135,18 +144,77 @@ Routes:
 
 | Method | Path | Purpose | Response data |
 |---|---|---|---|
-| GET | `/dashboards/executive/` | Institution-level executive rollup | employee counts, pending leave, pending journals, finalized payroll cost |
-| GET | `/dashboards/hr/` | HR workforce rollup | employee counts, status mix, hire-year distribution |
-| GET | `/dashboards/leave/` | Leave rollup | pending, currently-on-leave, upcoming counts |
-| GET | `/dashboards/attendance/` | Today's attendance rollup | present, late, absent, overtime minutes |
-| GET | `/dashboards/payroll/` | Payroll operations rollup | latest run, pending runs, finalized gross pay |
-| GET | `/dashboards/finance/` | Finance operations rollup | pending journals, open AP, open AR, posted expenses |
+| GET | `/dashboards/executive/` | Institution-level executive rollup | employee counts, pending leave/journals, finalized payroll cost, current attendance, operational financial position including registered-bank balance/account count, tenant-scoped recruitment activity (open jobs, active candidates, applications, scheduled interviews, and extended offers), finalized payroll-by-period series, posted-ledger P&L, and registered-bank cash movement (`month`, `inflow`, `outflow`, `net_movement`) |
+| GET | `/dashboards/hr/` | HR workforce rollup | employee counts, status mix, hire-year distribution, active-current-employment distributions (department, grade, location, employment type), and five recent active hires |
+| GET | `/dashboards/leave/` | Leave rollup | pending, currently-on-leave, upcoming counts, approved leave-type distribution, six-month approved-leave activity series, and current-year aggregated balance utilisation (`entitlement_days`, `used_days`, `available_days`, nullable `utilisation_percent`) |
+| GET | `/dashboards/attendance/` | Attendance operations rollup | today's present/late/absent/overtime totals, a seven-day attendance series, and today-by-current-department attendance counts |
+| GET | `/dashboards/payroll/` | Payroll operations rollup | latest run, pending runs, finalized gross/net pay, deductions, employer contributions, run-status mix, and finalized payroll-by-period series |
+| GET | `/dashboards/finance/` | Finance operations rollup | pending journals, open AP, open AR, posted expenses, registered-bank balance/account count, AP/AR aging buckets, journal status mix, a six-point maximum posted-ledger P&L series (`month`, `income`, `expenses`, `net_income`), and a six-point maximum registered-bank cash-movement series (`month`, `inflow`, `outflow`, `net_movement`) |
 
 Frontend behavior:
 
 - Treat all numeric totals as tenant-scoped summaries, not ledger-grade financial statements.
+- `weekly_attendance` contains exactly the current date and six preceding calendar dates; a day without recorded attendance is returned as zero values rather than omitted.
+- HR employment distributions include only active employees with one current employment record. They must not be interpreted as all historical employment assignments.
 - Render missing latest payroll run fields as an empty state when `latest_run_id` is `null`.
 - Refresh dashboards after workflow actions that can change counts or totals.
+- `bank_balance` and `cash_flow_trend` include only active `BankAccount.ledger_account` records and posted journals. An arbitrary asset account is not treated as cash; empty bank configuration yields zero balance and an empty movement series.
+
+## Audit History Contract
+
+## Accounting localisation catalogue contract
+
+The Accounting module exposes the authoritative tax and withholding catalogue
+attached to a preset. These are read-only catalogue endpoints: a browser must
+never derive, modify, or substitute statutory rates.
+
+All routes require an active institution, the `ACCOUNTING` module, and
+`account.view`:
+
+| Method | Path | Supported selectors | Purpose |
+|---|---|---|---|
+| GET | `/tax-codes/` | `preset_version`, `code`, `tax_treatment`, `is_active`, `effective_from` | Tax codes and their effective dates |
+| GET | `/tax-components/` | `tax_code`, `code`, `sequence` | Rate components for a tax code |
+| GET | `/withholding-rules/` | `preset_version`, `code`, `residency`, `transaction_category`, `is_vat_withholding_rule`, `requires_confirmation`, `effective_from` | Withholding rules and thresholds |
+| GET | `/ghana-compliance-reminders/` | `code`, `status`, `due_date` | Institution-owned Ghana compliance reminders |
+
+Frontend behaviour:
+
+- Read the current institution accounting configuration first. Only request
+  catalogue records for its `selected_accounting_preset_version`.
+- If no preset is selected, render the configuration-required state and link
+  to the authorized accounting-setup route; do not display country-default
+  rates or inferred rules.
+- Query tax components by each returned tax-code UUID. Do not download a
+  global component list and filter it in the browser.
+- Treat all rates and effective dates as display-only data. Applying a preset
+  remains the separately confirmed backend workflow.
+- `/ghana-compliance-reminders/` requires `financial_report.view` for reads;
+  only show that optional compliance section when the active membership has
+  that permission. Never represent an inaccessible reminder list as empty.
+
+`GET /audit/` requires `audit.view`, an active institution context, and returns
+only that institution's audit records. It is read-only and paginated. Supported
+filters are `from`, `to`, `actor`, `action`, `entity_type`, `entity_id`, and
+`q`. `entity_id` must be a UUID. Sensitive metadata values are redacted by the
+API before the frontend receives them.
+
+## Notifications Contract
+
+All notification endpoints require `home.view`, an active institution context,
+and return only the authenticated recipient's in-app notifications in that
+institution. They never expose notification metadata to another recipient.
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/notifications/` | Paginated notification history; pass `unread=true` for unread items only |
+| POST | `/notifications/{id}/mark-read/` | Mark one recipient-owned notification read |
+| POST | `/notifications/mark-all-read/` | Mark the active recipient's in-app notifications read |
+
+The frontend top-bar tray may show a compact unread subset. `/notifications`
+is the full history surface. A successful mark-read response is authoritative;
+the UI must not optimistically claim a notification is read before that
+response returns.
 
 ## Reports Contract
 
@@ -160,13 +228,14 @@ Routes:
 
 | Method | Path | Purpose | Optional query | Response |
 |---|---|---|---|---|
-| GET | `/reports/workforce-cost/` | Employee count by status plus payroll totals | `export=csv` | JSON rows or CSV download |
-| GET | `/reports/leave/` | Leave requests by status | `export=csv` | JSON rows or CSV download |
-| GET | `/reports/attendance/` | Attendance records by status | `export=csv` | JSON rows or CSV download |
-| GET | `/reports/payroll/` | Payroll records by run status | `export=csv` | JSON rows or CSV download |
-| GET | `/reports/accounting/` | Journal count by source/status | `export=csv` | JSON rows or CSV download |
+| GET | `/reports/workforce-cost/` | Employee count by status plus payroll totals | `export=csv`, `status` | JSON rows or CSV download |
+| GET | `/reports/recruitment/` | Recruitment applications by status | `export=csv`, `status` | JSON rows or CSV download |
+| GET | `/reports/leave/` | Leave requests by status | `export=csv`, `status` | JSON rows or CSV download |
+| GET | `/reports/attendance/` | Attendance records by status | `export=csv`, `status` | JSON rows or CSV download |
+| GET | `/reports/payroll/` | Payroll records by run status | `export=csv`, `status` | JSON rows or CSV download |
+| GET | `/reports/accounting/` | Journal count by source/status | `export=csv`, `status` | JSON rows or CSV download |
 | GET | `/reports/ap-ar/` | Open AP and AR amounts | `export=csv` | JSON rows or CSV download |
-| GET | `/reports/expenses/` | Expense count and amount by status | `export=csv` | JSON rows or CSV download |
+| GET | `/reports/expenses/` | Expense count and amount by status | `export=csv`, `status` | JSON rows or CSV download |
 
 JSON shape:
 
@@ -184,7 +253,7 @@ JSON shape:
 
 Frontend behavior:
 
-- Use `export=csv` for spreadsheet-ready downloads.
+- Use `export=csv` for spreadsheet-ready downloads. Report selectors also accept `date_from` and `date_to` (`YYYY-MM-DD`) where the source model has a date boundary; invalid or reversed ranges fail clearly rather than returning misleading totals.
 - Treat CSV responses as file downloads, not JSON.
 - Native XLSX/PDF rendering and scheduled/generated report artifacts are not part of the current MVP contract; see `REPORT-001`.
 
@@ -382,10 +451,10 @@ Import create payload:
 
 ```json
 {
-  "import_type": "EMPLOYEE",
-  "file_reference": "imports/employees-2026-09.csv",
+  "import_type": "ATTENDANCE",
+  "file_reference": "imports/attendance-2026-09.csv",
   "metadata": {
-    "schema_version": "employee-import-v1"
+    "schema_version": "attendance-import-v1"
   }
 }
 ```
@@ -407,12 +476,23 @@ Row result status values:
 - `IMPORTED`;
 - `SKIPPED`.
 
+Implemented import handler schemas:
+
+- `EMPLOYEE`: existing employee-import v1 schema.
+- `ATTENDANCE`: `attendance-import-v1` requires normalized
+  `employee_number`, `attendance_date` (ISO date), and `status`. It accepts
+  optional ISO `check_in`/`check_out`, minute totals, and `notes`. Employee
+  lookup is tenant-scoped; a row is skipped if that employee already has any
+  attendance record on that date (scheduled or unscheduled). Successfully
+  committed records are always marked with source `IMPORT`.
+
 Export routes:
 
 | Method | Path | Purpose | Permission |
 |---|---|---|---|
 | GET/POST | `/export-jobs/` | List/create export job records | `export_job.view/create` |
 | GET | `/export-jobs/{id}/` | Read export job | `export_job.view` |
+| GET | `/export-jobs/{id}/download/` | Download completed CSV artifact | `export_job.view`; returns `409` until complete |
 
 Export create payload:
 
@@ -455,20 +535,33 @@ Frontend behavior:
 - `confirm` returns HTTP 409 when the job is not `READY`.
 - Poll the import/export/background-job record for completion status; do not assume create means the work has finished.
 - Display `error_summary` for failed jobs.
-- The only committed import handler currently documented as implemented is `EMPLOYEE`.
-- Export job creation currently records and queues the request; generated file artifacts require type-specific handlers. See `OPS-001` and `REPORT-001`.
+- Committed import handlers are `EMPLOYEE` and `ATTENDANCE`; use their versioned
+  schemas rather than inferring a generic column format.
+- Export job creation records and queues a normalized report type (`REPORT_WORKFORCE_COST` or `workforce-cost` forms are accepted). The worker generates a tenant-scoped CSV artifact and the download action returns `409` until the job is complete; artifacts are bounded to 10 MB inline storage. Non-report exports still require explicit handlers.
 
 ## Current Frontend Limitations
 
 The following limitations are intentionally part of the current contract and are tracked in `DEVELOPMENT_DISCREPANCIES_AND_LIMITATIONS.md`:
 
-- `PWA-001`: offline support is application-shell only.
-- `PWA-002`: browser session tokens are stored in local storage pending production security decision.
+- `PWA-001`: resolved by the static-only production PWA shell; see the cache boundary above.
+- `PWA-002`: resolved by the same-origin HttpOnly-cookie/BFF session boundary.
 - `PWA-003`: initial operational module screens are read-oriented.
 - `REPORT-001`: MVP report exports are CSV only.
-- `OPS-001`: import/export infrastructure requires type-specific handlers.
+- `OPS-001`: report CSV export jobs are now handled; non-report import/export types still require explicit schema/version/idempotency handlers.
 
 ## Existing Module Contracts
+
+## Release-candidate cross-cutting additions
+
+- Authentication accepts an optional `mfa_code` on `POST /api/auth/login/`. When MFA is enabled for the user, the API returns `401` with `api_code=mfa_required` until a valid six-digit TOTP is supplied. MFA setup is managed through `GET|POST|PUT|DELETE /api/auth/security/mfa/`; setup returns an `otpauth_uri`, while confirmation enables the secret.
+- Profile payloads expose `avatar_key`; the self-service profile screen persists the selected key through the normal profile update endpoint.
+- Audit rows expose `ip_address` and `user_agent`; clients should display the IP as a normal table column and treat null as unavailable.
+- Notification payloads may expose `route_hint`. Clicking a notification marks it read and navigates to that route when present.
+- Accounting reports use `GET /api/accounting/reports/income-statement/` and `GET /api/accounting/reports/balance-sheet/`; trial balance remains available through its existing endpoint. Report cards are responsive and must not be shown as payroll setup controls.
+- Payslip detail must tolerate a missing or deleted payroll period and render the institution name from the active institution context.
+- Executive and finance dashboard payloads include `currency`, `profit_and_loss_trend`, and `cash_flow_trend`. These series are derived from posted journals, are tenant-scoped, and include up to twelve available monthly periods. The Accounting dashboard renders detailed full-width P&L and inflow/outflow visualizations; the Executive dashboard renders compact financial KPIs and one summarized performance chart.
+- Document uploads may use multipart `POST /api/v1/documents/` with `uploaded_file` plus `category`, `classification`, and optional entity fields. Managed uploads accept PDF/JPEG/PNG files up to 10 MB, validate file signatures, and expose protected `GET /api/v1/documents/{id}/download/`; leave supporting uploads use category `LEAVE_SUPPORTING` and the `leave.request` permission.
+- Attendance dashboard responses include `repeated_lateness`, `lateness_trend`, and `lateness_by_department`, all tenant-scoped and permission-gated. The frontend presents the employee name, number, department, late occurrences, and total minutes late in a neutral Repeated Lateness table.
 
 Use these module contracts for domain-specific workflows:
 

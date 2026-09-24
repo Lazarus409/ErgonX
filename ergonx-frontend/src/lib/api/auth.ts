@@ -7,8 +7,10 @@
 
 import {
   apiGet,
+  apiDelete,
   apiPatch,
   apiPost,
+  apiPut,
   clearTenantContext,
   setAuthTokens,
 } from "./client";
@@ -25,13 +27,15 @@ export interface AuthUser {
 export interface LoginCredentials {
   email: string;
   password: string;
+  mfa_code?: string;
 }
 
 export interface LoginResult {
-  access: string;
-  refresh: string;
   user: AuthUser;
 }
+
+export type MFAMethod = "AUTHENTICATOR_APP" | "EMAIL_OTP";
+export interface MFAStatus { enabled: boolean; pending: boolean; method?: MFAMethod | null; secret?: string; otpauth_uri?: string; }
 
 export interface AuthBootstrap {
   user: AuthUser;
@@ -55,7 +59,7 @@ export interface AuthBootstrap {
   available_dashboards: string[];
 }
 
-/** Signs in and persists the returned token pair. */
+/** Signs in; the same-origin BFF persists the token pair as HttpOnly cookies. */
 export async function login(
   credentials: LoginCredentials,
 ): Promise<LoginResult> {
@@ -64,7 +68,7 @@ export async function login(
     credentials,
   );
 
-  setAuthTokens(result.access, result.refresh);
+  setAuthTokens();
 
   return result;
 }
@@ -72,6 +76,12 @@ export async function login(
 export async function getCurrentUser(): Promise<AuthUser> {
   return apiGet<AuthUser>("/auth/me/");
 }
+
+export function getMFAStatus(): Promise<MFAStatus> { return apiGet<MFAStatus>("/auth/security/mfa/"); }
+export function beginMFASetup(): Promise<MFAStatus> { return apiPost<MFAStatus, Record<string, never>>("/auth/security/mfa/", {}); }
+export function confirmMFASetup(code: string): Promise<MFAStatus> { return apiPut<MFAStatus, { code: string }>("/auth/security/mfa/", { code }); }
+export async function disableMFA(): Promise<MFAStatus> { await apiDelete("/auth/security/mfa/"); return { enabled: false, pending: false }; }
+export function setMFAMethod(method: MFAMethod): Promise<MFAStatus> { return apiPatch<MFAStatus, { method: MFAMethod }>("/auth/security/mfa/", { method }); }
 
 export interface AccountProfilePayload {
   email?: string;
@@ -138,7 +148,7 @@ export function getInstitutionAdminInvitation(token: string): Promise<Institutio
 
 export async function acceptInstitutionAdminInvitation(token: string, payload: InstitutionAdminInvitationPayload): Promise<LoginResult> {
   const result = await apiPost<LoginResult, InstitutionAdminInvitationPayload>(`/auth/institution-admin-invitations/${token}/`, payload);
-  setAuthTokens(result.access, result.refresh);
+  setAuthTokens();
   return result;
 }
 
@@ -172,6 +182,9 @@ export function createInstitutionAdminInvitation(payload: CreatePlatformInstitut
 
 /** Clears tokens and the selected institution. Purely client-side. */
 export function logout(): void {
+  void apiPost<{ logged_out: boolean }>("/auth/logout/").catch(() => {
+    // Local state is cleared even if the browser is already offline.
+  });
   clearTenantContext();
 }
 

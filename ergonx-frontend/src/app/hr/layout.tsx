@@ -2,11 +2,13 @@
 
 import { ReactNode } from "react";
 import AppShell from "@/components/layout/AppShell";
+import ModuleAccessGate from "@/components/guards/ModuleAccessGate";
+import { moduleAccessPermissions } from "@/components/navigation/navigation";
 
 export default function HRLayout({
   children,
 }: {
   children: ReactNode;
 }) {
-  return <AppShell>{children}</AppShell>;
+  return <AppShell><ModuleAccessGate module="HR" anyPermissions={[...moduleAccessPermissions.HR]}>{children}</ModuleAccessGate></AppShell>;
 }

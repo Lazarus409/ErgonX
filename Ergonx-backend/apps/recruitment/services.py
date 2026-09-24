@@ -8,6 +8,7 @@ from apps.audit.services import record_audit_event
 from apps.compensation.models import EmployeeCompensation
 from apps.employees.models import Employee, EmployeeOnboarding, Employment
 from apps.notifications.models import Notification
+from apps.institutions.services import record_user_activity
 from apps.recruitment.models import (
     Application,
     ApplicationStageHistory,
@@ -92,6 +93,7 @@ def submit_application(*, application, actor):
     instance.save(update_fields=("current_stage", "status", "applied_at", "updated_at"))
     ApplicationStageHistory.objects.create(institution=instance.institution, application=instance, to_stage=stage, changed_by=actor, comment="Application submitted")
     record_audit_event(actor=actor, institution=instance.institution, entity=instance, action="recruitment.application.submitted", metadata={"stage_id": str(stage.id)})
+    record_user_activity(actor=actor, institution=instance.institution, activity_code="application.submit", entity=instance)
     _notify(instance.job_posting.hiring_manager, instance, "RECRUITMENT_APPLICATION_SUBMITTED", "New application", f"{instance.candidate.full_name} applied for {instance.job_posting.title}.")
     return instance
 
@@ -160,6 +162,7 @@ def update_interview_status(*, interview, actor, status):
     instance.status = status
     instance.save(update_fields=("status", "updated_at"))
     record_audit_event(actor=actor, institution=instance.institution, entity=instance, action=f"recruitment.interview.{status.lower()}")
+    record_user_activity(actor=actor, institution=instance.institution, activity_code="interview.update", entity=instance)
     return instance
 
 
@@ -191,6 +194,7 @@ def extend_offer(*, offer, actor):
     instance.application.status = Application.Status.OFFERED
     instance.application.save(update_fields=("status", "updated_at"))
     record_audit_event(actor=actor, institution=instance.institution, entity=instance, action="recruitment.offer.extended")
+    record_user_activity(actor=actor, institution=instance.institution, activity_code="offer.manage", entity=instance)
     _notify(instance.application.job_posting.hiring_manager, instance, "RECRUITMENT_OFFER_EXTENDED", "Offer extended", f"An offer was extended to {instance.application.candidate.full_name}.")
     return instance
 
@@ -297,5 +301,6 @@ def hire_candidate(*, offer, actor, employee_number=None, existing_employee=None
     candidate.status = Candidate.Status.HIRED
     candidate.save(update_fields=("status", "updated_at"))
     record_audit_event(actor=actor, institution=instance.institution, entity=instance, action="recruitment.offer.hired", metadata={"employee_id": str(employee.id), "employment_id": str(employment.id)})
+    record_user_activity(actor=actor, institution=instance.institution, activity_code="offer.manage", entity=instance)
     _notify(instance.application.job_posting.hiring_manager, instance, "RECRUITMENT_CANDIDATE_HIRED", "Candidate hired", f"{candidate.full_name} has been converted to employee {employee.employee_number}.")
     return employee

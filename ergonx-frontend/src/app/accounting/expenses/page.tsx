@@ -28,8 +28,8 @@ export default function ExpensesPage() {
   const [status, setStatus] = useState("ALL"); const [search, setSearch] = useState(""); const [creating, setCreating] = useState(false);
   const [pending, setPending] = useState<{ expense: Expense; action: Action } | null>(null); const [acting, setActing] = useState(false); const [actionError, setActionError] = useState("");
   const load = useCallback(() => accountingApi.listExpenses({ page_size: MAX_PAGE_SIZE, status: status === "ALL" ? undefined : status, ordering: "-expense_date" }), [status]);
-  const { data, loading, error, reload } = useApiResource(load); const expenses = data?.results ?? [];
-  const shown = useMemo(() => { const query = search.trim().toLowerCase(); return expenses.filter((expense) => !query || expense.description.toLowerCase().includes(query)); }, [expenses, search]);
+  const { data, loading, error, reload } = useApiResource(load);
+  const shown = useMemo(() => { const query = search.trim().toLowerCase(); return (data?.results ?? []).filter((expense) => !query || expense.description.toLowerCase().includes(query)); }, [data, search]);
   const actionsFor = (expense: Expense): Action[] => {
     const candidates: Action[] = expense.status === "DRAFT" ? ["submit"] : expense.status === "PENDING" ? ["approve", "reject"] : expense.status === "APPROVED" ? ["post"] : [];
     return candidates.filter((action) => allowed(action === "submit" ? "expense.create" : action === "post" ? "expense.post" : "expense.approve"));

@@ -5,6 +5,7 @@ from apps.institutions.views import UniversalSearchView
 urlpatterns = [
     path("auth/", include("apps.accounts.urls")),
     path("institutions/", include("apps.institutions.urls")),
+    path("", include("apps.audit.urls")),
     path("search/", UniversalSearchView.as_view(), name="universal-search"),
     path("", include("apps.organization.urls")),
     path("", include("apps.employees.urls")),
@@ -20,4 +21,5 @@ urlpatterns = [
     path("", include("apps.dashboards.urls")),
     path("", include("apps.reports.urls")),
     path("", include("apps.recruitment.urls")),
+    path("", include("apps.notifications.urls")),
 ]

@@ -5,7 +5,7 @@ from django.core.exceptions import ValidationError
 from django.db.models import Q
 
 from apps.attendance.models import OvertimeRecord
-from apps.compensation.models import PayComponent
+from apps.compensation.models import EmployeeCompensation, PayComponent
 from apps.compensation.services import compensation_for, resolve_compensation
 from apps.employees.models import Employment
 from apps.leave.models import LeaveRequest
@@ -285,6 +285,15 @@ def calculate_employee_record(payroll_run, employee, configuration):
             {
                 "currency": (
                     f"{employee.employee_number} compensation currency does not match payroll."
+                )
+            }
+        )
+    if compensation.pay_basis != EmployeeCompensation.PayBasis.PAYROLL_PERIOD:
+        raise ValidationError(
+            {
+                "pay_basis": (
+                    "This payroll engine supports compensation expressed per configured "
+                    "payroll period only; convert the amount before processing."
                 )
             }
         )

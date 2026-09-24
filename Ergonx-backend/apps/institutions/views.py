@@ -4,7 +4,7 @@ from rest_framework.views import APIView
 from rest_framework.decorators import action
 from django.utils import timezone
 from datetime import timedelta
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiTypes, extend_schema
 
 from apps.institutions.serializers import (
     CurrentInstitutionSerializer,
@@ -22,10 +22,13 @@ from apps.institutions.serializers import (
     InstitutionModuleSerializer,
     InstitutionSettingSerializer,
     InstitutionProfileUpdateSerializer,
+    LocaleCataloguesSerializer,
+    InstitutionInvitationSerializer,
 )
-from apps.institutions.models import InstitutionMembership, InstitutionModule, InstitutionOnboarding, InstitutionOnboardingStep, InstitutionSetting, Permission, Role, UserPreference
-from apps.institutions.services import ONBOARDING_STEP_DEFINITIONS, clone_role, create_custom_role, create_invitation, invite_existing_user, reconcile_institution_onboarding, resume_institution_onboarding_step, skip_institution_onboarding_step, update_custom_role, update_membership, validate_institution_onboarding
+from apps.institutions.models import InstitutionInvitation, InstitutionMembership, InstitutionModule, InstitutionOnboarding, InstitutionOnboardingStep, InstitutionSetting, Permission, Role, UserPreference
+from apps.institutions.services import ONBOARDING_STEP_DEFINITIONS, clone_role, create_custom_role, create_invitation, invite_existing_user, reconcile_institution_onboarding, resume_institution_onboarding_step, revoke_invitation, skip_institution_onboarding_step, update_custom_role, update_membership, validate_institution_onboarding
 from apps.institutions.search import universal_search
+from apps.institutions.catalogues import locale_catalogues
 from common.serializers import call_validated_service
 from common.viewsets import TenantModelViewSet
 from common.permissions import TenantContextPermission, TenantRBACPermission
@@ -131,6 +134,53 @@ class MembershipViewSet(TenantModelViewSet):
         return Response({"id": str(invitation.id), "email": invitation.email, "expires_at": invitation.expires_at, "acceptance_token": token})
 
 
+class InstitutionInvitationViewSet(TenantModelViewSet):
+    """Invitation lifecycle for access administrators; no tokens are persisted or listed."""
+
+    model = InstitutionInvitation
+    serializer_class = InstitutionInvitationSerializer
+    required_permission = "settings.users.manage"
+    http_method_names = ("get", "post", "head", "options")
+    ordering_fields = ("created_at", "expires_at", "status", "email")
+    search_fields = ("email", "role__name", "role__code")
+
+    def get_queryset(self):
+        return super().get_queryset().select_related("role", "invited_by").prefetch_related("role__permissions")
+
+    def create(self, request, *args, **kwargs):
+        payload = InvitationCreateSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        role = Role.objects.for_institution(request.institution).get(pk=payload.validated_data["role_id"])
+        invitation, token = call_validated_service(
+            create_invitation,
+            institution=request.institution,
+            actor=request.user,
+            role=role,
+            email=payload.validated_data["email"],
+            expires_at=timezone.now() + timedelta(hours=payload.validated_data["expires_in_hours"]),
+        )
+        return Response({"invitation": self.get_serializer(invitation).data, "acceptance_token": token}, status=201)
+
+    @action(detail=True, methods=("post",))
+    def revoke(self, request, pk=None):
+        invitation = call_validated_service(revoke_invitation, invitation=self.get_object(), institution=request.institution, actor=request.user)
+        return Response(self.get_serializer(invitation).data)
+
+    @action(detail=True, methods=("post",))
+    def resend(self, request, pk=None):
+        previous = self.get_object()
+        call_validated_service(revoke_invitation, invitation=previous, institution=request.institution, actor=request.user)
+        invitation, token = call_validated_service(
+            create_invitation,
+            institution=request.institution,
+            actor=request.user,
+            role=previous.role,
+            email=previous.email,
+            expires_at=timezone.now() + timedelta(days=7),
+        )
+        return Response({"invitation": self.get_serializer(invitation).data, "acceptance_token": token})
+
+
 class PermissionCatalogView(APIView):
     permission_classes = [TenantContextPermission, TenantRBACPermission]
 
@@ -176,6 +226,7 @@ class RoleViewSet(TenantModelViewSet):
 
 class MyPreferencesView(APIView):
     permission_classes = [TenantContextPermission, TenantRBACPermission]
+    serializer_class = UserPreferenceSerializer
 
     def get_required_permission(self):
         return "settings.profile.manage_self"
@@ -184,6 +235,7 @@ class MyPreferencesView(APIView):
         rows = UserPreference.objects.for_institution(request.institution).filter(user=request.user)
         return Response(UserPreferenceSerializer(rows, many=True).data)
 
+    @extend_schema(request=UserPreferenceSerializer, responses=UserPreferenceSerializer)
     def put(self, request):
         payload = UserPreferenceSerializer(data=request.data)
         payload.is_valid(raise_exception=True)
@@ -198,6 +250,7 @@ class MyPreferencesView(APIView):
 
 class InstitutionSettingsView(APIView):
     permission_classes = [TenantContextPermission, TenantRBACPermission]
+    serializer_class = InstitutionSettingSerializer
 
     def get_required_permission(self):
         return "settings.institution.view"
@@ -206,6 +259,7 @@ class InstitutionSettingsView(APIView):
         rows = InstitutionSetting.objects.for_institution(request.institution).filter(is_sensitive=False)
         return Response(InstitutionSettingSerializer(rows, many=True).data)
 
+    @extend_schema(request=InstitutionSettingSerializer, responses=InstitutionSettingSerializer)
     def put(self, request):
         if "settings.institution.manage" not in request.membership.role.permissions.values_list("code", flat=True):
             from rest_framework.exceptions import PermissionDenied
@@ -248,7 +302,11 @@ class InstitutionOnboardingView(APIView):
         onboarding, _ = InstitutionOnboarding.objects.get_or_create(institution=request.institution)
         return Response(InstitutionOnboardingSerializer(onboarding).data)
 
-    @extend_schema(responses=InstitutionOnboardingSerializer)
+    @extend_schema(
+        operation_id="institutions_onboarding_validate",
+        request=OpenApiTypes.OBJECT,
+        responses=InstitutionOnboardingSerializer,
+    )
     def post(self, request):
         if "onboarding.manage" not in request.membership.role.permissions.values_list("code", flat=True):
             from rest_framework.exceptions import PermissionDenied
@@ -257,12 +315,15 @@ class InstitutionOnboardingView(APIView):
         return Response(InstitutionOnboardingSerializer(onboarding).data)
 
 
+@extend_schema(responses=InstitutionOnboardingSerializer)
 class InstitutionOnboardingStepActionView(APIView):
     permission_classes = [TenantContextPermission, TenantRBACPermission]
+    serializer_class = InstitutionOnboardingSerializer
 
     def get_required_permission(self):
         return "onboarding.manage"
 
+    @extend_schema(operation_id="institutions_onboarding_step_action")
     def post(self, request, step_code, action_name):
         if action_name not in {"skip", "resume"}:
             from rest_framework.exceptions import NotFound
@@ -277,6 +338,19 @@ class InstitutionOnboardingStepActionView(APIView):
         return Response(InstitutionOnboardingSerializer(onboarding).data)
 
 
+class LocaleCataloguesView(APIView):
+    """Public reference data; values are validated by profile serializers."""
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses=LocaleCataloguesSerializer)
+    @extend_schema(responses=UserPreferenceSerializer(many=True))
+    @extend_schema(responses=InstitutionSettingSerializer(many=True))
+    def get(self, request):
+        return Response(locale_catalogues())
+
+
+@extend_schema(responses={200: OpenApiTypes.OBJECT})
 class UniversalSearchView(APIView):
     permission_classes = [TenantContextPermission, TenantRBACPermission]
 

@@ -5,8 +5,6 @@ import {
   AlertTriangle,
   CalendarDays,
   Clock3,
-  Moon,
-  Settings2,
   Timer,
   UserCheck,
   UserMinus,
@@ -179,25 +177,6 @@ export default function AttendanceDashboardPage() {
           icon={<Activity className="h-5 w-5" />}
         />
 
-        {/*
-          Night-shift and flexible-work headcounts have no backing endpoint.
-          Substituting a different metric under these labels would misreport
-          them, so they stay blank.
-        */}
-        <KPIStatCard
-          title="Night Shift"
-          value={EM_DASH}
-          subtitle="Not reported by the API"
-          icon={<Moon className="h-5 w-5" />}
-        />
-
-        <KPIStatCard
-          title="Flexible Work"
-          value={EM_DASH}
-          subtitle="Not reported by the API"
-          icon={<Settings2 className="h-5 w-5" />}
-        />
-
         <KPIStatCard
           title="Overtime Pending"
           value={value(data?.overtimePending)}
@@ -211,12 +190,6 @@ export default function AttendanceDashboardPage() {
         />
       </div>
 
-      {/*
-        The attendance rollup is a single-day snapshot. Multi-day trends and
-        per-department rates are not exposed, and deriving them in the browser
-        would mean paging raw attendance records and reporting figures that
-        silently truncate. These three panels stay as placeholders.
-      */}
       <div className="grid gap-6 xl:grid-cols-3">
         <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm xl:col-span-2">
           <div className="mb-6">
@@ -228,9 +201,7 @@ export default function AttendanceDashboardPage() {
             </p>
           </div>
 
-          <div className="flex h-64 items-center justify-center rounded-lg border border-dashed border-slate-200 text-sm text-slate-500">
-            Multi-day attendance trends are not yet reported by the API.
-          </div>
+          <WeeklyAttendanceTrend points={data?.today.weekly_attendance ?? []} loading={loading} />
         </section>
 
         <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -243,11 +214,20 @@ export default function AttendanceDashboardPage() {
             </p>
           </div>
 
-          <div className="flex h-64 items-center justify-center rounded-lg border border-dashed border-slate-200 px-4 text-center text-sm text-slate-500">
-            Per-department attendance rates are not yet reported by the API.
-          </div>
+          <DepartmentAttendance items={data?.today.by_department ?? []} loading={loading} />
         </section>
       </div>
+
+      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="mb-5 flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">Repeated Lateness</h2>
+            <p className="mt-1 text-xs text-slate-500">Employees with repeated late arrivals in the last 90 days, including total minutes late.</p>
+          </div>
+          <span className="text-xs text-slate-500">Attendance and HR permissions apply</span>
+        </div>
+        {!data && loading ? <p className="py-8 text-sm text-slate-500">Loading lateness analytics…</p> : !data?.today.repeated_lateness.length ? <p className="py-8 text-sm text-slate-500">No repeated late arrivals have been recorded in the selected period.</p> : <div className="overflow-x-auto"><table className="w-full min-w-[680px] text-left text-sm"><thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-3 font-semibold">Employee</th><th className="px-3 py-3 font-semibold">Employee number</th><th className="px-3 py-3 font-semibold">Department</th><th className="px-3 py-3 text-right font-semibold">Late arrivals</th><th className="px-3 py-3 text-right font-semibold">Minutes late</th></tr></thead><tbody className="divide-y divide-slate-100">{data.today.repeated_lateness.map((item) => <tr key={item.employee_id}><td className="max-w-[220px] px-3 py-3 font-medium text-slate-900"><span className="block truncate" title={`${item.employee__first_name} ${item.employee__last_name}`}>{item.employee__first_name} {item.employee__last_name}</span></td><td className="px-3 py-3 font-mono text-xs text-slate-600">{item.employee__employee_number}</td><td className="max-w-[180px] px-3 py-3 text-slate-600"><span className="block truncate" title={item.employee__employments__department__name}>{item.employee__employments__department__name || "Unassigned"}</span></td><td className="px-3 py-3 text-right font-semibold text-amber-700">{formatNumber(item.late_occurrences)}</td><td className="px-3 py-3 text-right text-slate-700">{formatNumber(item.total_minutes_late)}</td></tr>)}</tbody></table></div>}
+      </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -347,66 +327,18 @@ export default function AttendanceDashboardPage() {
         </section>
       </div>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="mb-5 flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-semibold text-slate-900">
-              Quick Actions
-            </h2>
-            <p className="mt-1 text-xs text-slate-500">
-              Manage attendance operations.
-            </p>
-          </div>
-        </div>
-
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <QuickAction
-            href="/attendance/live"
-            icon={<Activity className="h-5 w-5" />}
-            title="View Live Attendance"
-          />
-
-          <QuickAction
-            href="/attendance/schedules"
-            icon={<CalendarDays className="h-5 w-5" />}
-            title="Manage Schedules"
-          />
-
-          <QuickAction
-            href="/attendance/shifts"
-            icon={<Clock3 className="h-5 w-5" />}
-            title="Manage Shifts"
-          />
-
-          <QuickAction
-            href="/attendance/adjustments"
-            icon={<AlertTriangle className="h-5 w-5" />}
-            title="Review Adjustments"
-          />
-        </div>
-      </section>
     </div>
   );
 }
 
-function QuickAction({
-  href,
-  icon,
-  title,
-}: {
-  href: string;
-  icon: React.ReactNode;
-  title: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className="flex items-center gap-3 rounded-lg border border-slate-200 p-4 transition hover:bg-slate-50"
-    >
-      <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
-        {icon}
-      </span>
-      <span className="text-sm font-medium text-slate-800">{title}</span>
-    </Link>
-  );
+function WeeklyAttendanceTrend({ points, loading }: { points: AttendanceDashboard["weekly_attendance"]; loading: boolean }) {
+  const maximum = Math.max(...points.map((point) => point.present + point.late + point.absent + point.on_leave), 1);
+  if (loading) return <p className="flex h-64 items-center justify-center text-sm text-slate-500">Loading weekly attendance…</p>;
+  return <div className="mt-6 flex h-64 items-end gap-2" aria-label="Seven-day attendance trend">{points.map((point) => { const total = point.present + point.late + point.absent + point.on_leave; const height = total ? Math.max((total / maximum) * 100, 5) : 2; return <div key={point.date} className="flex min-w-0 flex-1 flex-col justify-end gap-2"><span className="text-center text-xs font-medium text-slate-600">{total}</span><div className="overflow-hidden rounded-t-lg bg-slate-100" style={{ height: `${height}%` }} title={`${point.date}: ${point.present} present, ${point.late} late, ${point.absent} absent, ${point.on_leave} on leave`}><div className="bg-emerald-500" style={{ height: `${total ? (point.present / total) * 100 : 0}%` }} /><div className="bg-amber-400" style={{ height: `${total ? (point.late / total) * 100 : 0}%` }} /><div className="bg-rose-500" style={{ height: `${total ? (point.absent / total) * 100 : 0}%` }} /><div className="bg-sky-500" style={{ height: `${total ? (point.on_leave / total) * 100 : 0}%` }} /></div><span className="text-center text-[10px] text-slate-500">{new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(new Date(`${point.date}T00:00:00`))}</span></div>; })}</div>;
+}
+
+function DepartmentAttendance({ items, loading }: { items: AttendanceDashboard["by_department"]; loading: boolean }) {
+  if (loading) return <p className="flex h-64 items-center justify-center text-sm text-slate-500">Loading department attendance…</p>;
+  if (!items.length) return <p className="flex h-64 items-center justify-center px-4 text-center text-sm text-slate-500">No department-linked attendance has been recorded today.</p>;
+  return <div className="mt-6 space-y-4">{items.map((item) => { const rate = item.total ? Math.round(((item.present + item.late) / item.total) * 100) : 0; return <div key={item.employee__employments__department__name}><div className="mb-1.5 flex justify-between gap-3 text-sm"><span className="truncate text-slate-600">{item.employee__employments__department__name}</span><span className="font-semibold text-slate-950">{rate}%</span></div><div className="h-2.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-cyan-500" style={{ width: `${rate}%` }} /></div><p className="mt-1 text-xs text-slate-500">{item.present + item.late} present or late of {item.total} records</p></div>; })}</div>;
 }

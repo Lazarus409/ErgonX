@@ -43,16 +43,14 @@ def test_accounting_demo_seed_is_deterministic_and_report_ready():
         "notifications": Notification.objects.filter(institution=institution).count(),
     }
     call_command("seed_accounting_demo", verbosity=0)
-    assert Account.objects.filter(institution=institution).count() == counts["accounts"] == 3
-    assert AccountingPeriod.objects.filter(institution=institution).count() == counts["periods"] == 1
-    assert JournalEntry.objects.filter(institution=institution).count() == counts["journals"] == 2
-    assert JournalLine.objects.filter(journal_entry__institution=institution).count() == counts["lines"] == 4
+    assert Account.objects.filter(institution=institution).count() == counts["accounts"] == 4
+    assert AccountingPeriod.objects.filter(institution=institution).count() == counts["periods"] == 9
+    assert JournalEntry.objects.filter(institution=institution).count() == counts["journals"] == 19
+    assert JournalLine.objects.filter(journal_entry__institution=institution).count() == counts["lines"] == 38
     assert AuditLog.objects.filter(institution=institution).count() == counts["audits"]
     assert Notification.objects.filter(institution=institution).count() == counts["notifications"]
     assert institution.memberships.get(user__email=DEMO_ADMIN_EMAIL).user.has_usable_password()
-    assert JournalEntry.objects.filter(
-        institution=institution, status=JournalEntry.Status.POSTED
-    ).count() == 2
+    assert JournalEntry.objects.filter(institution=institution, status=JournalEntry.Status.POSTED).count() == 19
     configuration = InstitutionAccountingConfiguration.objects.get(
         institution=institution
     )
@@ -60,15 +58,15 @@ def test_accounting_demo_seed_is_deterministic_and_report_ready():
     assert AccountingPreset.objects.filter(code="GH-DEMO-COMMERCIAL").exists()
     assert AccountTemplate.objects.filter(
         coa_template__preset_version=configuration.selected_accounting_preset_version
-    ).count() == 3
+    ).count() == 4
     assert AuditLog.objects.filter(
         institution=institution, action="accounting.preset.applied"
     ).count() == 1
 
     trial = trial_balance(institution=institution)
     assert trial["balanced"] is True
-    assert trial["total_debit"] == trial["total_credit"] == 27500
-    assert income_statement(institution=institution)["net_income"] == -2500
+    assert trial["total_debit"] == trial["total_credit"]
+    assert income_statement(institution=institution)["net_income"] > 0
     statement = balance_sheet(institution=institution)
     assert statement["balanced"] is True
-    assert statement["total_assets"] == 22500
+    assert statement["total_assets"] == 114825

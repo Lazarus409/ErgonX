@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  ArrowLeft,
   Check,
   ChevronDown,
   Mail,
@@ -11,6 +10,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import ErrorState from "@/components/ui/ErrorState";
+import BackNavigation from "@/components/ui/BackNavigation";
 import {
   employeesApi,
   getApiErrorMessage,
@@ -280,15 +280,8 @@ export default function CreateEmployeePage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div className="flex items-center gap-3">
-        <Link
-          href="/hr/employees"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
-          aria-label="Back to employees"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Link>
-
+      <div className="space-y-3">
+        <BackNavigation fallback="/hr/employees" label="Back to employees" />
         <div>
           <p className="text-sm text-slate-500">HR / Employees</p>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">

@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Calculator, CheckCircle2, Lock, Send, XCircle } from "lucide-react";
+import { Calculator, CheckCircle2, Lock, Send, XCircle } from "lucide-react";
 
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import BackNavigation from "@/components/ui/BackNavigation";
 import ErrorState from "@/components/ui/ErrorState";
 import LoadingState from "@/components/ui/LoadingState";
 import PageHeader from "@/components/ui/PageHeader";
@@ -117,7 +118,8 @@ export default function PayrollRunDetailPage() {
 
   return (
     <main className="space-y-6">
-      <PageHeader title={`Payroll Run #${run.run_number}`} description={period ? `${period.name} · Started ${formatDateTime(run.started_at)}` : "Review payroll results and workflow status."} actions={<Link href="/payroll/runs" className="inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold"><ArrowLeft className="h-4 w-4" />Back</Link>} />
+      <BackNavigation fallback="/payroll/runs" label="Back to payroll runs" />
+      <PageHeader title={`Payroll Run #${run.run_number}`} description={period ? `${period.name} · Started ${formatDateTime(run.started_at)}` : "Review payroll results and workflow status."} />
       {error && <ErrorState title="Payroll action failed" message={error} onRetry={() => void load()} />}
 
       <div className="grid gap-4 md:grid-cols-5">

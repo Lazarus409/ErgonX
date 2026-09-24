@@ -8,6 +8,7 @@ import {
   FileCog,
   FileText,
   GitPullRequest,
+  IdCard,
   LayoutDashboard,
   Settings,
   ShieldCheck,
@@ -62,6 +63,12 @@ const payrollPages = [
     description: "Configure institution-level payroll settings and mappings.",
     href: "/payroll/configuration",
     icon: Settings,
+  },
+  {
+    title: "Employee Payroll Profiles",
+    description: "Maintain employee tax residency and tax identifiers used by payroll policy.",
+    href: "/payroll/employee-profiles",
+    icon: IdCard,
   },
   {
     title: "Ghana Payroll Setup",

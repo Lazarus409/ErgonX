@@ -18,6 +18,7 @@ import { MAX_PAGE_SIZE } from "@/types/api";
 import { hasModule } from "@/types/institutions";
 import type { PayrollPeriod, PayrollRecord, PayrollReconciliation, PayrollRun } from "@/types/payroll";
 import { buttonClasses } from "@/components/ui/Button";
+import { PrintButton, PrintFooter, PrintMasthead } from "@/components/brand/PrintDocument";
 
 type Action = "calculate" | "submit" | "approve" | "finalize" | "cancel" | "generateJournal";
 
@@ -119,8 +120,9 @@ export default function PayrollRunDetailPage() {
 
   return (
     <div className="space-y-6">
-      <BackNavigation fallback="/payroll/runs" label="Back to payroll runs" />
-      <PageHeader title={`Payroll Run #${run.run_number}`} description={period ? `${period.name} · Started ${formatDateTime(run.started_at)}` : "Review payroll results and workflow status."} />
+      <PrintMasthead documentTitle="Payroll run summary" reference={`Run #${run.run_number}`} />
+      <div className="print:hidden"><BackNavigation fallback="/payroll/runs" label="Back to payroll runs" /></div>
+      <PageHeader title={`Payroll Run #${run.run_number}`} description={period ? `${period.name} · Started ${formatDateTime(run.started_at)}` : "Review payroll results and workflow status."} actions={<PrintButton />} />
       {error && <ErrorState title="Payroll action failed" message={error} onRetry={() => void load()} />}
 
       <div className="grid gap-4 md:grid-cols-5">
@@ -148,6 +150,7 @@ export default function PayrollRunDetailPage() {
       <section className="rounded-2xl border bg-surface p-5"><h2 className="font-semibold">Payroll to Accounting</h2><p className="mt-1 text-sm text-ink-muted">{run.accounting_journal_entry ? "An accounting journal is linked to this payroll run." : run.status === "FINALIZED" && canGenerateJournal ? "Generate the idempotent draft journal, then submit, approve, and post it through Accounting." : "A draft accounting journal can only be generated from a finalized run by a user with Accounting journal-create access."}</p>{run.accounting_journal_entry && <Link href={`/accounting/journals/${run.accounting_journal_entry}`} className="mt-4 inline-flex text-sm font-semibold text-ink-strong hover:underline">Open accounting journal</Link>}{run.status === "FINALIZED" && !run.accounting_journal_entry && canGenerateJournal && <button type="button" onClick={() => setPendingAction("generateJournal")} className={buttonClasses({ variant: "secondary", className: "mt-4 inline-flex" })}>Generate Accounting Journal</button>}</section>
 
       {pendingAction && <ConfirmDialog open title={actionCopy[pendingAction].title} description={actionCopy[pendingAction].description} confirmLabel={actionCopy[pendingAction].label} destructive={actionCopy[pendingAction].destructive} loading={acting} onCancel={() => setPendingAction(null)} onConfirm={() => void executeAction()} />}
+      <PrintFooter />
     </div>
   );
 }

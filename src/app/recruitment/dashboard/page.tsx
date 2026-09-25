@@ -68,13 +68,13 @@ export default function RecruitmentDashboardPage() {
 
         <div className="grid content-start gap-4">
           <InsightCard title="Interview reach" icon={CalendarDays} accent="recruitment">
-            <p><span className="text-kpi-sm font-semibold text-ink-strong tabular-nums">{ratio(data?.scheduled_interviews, data?.applications)}</span> of applications currently have a scheduled interview.</p>
+            <p><span className="block text-kpi-sm font-semibold text-ink-strong tabular-nums">{ratio(data?.scheduled_interviews, data?.applications)}</span><span className="mt-1 block">Applications with a scheduled interview</span></p>
           </InsightCard>
           <InsightCard title="Offer rate" icon={FileCheck2} accent="accounting">
-            <p><span className="text-kpi-sm font-semibold text-ink-strong tabular-nums">{ratio(data?.offers_extended, data?.applications)}</span> of applications have progressed to an extended offer.</p>
+            <p><span className="block text-kpi-sm font-semibold text-ink-strong tabular-nums">{ratio(data?.offers_extended, data?.applications)}</span><span className="mt-1 block">Applications that reached an extended offer</span></p>
           </InsightCard>
           <InsightCard title="Load per opening" icon={ClipboardCheck} accent="hr">
-            <p><span className="text-kpi-sm font-semibold text-ink-strong tabular-nums">{data?.open_jobs ? formatNumber(Math.round((data.applications / data.open_jobs) * 10) / 10) : EM_DASH}</span> applications per open job.</p>
+            <p><span className="block text-kpi-sm font-semibold text-ink-strong tabular-nums">{data?.open_jobs ? formatNumber(Math.round((data.applications / data.open_jobs) * 10) / 10) : EM_DASH}</span><span className="mt-1 block">Applications per open job</span></p>
           </InsightCard>
         </div>
       </div>

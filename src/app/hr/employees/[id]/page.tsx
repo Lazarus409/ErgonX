@@ -36,6 +36,7 @@ import type {
   Employee as ApiEmployee,
   Employment,
 } from "@/types/hr";
+import { PrintButton, PrintFooter, PrintMasthead } from "@/components/brand/PrintDocument";
 
 interface EmployeeView {
   id: string;
@@ -764,7 +765,8 @@ export default function EmployeeDetailPage() {
 
   return (
     <div className="space-y-6">
-      <BackNavigation fallback="/hr/employees" label="Back to Employees" />
+      <PrintMasthead documentTitle="Employee record" reference={employee.employeeNumber} />
+      <div className="print:hidden"><BackNavigation fallback="/hr/employees" label="Back to Employees" /></div>
 
       {savedMessage && (
         <div className="rounded-xl border border-success/25 bg-success-soft px-4 py-3 text-sm text-success-ink">
@@ -928,9 +930,12 @@ export default function EmployeeDetailPage() {
           </div>
 
           {!isEditing && (
-            <Button onClick={startEditing} leadingIcon={<Pencil className="h-4 w-4" />}>
-              Edit Employee
-            </Button>
+            <div className="flex flex-wrap items-center gap-2 print:hidden">
+              <PrintButton />
+              <Button onClick={startEditing} leadingIcon={<Pencil className="h-4 w-4" />}>
+                Edit Employee
+              </Button>
+            </div>
           )}
         </div>
       </div>
@@ -1723,6 +1728,7 @@ export default function EmployeeDetailPage() {
         </form>
       )}
 
+      <PrintFooter />
     </div>
   );
 }

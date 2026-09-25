@@ -1,9 +1,10 @@
-import Logo from "@/components/brand/Logo";
+import Logo, { AdaptiveLogo } from "@/components/brand/Logo";
 
 /**
  * Restrained start-up treatment shown only while the session is genuinely
- * resolving. It never delays start-up: it disappears as soon as the
- * authenticated shell can render.
+ * resolving: the X mark breathes, the full wordmark reveals left to right
+ * beneath it, and a signature shimmer tracks progress. It never delays
+ * start-up: it disappears as soon as the authenticated shell can render.
  */
 export default function SplashScreen({ message = "Preparing your workspace…" }: { message?: string }) {
   return (
@@ -14,7 +15,10 @@ export default function SplashScreen({ message = "Preparing your workspace…" }
           <Logo variant="mark" height={40} alt="" priority />
         </span>
       </div>
-      <div className="mt-6 h-1 w-40 overflow-hidden rounded-full bg-surface-muted" aria-hidden="true">
+      <span className="mt-5 block animate-wordmark-reveal" aria-hidden="true">
+        <AdaptiveLogo height={24} />
+      </span>
+      <div className="mt-5 h-1 w-40 overflow-hidden rounded-full bg-surface-muted" aria-hidden="true">
         <span className="block h-full w-full bg-[linear-gradient(90deg,transparent,var(--accent-aqua),var(--accent-blue),var(--accent-violet),transparent)] bg-[length:200%_100%] animate-shimmer" />
       </div>
       <p className="mt-4 text-support font-medium text-ink-muted">{message}</p>

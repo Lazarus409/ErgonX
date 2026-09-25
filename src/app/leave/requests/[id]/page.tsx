@@ -34,6 +34,7 @@ import type {
 import type { DocumentRecord } from "@/types/operations";
 import { EM_DASH, formatDate, formatDateTime, formatNumber } from "@/lib/format";
 import { buttonClasses } from "@/components/ui/Button";
+import { PrintButton, PrintFooter, PrintMasthead } from "@/components/brand/PrintDocument";
 
 type PendingAction = "submit" | "approve" | "reject" | "cancel" | null;
 
@@ -268,10 +269,11 @@ export default function LeaveRequestDetailPage() {
 
   return (
     <>
+      <PrintMasthead documentTitle="Leave request form" />
       <PageHeader
         title="Leave Request"
         description="Review the employee leave request and take the appropriate authorised action."
-        actions={<BackNavigation fallback="/leave/requests" label="Back to Requests" />}
+        actions={<div className="flex flex-wrap items-center gap-2 print:hidden"><PrintButton /><BackNavigation fallback="/leave/requests" label="Back to Requests" /></div>}
       />
 
       <div className="mt-6 space-y-6">
@@ -797,6 +799,7 @@ export default function LeaveRequestDetailPage() {
         onConfirm={runAction}
         onCancel={() => setPendingAction(null)}
       />
+      <PrintFooter />
     </>
   );
 }

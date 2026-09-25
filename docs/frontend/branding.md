@@ -23,6 +23,7 @@ All derivatives come from the approved high-resolution lockup `public/ergonx-log
 - Minimum clear space around any lockup: the height of the "E" cap on all sides. Minimum height: 20 px (lockup), 16 px (mark).
 - Backgrounds: primary on light/neutral surfaces; reversed on navy (`--brand-navy`) or dark surfaces; mono on print and formal documents. Do not place the full-colour logo on the signature gradient.
 - The splash screen, auth brand panel and hero art may use the signature gradient *around* the logo; the logo itself stays as supplied.
+- Splash (`SplashScreen.tsx`): the X mark breathes on a navy tile, the full wordmark (primary or reversed by theme) reveals left to right beneath it (`animate-wordmark-reveal`, 520 ms after a 240 ms delay), and a signature shimmer tracks progress with "Preparing your workspace…". All motion collapses under `prefers-reduced-motion`.
 
 ## Multicolour X — current status
 
@@ -54,4 +55,5 @@ Implemented in `SidebarLogo.tsx` (2026-09-25; replaces the earlier wordmark/mark
 - Tenant identity is prominent: institution name in the top bar context line, sidebar workspace header (logo or X mark + name + code), Home greeting, document headers.
 - ErgonX identity is subtle but persistent: sidebar logo, "on ErgonX" mono attribution in the sidebar header, "Powered by ErgonX" on documents.
 - Tenant-generated documents (`DocumentFrame`: payslips, financial statements): the institution logo (when uploaded) and name are primary; ErgonX appears only as a monochrome "Powered by" attribution in the footer.
+- Printable records (`PrintDocument.tsx`: journal entry, leave request form, employment offer, employee record, payroll run summary): a **Print** button, and in print/PDF only an institution masthead (logo, name, document title, reference, printed date) plus the monochrome "Powered by ErgonX" footer. On screen nothing changes; the app shell is hidden in print.
 - Institution logo images: uploaded in Settings → Institution as a private `ImageAsset`. `/auth/bootstrap/` exposes the current one as `active_institution.logo_image_id` (session `institution.logoImageId`); any member may view it, only `settings.institution.manage` may replace or remove it. It renders in the sidebar header and the `DocumentFrame` header.

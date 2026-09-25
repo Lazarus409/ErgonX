@@ -32,11 +32,13 @@ export default function SidebarLogo({ collapsed, institutionName, institutionCod
         aria-hidden={collapsed || undefined}
       >
         <span className="block truncate text-sm font-semibold text-white">{institutionName ?? "ErgonX"}</span>
-        <span className="flex items-center gap-1.5 text-caption text-white/50">
-          {institutionCode && <span className="truncate">{institutionCode}</span>}
-          {institutionCode && <span aria-hidden="true">·</span>}
-          <span className="inline-flex shrink-0 items-center gap-1">on <Logo variant="mono-white" height={9} alt="ErgonX" className="opacity-75" /></span>
-        </span>
+        {logoSrc ? (
+          <span className="flex items-center gap-1 text-caption text-white/50">
+            on <Logo variant="mono-white" height={9} alt="ErgonX" className="opacity-75" />
+          </span>
+        ) : (
+          institutionCode && <span className="block truncate text-caption text-white/50">{institutionCode}</span>
+        )}
       </span>
     </span>
   );

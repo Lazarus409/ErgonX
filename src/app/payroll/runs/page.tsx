@@ -76,7 +76,7 @@ export default function PayrollRunsPage() {
         empty={{ title: "No payroll runs found", description: search || status !== ALL ? "Try a different search or status." : "Start a run from an open payroll period.", icon: ListChecks }}
         columns={[
           { key: "period", header: "Period", sortValue: (run) => periodNames.get(run.payroll_period) ?? "", cell: (run) => <Link href={`/payroll/runs/${run.id}`} className="font-semibold text-ink-strong hover:text-primary-ink">{periodNames.get(run.payroll_period) ?? EM_DASH}</Link> },
-          { key: "run", header: "Run", numeric: true, sortValue: (run) => run.run_number, cell: (run) => <span className="font-mono">#{run.run_number}</span> },
+          { key: "run", header: "Run", sortValue: (run) => run.run_number, cell: (run) => <span className="font-mono">#{run.run_number}</span> },
           { key: "started", header: "Started", sortValue: (run) => run.started_at ?? "", cell: (run) => formatDateTime(run.started_at) },
           { key: "status", header: "Status", cell: (run) => <StatusBadge status={run.status} size="sm" /> },
           { key: "open", header: <span className="sr-only">Open</span>, cell: (run) => <Link href={`/payroll/runs/${run.id}`} aria-label={`Open run ${run.run_number}`} className="flex justify-end text-ink-subtle hover:text-ink-strong"><ChevronRight className="h-4 w-4" /></Link> },

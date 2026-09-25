@@ -379,6 +379,7 @@ export default function EmployeesPage() {
           {
             key: "employee",
             header: "Employee",
+            className: "max-w-[18rem]",
             cell: (employee) => {
               const name = employeesApi.employeeDisplayName(employee);
               return (
@@ -396,7 +397,7 @@ export default function EmployeesPage() {
           { key: "position", header: "Position", cell: (employee) => assignmentFor(employee.id).position },
           { key: "employment", header: "Employment", hideBelow: "lg", cell: (employee) => assignmentFor(employee.id).employmentType },
           { key: "location", header: "Location", hideBelow: "xl", cell: (employee) => assignmentFor(employee.id).location },
-          { key: "joined", header: "Date joined", sortValue: (employee) => employee.hire_date, cell: (employee) => formatDate(employee.hire_date) },
+          { key: "joined", header: "Date joined", className: "whitespace-nowrap", sortValue: (employee) => employee.hire_date, cell: (employee) => formatDate(employee.hire_date) },
           { key: "status", header: "Status", cell: (employee) => <StatusBadge status={employee.status} size="sm" /> },
           {
             key: "actions",

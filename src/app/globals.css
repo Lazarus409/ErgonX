@@ -337,6 +337,7 @@
   --animate-slide-up: slide-up var(--duration-emphasis) var(--ease-standard) both;
   --animate-shimmer: shimmer 1.6s linear infinite;
   --animate-splash-pulse: splash-pulse 1.8s var(--ease-standard) infinite;
+  --animate-wordmark-reveal: wordmark-reveal 520ms var(--ease-standard) 240ms both;
 }
 
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
@@ -344,6 +345,7 @@
 @keyframes slide-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 @keyframes splash-pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(0.94); opacity: 0.82; } }
+@keyframes wordmark-reveal { from { opacity: 0; clip-path: inset(0 100% 0 0); transform: translateY(2px); } to { opacity: 1; clip-path: inset(0 0 0 0); transform: none; } }
 @keyframes drawer-in-right { from { transform: translateX(100%); } to { transform: none; } }
 @keyframes drawer-in-left { from { transform: translateX(-100%); } to { transform: none; } }
 
@@ -424,6 +426,17 @@ input[type="file"]:not(:disabled),
 label:has(input[type="checkbox"]),
 label:has(input[type="radio"]) {
   cursor: pointer;
+}
+
+/* Bare native selects share the <Select> primitive's chevron instead of the
+   platform arrow, so hand-rolled filters match the design system. */
+select:where(:not([data-ui]):not([multiple]):not([size])) {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237b8aa3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-position: right 0.75rem center;
+  background-repeat: no-repeat;
+  background-size: 1rem;
+  padding-right: 2.25rem;
 }
 
 button:disabled,

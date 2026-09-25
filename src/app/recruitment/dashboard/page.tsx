@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback } from "react";
-import { BriefcaseBusiness, CalendarDays, ClipboardCheck, FileCheck2, FileSignature, Layers, PieChart as PieChartIcon, TrendingUp, UsersRound } from "lucide-react";
+import { BriefcaseBusiness, CalendarDays, ClipboardCheck, FileCheck2, FileSignature, Layers, PieChart as PieChartIcon, Share2, Timer, TrendingUp, UsersRound } from "lucide-react";
 
 import ChartCard from "@/components/charts/ChartCard";
 import { BarsChart, DonutChart, TrendChart, donutLegend } from "@/components/charts/Charts";
-import { FunnelChart } from "@/components/charts/Visuals";
+import { FunnelChart, RankingBars } from "@/components/charts/Visuals";
 import { ButtonLink } from "@/components/ui/Button";
 import { ActionCard, Card, InsightCard, MetricCard, SummaryList } from "@/components/ui/Card";
 import ErrorState from "@/components/ui/ErrorState";
@@ -27,8 +27,9 @@ export default function RecruitmentDashboardPage() {
   const value = (count: number | undefined) => (count === undefined ? EM_DASH : formatNumber(count));
   const pipelineTotal = data?.pipeline.reduce((sum, stage) => sum + stage.count, 0) ?? 0;
   const trend = data?.applications_trend ?? [];
-  const byStatus = (data?.applications_by_status ?? []).map((item) => ({ label: humanizeEnum(item.status), value: item.count }));
-  const topJobs = data?.top_open_jobs ?? [];
+  const interviewStatus = (data?.interviews_by_status ?? []).map((item) => ({ label: humanizeEnum(item.status), value: item.count }));
+  const sources = (data?.applications_by_source ?? []).map((item) => ({ label: item.source, value: item.count }));
+  const timeToHire = data?.time_to_hire ?? [];
   const chartError = !data && error ? "This data is unavailable right now." : null;
   const ratio = (numerator?: number, denominator?: number) => (numerator !== undefined && denominator ? `${Math.round((numerator / denominator) * 100)}%` : EM_DASH);
 
@@ -92,38 +93,53 @@ export default function RecruitmentDashboardPage() {
           emptyDescription="New applications will appear here."
           data={{ columns: ["Month", "Applications"], rows: trend.map((point) => [point.month, point.applications]) }}
         >
-          <TrendChart variant="area" data={trend} xKey="month" height={250} series={[{ key: "applications", label: "Applications", color: "var(--mod-recruitment)" }]} />
+          <TrendChart data={trend} xKey="month" height={250} series={[{ key: "applications", label: "Applications", color: "var(--mod-recruitment)" }]} />
         </ChartCard>
         <ChartCard
           className="xl:col-span-2"
-          title="Applications by status"
-          description="Where every application currently stands."
+          title="Interviews by status"
+          description="Scheduled, completed, cancelled and no-show interviews."
           accent="recruitment"
           icon={PieChartIcon}
           loading={initial}
           error={chartError}
-          empty={!byStatus.length}
-          emptyDescription="No applications yet."
-          data={{ columns: ["Status", "Applications"], rows: byStatus.map((item) => [item.label, item.value]) }}
+          empty={!interviewStatus.length}
+          emptyDescription="Interviews will appear here once scheduled."
+          data={{ columns: ["Status", "Interviews"], rows: interviewStatus.map((item) => [item.label, item.value]) }}
         >
-          <DonutChart data={byStatus} height={180} centerValue={formatNumber(byStatus.reduce((sum, item) => sum + item.value, 0))} centerLabel="applications" />
-          <SummaryList className="mt-4" items={donutLegend(byStatus).map((item) => ({ label: <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ background: item.color }} />{item.label}</span>, value: item.value }))} />
+          <DonutChart data={interviewStatus} height={180} centerValue={formatNumber(interviewStatus.reduce((sum, item) => sum + item.value, 0))} centerLabel="interviews" />
+          <SummaryList className="mt-4" items={donutLegend(interviewStatus).map((item) => ({ label: <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ background: item.color }} />{item.label}</span>, value: item.value }))} />
         </ChartCard>
       </div>
 
-      <ChartCard
-        title="Most active openings"
-        description="Open roles with the most applications."
-        accent="recruitment"
-        icon={BriefcaseBusiness}
-        loading={initial}
-        error={chartError}
-        empty={!topJobs.length}
-        emptyDescription="Open roles will appear here once published."
-        data={{ columns: ["Opening", "Applications"], rows: topJobs.map((job) => [job.title, job.application_count]) }}
-      >
-        <BarsChart data={topJobs} xKey="title" layout="horizontal" height={Math.max(160, topJobs.length * 44)} colorByIndex series={[{ key: "application_count", label: "Applications", color: "var(--mod-recruitment)" }]} />
-      </ChartCard>
+      <div className="grid gap-5 xl:grid-cols-2">
+        <ChartCard
+          title="Candidate sources"
+          description="Where applications come from, by the candidate's recorded source."
+          accent="recruitment"
+          icon={Share2}
+          loading={initial}
+          error={chartError}
+          empty={!sources.length}
+          emptyDescription="Record a source on candidates to see where applicants come from."
+          data={{ columns: ["Source", "Applications"], rows: sources.map((item) => [item.label, item.value]) }}
+        >
+          <RankingBars items={sources} color="var(--mod-recruitment)" limit={6} />
+        </ChartCard>
+        <ChartCard
+          title="Time to hire"
+          description="Days from application to accepted offer."
+          accent="recruitment"
+          icon={Timer}
+          loading={initial}
+          error={chartError}
+          empty={!timeToHire.some((bucket) => bucket.hires > 0)}
+          emptyDescription="Accepted offers will appear here."
+          data={{ columns: ["Days to hire", "Hires"], rows: timeToHire.map((bucket) => [bucket.bucket, bucket.hires]) }}
+        >
+          <BarsChart data={timeToHire} xKey="bucket" height={230} series={[{ key: "hires", label: "Hires", color: "var(--mod-recruitment)" }]} />
+        </ChartCard>
+      </div>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Recruitment areas">
         {can("candidate.view") && <ActionCard href="/recruitment/applications" title="Applications" description="Review and progress applicants" icon={FileCheck2} accent="recruitment" />}

@@ -8,6 +8,8 @@ import {
   CheckCircle2,
   Clock3,
   ClipboardList,
+  Building2,
+  Grid3X3,
   FileSliders,
   PieChart as PieChartIcon,
   Users,
@@ -15,7 +17,7 @@ import {
 
 import ChartCard from "@/components/charts/ChartCard";
 import { DonutChart, TrendChart, donutLegend } from "@/components/charts/Charts";
-import { ProgressMeter } from "@/components/charts/Visuals";
+import { HeatmapGrid, ProgressMeter, RankingBars } from "@/components/charts/Visuals";
 import { ButtonLink } from "@/components/ui/Button";
 import { ActionCard, Avatar, Card, MetricCard, SummaryList } from "@/components/ui/Card";
 import { DataTable } from "@/components/ui/DataTable";
@@ -98,6 +100,8 @@ export default function LeaveDashboardPage() {
     count === null || count === undefined ? EM_DASH : formatNumber(count);
 
   const monthly = data?.rollup.monthly_approved_leave ?? [];
+  const byDepartment = (data?.rollup.approved_days_by_department ?? []).map((item) => ({ label: item.department, value: Number(item.requested_days) }));
+  const calendarWeeks = leaveCalendarWeeks(data?.rollup.leave_calendar ?? []);
   const byType = (data?.rollup.by_leave_type ?? []).map((item) => ({ label: item.leave_type__name, value: Number(item.requested_days) }));
   const utilisation = data?.rollup.balance_utilisation;
   const hasEntitlement = Boolean(utilisation && Number(utilisation.entitlement_days) > 0);
@@ -171,6 +175,28 @@ export default function LeaveDashboardPage() {
         ) : <p className="text-support text-ink-muted">No positive current-year leave entitlement is available to calculate utilisation.</p>}
       </Card>
 
+      <div className="grid gap-5 xl:grid-cols-5">
+        <ChartCard
+          className="xl:col-span-2"
+          title="Leave by department"
+          description={`Approved leave days this year, by current department.`}
+          accent="leave"
+          icon={Building2}
+          loading={initial}
+          error={!data && error ? "This data is unavailable right now." : null}
+          empty={!byDepartment.length}
+          emptyDescription="Approved leave for employees with a department will appear here."
+          data={{ columns: ["Department", "Approved days"], rows: byDepartment.map((item) => [item.label, item.value]) }}
+        >
+          <RankingBars items={byDepartment} format="days" color="var(--mod-leave)" limit={8} />
+        </ChartCard>
+        <Card className="xl:col-span-3" title="Next four weeks" description="Employees on approved leave each day. Darker cells mean more people away." icon={Grid3X3} accent="leave">
+          {initial ? <div className="skeleton h-48 rounded-xl" /> : calendarWeeks.rows.length ? (
+            <HeatmapGrid rows={calendarWeeks.rows} columns={WEEKDAYS} cells={calendarWeeks.cells} color="var(--mod-leave)" />
+          ) : <p className="text-support text-ink-muted">The leave calendar is unavailable right now.</p>}
+        </Card>
+      </div>
+
       <DataTable
         caption="Upcoming leave"
         rows={data?.upcoming}
@@ -211,4 +237,30 @@ export default function LeaveDashboardPage() {
       </section>
     </div>
   );
+}
+
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+/** Lay the server's 28-day series out as Monday-start week rows; days outside it stay blank. */
+function leaveCalendarWeeks(days: Array<{ date: string; on_leave: number }>) {
+  if (!days.length) return { rows: [] as string[], cells: [] as Array<Array<{ value: number; label?: string }>> };
+  const byDate = new Map(days.map((day) => [day.date, day.on_leave]));
+  const first = new Date(`${days[0].date}T00:00:00`);
+  const last = new Date(`${days[days.length - 1].date}T00:00:00`);
+  const cursor = new Date(first);
+  cursor.setDate(cursor.getDate() - ((cursor.getDay() + 6) % 7));
+  const rows: string[] = [];
+  const cells: Array<Array<{ value: number; label?: string }>> = [];
+  while (cursor <= last) {
+    rows.push(`w/c ${cursor.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`);
+    const week: Array<{ value: number; label?: string }> = [];
+    for (let offset = 0; offset < 7; offset += 1) {
+      const iso = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(cursor.getDate()).padStart(2, "0")}`;
+      const label = cursor.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+      week.push(byDate.has(iso) ? { value: byDate.get(iso) ?? 0, label: `${label}: ${byDate.get(iso)} on leave` } : { value: 0, label: `${label}: outside the four-week window` });
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    cells.push(week);
+  }
+  return { rows, cells };
 }

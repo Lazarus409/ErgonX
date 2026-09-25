@@ -8,7 +8,7 @@ import ChartCard from "@/components/charts/ChartCard";
 import { BarsChart, TrendChart } from "@/components/charts/Charts";
 import PayrollWorkflow from "@/components/payroll/PayrollWorkflow";
 import { ButtonLink } from "@/components/ui/Button";
-import { Sparkline } from "@/components/charts/Visuals";
+import { RankingBars, Sparkline } from "@/components/charts/Visuals";
 import { Card, InsightCard, MetricCard } from "@/components/ui/Card";
 import ErrorState from "@/components/ui/ErrorState";
 import PageHeader from "@/components/ui/PageHeader";
@@ -23,6 +23,7 @@ export default function PayrollDashboardPage() {
   const initial = loading && !data;
   const latestStatus = data?.latest_run_status ?? null;
   const periods = data?.payroll_by_period ?? [];
+  const costByDepartment = data?.cost_by_department ?? { period: null, departments: [] };
   const latest = periods.at(-1);
   const previous = periods.at(-2);
   const grossDelta = latest && previous ? Number(latest.gross_pay) - Number(previous.gross_pay) : null;
@@ -104,19 +105,36 @@ export default function PayrollDashboardPage() {
         </div>
       </div>
 
-      <ChartCard
-        title="Earnings and deductions"
-        description="Net pay and deductions that make up gross pay for each finalized period."
-        accent="payroll"
-        loading={initial}
-        error={!data && error ? "This data is unavailable right now." : null}
-        empty={!periods.length}
-        emptyDescription="Finalized payroll periods will appear here."
-        legend={[{ label: "Net pay", color: "var(--chart-2)", shape: "square" }, { label: "Deductions", color: "var(--chart-6)", shape: "square" }]}
-        data={{ columns: ["Period", "Net pay", "Deductions"], rows: periods.map((point) => [point.label, formatAmount(point.net_pay), formatAmount(point.total_deductions)]) }}
-      >
-        <BarsChart data={periods} xKey="label" mode="stacked" format="currency" height={250} series={[{ key: "net_pay", label: "Net pay", color: "var(--chart-2)" }, { key: "total_deductions", label: "Deductions", color: "var(--chart-6)" }]} />
-      </ChartCard>
+      <div className="grid gap-5 xl:grid-cols-5">
+        <ChartCard
+          className="xl:col-span-3"
+          title="Earnings and deductions"
+          description="Net pay and deductions that make up gross pay for each finalized period."
+          accent="payroll"
+          loading={initial}
+          error={!data && error ? "This data is unavailable right now." : null}
+          empty={!periods.length}
+          emptyDescription="Finalized payroll periods will appear here."
+          legend={[{ label: "Net pay", color: "var(--chart-2)", shape: "square" }, { label: "Deductions", color: "var(--chart-6)", shape: "square" }]}
+          data={{ columns: ["Period", "Net pay", "Deductions"], rows: periods.map((point) => [point.label, formatAmount(point.net_pay), formatAmount(point.total_deductions)]) }}
+        >
+          <BarsChart data={periods} xKey="label" mode="stacked" format="currency" height={250} series={[{ key: "net_pay", label: "Net pay", color: "var(--chart-2)" }, { key: "total_deductions", label: "Deductions", color: "var(--chart-6)" }]} />
+        </ChartCard>
+        <ChartCard
+          className="xl:col-span-2"
+          title="Cost by department"
+          description={costByDepartment.period ? `Gross pay by current department, ${costByDepartment.period}.` : "Gross pay by current department for the latest finalized run."}
+          accent="payroll"
+          icon={Building2}
+          loading={initial}
+          error={!data && error ? "This data is unavailable right now." : null}
+          empty={!costByDepartment.departments.length}
+          emptyDescription="Department costs appear after a payroll run is finalized."
+          data={{ columns: ["Department", "Gross pay"], rows: costByDepartment.departments.map((item) => [item.department, formatAmount(item.gross_pay)]) }}
+        >
+          <RankingBars items={costByDepartment.departments.map((item) => ({ label: item.department, value: item.gross_pay }))} format="currency" color="var(--mod-payroll)" limit={8} />
+        </ChartCard>
+      </div>
     </div>
   );
 }

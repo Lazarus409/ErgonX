@@ -15,7 +15,7 @@ import { useCallback } from "react";
 
 import ChartCard from "@/components/charts/ChartCard";
 import { BarsChart, TrendChart } from "@/components/charts/Charts";
-import { HeatmapGrid } from "@/components/charts/Visuals";
+import { HeatmapGrid, ProgressMeter } from "@/components/charts/Visuals";
 import { hasValues } from "@/components/charts/format";
 import { ButtonLink } from "@/components/ui/Button";
 import { Sparkline } from "@/components/charts/Visuals";
@@ -188,6 +188,17 @@ export default function AttendanceDashboardPage() {
           ) : <p className="text-support text-ink-muted">No department-linked attendance has been recorded today.</p>}
         </Card>
         <Card className="xl:col-span-2" title="Action required" description="Attendance items awaiting operational attention." icon={AlertTriangle} accent="attendance">
+          {data && data.scheduledToday ? (
+            <div className="mb-4 border-b border-line-soft pb-4">
+              <ProgressMeter
+                label="Shift coverage today"
+                value={Math.min(data.today.present + data.today.late, data.scheduledToday)}
+                max={data.scheduledToday}
+                color="var(--mod-attendance)"
+                detail={`${formatNumber(data.today.present + data.today.late)} clocked in (present or late) against ${formatCount(data.scheduledToday, "current schedule assignment")}.`}
+              />
+            </div>
+          ) : null}
           <div className="-mx-3 -mb-2 space-y-1">
             <AttentionItem title="Overtime awaiting approval" description={`${formatCount(data?.overtimePending, "overtime record")} awaiting review.`} severity={data?.overtimePending ? "warning" : "info"} href="/attendance/overtime" />
             <AttentionItem title="Attendance adjustments" description={`${formatCount(data?.adjustmentsPending, "correction request")} awaiting review.`} severity={data?.adjustmentsPending ? "warning" : "info"} href="/attendance/adjustments" />

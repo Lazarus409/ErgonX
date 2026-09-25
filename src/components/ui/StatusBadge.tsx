@@ -78,6 +78,9 @@ const statusConfig: Record<string, { label: string; tone: BadgeTone; icon?: Luci
   HOLIDAY: { label: "Holiday", tone: "violet" },
   OFF_DAY: { label: "Off day", tone: "neutral" },
   REMOTE: { label: "Remote", tone: "info" },
+  UNMATCHED: { label: "Unmatched", tone: "warning", icon: TriangleAlert },
+  MATCHED: { label: "Matched", tone: "success" },
+  EXCEPTION: { label: "Exception", tone: "danger", icon: TriangleAlert },
 };
 
 function humanize(value: string): string {

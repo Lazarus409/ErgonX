@@ -1,18 +1,20 @@
 "use client";
 
 import { useCallback } from "react";
-import { ArrowDownLeft, ArrowUpRight, Building2, FileBarChart, FileText, Landmark, Plus, Receipt, Scale, WalletCards } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Building2, FileBarChart, FileText, Landmark, PieChart as PieChartIcon, Plus, Receipt, Scale, WalletCards } from "lucide-react";
 
 import ChartCard from "@/components/charts/ChartCard";
-import { BarsChart, ComposedTrendChart, DonutChart, donutLegend } from "@/components/charts/Charts";
+import { BarsChart, DonutChart, TrendChart, donutLegend } from "@/components/charts/Charts";
 import { useAuth } from "@/components/guards/AuthProvider";
 import { ButtonLink } from "@/components/ui/Button";
 import { Sparkline } from "@/components/charts/Visuals";
 import { ActionCard, AttentionItem, Card, MetricCard, SummaryList } from "@/components/ui/Card";
+import { DataTable } from "@/components/ui/DataTable";
+import StatusBadge from "@/components/ui/StatusBadge";
 import ErrorState from "@/components/ui/ErrorState";
 import PageHeader from "@/components/ui/PageHeader";
 import { dashboardsApi } from "@/lib/api";
-import { EM_DASH, formatAmount, formatNumber, humanizeEnum, formatCount } from "@/lib/format";
+import { EM_DASH, formatAmount, formatDate, formatNumber, humanizeEnum, formatCount } from "@/lib/format";
 import { useApiResource } from "@/lib/useApiResource";
 import { hasModule } from "@/types/institutions";
 
@@ -42,7 +44,8 @@ export default function AccountingDashboard() {
     payable: Number(data?.accounts_payable_aging.find((item) => item.bucket === bucket)?.amount ?? 0),
   }));
   const journals = (data?.journals_by_status ?? []).map((item) => ({ label: humanizeEnum(item.status), value: item.count, color: journalStatusColors[item.status.toUpperCase()] }));
-  const journalTotal = journals.reduce((sum, item) => sum + item.value, 0);
+  const expenseCategories = (data?.expenses_by_account ?? []).map((item) => ({ label: item.label, value: Number(item.value) }));
+  const unreconciled = data?.unreconciled_bank_lines ?? { count: 0, latest: [] };
 
   return (
     <div className="space-y-6">
@@ -76,12 +79,12 @@ export default function AccountingDashboard() {
         error={!data && error ? "This data is unavailable right now." : null}
         empty={!pnl.length}
         emptyDescription="Posted income or expense journals will appear here when available."
-        legend={[{ label: "Income", color: "var(--chart-2)", shape: "square", value: latestPnl ? formatAmount(latestPnl.income, currency) : undefined }, { label: "Expenses", color: "var(--chart-6)", shape: "square", value: latestPnl ? formatAmount(latestPnl.expenses, currency) : undefined }, { label: "Net result", color: "var(--chart-1)", shape: "line", value: latestPnl ? formatAmount(latestPnl.net_income, currency) : undefined }]}
+        legend={[{ label: "Income", color: "var(--chart-2)", shape: "line", value: latestPnl ? formatAmount(latestPnl.income, currency) : undefined }, { label: "Expenses", color: "var(--chart-6)", shape: "line", value: latestPnl ? formatAmount(latestPnl.expenses, currency) : undefined }, { label: "Net result", color: "var(--chart-1)", shape: "line", value: latestPnl ? formatAmount(latestPnl.net_income, currency) : undefined }]}
         summary={latestPnl ? `Latest posted month: income ${formatAmount(latestPnl.income, currency)}, expenses ${formatAmount(latestPnl.expenses, currency)}, net result ${formatAmount(latestPnl.net_income, currency)}.` : undefined}
         data={{ columns: ["Month", "Income", "Expenses", "Net result"], rows: pnl.map((point) => [point.month, formatAmount(point.income, currency), formatAmount(point.expenses, currency), formatAmount(point.net_income, currency)]) }}
         footer="Posted journals only. Legend values show the latest posted month."
       >
-        <ComposedTrendChart data={pnl} xKey="month" format="currency" currency={currency} height={280} series={[{ key: "income", label: "Income", color: "var(--chart-2)", type: "bar" }, { key: "expenses", label: "Expenses", color: "var(--chart-6)", type: "bar" }, { key: "net_income", label: "Net result", color: "var(--chart-1)", type: "line" }]} />
+        <TrendChart data={pnl} xKey="month" format="currency" currency={currency} height={280} zeroLine series={[{ key: "income", label: "Income", color: "var(--chart-2)" }, { key: "expenses", label: "Expenses", color: "var(--chart-6)" }, { key: "net_income", label: "Net result", color: "var(--chart-1)" }]} />
       </ChartCard>
 
       <div className="grid gap-5 xl:grid-cols-2">
@@ -118,19 +121,19 @@ export default function AccountingDashboard() {
       <div className="grid gap-5 xl:grid-cols-5">
         <ChartCard
           className="xl:col-span-2"
-          title="Journal status"
-          description="Tenant-scoped journal workflow composition."
+          title="Expenses by category"
+          description="Posted expenses by expense account."
           accent="accounting"
-          icon={FileText}
+          icon={PieChartIcon}
           loading={initial}
           error={!data && error ? "This data is unavailable right now." : null}
-          empty={!journals.length}
-          emptyDescription="Journals will appear here once created."
-          data={{ columns: ["Status", "Journals"], rows: journals.map((item) => [item.label, item.value]) }}
+          empty={!expenseCategories.length}
+          emptyDescription="Posted expenses will appear here."
+          data={{ columns: ["Expense account", "Posted"], rows: expenseCategories.map((item) => [item.label, formatAmount(item.value, currency)]) }}
         >
           <div className="grid items-center gap-5 sm:grid-cols-[160px_1fr] xl:grid-cols-1 2xl:grid-cols-[160px_1fr]">
-            <DonutChart data={journals} height={160} centerValue={formatNumber(journalTotal)} centerLabel="journals" />
-            <SummaryList items={donutLegend(journals).map((item) => ({ label: <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ background: item.color }} />{item.label}</span>, value: item.value }))} />
+            <DonutChart data={expenseCategories} height={160} format="currency" currency={currency} centerValue={formatAmount(data?.expenses ?? 0, currency)} centerLabel="posted" />
+            <SummaryList items={donutLegend(expenseCategories, "currency", currency).map((item) => ({ label: <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ background: item.color }} />{item.label}</span>, value: item.value }))} />
           </div>
         </ChartCard>
         <Card className="xl:col-span-3" title="Controls and exceptions" description="Items that need review before the period can close cleanly." icon={Scale} accent="accounting">
@@ -139,8 +142,34 @@ export default function AccountingDashboard() {
             {data && Number(data.accounts_payable) > 0 && Number(data.accounts_payable) > Number(data.bank_balance) && <AttentionItem title="Payables exceed bank balance" description={`Outstanding payables of ${formatAmount(data.accounts_payable, currency)} exceed the registered bank balance.`} severity="high" href={can("vendor_bill.view") ? "/accounting/payables" : undefined} />}
             {data && !(Number(data.accounts_payable) > 0) && Number(data.bank_balance) < 0 && <AttentionItem title="Bank balance is negative" description={`The registered bank ledger balance is ${formatAmount(data.bank_balance, currency)}.`} severity="high" href={can("bank_account.view") ? "/accounting/banking" : undefined} />}
             {latestPnl && Number(latestPnl.net_income) < 0 && <AttentionItem title="Net loss in the latest posted month" description={`Net result of ${formatAmount(latestPnl.net_income, currency)}.`} severity="high" href={can("financial_report.view") ? "/accounting/reports" : undefined} />}
-            {can("bank_reconciliation.view") && <AttentionItem title="Bank reconciliation" description="Match statement lines against posted cash movements." severity="info" href="/accounting/banking" />}
+            {can("bank_reconciliation.view") && <AttentionItem title="Bank reconciliation" description={unreconciled.count ? `${formatCount(unreconciled.count, "statement line")} not yet matched to a posted cash journal.` : "Every imported statement line is matched."} severity={unreconciled.count ? "warning" : "info"} href="/accounting/banking" />}
           </div>
+        </Card>
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-5">
+        <DataTable<(typeof unreconciled.latest)[number]>
+          className="xl:col-span-3"
+          caption="Unreconciled bank statement lines"
+          density="compact"
+          minWidth={560}
+          rows={unreconciled.latest}
+          rowKey={(line) => line.id}
+          loading={initial}
+          toolbar={<div className="flex items-center justify-between gap-3"><div><h2 className="text-card-title font-semibold text-ink-strong">Unreconciled bank lines</h2><p className="text-support text-ink-muted">{unreconciled.count > unreconciled.latest.length ? `Latest ${unreconciled.latest.length} of ${formatNumber(unreconciled.count)}.` : "Imported statement lines awaiting a match."}</p></div>{can("bank_reconciliation.view") && <ButtonLink href="/accounting/banking" size="sm" variant="secondary">Reconcile</ButtonLink>}</div>}
+          empty={{ title: "Nothing to reconcile", description: "Every imported statement line is matched to a posted cash journal.", icon: Landmark }}
+          columns={[
+            { key: "date", header: "Date", cell: (line) => formatDate(line.statement_date) },
+            { key: "account", header: "Bank account", cell: (line) => line.bank_account, hideBelow: "sm" },
+            { key: "reference", header: "Reference", cell: (line) => line.reference || line.description || EM_DASH, className: "max-w-48 truncate" },
+            { key: "amount", header: "Amount", numeric: true, cell: (line) => formatAmount(line.amount, line.currency) },
+            { key: "status", header: "Status", cell: (line) => <StatusBadge status={line.status} size="sm" /> },
+          ]}
+        />
+        <Card className="xl:col-span-2" title="Journal status" description="Where journals sit in the approval workflow." icon={FileText} accent="accounting">
+          {journals.length ? (
+            <SummaryList items={(data?.journals_by_status ?? []).map((item) => ({ label: <StatusBadge status={item.status} size="sm" />, value: formatNumber(item.count) }))} />
+          ) : <p className="text-support text-ink-muted">{initial ? "Loading…" : "Journals will appear here once created."}</p>}
         </Card>
       </div>
 

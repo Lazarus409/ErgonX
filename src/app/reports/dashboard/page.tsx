@@ -3,6 +3,8 @@
 import { BarChart3, Briefcase, CalendarDays, Clock3, Download, FileBarChart, Receipt, Scale, Users, WalletCards, type LucideIcon } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
+import ChartCard from "@/components/charts/ChartCard";
+import { BarsChart } from "@/components/charts/Charts";
 import { Button } from "@/components/ui/Button";
 import { DataTable, DataToolbar } from "@/components/ui/DataTable";
 import ErrorState from "@/components/ui/ErrorState";
@@ -69,6 +71,12 @@ export default function ReportsDashboardPage() {
   };
   const isNumericColumn = (column: string) => (data?.rows ?? []).length > 0 && (data?.rows ?? []).every((row) => row[column] === null || row[column] === undefined || typeof row[column] === "number" || (typeof row[column] === "string" && /^-?\d+(\.\d+)?$/.test(String(row[column]))));
 
+  // At-a-glance visual: the first descriptive column against the first measure.
+  const labelColumn = columns.find((column) => !isNumericColumn(column));
+  const valueColumn = columns.find((column) => isNumericColumn(column) && !/(^|_)(id|year|month|day)$/.test(column));
+  const chartRows = labelColumn && valueColumn
+    ? (data?.rows ?? []).filter((row) => row[valueColumn] !== null && row[valueColumn] !== undefined).slice(0, 12).map((row) => ({ label: String(row[labelColumn] ?? "—"), value: Number(row[valueColumn]) }))
+    : [];
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <PageHeader
@@ -109,6 +117,18 @@ export default function ReportsDashboardPage() {
               );
             })}
           </section>
+
+          {labelColumn && valueColumn && chartRows.length >= 2 && (
+            <ChartCard
+              title={`${report?.title ?? "Report"} at a glance`}
+              description={`${humanizeEnum(valueColumn)} by ${humanizeEnum(labelColumn).toLowerCase()}${(data?.rows.length ?? 0) > chartRows.length ? `, first ${chartRows.length} rows` : ""}.`}
+              accent="reports"
+              icon={BarChart3}
+              data={{ columns: [humanizeEnum(labelColumn), humanizeEnum(valueColumn)], rows: chartRows.map((row) => [row.label, row.value]) }}
+            >
+              <BarsChart data={chartRows} xKey="label" layout="horizontal" height={Math.max(160, chartRows.length * 36)} series={[{ key: "value", label: humanizeEnum(valueColumn), color: "var(--mod-reports)" }]} />
+            </ChartCard>
+          )}
 
           <DataTable<ReportRow>
             caption={report?.title ?? "Report"}

@@ -29,7 +29,7 @@ function formValues(context: Awaited<ReturnType<typeof institutionsApi.getCurren
 }
 
 export default function InstitutionSettingsPage() {
-  const { user, refreshSession } = useAuth();
+  const { user, institution: sessionInstitution, refreshSession } = useAuth();
   const load = useCallback(async () => {
     const [context, catalogues] = await Promise.all([institutionsApi.getCurrentInstitution(), institutionsApi.getLocaleCatalogues()]);
     return { context, catalogues };
@@ -39,7 +39,8 @@ export default function InstitutionSettingsPage() {
   const [draft, setDraft] = useState<FormValues | null>(null);
   const [saving, setSaving] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [logoId, setLogoId] = useState<string | null>(null);
+  const [uploadedLogoId, setLogoId] = useState<string | null>(null);
+  const logoId = uploadedLogoId ?? sessionInstitution?.logoImageId ?? null;
   const [logoUploading, setLogoUploading] = useState(false);
   const [logoProgress, setLogoProgress] = useState(0);
   const canManage = user?.permissions.includes("*") || user?.permissions.includes("settings.institution.manage");
@@ -65,6 +66,8 @@ export default function InstitutionSettingsPage() {
     try {
       const image = await imagesApi.uploadImage(file, "INSTITUTION", data.context.institution.id, setLogoProgress);
       setLogoId(image.id);
+      // The shell and documents read the logo from the session.
+      await refreshSession();
     } catch (caught) { setActionError(getApiErrorMessage(caught)); }
     finally { setLogoUploading(false); }
   };

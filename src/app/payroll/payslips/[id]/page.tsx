@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/Button";
 import ErrorState from "@/components/ui/ErrorState";
 import LoadingState from "@/components/ui/LoadingState";
 import PageHeader from "@/components/ui/PageHeader";
-import { employeesApi, payrollApi } from "@/lib/api";
+import { employeesApi, imagesApi, payrollApi } from "@/lib/api";
 import { EM_DASH, formatAmount, formatDate, formatDateTime } from "@/lib/format";
 import { useApiResource } from "@/lib/useApiResource";
 import type { PayslipItem } from "@/types/payroll";
@@ -46,6 +46,7 @@ export default function PayslipDetailPage() {
 
       <DocumentFrame
         institutionName={institution?.name ?? "Institution"}
+        institutionLogoSrc={institution?.logoImageId ? imagesApi.imageContentUrl(institution.logoImageId) : null}
         documentTitle="Employee payslip"
         meta={<><p className="font-semibold text-ink-strong">{period.name}</p><p className="text-ink-muted">Pay date: {formatDate(period.pay_date)}</p></>}
         footerNote={<span className="inline-flex items-center gap-2"><Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />Generated from a finalized payroll record. Historical payroll data is immutable.</span>}

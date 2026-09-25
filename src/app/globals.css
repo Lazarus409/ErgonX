@@ -33,11 +33,11 @@
   --gradient-signature: linear-gradient(120deg, var(--accent-teal) 0%, var(--accent-aqua) 30%, var(--accent-blue) 68%, var(--accent-violet) 100%);
 
   /* Surfaces */
-  --canvas: #f7f8fa;
+  --canvas: #f5f7fb;
   --surface: #ffffff;
-  --surface-muted: #f3f5f9;
-  --surface-sunken: #eceff5;
-  --surface-hover: #f5f7fa;
+  --surface-muted: #eef3fa;
+  --surface-sunken: #e7edf6;
+  --surface-hover: #f3f6fb;
   --surface-inverse: #0f2345;
   --overlay: rgb(8 23 47 / 0.48);
 
@@ -49,9 +49,9 @@
   --ink-inverse: #ffffff;
 
   /* Lines */
-  --line: #e1e6ee;
-  --line-soft: #ebeef4;
-  --line-strong: #cdd5e1;
+  --line: #d9e2ef;
+  --line-soft: #e6ecf5;
+  --line-strong: #c2cedf;
 
   /* Interactive */
   --primary: #2f6bff;
@@ -97,6 +97,9 @@
   --mod-settings: #23324d;
   --mod-settings-soft: #edf1f7;
 
+  /* Soft brand glow for the most important calls to action. */
+  --glow-primary: 0 6px 16px -6px rgb(47 107 255 / 0.55);
+
   /* Chart series (validated against both canvases) */
   --chart-1: #2f6bff;
   --chart-2: #14b8a6;
@@ -104,7 +107,7 @@
   --chart-4: #f59e0b;
   --chart-5: #0ea5e9;
   --chart-6: #e11d48;
-  --chart-grid: #ebeef4;
+  --chart-grid: #e6ecf5;
   --chart-axis: #8290a8;
 
   /* Elevation (navy-tinted, never pure black) */
@@ -197,6 +200,8 @@
   --chart-6: #fb7191;
   --chart-grid: #1c3155;
   --chart-axis: #7d8fae;
+
+  --glow-primary: 0 6px 18px -6px rgb(86 135 255 / 0.6);
 
   --elevation-1: 0 1px 2px rgb(0 0 0 / 0.3);
   --elevation-2: 0 2px 6px rgb(0 0 0 / 0.28), 0 8px 20px -6px rgb(0 0 0 / 0.36);
@@ -465,9 +470,9 @@ h1, h2 { letter-spacing: -0.012em; }
 @media print {
   /* Official documents always print on light, neutral tokens. */
   html.dark {
-    --canvas: #ffffff; --surface: #ffffff; --surface-muted: #f3f5f9; --surface-sunken: #eceff5; --surface-hover: #ffffff;
+    --canvas: #ffffff; --surface: #ffffff; --surface-muted: #eef3fa; --surface-sunken: #e7edf6; --surface-hover: #ffffff;
     --ink-strong: #0f2345; --ink: #23324d; --ink-muted: #56657f; --ink-subtle: #8290a8;
-    --line: #e1e6ee; --line-soft: #ebeef4; --line-strong: #cdd5e1;
+    --line: #d9e2ef; --line-soft: #e6ecf5; --line-strong: #c2cedf;
     color-scheme: light;
   }
   body { background: #fff; color: #000; }

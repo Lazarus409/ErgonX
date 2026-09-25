@@ -1,15 +1,17 @@
 "use client";
 
 import { useCallback } from "react";
-import { BriefcaseBusiness, CalendarDays, ClipboardCheck, FileCheck2, FileSignature, Layers, UsersRound } from "lucide-react";
+import { BriefcaseBusiness, CalendarDays, ClipboardCheck, FileCheck2, FileSignature, Layers, PieChart as PieChartIcon, TrendingUp, UsersRound } from "lucide-react";
 
+import ChartCard from "@/components/charts/ChartCard";
+import { BarsChart, DonutChart, TrendChart, donutLegend } from "@/components/charts/Charts";
 import { FunnelChart } from "@/components/charts/Visuals";
 import { ButtonLink } from "@/components/ui/Button";
-import { ActionCard, Card, InsightCard, MetricCard } from "@/components/ui/Card";
+import { ActionCard, Card, InsightCard, MetricCard, SummaryList } from "@/components/ui/Card";
 import ErrorState from "@/components/ui/ErrorState";
 import PageHeader from "@/components/ui/PageHeader";
 import { dashboardsApi } from "@/lib/api";
-import { EM_DASH, formatNumber } from "@/lib/format";
+import { EM_DASH, formatNumber, humanizeEnum } from "@/lib/format";
 import { useApiResource } from "@/lib/useApiResource";
 import { useAccess } from "@/lib/access";
 
@@ -24,6 +26,10 @@ export default function RecruitmentDashboardPage() {
   const initial = loading && !data;
   const value = (count: number | undefined) => (count === undefined ? EM_DASH : formatNumber(count));
   const pipelineTotal = data?.pipeline.reduce((sum, stage) => sum + stage.count, 0) ?? 0;
+  const trend = data?.applications_trend ?? [];
+  const byStatus = (data?.applications_by_status ?? []).map((item) => ({ label: humanizeEnum(item.status), value: item.count }));
+  const topJobs = data?.top_open_jobs ?? [];
+  const chartError = !data && error ? "This data is unavailable right now." : null;
   const ratio = (numerator?: number, denominator?: number) => (numerator !== undefined && denominator ? `${Math.round((numerator / denominator) * 100)}%` : EM_DASH);
 
   return (
@@ -72,6 +78,52 @@ export default function RecruitmentDashboardPage() {
           </InsightCard>
         </div>
       </div>
+
+      <div className="grid gap-5 xl:grid-cols-5">
+        <ChartCard
+          className="xl:col-span-3"
+          title="Application intake"
+          description="Applications received in each of the last six calendar months."
+          accent="recruitment"
+          icon={TrendingUp}
+          loading={initial}
+          error={chartError}
+          empty={!trend.some((point) => point.applications > 0)}
+          emptyDescription="New applications will appear here."
+          data={{ columns: ["Month", "Applications"], rows: trend.map((point) => [point.month, point.applications]) }}
+        >
+          <TrendChart variant="area" data={trend} xKey="month" height={250} series={[{ key: "applications", label: "Applications", color: "var(--mod-recruitment)" }]} />
+        </ChartCard>
+        <ChartCard
+          className="xl:col-span-2"
+          title="Applications by status"
+          description="Where every application currently stands."
+          accent="recruitment"
+          icon={PieChartIcon}
+          loading={initial}
+          error={chartError}
+          empty={!byStatus.length}
+          emptyDescription="No applications yet."
+          data={{ columns: ["Status", "Applications"], rows: byStatus.map((item) => [item.label, item.value]) }}
+        >
+          <DonutChart data={byStatus} height={180} centerValue={formatNumber(byStatus.reduce((sum, item) => sum + item.value, 0))} centerLabel="applications" />
+          <SummaryList className="mt-4" items={donutLegend(byStatus).map((item) => ({ label: <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ background: item.color }} />{item.label}</span>, value: item.value }))} />
+        </ChartCard>
+      </div>
+
+      <ChartCard
+        title="Most active openings"
+        description="Open roles with the most applications."
+        accent="recruitment"
+        icon={BriefcaseBusiness}
+        loading={initial}
+        error={chartError}
+        empty={!topJobs.length}
+        emptyDescription="Open roles will appear here once published."
+        data={{ columns: ["Opening", "Applications"], rows: topJobs.map((job) => [job.title, job.application_count]) }}
+      >
+        <BarsChart data={topJobs} xKey="title" layout="horizontal" height={Math.max(160, topJobs.length * 44)} colorByIndex series={[{ key: "application_count", label: "Applications", color: "var(--mod-recruitment)" }]} />
+      </ChartCard>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Recruitment areas">
         {can("candidate.view") && <ActionCard href="/recruitment/applications" title="Applications" description="Review and progress applicants" icon={FileCheck2} accent="recruitment" />}

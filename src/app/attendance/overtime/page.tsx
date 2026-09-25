@@ -26,6 +26,7 @@ import type { AttendanceRecord, OvertimeRecord } from "@/types/attendance";
 import type { Department, Employee, Employment } from "@/types/hr";
 import { EM_DASH, formatDate, formatNumber } from "@/lib/format";
 import { buttonClasses } from "@/components/ui/Button";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 
 const ALL = "ALL";
 const SEARCH_DEBOUNCE_MS = 350;
@@ -387,20 +388,15 @@ export default function OvertimePage() {
             ))}
           </select>
 
-          <select
+          <SegmentedControl
+            label="Filter by status"
             value={statusFilter}
-            onChange={(event) => {
-              setStatusFilter(event.target.value);
+            onChange={(next) => {
+              setStatusFilter(next);
               setPage(1);
             }}
-            aria-label="Filter by status"
-            className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink outline-none"
-          >
-            <option value={ALL}>All Statuses</option>
-            <option value="PENDING">Pending</option>
-            <option value="APPROVED">Approved</option>
-            <option value="REJECTED">Rejected</option>
-          </select>
+            options={[{ value: ALL, label: "All" }, { value: "PENDING", label: "Pending" }, { value: "APPROVED", label: "Approved" }, { value: "REJECTED", label: "Rejected" }]}
+          />
 
           <button
             type="button"

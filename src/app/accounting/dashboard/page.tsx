@@ -7,6 +7,7 @@ import ChartCard from "@/components/charts/ChartCard";
 import { BarsChart, ComposedTrendChart, DonutChart, donutLegend } from "@/components/charts/Charts";
 import { useAuth } from "@/components/guards/AuthProvider";
 import { ButtonLink } from "@/components/ui/Button";
+import { Sparkline } from "@/components/charts/Visuals";
 import { ActionCard, AttentionItem, Card, MetricCard, SummaryList } from "@/components/ui/Card";
 import ErrorState from "@/components/ui/ErrorState";
 import PageHeader from "@/components/ui/PageHeader";
@@ -64,7 +65,7 @@ export default function AccountingDashboard() {
         <MetricCard size="sm" label="Bank balance" value={data ? formatAmount(data.bank_balance, currency) : EM_DASH} description={data ? formatCount(data.registered_bank_accounts, "registered account") : undefined} icon={Landmark} accent="accounting" loading={initial} />
         <MetricCard size="sm" label="Accounts receivable" value={data ? formatAmount(data.accounts_receivable, currency) : EM_DASH} description="Outstanding from customers" icon={ArrowDownLeft} accent="attendance" loading={initial} href={can("invoice.view") ? "/accounting/receivables" : undefined} />
         <MetricCard size="sm" label="Accounts payable" value={data ? formatAmount(data.accounts_payable, currency) : EM_DASH} description="Owed to vendors" icon={ArrowUpRight} accent="payroll" loading={initial} href={can("vendor_bill.view") ? "/accounting/payables" : undefined} />
-        <MetricCard size="sm" label="Posted expenses" value={data ? formatAmount(data.expenses, currency) : EM_DASH} description="Posted to the ledger" icon={Receipt} accent="audit" loading={initial} href={can("expense.view") ? "/accounting/expenses" : undefined} />
+        <MetricCard size="sm" label="Posted expenses" value={data ? formatAmount(data.expenses, currency) : EM_DASH} description="Posted to the ledger" icon={Receipt} accent="audit" loading={initial} href={can("expense.view") ? "/accounting/expenses" : undefined} chart={<Sparkline values={pnl.map((point) => point.expenses)} color="var(--mod-audit)" height={32} label="Expenses by month" />} />
       </section>
 
       <ChartCard

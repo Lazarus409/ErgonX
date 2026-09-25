@@ -27,6 +27,7 @@ import type {
 } from "@/types/attendance";
 import { EM_DASH } from "@/lib/format";
 import { buttonClasses } from "@/components/ui/Button";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 
 const ALL = "ALL";
 
@@ -354,16 +355,12 @@ export default function RotationsPage() {
             />
           </div>
 
-          <select
+          <SegmentedControl
+            label="Filter by status"
             value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
-            aria-label="Filter by status"
-            className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink outline-none"
-          >
-            <option value={ALL}>All Statuses</option>
-            <option value="ACTIVE">Active</option>
-            <option value="INACTIVE">Inactive</option>
-          </select>
+            onChange={(next) => setStatusFilter(next)}
+            options={[{ value: ALL, label: "All" }, { value: "ACTIVE", label: "Active" }, { value: "INACTIVE", label: "Inactive" }]}
+          />
         </div>
       </div>
 

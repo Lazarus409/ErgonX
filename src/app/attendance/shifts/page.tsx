@@ -20,6 +20,7 @@ import { attendanceApi, getApiErrorMessage, schedulingApi } from "@/lib/api";
 import { MAX_PAGE_SIZE } from "@/types/api";
 import type { Shift } from "@/types/attendance";
 import { buttonClasses } from "@/components/ui/Button";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 
 const ALL = "ALL";
 
@@ -276,16 +277,12 @@ export default function AttendanceShiftsPage() {
             <option value="OVERNIGHT">Crosses midnight</option>
           </select>
 
-          <select
+          <SegmentedControl
+            label="Filter by status"
             value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
-            aria-label="Filter by status"
-            className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink outline-none"
-          >
-            <option value={ALL}>All Statuses</option>
-            <option value="ACTIVE">ACTIVE</option>
-            <option value="INACTIVE">INACTIVE</option>
-          </select>
+            onChange={(next) => setStatusFilter(next)}
+            options={[{ value: ALL, label: "All" }, { value: "ACTIVE", label: "ACTIVE" }, { value: "INACTIVE", label: "INACTIVE" }]}
+          />
         </div>
 
         <div className="hidden overflow-x-auto md:block">

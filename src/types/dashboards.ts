@@ -188,4 +188,15 @@ export interface FinanceDashboard {
   cash_flow_trend: CashFlowPoint[];
 }
 
-export interface RecruitmentDashboard { open_jobs: number; active_candidates: number; applications: number; scheduled_interviews: number; offers_extended: number; pipeline: Array<{ name: string; count: number }>; }
+export interface RecruitmentDashboard {
+  open_jobs: number;
+  active_candidates: number;
+  applications: number;
+  scheduled_interviews: number;
+  offers_extended: number;
+  pipeline: Array<{ name: string; count: number }>;
+  applications_by_status?: Array<{ status: string; count: number }>;
+  /** Six calendar months ending with the current month, by application date. */
+  applications_trend?: Array<{ month: string; applications: number }>;
+  top_open_jobs?: Array<{ title: string; application_count: number }>;
+}

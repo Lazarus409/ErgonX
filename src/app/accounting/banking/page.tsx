@@ -133,14 +133,14 @@ export default function BankingPage() {
         description="Manage bank accounts and payment or receipt references."
         actions={
           <div className="flex gap-2">
-            <button type="button" onClick={() => setBankFormOpen(true)} className="rounded-xl border px-4 py-2.5 text-sm font-semibold">New Bank Account</button>
+            <button type="button" onClick={() => setBankFormOpen(true)} className={buttonClasses({ variant: "secondary" })}>New Bank Account</button>
             <button
               type="button"
               onClick={() => {
                 setFormError("");
                 setCreating("payment");
               }}
-              className="rounded-xl border px-4 py-2.5 text-sm font-semibold"
+              className={buttonClasses({ variant: "secondary" })}
             >
               Record Payment
             </button>
@@ -273,7 +273,7 @@ export default function BankingPage() {
               type="date"
               value={voidDate}
               onChange={(event) => setVoidDate(event.target.value)}
-              className="mt-2 block w-full rounded border p-2"
+              className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink-strong shadow-elevation-1 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/15 mt-2 block w-full"
             />
           </label>
         </div>
@@ -386,7 +386,7 @@ function CashModal({
                     event.target.value === "CASH" ? "" : form.bank_account,
                 })
               }
-              className="w-full rounded border p-2"
+              className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink-strong shadow-elevation-1 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/15 w-full"
             >
               {[
                 "CASH",
@@ -406,7 +406,7 @@ function CashModal({
               value={form.bank_account}
               disabled={form.method === "CASH"}
               onChange={(event) => update({ bank_account: event.target.value })}
-              className="w-full rounded border p-2 disabled:bg-surface-muted"
+              className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink-strong shadow-elevation-1 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/15 w-full disabled:bg-surface-muted"
             >
               <option value="">
                 {form.method === "CASH"
@@ -429,7 +429,7 @@ function CashModal({
             <select
               value={form.reference}
               onChange={(event) => update({ reference: event.target.value })}
-              className="w-full rounded border p-2"
+              className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink-strong shadow-elevation-1 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/15 w-full"
             >
               <option value="">Select reference</option>
               {references.map((reference) => (
@@ -445,7 +445,7 @@ function CashModal({
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="rounded border px-4 py-2"
+            className={buttonClasses({ variant: "secondary" })}
           >
             Cancel
           </button>
@@ -482,13 +482,13 @@ function Input({
         type={type}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded border p-2"
+        className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink-strong shadow-elevation-1 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/15 w-full"
       />
     </label>
   );
 }
 
-function BankAccountForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) { const [form, setForm] = useState({ name: "", bank_name: "", masked_account_number: "", currency: "", ledger_account: "", is_active: true }); const [error, setError] = useState(""); const [saving, setSaving] = useState(false); const { data } = useApiResource(() => accountingApi.listAccounts({ page_size: MAX_PAGE_SIZE, is_active: true, is_postable: true })); const save = async () => { if (!form.name.trim() || !form.bank_name.trim() || !form.masked_account_number.trim() || !form.currency || !form.ledger_account) { setError("Complete every bank account field."); return; } setSaving(true); try { await accountingApi.createBankAccount({ ...form, name: form.name.trim(), bank_name: form.bank_name.trim(), masked_account_number: form.masked_account_number.trim(), currency: form.currency.toUpperCase() }); onSaved(); } catch (caught) { setError(getApiErrorMessage(caught)); } finally { setSaving(false); } }; return <div className="rounded-2xl border bg-surface p-5"><h2 className="font-semibold">New Bank Account</h2>{error && <p className="mt-3 text-sm text-danger-ink">{error}</p>}<div className="mt-4 grid gap-3 sm:grid-cols-2"><input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Account name" className="rounded border p-2" /><input value={form.bank_name} onChange={(event) => setForm({ ...form, bank_name: event.target.value })} placeholder="Bank name" className="rounded border p-2" /><input value={form.masked_account_number} onChange={(event) => setForm({ ...form, masked_account_number: event.target.value })} placeholder="Masked account number" className="rounded border p-2" /><input value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value.toUpperCase() })} placeholder="Currency" className="rounded border p-2" /><select value={form.ledger_account} onChange={(event) => setForm({ ...form, ledger_account: event.target.value })} className="rounded border p-2 sm:col-span-2"><option value="">Cash/bank ledger account</option>{(data?.results ?? []).map((account) => <option key={account.id} value={account.id}>{account.code} — {account.name}</option>)}</select></div><div className="mt-4 flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded border px-3 py-2">Cancel</button><button type="button" disabled={saving} onClick={() => void save()} className={buttonClasses({ variant: "primary", size: "sm" })}>{saving ? "Saving..." : "Create Account"}</button></div></div>; }
+function BankAccountForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) { const [form, setForm] = useState({ name: "", bank_name: "", masked_account_number: "", currency: "", ledger_account: "", is_active: true }); const [error, setError] = useState(""); const [saving, setSaving] = useState(false); const { data } = useApiResource(() => accountingApi.listAccounts({ page_size: MAX_PAGE_SIZE, is_active: true, is_postable: true })); const save = async () => { if (!form.name.trim() || !form.bank_name.trim() || !form.masked_account_number.trim() || !form.currency || !form.ledger_account) { setError("Complete every bank account field."); return; } setSaving(true); try { await accountingApi.createBankAccount({ ...form, name: form.name.trim(), bank_name: form.bank_name.trim(), masked_account_number: form.masked_account_number.trim(), currency: form.currency.toUpperCase() }); onSaved(); } catch (caught) { setError(getApiErrorMessage(caught)); } finally { setSaving(false); } }; return <div className="rounded-2xl border bg-surface p-5"><h2 className="font-semibold">New Bank Account</h2>{error && <p className="mt-3 text-sm text-danger-ink">{error}</p>}<div className="mt-4 grid gap-3 sm:grid-cols-2"><input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Account name" className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink-strong shadow-elevation-1 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/15" /><input value={form.bank_name} onChange={(event) => setForm({ ...form, bank_name: event.target.value })} placeholder="Bank name" className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink-strong shadow-elevation-1 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/15" /><input value={form.masked_account_number} onChange={(event) => setForm({ ...form, masked_account_number: event.target.value })} placeholder="Masked account number" className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink-strong shadow-elevation-1 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/15" /><input value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value.toUpperCase() })} placeholder="Currency" className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink-strong shadow-elevation-1 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/15" /><select value={form.ledger_account} onChange={(event) => setForm({ ...form, ledger_account: event.target.value })} className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink-strong shadow-elevation-1 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/15 sm:col-span-2"><option value="">Cash/bank ledger account</option>{(data?.results ?? []).map((account) => <option key={account.id} value={account.id}>{account.code} — {account.name}</option>)}</select></div><div className="mt-4 flex justify-end gap-2"><button type="button" onClick={onClose} className={buttonClasses({ variant: "secondary", size: "sm" })}>Cancel</button><button type="button" disabled={saving} onClick={() => void save()} className={buttonClasses({ variant: "primary", size: "sm" })}>{saving ? "Saving..." : "Create Account"}</button></div></div>; }
 function Transactions({
   title,
   rows,
@@ -540,7 +540,7 @@ function Transactions({
                     <button
                       type="button"
                       onClick={() => onVoid(row)}
-                      className="rounded-lg border px-3 py-2 text-xs font-semibold"
+                      className={buttonClasses({ variant: "secondary", size: "sm" })}
                     >
                       Void
                     </button>
@@ -611,7 +611,7 @@ function Reconciliation() {
           same bank-ledger amount.
         </p>
         </div>
-        <button type="button" onClick={() => setImporting(true)} className="rounded-lg border px-3 py-2 text-xs font-semibold">Import statement line</button>
+        <button type="button" onClick={() => setImporting(true)} className={buttonClasses({ variant: "secondary", size: "sm" })}>Import statement line</button>
       </div>
       {importing && <StatementImport onClose={() => setImporting(false)} onSaved={() => { setImporting(false); reload(); }} />}
       {error && <ErrorState message={error} onRetry={reload} />}
@@ -652,7 +652,7 @@ function Reconciliation() {
                     <button
                       type="button"
                       onClick={() => void act(line.id, false)}
-                      className="rounded-lg border px-3 py-2 text-xs font-semibold"
+                      className={buttonClasses({ variant: "secondary", size: "sm" })}
                     >
                       Unmatch
                     </button>
@@ -666,7 +666,7 @@ function Reconciliation() {
                             [line.id]: event.target.value,
                           })
                         }
-                        className="max-w-xs rounded border px-2 text-xs"
+                        className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink-strong shadow-elevation-1 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/15 max-w-xs"
                       >
                         <option value="">Select posted journal</option>
                         {journals.map((journal) => (
@@ -679,7 +679,7 @@ function Reconciliation() {
                       <button
                         type="button"
                         onClick={() => void act(line.id, true)}
-                        className="rounded-lg border px-3 py-2 text-xs font-semibold"
+                        className={buttonClasses({ variant: "secondary", size: "sm" })}
                       >
                         Match
                       </button>
@@ -710,5 +710,5 @@ function StatementImport({ onClose, onSaved }: { onClose: () => void; onSaved: (
   const [error, setError] = useState(""); const [saving, setSaving] = useState(false);
   const { data } = useApiResource(() => accountingApi.listBankAccounts({ page_size: MAX_PAGE_SIZE, is_active: true }));
   const save = async () => { if (!form.bank_account || !form.external_id.trim() || !form.amount || !form.currency.trim()) { setError("Bank account, external ID, amount, and currency are required."); return; } setSaving(true); try { await accountingApi.createBankStatementLine({ ...form, external_id: form.external_id.trim(), currency: form.currency.trim().toUpperCase() }); onSaved(); } catch (caught) { setError(getApiErrorMessage(caught)); } finally { setSaving(false); } };
-  return <div className="mt-4 rounded-xl border bg-surface-muted p-4"><p className="font-medium">Import statement line</p>{error && <p className="mt-2 text-sm text-danger-ink">{error}</p>}<div className="mt-3 grid gap-3 sm:grid-cols-2"><select value={form.bank_account} onChange={(event) => setForm({ ...form, bank_account: event.target.value })} className="rounded border p-2"><option value="">Bank account</option>{(data?.results ?? []).map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select><input type="date" value={form.statement_date} onChange={(event) => setForm({ ...form, statement_date: event.target.value })} className="rounded border p-2" /><input value={form.external_id} onChange={(event) => setForm({ ...form, external_id: event.target.value })} placeholder="Bank external ID" className="rounded border p-2" /><input type="number" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} placeholder="Amount (+/-)" className="rounded border p-2" /><input value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value.toUpperCase() })} placeholder="Currency" className="rounded border p-2" /><input value={form.reference} onChange={(event) => setForm({ ...form, reference: event.target.value })} placeholder="Reference (optional)" className="rounded border p-2" /><input value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Description (optional)" className="rounded border p-2 sm:col-span-2" /></div><div className="mt-3 flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded border px-3 py-2 text-sm">Cancel</button><button type="button" onClick={() => void save()} disabled={saving} className={buttonClasses({ variant: "primary" })}>{saving ? "Importing..." : "Import"}</button></div></div>;
+  return <div className="mt-4 rounded-xl border bg-surface-muted p-4"><p className="font-medium">Import statement line</p>{error && <p className="mt-2 text-sm text-danger-ink">{error}</p>}<div className="mt-3 grid gap-3 sm:grid-cols-2"><select value={form.bank_account} onChange={(event) => setForm({ ...form, bank_account: event.target.value })} className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink-strong shadow-elevation-1 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/15"><option value="">Bank account</option>{(data?.results ?? []).map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select><input type="date" value={form.statement_date} onChange={(event) => setForm({ ...form, statement_date: event.target.value })} className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink-strong shadow-elevation-1 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/15" /><input value={form.external_id} onChange={(event) => setForm({ ...form, external_id: event.target.value })} placeholder="Bank external ID" className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink-strong shadow-elevation-1 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/15" /><input type="number" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} placeholder="Amount (+/-)" className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink-strong shadow-elevation-1 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/15" /><input value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value.toUpperCase() })} placeholder="Currency" className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink-strong shadow-elevation-1 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/15" /><input value={form.reference} onChange={(event) => setForm({ ...form, reference: event.target.value })} placeholder="Reference (optional)" className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink-strong shadow-elevation-1 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/15" /><input value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Description (optional)" className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink-strong shadow-elevation-1 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/15 sm:col-span-2" /></div><div className="mt-3 flex justify-end gap-2"><button type="button" onClick={onClose} className={buttonClasses({ variant: "secondary", size: "sm" })}>Cancel</button><button type="button" onClick={() => void save()} disabled={saving} className={buttonClasses({ variant: "primary" })}>{saving ? "Importing..." : "Import"}</button></div></div>;
 }

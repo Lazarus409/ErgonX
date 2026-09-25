@@ -46,17 +46,17 @@ This document describes the system as implemented. When code and this document d
 
 | Role | Utility | Light | Dark |
 |---|---|---|---|
-| Canvas | `bg-canvas` | `#F7F8FA` | `#08111F` |
+| Canvas | `bg-canvas` | `#F5F7FB` | `#08111F` |
 | Surface | `bg-surface` | `#FFFFFF` | `#0D1C37` |
-| Surface muted | `bg-surface-muted` | `#F3F5F9` | `#13223A` |
-| Surface sunken | `bg-surface-sunken` | `#ECEFF5` | `#0B1526` |
-| Surface hover | `bg-surface-hover` | `#F5F7FA` | `#172841` |
+| Surface muted | `bg-surface-muted` | `#EEF3FA` | `#13223A` |
+| Surface sunken | `bg-surface-sunken` | `#E7EDF6` | `#0B1526` |
+| Surface hover | `bg-surface-hover` | `#F3F6FB` | `#172841` |
 | Ink strong | `text-ink-strong` | `#0F2345` | `#F2F5FB` |
 | Ink | `text-ink` | `#23324D` | `#D3DCEC` |
 | Ink muted | `text-ink-muted` | `#56657F` | `#9AA9C3` |
 | Ink subtle | `text-ink-subtle` | `#8290A8` | `#6F82A3` |
-| Line | `border-line` | `#E1E6EE` | `#1F3050` |
-| Line soft / strong | `border-line-soft` / `border-line-strong` | `#EBEEF4` / `#CDD5E1` | `#182743` / `#2B4066` |
+| Line | `border-line` | `#D9E2EF` | `#1F3050` |
+| Line soft / strong | `border-line-soft` / `border-line-strong` | `#E6ECF5` / `#C2CEDF` | `#182743` / `#2B4066` |
 | Primary | `bg-primary`, `text-primary` | `#2F6BFF` | `#5687FF` |
 | Primary soft / ink | `bg-primary-soft`, `text-primary-ink` | `#E9F0FF` / `#1D4ED8` | 16% tint / `#A9C2FF` |
 | Focus ring | `--focus-ring` | blue 45% | light blue 55% |
@@ -144,7 +144,7 @@ Named animations: `animate-fade-in`, `animate-pop-in`, `animate-slide-up`, `anim
 
 - **Surface** — base container (`tone`, `elevation`, `padding`, `radius`).
 - **Card** — Surface + header (`title`, `description`, `icon`, `accent`, `actions`) and optional 3 px module `accentLine`.
-- **MetricCard** — KPI: label, `text-kpi` value, description, icon tile, optional trend chip (direction + whether up is good), skeleton while loading, optional link.
+- **MetricCard** — KPI: label, `text-kpi` value, description, icon tile, soft accent glow, optional `chart` slot (e.g. a `Sparkline` of the recent trend), optional trend chip (direction + whether up is good), skeleton while loading, optional link.
 - **InsightCard** — module-tinted interpretation of data ("Offer rate …").
 - **ActionCard** — navigation card with icon tile, animated accent line and CTA.
 - **AttentionItem** — severity bar + chip (label, not colour alone) + description + link.
@@ -207,10 +207,14 @@ All routes now use semantic colour roles. The 2026-09-25 pass mapped every raw p
 
 ## 12. 2026-09-25 refinement (Linear/Stripe direction)
 
-- Canvas and lines moved towards neutral (`#F7F8FA`, hairline `#E1E6EE`); dark mode deepened.
+- Dark mode deepened. (Light canvas and line values briefly moved to neutral and were restored to the locked brand palette the same day; see below.)
 - Radii: controls 8 px, cards 12 px, heroes/dialogs 16 px (previously 14/18/22).
 - Elevation flattened: borders carry structure; `elevation-1` is a 1 px hint.
-- Controls and buttons 36 px by default; primary/danger buttons carry an inset top highlight.
+- Controls and buttons 36 px by default; primary/danger buttons carry an inset top highlight; primary CTAs also carry the soft brand glow (`--glow-primary`).
 - Type: page titles 24 px semibold, body 14 px; KPI 28 px.
 - Shell: 56 px top bar, 16 rem sidebar with 36 px nav rows and no decorative glow; content max width 1360 px.
-- MetricCard/ActionCard: no hover lift or accent glow; hover strengthens the border and shadow only.
+- MetricCard keeps its soft module-accent glow; MetricCard and ActionCard no longer lift on hover.
+
+**Brand-spec reconciliation (same day):** the locked brand foundation wins on colour (canvas `#F5F7FB`, muted surface `#EEF3FA`, soft border `#D9E2EF`), and important CTAs and KPI cards keep a soft glow. The crisper radii, 36 px density and type scale from the refinement remain.
+
+**New in this pass:** `SegmentedControl` (filters with five or fewer options, radio-group semantics; used for attendance status filters), the `MetricCard` `chart` slot with sparklines on Payroll, Attendance and Accounting KPIs, row action menus (`Menu` + `IconButton`) on Employees and Schedules, charts on the Recruitment dashboard (intake trend, status donut, most active openings) and an at-a-glance chart on Reports & Analytics.

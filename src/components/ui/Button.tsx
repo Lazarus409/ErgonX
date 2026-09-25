@@ -13,7 +13,7 @@ const base =
   "inline-flex shrink-0 select-none items-center justify-center gap-2 whitespace-nowrap font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-standard active:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50";
 
 const variants: Record<ButtonVariant, string> = {
-  primary: "bg-primary text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.14),0_1px_2px_rgb(15_35_69/0.18)] hover:bg-primary-hover active:bg-primary-active",
+  primary: "bg-primary text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.16),0_1px_2px_rgb(15_35_69/0.18),var(--glow-primary)] hover:bg-primary-hover active:bg-primary-active",
   secondary: "border border-line bg-surface text-ink-strong shadow-elevation-1 hover:border-line-strong hover:bg-surface-hover",
   ghost: "text-ink hover:bg-surface-hover hover:text-ink-strong",
   danger: "bg-danger text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.14),0_1px_2px_rgb(15_35_69/0.18)] hover:brightness-95 active:brightness-90",

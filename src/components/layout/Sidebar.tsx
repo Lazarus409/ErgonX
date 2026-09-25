@@ -6,11 +6,11 @@ import { ChevronDown, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 import { useState } from "react";
 
 import SidebarLogo from "@/components/brand/SidebarLogo";
-import Logo from "@/components/brand/Logo";
 import { navigation, selfServiceNavigation, type NavigationItem } from "@/components/navigation/navigation";
 import { useAuth } from "@/components/guards/AuthProvider";
 import { hasModule } from "@/types/institutions";
 import { cx } from "@/lib/cx";
+import { imageContentUrl } from "@/lib/api/images";
 import { accentForPath, moduleAccents } from "@/lib/moduleTheme";
 
 interface SidebarProps {
@@ -67,9 +67,9 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
   // In the mobile drawer the sidebar is always rendered expanded.
   const renderPanel = (compact: boolean, mobile: boolean) => (
     <div className="flex h-full flex-col">
-      <div className={cx("flex h-14 shrink-0 items-center justify-between gap-2 border-b border-white/[0.07]", compact ? "px-[22px]" : "pl-[22px] pr-3")}>
-        <Link href="/" onClick={closeMobile} className="rounded-lg focus-visible:outline-offset-4" aria-label="ErgonX home">
-          <SidebarLogo collapsed={compact} />
+      <div className={cx("flex h-14 shrink-0 items-center justify-between gap-2 overflow-hidden border-b border-white/[0.07]", compact ? "px-[18px]" : "pl-[18px] pr-2.5")}>
+        <Link href="/" onClick={closeMobile} className="min-w-0 rounded-lg focus-visible:outline-offset-4" aria-label={`${institution?.name ?? "ErgonX"} home`} title={compact ? institution?.name : undefined}>
+          <SidebarLogo collapsed={compact} institutionName={institution?.name} institutionCode={institution?.code} logoSrc={institution?.logoImageId ? imageContentUrl(institution.logoImageId) : null} />
         </Link>
         {mobile ? (
           <button type="button" onClick={closeMobile} className="rounded-xl p-2 text-white/70 transition-colors hover:bg-white/10 hover:text-white" aria-label="Close navigation">
@@ -156,26 +156,13 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
         )}
       </nav>
 
-      <div className="shrink-0 border-t border-white/[0.07] p-3">
-        {compact && !mobile && (
-          <button type="button" onClick={() => onCollapsedChange(false)} className="mb-2 flex h-10 w-full items-center justify-center rounded-xl text-white/60 transition-colors hover:bg-white/10 hover:text-white" aria-label="Expand sidebar" title="Expand sidebar">
+      {compact && !mobile && (
+        <div className="shrink-0 border-t border-white/[0.07] p-3">
+          <button type="button" onClick={() => onCollapsedChange(false)} className="flex h-9 w-full items-center justify-center rounded-lg text-white/60 transition-colors hover:bg-white/10 hover:text-white" aria-label="Expand sidebar" title="Expand sidebar">
             <PanelLeftOpen className="h-[18px] w-[18px]" />
           </button>
-        )}
-        <div className={cx("flex items-center rounded-xl bg-white/[0.05]", compact ? "justify-center p-2" : "gap-3 p-2.5")} title={compact ? institution?.name : undefined}>
-          <InstitutionMonogram name={institution?.name ?? "ErgonX"} />
-          {!compact && (
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-support font-semibold text-white">{institution?.name ?? "No active institution"}</p>
-              <p className="flex items-center gap-1.5 truncate text-caption text-white/45">
-                {institution?.code && <span className="truncate">{institution.code}</span>}
-                {institution?.code && <span aria-hidden="true">·</span>}
-                <span className="inline-flex items-center gap-1">on <Logo variant="mono-white" height={9} alt="ErgonX" className="opacity-70" /></span>
-              </p>
-            </div>
-          )}
         </div>
-      </div>
+      )}
     </div>
   );
 
@@ -236,14 +223,5 @@ function NavRow({ item, active, groupActive, compact, onNavigate, expander }: { 
         </span>
       )}
     </div>
-  );
-}
-
-function InstitutionMonogram({ name }: { name: string }) {
-  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "E";
-  return (
-    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent-aqua/80 via-accent-blue to-accent-violet text-caption font-bold text-white shadow-sm" aria-hidden="true">
-      {initials}
-    </span>
   );
 }

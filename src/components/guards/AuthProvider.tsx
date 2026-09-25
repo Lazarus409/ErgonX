@@ -91,6 +91,7 @@ async function loadLiveSession(): Promise<{
     id: context.active_institution.id,
     name: context.active_institution.name,
     code: context.active_institution.code,
+    logoImageId: context.active_institution.logo_image_id ?? null,
     enabledModules: context.enabled_modules,
   };
 

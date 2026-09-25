@@ -95,14 +95,17 @@ export interface MetricCardProps {
   href?: string;
   size?: "md" | "sm";
   footer?: ReactNode;
+  /** Compact visual under the value, e.g. a <Sparkline /> of the recent trend. */
+  chart?: ReactNode;
   className?: string;
 }
 
-export function MetricCard({ label, value, description, icon, accent = "brand", trend, loading, href, size = "md", footer, className }: MetricCardProps) {
+export function MetricCard({ label, value, description, icon, accent = "brand", trend, loading, href, size = "md", footer, chart, className }: MetricCardProps) {
   const good = trend ? (trend.direction === "flat" ? null : (trend.direction === "up") === (trend.positiveIsGood ?? true)) : null;
   const TrendIcon = trend?.direction === "up" ? ArrowUpRight : trend?.direction === "down" ? ArrowDownRight : Minus;
   const body = (
     <>
+      <span aria-hidden="true" className={cx("pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full opacity-50 blur-2xl", moduleAccents[accent].soft)} />
       <div className="relative flex items-start justify-between gap-3">
         <p className="text-support font-medium text-ink-muted">{label}</p>
         {icon && <IconTile icon={icon} accent={accent} size="sm" />}
@@ -115,6 +118,7 @@ export function MetricCard({ label, value, description, icon, accent = "brand", 
         )}
         {description && <p className="mt-1 text-support text-ink-muted">{description}</p>}
       </div>
+      {chart && !loading && <div className="relative -mx-1 mt-3">{chart}</div>}
       {trend && !loading && (
         <p className={cx("relative mt-3 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-caption font-semibold", good === null ? "bg-neutral-soft text-neutral-ink" : good ? "bg-success-soft text-success-ink" : "bg-danger-soft text-danger-ink")}>
           <TrendIcon className="h-3.5 w-3.5" aria-hidden="true" />

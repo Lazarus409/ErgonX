@@ -44,6 +44,8 @@ export interface AuthBootstrap {
     code: string;
     name: string;
     timezone: string;
+    /** Active institution logo image, served by `imageContentUrl`. */
+    logo_image_id?: string | null;
   };
   active_membership: {
     id: string;

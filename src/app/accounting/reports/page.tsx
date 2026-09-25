@@ -14,7 +14,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import { Skeleton } from "@/components/ui/Skeleton";
 import Tabs from "@/components/ui/Tabs";
 import { cx } from "@/lib/cx";
-import { accountingApi, getApiErrorMessage, institutionsApi } from "@/lib/api";
+import { accountingApi, getApiErrorMessage, imagesApi, institutionsApi } from "@/lib/api";
 import { formatAmount, formatDate, humanizeEnum } from "@/lib/format";
 import type { BalanceSheet, IncomeStatement, TrialBalance } from "@/types/accounting";
 import { useApiResource } from "@/lib/useApiResource";
@@ -70,6 +70,7 @@ export default function AccountingReportsPage() {
       </div>
       <DocumentFrame
         institutionName={institution?.name ?? "Institution"}
+        institutionLogoSrc={institution?.logoImageId ? imagesApi.imageContentUrl(institution.logoImageId) : null}
         documentTitle={reportLabels[report]}
         meta={<><p className="font-semibold text-ink-strong">{report === "balance" ? `As of ${applied.date_to ? formatDate(applied.date_to) : "today"}` : applied.date_from || applied.date_to ? `${applied.date_from ? formatDate(applied.date_from) : "Start"} – ${applied.date_to ? formatDate(applied.date_to) : "today"}` : "All posted periods"}</p>{currency && <p className="text-ink-muted">Reporting currency: {currency}</p>}</>}
         footerNote="Derived from posted journal lines by the ErgonX ledger. Draft and pending journals are excluded."

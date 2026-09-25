@@ -8,6 +8,7 @@ import ChartCard from "@/components/charts/ChartCard";
 import { BarsChart, TrendChart } from "@/components/charts/Charts";
 import PayrollWorkflow from "@/components/payroll/PayrollWorkflow";
 import { ButtonLink } from "@/components/ui/Button";
+import { Sparkline } from "@/components/charts/Visuals";
 import { Card, InsightCard, MetricCard } from "@/components/ui/Card";
 import ErrorState from "@/components/ui/ErrorState";
 import PageHeader from "@/components/ui/PageHeader";
@@ -40,9 +41,9 @@ export default function PayrollDashboardPage() {
       {error && <ErrorState variant="inline" title="Unable to load payroll dashboard" message={error} onRetry={reload} />}
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Finalized payroll totals">
-        <MetricCard size="sm" label="Finalized gross pay" value={data ? formatAmount(data.finalized_gross_pay) : EM_DASH} description="Across finalized runs" icon={WalletCards} accent="payroll" loading={initial} />
-        <MetricCard size="sm" label="Finalized net pay" value={data ? formatAmount(data.finalized_net_pay) : EM_DASH} description="Paid to employees" icon={HandCoins} accent="accounting" loading={initial} />
-        <MetricCard size="sm" label="Deductions" value={data ? formatAmount(data.finalized_deductions) : EM_DASH} description="Statutory and voluntary" icon={MinusCircle} accent="audit" loading={initial} />
+        <MetricCard size="sm" label="Finalized gross pay" value={data ? formatAmount(data.finalized_gross_pay) : EM_DASH} description="Across finalized runs" icon={WalletCards} accent="payroll" loading={initial} chart={<Sparkline values={periods.map((point) => point.gross_pay)} color="var(--mod-payroll)" height={32} label="Gross pay by period" />} />
+        <MetricCard size="sm" label="Finalized net pay" value={data ? formatAmount(data.finalized_net_pay) : EM_DASH} description="Paid to employees" icon={HandCoins} accent="accounting" loading={initial} chart={<Sparkline values={periods.map((point) => point.net_pay)} color="var(--mod-accounting)" height={32} label="Net pay by period" />} />
+        <MetricCard size="sm" label="Deductions" value={data ? formatAmount(data.finalized_deductions) : EM_DASH} description="Statutory and voluntary" icon={MinusCircle} accent="audit" loading={initial} chart={<Sparkline values={periods.map((point) => point.total_deductions)} color="var(--mod-audit)" height={32} label="Deductions by period" />} />
         <MetricCard size="sm" label="Employer contributions" value={data ? formatAmount(data.employer_contributions) : EM_DASH} description="Employer-side cost" icon={Building2} accent="hr" loading={initial} />
       </section>
 

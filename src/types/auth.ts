@@ -18,6 +18,8 @@ export interface SessionInstitution {
   id: string;
   name: string;
   code: string;
+  /** Uploaded institution logo (image asset id), when one exists. */
+  logoImageId?: string | null;
   /**
    * Enabled backend module codes (`CORE_HR`, `LEAVE`, ...). The development
    * bypass uses the short label `HR`; compare with `hasModule` from

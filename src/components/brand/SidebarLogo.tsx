@@ -2,34 +2,41 @@ import Logo from "@/components/brand/Logo";
 import { cx } from "@/lib/cx";
 
 /**
- * Sidebar brand transition (Design System v2, branding.md §Sidebar transition).
+ * Sidebar workspace header (branding.md §Sidebar).
  *
- * Two layered assets share one fixed-size container so the header never
- * reflows. Collapsing, the reversed wordmark scales/fades toward the symbol
- * position while the X mark scales/fades in; expanding reverses it. Timing
- * is 220 ms on the standard curve and collapses to an instant swap under
- * prefers-reduced-motion (global rule in globals.css).
+ * The shell always carries the ErgonX symbol; the tenant is the workspace
+ * context beside it. When the institution has uploaded a logo, that logo takes
+ * the symbol's place and ErgonX drops to a subtle "on ErgonX" attribution, so
+ * the tenant never feels like a guest in its own system. Collapsing leaves
+ * only the symbol (or tenant logo); the text fades in 220 ms and collapses to
+ * an instant swap under prefers-reduced-motion.
  */
-export default function SidebarLogo({ collapsed }: { collapsed: boolean }) {
+export default function SidebarLogo({ collapsed, institutionName, institutionCode, logoSrc }: { collapsed: boolean; institutionName?: string | null; institutionCode?: string | null; logoSrc?: string | null }) {
   return (
-    <span className="relative block h-9 w-[120px]" aria-label="ErgonX" role="img">
+    <span className="flex min-w-0 items-center gap-2.5">
+      {logoSrc ? (
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white p-1 ring-1 ring-white/10">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={logoSrc} alt="" className="h-full w-full object-contain" />
+        </span>
+      ) : (
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center">
+          <Logo variant="mark" height={30} alt="" priority />
+        </span>
+      )}
       <span
-        aria-hidden="true"
         className={cx(
-          "absolute left-0 top-1/2 origin-left -translate-y-1/2 transition-[opacity,transform,filter] duration-[220ms] ease-standard",
-          collapsed ? "pointer-events-none scale-[0.72] opacity-0 blur-[1px]" : "scale-100 opacity-100 blur-0",
+          "min-w-0 leading-tight transition-[opacity,transform] duration-220 ease-standard",
+          collapsed ? "pointer-events-none -translate-x-1 opacity-0" : "opacity-100",
         )}
+        aria-hidden={collapsed || undefined}
       >
-        <Logo variant="reversed" height={30} alt="" priority />
-      </span>
-      <span
-        aria-hidden="true"
-        className={cx(
-          "absolute left-0 top-1/2 -translate-y-1/2 transition-[opacity,transform] duration-[220ms] ease-standard",
-          collapsed ? "scale-100 opacity-100 delay-[40ms]" : "pointer-events-none scale-50 opacity-0",
-        )}
-      >
-        <Logo variant="mark" height={34} alt="" priority />
+        <span className="block truncate text-sm font-semibold text-white">{institutionName ?? "ErgonX"}</span>
+        <span className="flex items-center gap-1.5 text-caption text-white/50">
+          {institutionCode && <span className="truncate">{institutionCode}</span>}
+          {institutionCode && <span aria-hidden="true">·</span>}
+          <span className="inline-flex shrink-0 items-center gap-1">on <Logo variant="mono-white" height={9} alt="ErgonX" className="opacity-75" /></span>
+        </span>
       </span>
     </span>
   );

@@ -7,6 +7,7 @@ import {
   Check,
   Clock3,
   Eye,
+  MoreHorizontal,
   Pencil,
   Plus,
   Search,
@@ -35,7 +36,9 @@ import type {
 } from "@/types/attendance";
 import type { Employee } from "@/types/hr";
 import { formatDate, humanizeEnum, toISODate } from "@/lib/format";
-import { buttonClasses } from "@/components/ui/Button";
+import { IconButton, buttonClasses } from "@/components/ui/Button";
+import { Menu, MenuItem } from "@/components/ui/Overlay";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 
 const ALL = "ALL";
 
@@ -438,16 +441,12 @@ export default function SchedulesPage() {
             ))}
           </select>
 
-          <select
+          <SegmentedControl
+            label="Filter by status"
             value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
-            aria-label="Filter by status"
-            className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink outline-none"
-          >
-            <option value={ALL}>All Statuses</option>
-            <option value="ACTIVE">Active</option>
-            <option value="INACTIVE">Inactive</option>
-          </select>
+            onChange={(next) => setStatusFilter(next)}
+            options={[{ value: ALL, label: "All" }, { value: "ACTIVE", label: "Active" }, { value: "INACTIVE", label: "Inactive" }]}
+          />
         </div>
       </div>
 
@@ -525,35 +524,37 @@ export default function SchedulesPage() {
                     </td>
 
                     <td className="px-5 py-4">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => {
-                            setAssignFor(schedule);
-                            setSelectedEmployees(new Set());
-                            setEmployeeSearch("");
-                            setFormError("");
-                          }}
-                          className={buttonClasses({ variant: "secondary", size: "sm" })}
-                        >
-                          <Users className="h-4 w-4" />
-                          Assign
-                        </button>
-
+                      <div className="flex items-center justify-end gap-1">
                         <Link
                           href={`/attendance/schedules/${schedule.id}`}
-                          className={buttonClasses({ variant: "secondary", size: "sm" })}
+                          className={buttonClasses({ variant: "ghost", size: "sm" })}
                         >
                           <Eye className="h-4 w-4" />
                           View
                         </Link>
 
-                        <button
-                          onClick={() => openEdit(schedule)}
-                          className={buttonClasses({ variant: "secondary", size: "sm" })}
+                        <Menu
+                          label={`Actions for ${schedule.name}`}
+                          trigger={(props) => <IconButton {...props} label={`Actions for ${schedule.name}`} size="sm"><MoreHorizontal className="h-4 w-4" /></IconButton>}
                         >
-                          <Pencil className="h-4 w-4" />
-                          Edit
-                        </button>
+                          {(close) => (
+                            <div className="p-1.5">
+                              <MenuItem
+                                icon={<Users />}
+                                onSelect={() => {
+                                  close();
+                                  setAssignFor(schedule);
+                                  setSelectedEmployees(new Set());
+                                  setEmployeeSearch("");
+                                  setFormError("");
+                                }}
+                              >
+                                Assign employees
+                              </MenuItem>
+                              <MenuItem icon={<Pencil />} onSelect={() => { close(); openEdit(schedule); }}>Edit schedule</MenuItem>
+                            </div>
+                          )}
+                        </Menu>
                       </div>
                     </td>
                   </tr>

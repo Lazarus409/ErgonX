@@ -80,6 +80,10 @@ class ImageAssetViewSet(TenantModelViewSet):
         if owner_type == ImageAsset.OwnerType.EMPLOYEE and Employee.objects.for_institution(self.request.institution).filter(id=owner_id, user=self.request.user).exists():
             return "home.view"
         if owner_type == ImageAsset.OwnerType.INSTITUTION and owner_id == str(self.request.institution.id):
+            # Every member sees the institution logo in the shell and on
+            # documents; only institution managers may replace or remove it.
+            if self.action in ("retrieve", "content"):
+                return "home.view"
             return "settings.institution.manage"
         return "employee.update"
 

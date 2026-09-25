@@ -505,6 +505,22 @@ class DashboardViewSet(ViewSet):
     def recruitment(self, request):
         institution = request.institution
         applications = Application.objects.filter(institution=institution)
+        today = date.today()
+        first_month = today.replace(day=1)
+        for _ in range(5):
+            first_month = (first_month - timedelta(days=1)).replace(day=1)
+        monthly_counts = {
+            item["month"].date() if hasattr(item["month"], "date") else item["month"]: item["count"]
+            for item in applications.filter(applied_at__date__gte=first_month, applied_at__date__lte=today)
+            .annotate(month=TruncMonth("applied_at"))
+            .values("month")
+            .annotate(count=Count("id"))
+        }
+        applications_trend = []
+        month = first_month
+        for _ in range(6):
+            applications_trend.append({"month": month.isoformat(), "applications": monthly_counts.get(month, 0)})
+            month = (month + timedelta(days=32)).replace(day=1)
         return Response({
             "open_jobs": JobPosting.objects.filter(institution=institution, status=JobPosting.Status.OPEN).count(),
             "active_candidates": Candidate.objects.filter(institution=institution, status=Candidate.Status.ACTIVE).count(),
@@ -512,6 +528,14 @@ class DashboardViewSet(ViewSet):
             "scheduled_interviews": Interview.objects.filter(institution=institution, status=Interview.Status.SCHEDULED).count(),
             "offers_extended": Offer.objects.filter(institution=institution, status=Offer.Status.EXTENDED).count(),
             "pipeline": list(RecruitmentStage.objects.filter(institution=institution, is_active=True).values("name").annotate(count=Count("applications")).order_by("sequence")),
+            "applications_by_status": list(applications.values("status").annotate(count=Count("id")).order_by("status")),
+            "applications_trend": applications_trend,
+            "top_open_jobs": list(
+                JobPosting.objects.filter(institution=institution, status=JobPosting.Status.OPEN)
+                .annotate(application_count=Count("applications"))
+                .order_by("-application_count", "title")
+                .values("title", "application_count")[:5]
+            ),
         })
 
     @extend_schema(

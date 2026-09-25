@@ -16,6 +16,9 @@ RUN npm run build
 FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+# Render sets HOSTNAME to the container name. Next's standalone server uses
+# this variable as its bind address, so explicitly listen on all interfaces.
+ENV HOSTNAME=0.0.0.0
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static

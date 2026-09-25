@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { ChevronDown, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
 import { useState } from "react";
 
+import Logo from "@/components/brand/Logo";
 import SidebarLogo from "@/components/brand/SidebarLogo";
 import { navigation, selfServiceNavigation, type NavigationItem } from "@/components/navigation/navigation";
 import { useAuth } from "@/components/guards/AuthProvider";
@@ -68,8 +69,8 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
   const renderPanel = (compact: boolean, mobile: boolean) => (
     <div className="flex h-full flex-col">
       <div className={cx("flex h-14 shrink-0 items-center justify-between gap-2 overflow-hidden border-b border-white/[0.07]", compact ? "px-[18px]" : "pl-[18px] pr-2.5")}>
-        <Link href="/" onClick={closeMobile} className="min-w-0 rounded-lg focus-visible:outline-offset-4" aria-label={`${institution?.name ?? "ErgonX"} home`} title={compact ? institution?.name : undefined}>
-          <SidebarLogo collapsed={compact} institutionName={institution?.name} institutionCode={institution?.code} logoSrc={institution?.logoImageId ? imageContentUrl(institution.logoImageId) : null} />
+        <Link href="/" onClick={closeMobile} className="min-w-0 rounded-lg focus-visible:outline-offset-4" aria-label="ErgonX home">
+          <SidebarLogo collapsed={compact} />
         </Link>
         {mobile ? (
           <button type="button" onClick={closeMobile} className="rounded-xl p-2 text-white/70 transition-colors hover:bg-white/10 hover:text-white" aria-label="Close navigation">
@@ -156,13 +157,19 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
         )}
       </nav>
 
-      {compact && !mobile && (
-        <div className="shrink-0 border-t border-white/[0.07] p-3">
-          <button type="button" onClick={() => onCollapsedChange(false)} className="flex h-9 w-full items-center justify-center rounded-lg text-white/60 transition-colors hover:bg-white/10 hover:text-white" aria-label="Expand sidebar" title="Expand sidebar">
+      <div className="shrink-0 border-t border-white/[0.07] p-3">
+        {compact && !mobile && (
+          <button type="button" onClick={() => onCollapsedChange(false)} className="mb-2 flex h-9 w-full items-center justify-center rounded-lg text-white/60 transition-colors hover:bg-white/10 hover:text-white" aria-label="Expand sidebar" title="Expand sidebar">
             <PanelLeftOpen className="h-[18px] w-[18px]" />
           </button>
-        </div>
-      )}
+        )}
+        <InstitutionPanel
+          compact={compact}
+          name={institution?.name ?? "No active institution"}
+          code={institution?.code}
+          logoSrc={institution?.logoImageId ? imageContentUrl(institution.logoImageId) : null}
+        />
+      </div>
     </div>
   );
 
@@ -221,6 +228,42 @@ function NavRow({ item, active, groupActive, compact, onNavigate, expander }: { 
         <span role="tooltip" className="pointer-events-none absolute left-[calc(100%+14px)] top-1/2 z-50 -translate-y-1/2 whitespace-nowrap rounded-lg bg-brand-navy-deep px-2.5 py-1.5 text-caption font-semibold text-white opacity-0 shadow-elevation-3 ring-1 ring-white/10 transition-opacity duration-150 group-hover/nav:opacity-100 group-focus-within/nav:opacity-100">
           {item.label}
         </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Tenant context panel. The institution's uploaded logo (or a monogram) is
+ * the tenant identity here; a subtle "on ErgonX" attribution accompanies an
+ * uploaded logo. The header above always keeps the ErgonX brand.
+ */
+function InstitutionPanel({ compact, name, code, logoSrc }: { compact: boolean; name: string; code?: string | null; logoSrc: string | null }) {
+  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "E";
+  return (
+    <div className={cx("flex items-center rounded-lg bg-white/[0.05]", compact ? "justify-center p-1.5" : "gap-3 p-2")} title={compact ? name : undefined}>
+      {logoSrc ? (
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white p-0.5" aria-hidden="true">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={logoSrc} alt="" className="h-full w-full object-contain" />
+        </span>
+      ) : (
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-accent-aqua/80 via-accent-blue to-accent-violet text-caption font-bold text-white" aria-hidden="true">
+          {initials}
+        </span>
+      )}
+      {!compact && (
+        <div className="min-w-0 flex-1 leading-tight">
+          <p className="truncate text-support font-semibold text-white">{name}</p>
+          {logoSrc ? (
+            <p className="flex items-center gap-1 text-caption text-white/50">
+              {code && <span className="truncate">{code} ·</span>}
+              <span className="inline-flex shrink-0 items-center gap-1">on <Logo variant="mono-white" height={9} alt="ErgonX" className="opacity-75" /></span>
+            </p>
+          ) : (
+            code && <p className="truncate text-caption text-white/50">{code}</p>
+          )}
+        </div>
       )}
     </div>
   );

@@ -231,7 +231,7 @@ export default function FlexibleWorkPage() {
         </div>
       </section>
 
-      {filteredRules.length === 0 ? (
+      {error ? null : filteredRules.length === 0 ? (
         <EmptyState
           title={loading ? "Loading rules..." : "No flexible work rules"}
           description={

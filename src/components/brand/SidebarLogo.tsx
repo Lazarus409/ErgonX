@@ -1,43 +1,57 @@
+"use client";
+
+import { useState } from "react";
+
 import Logo from "@/components/brand/Logo";
 import { cx } from "@/lib/cx";
 
+const MARK_SRC = "/brand/ergonx-mark.png";
+
 /**
- * Sidebar workspace header (branding.md §Sidebar).
+ * Sidebar brand transition (branding.md §Sidebar transition).
  *
- * The shell always carries the ErgonX symbol; the tenant is the workspace
- * context beside it. When the institution has uploaded a logo, that logo takes
- * the symbol's place and ErgonX drops to a subtle "on ErgonX" attribution, so
- * the tenant never feels like a guest in its own system. Collapsing leaves
- * only the symbol (or tenant logo); the text fades in 220 ms and collapses to
- * an instant swap under prefers-reduced-motion.
+ * Two layered assets share one fixed-size container so the header never
+ * reflows. Collapsing, the reversed wordmark scales and fades toward the
+ * symbol position while the X mark scales and fades in; expanding reverses
+ * it. Each toggle plays one signature-gradient highlight across the X
+ * (masked to the mark's shape) and never loops. Timing is 220 ms on the
+ * standard curve; under prefers-reduced-motion the global rule makes the
+ * swap instant and suppresses the highlight.
  */
-export default function SidebarLogo({ collapsed, institutionName, institutionCode, logoSrc }: { collapsed: boolean; institutionName?: string | null; institutionCode?: string | null; logoSrc?: string | null }) {
+export default function SidebarLogo({ collapsed }: { collapsed: boolean }) {
+  // Count toggles (not the initial render) so the highlight plays once per change.
+  const [previous, setPrevious] = useState(collapsed);
+  const [toggles, setToggles] = useState(0);
+  if (previous !== collapsed) {
+    setPrevious(collapsed);
+    setToggles((count) => count + 1);
+  }
+
   return (
-    <span className="flex min-w-0 items-center gap-2.5">
-      {logoSrc ? (
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white p-1 ring-1 ring-white/10">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={logoSrc} alt="" className="h-full w-full object-contain" />
-        </span>
-      ) : (
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center">
-          <Logo variant="mark" height={30} alt="" priority />
-        </span>
-      )}
+    <span className="relative block h-9 w-[124px]" aria-label="ErgonX" role="img">
       <span
+        aria-hidden="true"
         className={cx(
-          "min-w-0 leading-tight transition-[opacity,transform] duration-220 ease-standard",
-          collapsed ? "pointer-events-none -translate-x-1 opacity-0" : "opacity-100",
+          "absolute left-0 top-1/2 origin-left -translate-y-1/2 transition-[opacity,transform,filter] duration-220 ease-standard",
+          collapsed ? "pointer-events-none scale-[0.72] opacity-0 blur-[1px]" : "scale-100 opacity-100 blur-0",
         )}
-        aria-hidden={collapsed || undefined}
       >
-        <span className="block truncate text-sm font-semibold text-white">{institutionName ?? "ErgonX"}</span>
-        {logoSrc ? (
-          <span className="flex items-center gap-1 text-caption text-white/50">
-            on <Logo variant="mono-white" height={9} alt="ErgonX" className="opacity-75" />
-          </span>
-        ) : (
-          institutionCode && <span className="block truncate text-caption text-white/50">{institutionCode}</span>
+        <Logo variant="reversed" height={28} alt="" priority />
+      </span>
+      <span
+        aria-hidden="true"
+        className={cx(
+          "absolute left-0 top-1/2 -translate-y-1/2 transition-[opacity,transform] duration-220 ease-standard",
+          collapsed ? "scale-100 opacity-100 delay-[40ms]" : "pointer-events-none scale-50 opacity-0",
+        )}
+      >
+        <Logo variant="mark" height={32} alt="" priority />
+        {toggles > 0 && (
+          <span
+            key={toggles}
+            className="pointer-events-none absolute inset-0 animate-mark-highlight bg-[linear-gradient(110deg,transparent_30%,var(--accent-aqua)_45%,#ffffff_50%,var(--accent-violet)_55%,transparent_70%)] bg-[length:250%_100%] mix-blend-screen"
+            style={{ WebkitMaskImage: `url(${MARK_SRC})`, maskImage: `url(${MARK_SRC})`, WebkitMaskSize: "contain", maskSize: "contain", WebkitMaskRepeat: "no-repeat", maskRepeat: "no-repeat" }}
+          />
         )}
       </span>
     </span>

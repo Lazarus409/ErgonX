@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useCallback } from "react";
 import {
   ArrowRight,
+  Bell,
+  CalendarClock,
   CalendarDays,
   CalendarPlus,
   CircleDollarSign,
@@ -25,10 +27,10 @@ import { ButtonLink } from "@/components/ui/Button";
 import { Card, IconTile, SectionHeading, SummaryList } from "@/components/ui/Card";
 import ErrorState from "@/components/ui/ErrorState";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { attendanceApi, employeesApi, homeApi, leaveApi, payrollApi } from "@/lib/api";
+import { attendanceApi, employeesApi, homeApi, leaveApi, notificationsApi, payrollApi, schedulingApi } from "@/lib/api";
 import { useAccess } from "@/lib/access";
 import { useApiResource } from "@/lib/useApiResource";
-import { EM_DASH, formatAmount, formatDate, formatNumber, toISODate } from "@/lib/format";
+import { EM_DASH, formatAmount, formatDate, formatDateTime, formatNumber, humanizeEnum, toISODate } from "@/lib/format";
 import { cx } from "@/lib/cx";
 import type { ModuleAccent } from "@/lib/moduleTheme";
 import { MAX_PAGE_SIZE } from "@/types/api";
@@ -37,6 +39,7 @@ import type { Employee } from "@/types/hr";
 import type { HomePayload } from "@/types/home";
 import type { LeaveBalance, LeaveRequest, LeaveType } from "@/types/leave";
 import type { Payslip } from "@/types/payroll";
+import type { AppNotification } from "@/types/notifications";
 
 interface PersonalData {
   employee: Employee | null;
@@ -44,6 +47,9 @@ interface PersonalData {
   attendance: AttendanceRecord[] | null;
   leave: { balances: LeaveBalance[]; requests: LeaveRequest[]; types: Map<string, LeaveType> } | null;
   payslips: Payslip[] | null;
+  /** Current schedule assignment (self-scoped by the backend for employees). */
+  schedule: { name: string; scheduleType: string; effectiveFrom: string; effectiveTo: string | null } | null;
+  updates: AppNotification[] | null;
 }
 
 function clockTime(value: string | null | undefined): string {
@@ -67,15 +73,16 @@ export default function SelfServiceHome() {
   const showAttendance = moduleEnabled("ATTENDANCE") && (can("attendance.view") || can("attendance.clock"));
   const showLeave = moduleEnabled("LEAVE") && can("leave.request");
   const showPayroll = moduleEnabled("PAYROLL") && can("payslip.view");
+  const showSchedule = moduleEnabled("ATTENDANCE") && can("schedule.view");
 
   const load = useCallback(async (): Promise<PersonalData> => {
     const [employee, home] = await Promise.all([
       employeesApi.getCurrentEmployee(),
       homeApi.getHome().catch(() => null),
     ]);
-    if (!employee) return { employee: null, home, attendance: null, leave: null, payslips: null };
+    if (!employee) return { employee: null, home, attendance: null, leave: null, payslips: null, schedule: null, updates: null };
 
-    const [attendance, leave, payslips] = await Promise.all([
+    const [attendance, leave, payslips, schedule, updates] = await Promise.all([
       showAttendance
         ? attendanceApi.listAttendanceRecords({ employee: employee.id, page_size: 35, ordering: "-attendance_date" }).then((page) => page.results).catch(() => null)
         : Promise.resolve(null),
@@ -89,9 +96,20 @@ export default function SelfServiceHome() {
       showPayroll
         ? payrollApi.listPayslips({ page_size: 6, ordering: "-generated_at" }).then((page) => page.results).catch(() => null)
         : Promise.resolve(null),
+      showSchedule
+        ? schedulingApi.listScheduleAssignments({ employee: employee.id, is_current: true, page_size: 1 })
+            .then(async (page) => {
+              const assignment = page.results[0];
+              if (!assignment) return null;
+              const workSchedule = await schedulingApi.getWorkSchedule(assignment.work_schedule);
+              return { name: workSchedule.name, scheduleType: String(workSchedule.schedule_type), effectiveFrom: assignment.effective_from, effectiveTo: assignment.effective_to };
+            })
+            .catch(() => null)
+        : Promise.resolve(null),
+      notificationsApi.getNotifications().then((items) => items.slice(0, 4)).catch(() => null),
     ]);
-    return { employee, home, attendance, leave, payslips };
-  }, [showAttendance, showLeave, showPayroll]);
+    return { employee, home, attendance, leave, payslips, schedule, updates };
+  }, [showAttendance, showLeave, showPayroll, showSchedule]);
 
   const { data, loading, error, reload } = useApiResource(load);
   const employee = data?.employee ?? null;
@@ -278,6 +296,54 @@ export default function SelfServiceHome() {
             {upcomingLeave.length ? (
               <Timeline items={upcomingLeave.slice(0, 4).map((request) => ({ id: request.id, title: typeName(request.leave_type), time: `${formatNumber(request.requested_days)} days`, description: `${formatDate(request.start_date)} – ${formatDate(request.end_date)}`, tone: "success" as const }))} />
             ) : <p className="text-support text-ink-muted">No approved leave coming up.</p>}
+          </Card>
+        </div>
+      )}
+
+      {/* Schedule + updates */}
+      {employee && (showSchedule || data?.updates) && (
+        <div className={cx("grid gap-5", showSchedule && "lg:grid-cols-2")}>
+          {showSchedule && (
+            <Card title="My schedule" description="Your current work schedule assignment." icon={CalendarClock} accent="attendance">
+              {data?.schedule ? (
+                <div className="space-y-3">
+                  <p className="text-heading font-semibold text-ink-strong">{data.schedule.name}</p>
+                  <SummaryList
+                    items={[
+                      { label: "Schedule type", value: humanizeEnum(data.schedule.scheduleType) },
+                      { label: "Effective from", value: formatDate(data.schedule.effectiveFrom) },
+                      { label: "Until", value: data.schedule.effectiveTo ? formatDate(data.schedule.effectiveTo) : "Ongoing" },
+                    ]}
+                  />
+                </div>
+              ) : (
+                <p className="text-support text-ink-muted">{loading && !data ? "Loading…" : "No current schedule is assigned to you. Your manager or HR assigns schedules."}</p>
+              )}
+            </Card>
+          )}
+          <Card
+            title="Recent updates"
+            description="Your latest notifications."
+            icon={Bell}
+            accent="brand"
+            actions={<Link href="/notifications" className="text-support font-semibold text-primary-ink hover:underline">View all</Link>}
+          >
+            {data?.updates?.length ? (
+              <ul className="divide-y divide-line-soft">
+                {data.updates.map((item) => (
+                  <li key={item.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+                    <span className={cx("mt-1.5 h-2 w-2 shrink-0 rounded-full", item.is_read ? "bg-line-strong" : "bg-primary")} aria-hidden="true" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-ink-strong">{item.title}<span className="sr-only">{item.is_read ? "" : " (unread)"}</span></p>
+                      <p className="line-clamp-2 text-support text-ink-muted">{item.message}</p>
+                      <p className="mt-0.5 text-caption text-ink-subtle">{formatDateTime(item.created_at)}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-support text-ink-muted">{loading && !data ? "Loading…" : "You're all caught up."}</p>
+            )}
           </Card>
         </div>
       )}

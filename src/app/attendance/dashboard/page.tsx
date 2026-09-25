@@ -128,8 +128,8 @@ export default function AttendanceDashboardPage() {
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Today's attendance">
         <MetricCard label="Present today" value={value(data?.today.present)} icon={UserCheck} accent="accounting" loading={initial} chart={<Sparkline values={weekly.map((day) => day.present)} color="var(--mod-accounting)" height={32} label="Present this week" />} />
         <MetricCard label="Late today" value={value(data?.today.late)} icon={Clock3} accent="payroll" loading={initial} chart={<Sparkline values={weekly.map((day) => day.late)} color="var(--mod-payroll)" height={32} label="Late arrivals this week" />} />
-        <MetricCard label="Absent today" value={value(data?.today.absent)} icon={UserX} accent="audit" loading={initial} chart={<Sparkline values={weekly.map((day) => day.absent)} color="var(--mod-audit)" height={32} label="Absences this week" />} />
-        <MetricCard label="Currently on leave" value={value(data?.onLeave)} icon={CalendarDays} accent="leave" loading={initial} chart={<Sparkline values={weekly.map((day) => day.on_leave)} color="var(--mod-leave)" height={32} label="On leave this week" />} />
+        <MetricCard label="Absent today" value={value(data?.today.absent)} icon={UserX} accent="audit" loading={initial} />
+        <MetricCard label="Currently on leave" value={value(data?.onLeave)} icon={CalendarDays} accent="leave" loading={initial} />
       </section>
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Scheduling and exceptions">
         <MetricCard size="sm" label="Scheduled today" value={value(data?.scheduledToday)} description="Current schedule assignments" icon={Users} accent="attendance" loading={initial} />

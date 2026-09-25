@@ -87,16 +87,16 @@ Font: **Plus Jakarta Sans** via `next/font/google` (self-hosted at build time) e
 
 | Utility | Size / line | Use |
 |---|---|---|
-| `text-display` | 30 / 38 | Hero titles (desktop) |
-| `text-title` | 24 / 32 | Page titles (`PageHeader`, semibold) |
-| `text-heading` | 17 / 24 | Section headings, dialog titles |
+| `text-display` | 32 / 40 | Hero titles (desktop) |
+| `text-title` | 28 / 36 | Page titles (`PageHeader`, semibold) |
+| `text-heading` | 19 / 26 | Section headings, dialog titles |
 | `text-card-title` | 15 / 22 | Card and table titles |
 | `text-body` | 14 / 22 | Descriptions, long copy (also the body default) |
 | `text-sm` | 14 / 20 | Default UI text, tables |
 | `text-support` | 13 / 20 | Secondary copy, labels |
 | `text-caption` | 12 / 16 | Metadata, table headers, legends |
-| `text-kpi` | 28 / 34 | Primary KPI values |
-| `text-kpi-sm` | 20 / 28 | Secondary KPI values |
+| `text-kpi` | 30 / 36 | Primary KPI values |
+| `text-kpi-sm` | 22 / 28 | Secondary KPI values |
 
 Rules: use weight and spacing for hierarchy rather than borders; avoid all-caps micro-labels (the bridge de-capitalises legacy `text-xs uppercase` inside `main`); numbers use `tabular-nums`.
 
@@ -118,10 +118,10 @@ Scale: 4 · 8 · 12 · 16 · 20 · 24 · 32 · 40 · 48 px.
 
 | Name | Value | Utility |
 |---|---|---|
-| Small | 8 px | `rounded-lg` |
-| Medium | 8 px | `rounded-xl` (controls, buttons) |
-| Large | 12 px | `rounded-2xl` (cards, tables) |
-| Hero | 16 px | `rounded-3xl` (heroes, dialogs) |
+| Small | 10 px | `rounded-lg` (controls, buttons) |
+| Medium | 14 px | `rounded-xl` (tiles, panels) |
+| Large | 18 px | `rounded-2xl` (cards, tables) |
+| Hero | 22 px | `rounded-3xl` (heroes, dialogs) |
 | Pill | full | `rounded-full` |
 
 Elevation (navy-tinted, never pure black): `shadow-elevation-1` (resting cards), `shadow-elevation-2` (hover, raised), `shadow-elevation-3` (heroes, splash), `shadow-overlay` (menus, dialogs, toasts). Legacy `shadow-sm/md/lg/xl` are re-tuned onto the same curve.
@@ -208,13 +208,13 @@ All routes now use semantic colour roles. The 2026-09-25 pass mapped every raw p
 ## 12. 2026-09-25 refinement (Linear/Stripe direction)
 
 - Dark mode deepened. (Light canvas and line values briefly moved to neutral and were restored to the locked brand palette the same day; see below.)
-- Radii: controls 8 px, cards 12 px, heroes/dialogs 16 px (previously 14/18/22).
+- Radii were briefly tightened to 8/12/16 px, then restored to the implementation prompt's 10/14/18/22 px scale (see reconciliation below).
 - Elevation flattened: borders carry structure; `elevation-1` is a 1 px hint.
 - Controls and buttons 36 px by default; primary/danger buttons carry an inset top highlight; primary CTAs also carry the soft brand glow (`--glow-primary`).
-- Type: page titles 24 px semibold, body 14 px; KPI 28 px.
+- Type was briefly tightened (24 px titles), then restored to the prompt's targets: 28 px titles, 19 px section headings, 14 px body, 30/22 px KPIs.
 - Shell: 56 px top bar, 16 rem sidebar with 36 px nav rows and no decorative glow; content max width 1360 px.
 - MetricCard keeps its soft module-accent glow; MetricCard and ActionCard no longer lift on hover.
 
-**Brand-spec reconciliation (same day):** the locked brand foundation wins on colour (canvas `#F5F7FB`, muted surface `#EEF3FA`, soft border `#D9E2EF`), and important CTAs and KPI cards keep a soft glow. The crisper radii, 36 px density and type scale from the refinement remain.
+**Brand-spec reconciliation (same day):** the locked brand foundation wins on colour (canvas `#F5F7FB`, muted surface `#EEF3FA`, soft border `#D9E2EF`), and important CTAs and KPI cards keep a soft glow. The prompt's type targets (28–32 px titles) and radius scale (10/14/18/22 px) also win; the 36 px control density from the refinement remains. The sidebar keeps the formal wordmark ↔ X transition (branding.md), with tenant context in the footer panel.
 
 **New in this pass:** `SegmentedControl` (filters with five or fewer options, radio-group semantics; used for attendance status filters), the `MetricCard` `chart` slot with sparklines on Payroll, Attendance and Accounting KPIs, row action menus (`Menu` + `IconButton`) on Employees and Schedules, charts on the Recruitment dashboard (intake trend, status donut, most active openings) and an at-a-glance chart on Reports & Analytics. Later the same day: the splash wordmark reveal and printable formal records (`PrintMasthead`, `PrintFooter`, `PrintButton` in `src/components/brand/PrintDocument.tsx`).

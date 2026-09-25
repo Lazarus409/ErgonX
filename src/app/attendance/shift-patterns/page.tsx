@@ -317,7 +317,7 @@ export default function ShiftPatternsPage() {
         </div>
       </div>
 
-      {filteredPatterns.length === 0 ? (
+      {error ? null : filteredPatterns.length === 0 ? (
         <EmptyState
           title={loading ? "Loading patterns..." : "No shift patterns"}
           description={

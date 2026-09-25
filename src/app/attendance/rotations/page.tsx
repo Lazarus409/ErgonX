@@ -364,7 +364,7 @@ export default function RotationsPage() {
         </div>
       </div>
 
-      {filteredPatterns.length === 0 ? (
+      {error ? null : filteredPatterns.length === 0 ? (
         <EmptyState
           title={loading ? "Loading rotations..." : "No rotation patterns"}
           description={

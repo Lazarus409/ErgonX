@@ -9,8 +9,8 @@ All derivatives come from the approved high-resolution lockup `public/ergonx-log
 | File | Role | Where it is used |
 |---|---|---|
 | `ergonx-logo-primary.png` | **Primary full logo** — navy wordmark, blue X | Login/auth (mobile), onboarding header, offline page, Platform header (light), major product moments |
-| `ergonx-logo-primary-reversed.png` | Primary lockup with white wordmark, X unchanged | Navy surfaces: auth brand panel, dark-mode headers |
-| `ergonx-mark.png` | **Sidebar mark** — the X symbol | Sidebar workspace header (expanded and collapsed), splash screen, compact brand spots |
+| `ergonx-logo-primary-reversed.png` | Primary lockup with white wordmark, X unchanged | Navy surfaces: expanded sidebar, auth brand panel, dark-mode headers |
+| `ergonx-mark.png` | **Sidebar mark** — the X symbol | Collapsed sidebar, splash screen, compact brand spots |
 | `icon-192.png`, `icon-512.png`, `icon-512-maskable.png`, `apple-touch-icon.png`, `favicon-32.png`, `favicon-48.png` | **App icon / favicon** — X on the navy gradient tile | Browser tab, PWA manifest, installed/shortcut icon |
 | `ergonx-logo-mono.png` | **Monochrome logo** (navy) | Payslips, financial statements, print/PDF, footers, watermarks, formal surfaces |
 | `ergonx-logo-mono-white.png` | Monochrome, white | Formal attribution on dark surfaces |
@@ -37,14 +37,16 @@ The approved direction is for the X to carry the **teal → aqua → royal blue 
 
 The icon tile reproduces the supplied app-icon layout: X mark centred on a vertical navy gradient (`#014299 → #011C48`, sampled from the supplied icon) with ~22% corner radius; the maskable variant is full-bleed square. Declared in `app/layout.tsx` metadata and `public/manifest.webmanifest`; `/favicon.ico` redirects to `favicon-48.png`. The service-worker cache name was bumped (`ergonx-static-v2`) so old icons are evicted.
 
-## Sidebar workspace header
+## Sidebar transition
 
-Implemented in `SidebarLogo.tsx` (2026-09-25; replaces the earlier wordmark/mark transition):
+Formal requirement, implemented in `SidebarLogo.tsx`:
 
-- The header is **symbol-only** brand plus workspace context: the ErgonX X mark, the institution name, and a second line `CODE · on ErgonX` (monochrome white wordmark).
-- **Tenant context:** when the institution has uploaded a logo, it replaces the X mark in a white 36 px tile and ErgonX remains as the "on ErgonX" attribution.
-- **Collapsed:** only the mark (or tenant logo tile) remains; the text fades over 220 ms (`ease-standard`), instant under `prefers-reduced-motion`.
-- The institution block that used to sit in the sidebar footer now lives here; the footer only carries the expand control when collapsed.
+- **Expanded:** the full ErgonX wordmark (reversed, on navy). **Collapsed:** the standalone X sidebar mark. The collapsed rail always shows the ErgonX X; tenant logos are never squeezed into it.
+- Two layered assets in one fixed 124×36 container, so the header never jumps. Typography is never morphed.
+- **Collapsing:** the wordmark scales to 72% toward the symbol position, fades and softly blurs; the X scales 50% → 100% and fades in (40 ms delay). **Expanding** reverses it.
+- Timing 220 ms, `ease-standard`. Each toggle plays **one** signature-gradient highlight across the X (`animate-mark-highlight`, masked to the mark's shape); nothing loops.
+- Under `prefers-reduced-motion` the swap is instant and the highlight is suppressed.
+- Tenant context lives in the sidebar footer panel: the uploaded institution logo (or a monogram), institution name and code, with "on ErgonX" beside an uploaded logo.
 
 ## Signature gradient
 
@@ -52,8 +54,8 @@ Implemented in `SidebarLogo.tsx` (2026-09-25; replaces the earlier wordmark/mark
 
 ## Institution branding
 
-- Tenant identity is prominent: institution name in the top bar context line, sidebar workspace header (logo or X mark + name + code), Home greeting, document headers.
-- ErgonX identity is subtle but persistent: sidebar logo, "on ErgonX" mono attribution in the sidebar header, "Powered by ErgonX" on documents.
+- Tenant identity is prominent: institution name in the top bar context line, sidebar footer panel (institution logo or monogram + name + code), Home greeting, document headers.
+- ErgonX identity is subtle but persistent: sidebar logo, ErgonX wordmark/X in the sidebar header, "on ErgonX" beside an uploaded tenant logo, "Powered by ErgonX" on documents.
 - Tenant-generated documents (`DocumentFrame`: payslips, financial statements): the institution logo (when uploaded) and name are primary; ErgonX appears only as a monochrome "Powered by" attribution in the footer.
 - Printable records (`PrintDocument.tsx`: journal entry, leave request form, employment offer, employee record, payroll run summary): a **Print** button, and in print/PDF only an institution masthead (logo, name, document title, reference, printed date) plus the monochrome "Powered by ErgonX" footer. On screen nothing changes; the app shell is hidden in print.
-- Institution logo images: uploaded in Settings → Institution as a private `ImageAsset`. `/auth/bootstrap/` exposes the current one as `active_institution.logo_image_id` (session `institution.logoImageId`); any member may view it, only `settings.institution.manage` may replace or remove it. It renders in the sidebar header and the `DocumentFrame` header.
+- Institution logo images: uploaded in Settings → Institution as a private `ImageAsset`. `/auth/bootstrap/` exposes the current one as `active_institution.logo_image_id` (session `institution.logoImageId`); any member may view it, only `settings.institution.manage` may replace or remove it. It renders in the sidebar footer panel, the `DocumentFrame` header and printed records.

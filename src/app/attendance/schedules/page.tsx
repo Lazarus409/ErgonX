@@ -450,7 +450,7 @@ export default function SchedulesPage() {
         </div>
       </div>
 
-      {filteredSchedules.length === 0 ? (
+      {error ? null : filteredSchedules.length === 0 ? (
         <EmptyState
           title={loading ? "Loading schedules..." : "No work schedules"}
           description={

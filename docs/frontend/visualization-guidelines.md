@@ -63,49 +63,53 @@ Pie charts only when composition genuinely warrants it; prefer donut. Scatter on
 | **Recruitment** | KPI ×4 | Open jobs, candidates, interviews, offers | Headline indicators |
 | | Funnel | Applications by pipeline stage | Stage conversion |
 | | Insight cards ×3 | Interview reach, offer rate, load per opening | Labelled presentation ratios of server counts |
+| | Area | Applications received by month (6 months) | Intake trend |
+| | Donut | Applications by status | Composition |
+| | Ranking | Open roles by application count (top 5) | Where demand concentrates |
 | **Leave** | KPI ×4 | Pending, awaiting me, on leave, upcoming | Headline indicators |
 | | Area | Approved leave days by month | Seasonal trend |
 | | Donut | Approved days by leave type | Composition |
 | | Progress meter | Balance utilisation (server %) | Consumption of entitlement |
 | | Table | Upcoming leave | Actionable queue |
-| **Attendance** | KPI ×8 | Present/late/absent/on leave; scheduled, shifts, overtime & adjustments pending | Headline + exceptions |
+| **Attendance** | KPI ×8 (sparklines on Present and Late) | Present/late/absent/on leave; scheduled, shifts, overtime & adjustments pending | Headline + exceptions |
 | | Stacked bars | Daily outcomes, 7 days | Composition over the week |
 | | Area | Overtime minutes, 7 days | Overtime load |
 | | Heatmap | Department × outcome today | Concentration of absence/lateness |
 | | Exception table (inline bars) | Repeated lateness, 90 days | Ranked follow-up list |
 | | Line | Late arrivals by month | Lateness trend |
-| **Payroll** | KPI ×4 | Gross, net, deductions, employer contributions | Totals |
+| **Payroll** | KPI ×4 (sparklines on gross and net) | Gross, net, deductions, employer contributions | Totals |
 | | Workflow stepper | Latest run status | Where the run is |
 | | Area | Gross pay by period | Cost trend |
 | | Stacked bars | Net pay + deductions by period | Earnings/deductions make-up |
 | | Insight card | Latest vs prior period gross change | Variance |
-| **Accounting** | KPI ×4 | Bank, AR, AP, posted expenses | Position |
+| **Accounting** | KPI ×4 (sparkline on posted expenses) | Bank, AR, AP, posted expenses | Position |
 | | Composed (bars + line) | Income & expenses (bars), net result (line) | P&L trend |
 | | Grouped bars | Cash inflow vs outflow by month | Cash movement |
 | | Horizontal grouped bars | AR vs AP by aging bucket | Aging exposure |
 | | Donut | Journals by status | Workflow composition |
 | **Recruitment pipeline page** | Funnel | Applications by stage | Stage conversion |
+| **Reports & Analytics** | Ranking | Selected report: first measure by first descriptive column (up to 12 rows) | At-a-glance read of the report table |
 
 ### System-wide counts (primary dashboards)
 
 | Type | Uses | Within target? |
 |---|---|---|
-| Area | 5 (Employee Home, Executive, Leave, Attendance, Payroll) | Yes |
-| Donut | 4 (Employee Home, HR, Leave, Accounting) | Yes |
+| Area | 6 (Employee Home, Executive, Leave, Attendance, Payroll, Recruitment) | Yes, at the ceiling; prefer another family for new trends |
+| Donut | 5 (Employee Home, HR, Leave, Accounting, Recruitment) | Yes |
 | Vertical bars (single series) | 3 (Employee Home, HR ×2) | Yes |
 | Stacked bars | 2 (Attendance, Payroll) | Yes |
 | Grouped bars (vertical + horizontal) | 2 (Accounting ×2) | Yes |
 | Line / multi-line | 2 (Executive, Attendance) | Yes |
 | Composed | 1 (Accounting) | Yes |
 | Funnel | 3 (Executive, Recruitment, Pipeline) | Yes |
-| Ranking | 2 (HR) + inline bars in the Attendance exception table | Yes |
+| Ranking | 4 (HR ×2, Recruitment, Reports) + inline bars in the Attendance exception table | Yes |
 | Segmented bar | 3 (Executive ×2, HR) | Yes |
 | Heatmap / calendar | 2 (Attendance, Employee Home) | Yes |
 | Progress meter | 1 (+ onboarding progress) | Yes |
 | Timeline | 1 dashboard (+ Approvals page) | Yes |
-| Sparkline | 1 surface (Home) | Yes |
+| Sparkline | 4 surfaces (Home ≤4 tiles; Attendance and Payroll ×2 each; Accounting ×1) | Yes; at most two per module dashboard |
 
-No dashboard uses more than two of the same type (Executive: segmented ×2; HR: vertical bars ×2, ranking ×2; Accounting: bar family ×2).
+No module dashboard uses more than two of the same type (Executive: segmented ×2; HR: vertical bars ×2, ranking ×2; Accounting: bar family ×2; Attendance and Payroll: sparklines ×2). Home's snapshot tiles carry up to four sparklines, one per permitted module pulse.
 
 Update this table whenever a dashboard changes.
 

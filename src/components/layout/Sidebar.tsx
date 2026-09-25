@@ -67,7 +67,7 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
   // In the mobile drawer the sidebar is always rendered expanded.
   const renderPanel = (compact: boolean, mobile: boolean) => (
     <div className="flex h-full flex-col">
-      <div className={cx("flex h-16 shrink-0 items-center justify-between gap-2 border-b border-white/[0.07]", compact ? "px-[22px]" : "pl-[22px] pr-3")}>
+      <div className={cx("flex h-14 shrink-0 items-center justify-between gap-2 border-b border-white/[0.07]", compact ? "px-[22px]" : "pl-[22px] pr-3")}>
         <Link href="/" onClick={closeMobile} className="rounded-lg focus-visible:outline-offset-4" aria-label="ErgonX home">
           <SidebarLogo collapsed={compact} />
         </Link>
@@ -85,7 +85,7 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
       </div>
 
       <nav aria-label="Primary navigation" className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 [scrollbar-color:rgb(255_255_255/0.18)_transparent]">
-        <ul className="space-y-1">
+        <ul className="space-y-0.5">
           {visibleNavigation.map((item) => {
             const childItems = childrenFor(item);
             const groupActive = isActive(item.href) || childItems.some((child) => childActive(item.href, child.href));
@@ -120,7 +120,7 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
                               tabIndex={expanded ? undefined : -1}
                               aria-current={active ? "page" : undefined}
                               className={cx(
-                                "relative flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-support font-medium transition-colors duration-150",
+                                "relative flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-support font-medium transition-colors duration-150",
                                 active ? "bg-white/[0.09] text-white" : "text-white/60 hover:bg-white/[0.05] hover:text-white",
                               )}
                             >
@@ -189,7 +189,6 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
           collapsed ? "w-[var(--shell-sidebar-collapsed)]" : "w-[var(--shell-sidebar-expanded)]",
         )}
       >
-        <SidebarGlow />
         {renderPanel(collapsed, false)}
       </aside>
 
@@ -204,7 +203,6 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
             className="relative h-full w-[min(86vw,var(--shell-sidebar-expanded))] bg-brand-navy text-white shadow-overlay dark:bg-brand-navy-deep"
             style={{ animation: "drawer-in-left var(--duration-emphasis) var(--ease-standard) both" }}
           >
-            <SidebarGlow />
             {renderPanel(false, true)}
           </aside>
         </div>
@@ -217,17 +215,17 @@ function NavRow({ item, active, groupActive, compact, onNavigate, expander }: { 
   const Icon = item.icon;
   const accent = moduleAccents[accentForPath(item.href)];
   return (
-    <div className={cx("group/nav relative flex items-center rounded-xl transition-colors duration-150", groupActive ? "bg-white/[0.09]" : "hover:bg-white/[0.05]")}>
-      {groupActive && <span aria-hidden="true" className="bg-signature absolute -left-3 top-2 bottom-2 w-[3px] rounded-r-full" />}
+    <div className={cx("group/nav relative flex items-center rounded-lg transition-colors duration-150", groupActive ? "bg-white/[0.08]" : "hover:bg-white/[0.05]")}>
+      {groupActive && <span aria-hidden="true" className="bg-signature absolute -left-3 top-2 bottom-2 w-[2px] rounded-r-full" />}
       <Link
         href={item.href}
         onClick={onNavigate}
         aria-current={active ? "page" : undefined}
         aria-label={compact ? item.label : undefined}
-        className={cx("flex min-w-0 flex-1 items-center rounded-xl text-sm font-medium", compact ? "h-11 justify-center" : "h-10 gap-3 px-3", groupActive ? "text-white" : "text-white/70 group-hover/nav:text-white")}
+        className={cx("flex min-w-0 flex-1 items-center rounded-lg text-sm font-medium", compact ? "h-10 justify-center" : "h-9 gap-2.5 px-2.5", groupActive ? "text-white" : "text-white/70 group-hover/nav:text-white")}
       >
-        <span className={cx("flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors", groupActive ? cx(accent.solid, "text-white shadow-sm") : "text-white/70 group-hover/nav:text-white")}>
-          <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
+        <span className={cx("flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors", groupActive ? cx(accent.solid, "text-white") : "text-white/65 group-hover/nav:text-white")}>
+          <Icon className="h-4 w-4" aria-hidden="true" />
         </span>
         {!compact && <span className="truncate">{item.label}</span>}
       </Link>
@@ -246,16 +244,6 @@ function InstitutionMonogram({ name }: { name: string }) {
   return (
     <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-accent-aqua/80 via-accent-blue to-accent-violet text-caption font-bold text-white shadow-sm" aria-hidden="true">
       {initials}
-    </span>
-  );
-}
-
-/** A single, static signature-gradient glow anchoring the navy rail. */
-function SidebarGlow() {
-  return (
-    <span aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-      <span className="absolute -left-24 -top-24 h-56 w-56 rounded-full bg-accent-blue/20 blur-3xl" />
-      <span className="absolute -bottom-28 -right-24 h-56 w-56 rounded-full bg-accent-violet/15 blur-3xl" />
     </span>
   );
 }

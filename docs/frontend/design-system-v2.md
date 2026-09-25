@@ -1,8 +1,8 @@
 # ErgonX Design System v2
 
-Status: adopted 2026-09-24 · Scope: `ergonx-frontend/` · Companion docs: [branding.md](./branding.md), [visualization-guidelines.md](./visualization-guidelines.md)
+Status: adopted 2026-09-24, refined 2026-09-25 (§12) · Scope: `ergonx-frontend/` · Companion docs: [branding.md](./branding.md), [visualization-guidelines.md](./visualization-guidelines.md)
 
-Visual direction: **modern enterprise blue + multi-accent signature X + module-coloured intelligence.** The interface should feel energetic yet calm enough for daily use: navy structure, blue actions, soft neutral canvas, and module colour used sparingly as information.
+Visual direction: **modern enterprise blue + multi-accent signature X + module-coloured intelligence.** The interface should feel energetic yet calm enough for daily use: navy structure, blue actions, soft neutral canvas, and module colour used sparingly as information. Since the 2026-09-25 refinement the reference feel is Linear/Stripe: crisp 8–12 px radii, hairline borders carrying structure, near-flat elevation, 36 px controls and a tighter type scale.
 
 This document describes the system as implemented. When code and this document disagree, the code in `src/app/globals.css` and `src/components/ui/` wins; update this file.
 
@@ -14,7 +14,7 @@ This document describes the system as implemented. When code and this document d
 |---|---|---|
 | Tokens | `src/app/globals.css` (`:root`, `.dark`) | Raw brand palette and semantic role variables for light and dark. |
 | Theme registration | `globals.css` `@theme inline` / `@theme` | Exposes roles as Tailwind v4 utilities (`bg-surface`, `text-ink-muted`, `border-line`, `bg-mod-payroll-soft`, `shadow-elevation-2`, `text-title` …). |
-| Legacy bridge | `globals.css` §3 | Re-tunes the default `slate` scale, radii and shadows, and maps legacy utilities onto roles in dark mode, so routes not yet migrated inherit v2. Temporary — delete rules as routes migrate. |
+| Legacy bridge | `globals.css` §3 | Two residual rules: sentence-cases legacy `text-xs uppercase` micro-labels and gives native controls without `data-ui` dark-mode colours. |
 | Primitives | `src/components/ui/*` | Button, Field/Input/Select/Textarea/Checkbox/Radio/Switch/FileInput, Card family, Badge/StatusBadge, Alert, DataTable/DataToolbar/Pagination, Dialog/Drawer/Popover/Menu/Tooltip, Tabs, Skeleton family, Empty/Error/Loading states, PageHeader, BackButton, ActionBar. |
 | Charts | `src/components/charts/*` | ChartCard frame, formatters, Recharts wrappers and custom visuals. |
 | Brand | `src/components/brand/*` | Logo, SidebarLogo transition, SplashScreen, AuthShell, DocumentFrame. |
@@ -22,7 +22,7 @@ This document describes the system as implemented. When code and this document d
 | Theme runtime | `src/components/context/ThemeProvider.tsx` | Single canonical light/dark/system theme. |
 | Module accents | `src/lib/moduleTheme.ts` | Accent class map, route→accent and route→module label. |
 
-**Rule:** new code uses semantic roles and primitives. Do not introduce new `slate-*`, `sky-*`, `blue-*` or hex values in components. Arbitrary values are acceptable only for one-off geometry (e.g. chart heights).
+**Rule:** new code uses semantic roles and primitives. Raw Tailwind palette classes (`slate-*`, `sky-*`, `red-*` …) are rejected by ESLint (`no-restricted-syntax` in `eslint.config.mjs`); do not introduce hex values in components either. Arbitrary values are acceptable only for one-off geometry (e.g. chart heights).
 
 ---
 
@@ -46,17 +46,17 @@ This document describes the system as implemented. When code and this document d
 
 | Role | Utility | Light | Dark |
 |---|---|---|---|
-| Canvas | `bg-canvas` | `#F5F7FB` | `#07132A` |
+| Canvas | `bg-canvas` | `#F7F8FA` | `#08111F` |
 | Surface | `bg-surface` | `#FFFFFF` | `#0D1C37` |
-| Surface muted | `bg-surface-muted` | `#EEF3FA` | `#122647` |
-| Surface sunken | `bg-surface-sunken` | `#E7EDF6` | `#0A1831` |
-| Surface hover | `bg-surface-hover` | `#F3F6FB` | `#15294C` |
+| Surface muted | `bg-surface-muted` | `#F3F5F9` | `#13223A` |
+| Surface sunken | `bg-surface-sunken` | `#ECEFF5` | `#0B1526` |
+| Surface hover | `bg-surface-hover` | `#F5F7FA` | `#172841` |
 | Ink strong | `text-ink-strong` | `#0F2345` | `#F2F5FB` |
 | Ink | `text-ink` | `#23324D` | `#D3DCEC` |
 | Ink muted | `text-ink-muted` | `#56657F` | `#9AA9C3` |
 | Ink subtle | `text-ink-subtle` | `#8290A8` | `#6F82A3` |
-| Line | `border-line` | `#D9E2EF` | `#20365C` |
-| Line soft / strong | `border-line-soft` / `border-line-strong` | `#E6ECF5` / `#C2CEDF` | `#192D4F` / `#2D4773` |
+| Line | `border-line` | `#E1E6EE` | `#1F3050` |
+| Line soft / strong | `border-line-soft` / `border-line-strong` | `#EBEEF4` / `#CDD5E1` | `#182743` / `#2B4066` |
 | Primary | `bg-primary`, `text-primary` | `#2F6BFF` | `#5687FF` |
 | Primary soft / ink | `bg-primary-soft`, `text-primary-ink` | `#E9F0FF` / `#1D4ED8` | 16% tint / `#A9C2FF` |
 | Focus ring | `--focus-ring` | blue 45% | light blue 55% |
@@ -87,16 +87,16 @@ Font: **Plus Jakarta Sans** via `next/font/google` (self-hosted at build time) e
 
 | Utility | Size / line | Use |
 |---|---|---|
-| `text-display` | 32 / 40 | Hero titles (desktop) |
-| `text-title` | 28 / 36 | Page titles (`PageHeader`) |
-| `text-heading` | 19 / 26 | Section headings, dialog titles |
+| `text-display` | 30 / 38 | Hero titles (desktop) |
+| `text-title` | 24 / 32 | Page titles (`PageHeader`, semibold) |
+| `text-heading` | 17 / 24 | Section headings, dialog titles |
 | `text-card-title` | 15 / 22 | Card and table titles |
-| `text-body` | 15 / 24 | Descriptions, long copy |
+| `text-body` | 14 / 22 | Descriptions, long copy (also the body default) |
 | `text-sm` | 14 / 20 | Default UI text, tables |
 | `text-support` | 13 / 20 | Secondary copy, labels |
 | `text-caption` | 12 / 16 | Metadata, table headers, legends |
-| `text-kpi` | 30 / 36 | Primary KPI values |
-| `text-kpi-sm` | 22 / 28 | Secondary KPI values |
+| `text-kpi` | 28 / 34 | Primary KPI values |
+| `text-kpi-sm` | 20 / 28 | Secondary KPI values |
 
 Rules: use weight and spacing for hierarchy rather than borders; avoid all-caps micro-labels (the bridge de-capitalises legacy `text-xs uppercase` inside `main`); numbers use `tabular-nums`.
 
@@ -112,16 +112,16 @@ Scale: 4 · 8 · 12 · 16 · 20 · 24 · 32 · 40 · 48 px.
 | Dashboard gaps | `gap-4` (KPI rows), `gap-5` (chart grids) |
 | Field spacing | `gap-4` in grids, `space-y-4` stacked, 6 px label→control |
 | Toolbar spacing | `gap-3` between controls, `p-4` toolbar padding |
-| Table density | comfortable: 20×14 px cells; compact: 16×10 px |
+| Table density | comfortable: 16×12 px cells; compact: 16×8 px |
 
 ### 2.6 Radius & elevation
 
 | Name | Value | Utility |
 |---|---|---|
-| Small | ~10 px | `rounded-lg` |
-| Medium | ~14 px | `rounded-xl` (controls, buttons) |
-| Large | ~18 px | `rounded-2xl` (cards, tables) |
-| Hero | ~22 px | `rounded-3xl` (heroes, dialogs) |
+| Small | 8 px | `rounded-lg` |
+| Medium | 8 px | `rounded-xl` (controls, buttons) |
+| Large | 12 px | `rounded-2xl` (cards, tables) |
+| Hero | 16 px | `rounded-3xl` (heroes, dialogs) |
 | Pill | full | `rounded-full` |
 
 Elevation (navy-tinted, never pure black): `shadow-elevation-1` (resting cards), `shadow-elevation-2` (hover, raised), `shadow-elevation-3` (heroes, splash), `shadow-overlay` (menus, dialogs, toasts). Legacy `shadow-sm/md/lg/xl` are re-tuned onto the same curve.
@@ -144,7 +144,7 @@ Named animations: `animate-fade-in`, `animate-pop-in`, `animate-slide-up`, `anim
 
 - **Surface** — base container (`tone`, `elevation`, `padding`, `radius`).
 - **Card** — Surface + header (`title`, `description`, `icon`, `accent`, `actions`) and optional 3 px module `accentLine`.
-- **MetricCard** — KPI: label, `text-kpi` value, description, icon tile, soft accent glow, optional trend chip (direction + whether up is good), skeleton while loading, optional link.
+- **MetricCard** — KPI: label, `text-kpi` value, description, icon tile, optional trend chip (direction + whether up is good), skeleton while loading, optional link.
 - **InsightCard** — module-tinted interpretation of data ("Offer rate …").
 - **ActionCard** — navigation card with icon tile, animated accent line and CTA.
 - **AttentionItem** — severity bar + chip (label, not colour alone) + description + link.
@@ -156,7 +156,7 @@ Avoid the "white rectangle + grey border" monotony: vary with accent lines, soft
 
 ## 4. Buttons
 
-`Button` variants: `primary`, `secondary`, `ghost`, `danger`, `link`, `inverse` (on navy). Sizes `sm` (32), `md` (40), `lg` (48). States: hover, active (1 px press), focus-visible ring, disabled (50% + no pointer events), `loading` (spinner, optional `loadingLabel`, `aria-busy`). `ButtonLink` renders a Next `Link` with button styling. `IconButton` requires `label` (accessible name + tooltip). Legacy `button.bg-slate-900/950` CTAs are bridged to the primary colour.
+`Button` variants: `primary`, `secondary`, `ghost`, `danger`, `link`, `inverse` (on navy). Sizes `sm` (32), `md` (36), `lg` (44). States: hover, active (1 px press), focus-visible ring, disabled (50% + no pointer events), `loading` (spinner, optional `loadingLabel`, `aria-busy`). `ButtonLink` renders a Next `Link` with button styling. `IconButton` requires `label` (accessible name + tooltip). Hand-styled page buttons use `buttonClasses({ variant, size, className })` so they share the primitive recipe exactly.
 
 ## 5. Forms
 
@@ -186,7 +186,7 @@ Avoid the "white rectangle + grey border" monotony: vary with accent lines, soft
 
 One theme architecture: `ThemeProvider` stores `ergonx-theme` (`light | dark | system`), toggles `.dark` on `<html>`, and an inline `THEME_INIT_SCRIPT` applies it before first paint. The former Platform-only colour mode (`ergonx-platform-color-mode`) is adopted once and removed.
 
-Dark uses a deep-navy canvas, elevated navy surfaces, readable neutral ink, subtle borders and preserved (lightened) module accents. It is not an inversion. The legacy bridge maps `bg-white`, `bg-slate-*`, `text-slate-*`, `border-slate-*`, and semantic hue tints/borders/text onto roles under `html.dark`. Printing always uses light tokens.
+Dark uses a deep-navy canvas, elevated navy surfaces, readable neutral ink, subtle borders and preserved (lightened) module accents. It is not an inversion. Because every route uses semantic roles, dark mode needs no per-utility patching. Printing always uses light tokens.
 
 ## 10. Accessibility
 
@@ -196,11 +196,21 @@ Dark uses a deep-navy canvas, elevated navy surfaces, readable neutral ink, subt
 - Tabs: roving `tabIndex`, arrow keys.
 - Charts: `figure` + caption, plain-language `summary`, and a visually hidden data table (`ChartCard data`).
 - Status, severity and calendar cells carry text/icons, not just colour.
-- Controls ≥ 32 px (40 px default); touch targets in the mobile shell are 40 px.
+- Controls ≥ 32 px (36 px default); touch targets in the mobile shell are ≥ 36 px.
 - `prefers-reduced-motion` respected globally.
 
 ## 11. Migration status and legacy bridge
 
 Fully migrated to primitives: shell, Home, Employee Home, Executive and all module dashboards, Reports, auth/public pages, onboarding hub, Platform, HR org resources, Employees list, Recruitment lists, Payroll lists (runs, periods, payslips, components, structures, adjustments), payslip document, Financial Reports, Audit, Approvals, Notifications, self-service profile/leave/payslips/documents/contacts, Settings landing/modules.
 
-Remaining routes (large attendance, leave management, accounting operational, employee detail/create, several settings and recruitment forms) render through the legacy bridge and inherit v2 tokens, radii, elevation, focus, buttons, tables, inputs and dark mode, but still carry page-local utility markup. Migrate them to primitives page by page, then delete the corresponding bridge rules. See the completion report for the exact list.
+All routes now use semantic colour roles. The 2026-09-25 pass mapped every raw palette utility (about 2,600 occurrences across 65 files) onto roles, snapped about 140 hand-styled buttons onto `buttonClasses()` and about 140 native inputs/selects onto the 36 px control height, and moved the remaining hand-rolled headers (Flexible Work, My Attendance, Add Employee, employee profile) onto `PageHeader`/`Avatar`/`Button`. Large operational pages (attendance, leave management, accounting operations, employee detail) still compose native `<input>`/`<table>` markup rather than `<Field>`/`<DataTable>`; convert them opportunistically when those pages next change.
+
+## 12. 2026-09-25 refinement (Linear/Stripe direction)
+
+- Canvas and lines moved towards neutral (`#F7F8FA`, hairline `#E1E6EE`); dark mode deepened.
+- Radii: controls 8 px, cards 12 px, heroes/dialogs 16 px (previously 14/18/22).
+- Elevation flattened: borders carry structure; `elevation-1` is a 1 px hint.
+- Controls and buttons 36 px by default; primary/danger buttons carry an inset top highlight.
+- Type: page titles 24 px semibold, body 14 px; KPI 28 px.
+- Shell: 56 px top bar, 16 rem sidebar with 36 px nav rows and no decorative glow; content max width 1360 px.
+- MetricCard/ActionCard: no hover lift or accent glow; hover strengthens the border and shadow only.

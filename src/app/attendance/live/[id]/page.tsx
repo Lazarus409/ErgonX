@@ -28,6 +28,7 @@ import { MAX_PAGE_SIZE } from "@/types/api";
 import type { AttendanceRecord, WorkSchedule } from "@/types/attendance";
 import type { Employee } from "@/types/hr";
 import { EM_DASH, formatDate, humanizeEnum } from "@/lib/format";
+import { buttonClasses } from "@/components/ui/Button";
 
 const HISTORY_LIMIT = 10;
 
@@ -220,8 +221,8 @@ export default function AttendanceRecordDetailPage() {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="text-center">
-          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-slate-900" />
-          <p className="mt-4 text-sm text-slate-500">
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-line-strong border-t-primary" />
+          <p className="mt-4 text-sm text-ink-muted">
             Loading attendance record...
           </p>
         </div>
@@ -269,7 +270,7 @@ export default function AttendanceRecordDetailPage() {
             {canClockOut && (
               <button
                 onClick={() => setConfirmClockOut(true)}
-                className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
+                className={buttonClasses({ variant: "primary" })}
               >
                 <LogOut className="h-4 w-4" />
                 Clock Out
@@ -278,7 +279,7 @@ export default function AttendanceRecordDetailPage() {
 
             <button
               onClick={openAdjustment}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              className={buttonClasses({ variant: "secondary" })}
             >
               <Pencil className="h-4 w-4" />
               Request Adjustment
@@ -288,17 +289,17 @@ export default function AttendanceRecordDetailPage() {
       />
 
       {actionError && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-lg border border-danger/25 bg-danger-soft px-4 py-3 text-sm text-danger-ink">
           {actionError}
         </div>
       )}
 
       {submitted && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-          <p className="text-sm font-semibold text-emerald-900">
+        <div className="rounded-xl border border-success/25 bg-success-soft p-4">
+          <p className="text-sm font-semibold text-success-ink">
             Adjustment request created
           </p>
-          <p className="mt-1 text-sm text-emerald-800">
+          <p className="mt-1 text-sm text-success-ink">
             The request is pending approval. It will appear on the{" "}
             <Link
               href="/attendance/adjustments"
@@ -312,9 +313,9 @@ export default function AttendanceRecordDetailPage() {
       )}
 
       <div className="grid gap-6 xl:grid-cols-3">
-        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm xl:col-span-2">
+        <section className="rounded-xl border border-line bg-surface p-5 shadow-sm xl:col-span-2">
           <div className="mb-5 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-slate-900">
+            <h2 className="text-base font-semibold text-ink-strong">
               Record Detail
             </h2>
 
@@ -355,19 +356,19 @@ export default function AttendanceRecordDetailPage() {
           </div>
 
           {record.notes && (
-            <div className="mt-5 rounded-lg bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <div className="mt-5 rounded-lg bg-surface-muted p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-subtle">
                 Notes
               </p>
-              <p className="mt-2 text-sm leading-6 text-slate-700">
+              <p className="mt-2 text-sm leading-6 text-ink">
                 {record.notes}
               </p>
             </div>
           )}
         </section>
 
-        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="mb-5 text-base font-semibold text-slate-900">
+        <section className="rounded-xl border border-line bg-surface p-5 shadow-sm">
+          <h2 className="mb-5 text-base font-semibold text-ink-strong">
             Derived Minutes
           </h2>
 
@@ -392,19 +393,19 @@ export default function AttendanceRecordDetailPage() {
             />
           </div>
 
-          <p className="mt-4 text-xs leading-5 text-slate-500">
+          <p className="mt-4 text-xs leading-5 text-ink-muted">
             All minute values are classified by the backend against the
             employee&apos;s effective schedule.
           </p>
         </section>
       </div>
 
-      <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 px-5 py-4">
-          <h2 className="text-base font-semibold text-slate-900">
+      <section className="rounded-xl border border-line bg-surface shadow-sm">
+        <div className="border-b border-line px-5 py-4">
+          <h2 className="text-base font-semibold text-ink-strong">
             Recent Attendance
           </h2>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-ink-muted">
             The employee&apos;s most recent attendance records.
           </p>
         </div>
@@ -412,29 +413,29 @@ export default function AttendanceRecordDetailPage() {
         <div className="overflow-x-auto">
           <table className="w-full min-w-[700px] text-left">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50">
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <tr className="border-b border-line bg-surface-muted">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Date
                 </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Check In
                 </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Check Out
                 </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Worked
                 </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Status
                 </th>
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-line-soft">
               {history.map((entry) => (
-                <tr key={entry.id} className={entry.id === record.id ? "bg-slate-50" : ""}>
-                  <td className="px-5 py-4 text-sm text-slate-700">
+                <tr key={entry.id} className={entry.id === record.id ? "bg-surface-muted" : ""}>
+                  <td className="px-5 py-4 text-sm text-ink">
                     <Link
                       href={`/attendance/live/${entry.id}`}
                       className="hover:underline"
@@ -442,13 +443,13 @@ export default function AttendanceRecordDetailPage() {
                       {formatDate(entry.attendance_date)}
                     </Link>
                   </td>
-                  <td className="px-5 py-4 text-sm text-slate-700">
+                  <td className="px-5 py-4 text-sm text-ink">
                     {clockTime(entry.check_in)}
                   </td>
-                  <td className="px-5 py-4 text-sm text-slate-700">
+                  <td className="px-5 py-4 text-sm text-ink">
                     {clockTime(entry.check_out)}
                   </td>
-                  <td className="px-5 py-4 text-sm text-slate-700">
+                  <td className="px-5 py-4 text-sm text-ink">
                     {attendanceApi.formatMinutes(entry.worked_minutes)}
                   </td>
                   <td className="px-5 py-4">
@@ -459,7 +460,7 @@ export default function AttendanceRecordDetailPage() {
 
               {history.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-5 py-10 text-center text-sm text-slate-500">
+                  <td colSpan={5} className="px-5 py-10 text-center text-sm text-ink-muted">
                     No other attendance records for this employee.
                   </td>
                 </tr>
@@ -471,17 +472,17 @@ export default function AttendanceRecordDetailPage() {
 
       {/* Adjustment request */}
       {showAdjustment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-xl">
-            <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
-              <h2 className="text-lg font-semibold text-slate-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
+          <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-surface shadow-xl">
+            <div className="sticky top-0 flex items-center justify-between border-b border-line bg-surface px-6 py-4">
+              <h2 className="text-lg font-semibold text-ink-strong">
                 Request Adjustment
               </h2>
 
               <button
                 onClick={() => setShowAdjustment(false)}
                 disabled={submitting}
-                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                className="rounded-lg p-2 text-ink-subtle hover:bg-surface-hover hover:text-ink-strong"
                 aria-label="Close"
               >
                 <X className="h-5 w-5" />
@@ -490,54 +491,54 @@ export default function AttendanceRecordDetailPage() {
 
             <div className="space-y-4 p-6">
               {actionError && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <div className="rounded-lg border border-danger/25 bg-danger-soft px-4 py-3 text-sm text-danger-ink">
                   {actionError}
                 </div>
               )}
 
-              <p className="rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-600">
+              <p className="rounded-lg bg-surface-muted p-3 text-xs leading-5 text-ink-muted">
                 Only check-in, check-out and notes can be adjusted. The original
                 values are snapshotted by the backend when the request is
                 raised.
               </p>
 
               <label className="block space-y-1.5">
-                <span className="text-sm font-medium text-slate-700">
+                <span className="text-sm font-medium text-ink">
                   Proposed Check In
                 </span>
                 <input
                   type="datetime-local"
                   value={adjustCheckIn}
                   onChange={(event) => setAdjustCheckIn(event.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                  className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
                 />
               </label>
 
               <label className="block space-y-1.5">
-                <span className="text-sm font-medium text-slate-700">
+                <span className="text-sm font-medium text-ink">
                   Proposed Check Out
                 </span>
                 <input
                   type="datetime-local"
                   value={adjustCheckOut}
                   onChange={(event) => setAdjustCheckOut(event.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                  className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
                 />
               </label>
 
               <label className="block space-y-1.5">
-                <span className="text-sm font-medium text-slate-700">
+                <span className="text-sm font-medium text-ink">
                   Notes
                 </span>
                 <input
                   value={adjustNotes}
                   onChange={(event) => setAdjustNotes(event.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                  className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
                 />
               </label>
 
               <label className="block space-y-1.5">
-                <span className="text-sm font-medium text-slate-700">
+                <span className="text-sm font-medium text-ink">
                   Reason
                 </span>
                 <textarea
@@ -545,16 +546,16 @@ export default function AttendanceRecordDetailPage() {
                   onChange={(event) => setReason(event.target.value)}
                   rows={3}
                   placeholder="Why does this record need correcting?"
-                  className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                  className="w-full resize-none rounded-lg border border-line px-3 py-2.5 text-sm outline-none focus:border-primary"
                 />
               </label>
             </div>
 
-            <div className="sticky bottom-0 flex justify-end gap-3 border-t border-slate-200 bg-white px-6 py-4">
+            <div className="sticky bottom-0 flex justify-end gap-3 border-t border-line bg-surface px-6 py-4">
               <button
                 onClick={() => setShowAdjustment(false)}
                 disabled={submitting}
-                className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                className={buttonClasses({ variant: "secondary" })}
               >
                 Cancel
               </button>
@@ -562,7 +563,7 @@ export default function AttendanceRecordDetailPage() {
               <button
                 onClick={submitAdjustment}
                 disabled={submitting || !reason.trim()}
-                className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                className={buttonClasses({ variant: "primary" })}
               >
                 {submitting ? "Submitting..." : "Submit Request"}
               </button>
@@ -599,21 +600,21 @@ function DetailItem({
 }) {
   return (
     <div>
-      <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+      <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-ink-subtle">
         {icon}
         {label}
       </p>
 
-      <p className="mt-2 text-sm font-medium text-slate-900">{value}</p>
+      <p className="mt-2 text-sm font-medium text-ink-strong">{value}</p>
     </div>
   );
 }
 
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between rounded-lg bg-slate-50 px-4 py-3">
-      <span className="text-sm text-slate-600">{label}</span>
-      <span className="text-sm font-semibold text-slate-900">{value}</span>
+    <div className="flex items-center justify-between rounded-lg bg-surface-muted px-4 py-3">
+      <span className="text-sm text-ink-muted">{label}</span>
+      <span className="text-sm font-semibold text-ink-strong">{value}</span>
     </div>
   );
 }

@@ -42,7 +42,7 @@ export function Field({ label, children, helper, error, required, optional, clas
 
   return (
     <div className={cx("flex min-w-0 flex-col gap-1.5", className)}>
-      <label htmlFor={controlId} className={cx("text-support font-semibold text-ink-strong", hideLabel && "sr-only")}>
+      <label htmlFor={controlId} className={cx("text-support font-medium text-ink-strong", hideLabel && "sr-only")}>
         {label}
         {required && <span className="ml-0.5 text-danger" aria-hidden="true">*</span>}
         {optional && <span className="ml-1.5 font-normal text-ink-subtle">(optional)</span>}
@@ -68,12 +68,12 @@ export function Field({ label, children, helper, error, required, optional, clas
 export type ControlSize = "sm" | "md" | "lg";
 
 const controlBase =
-  "w-full min-w-0 rounded-xl border border-line-strong bg-surface text-ink-strong shadow-[inset_0_1px_1px_rgb(15_35_69/0.03)] transition-[border-color,box-shadow,background-color] duration-150 placeholder:text-ink-subtle hover:border-ink-subtle focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/15 disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-ink-muted aria-[invalid=true]:border-danger aria-[invalid=true]:focus:ring-danger/15 read-only:bg-surface-muted";
+  "w-full min-w-0 rounded-lg border border-line-strong bg-surface text-ink-strong shadow-elevation-1 transition-[border-color,box-shadow,background-color] duration-150 placeholder:text-ink-subtle hover:border-ink-subtle/70 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/15 disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-ink-muted aria-[invalid=true]:border-danger aria-[invalid=true]:focus:ring-danger/15 read-only:bg-surface-muted";
 
 const controlSizes: Record<ControlSize, string> = {
   sm: "h-8 px-2.5 text-support",
-  md: "h-10 px-3 text-sm",
-  lg: "h-12 px-3.5 text-body",
+  md: "h-9 px-3 text-sm",
+  lg: "h-11 px-3.5 text-sm",
 };
 
 export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "size"> {
@@ -175,7 +175,7 @@ export function Switch({ checked, onChange, label, description, disabled, id, cl
         onClick={() => onChange(!checked)}
         className={cx("relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200 ease-standard", checked ? "bg-primary" : "bg-line-strong")}
       >
-        <span className={cx("inline-block h-5 w-5 rounded-full bg-white shadow-elevation-1 transition-transform duration-200 ease-standard", checked ? "translate-x-[1.375rem]" : "translate-x-0.5")} />
+        <span className={cx("inline-block h-5 w-5 rounded-full bg-surface shadow-elevation-1 transition-transform duration-200 ease-standard", checked ? "translate-x-[1.375rem]" : "translate-x-0.5")} />
       </button>
     </div>
   );

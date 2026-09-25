@@ -10,21 +10,21 @@ export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "link
 export type ButtonSize = "sm" | "md" | "lg";
 
 const base =
-  "inline-flex shrink-0 select-none items-center justify-center gap-2 whitespace-nowrap font-semibold transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-standard active:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50";
+  "inline-flex shrink-0 select-none items-center justify-center gap-2 whitespace-nowrap font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-standard active:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50";
 
 const variants: Record<ButtonVariant, string> = {
-  primary: "bg-primary text-white shadow-elevation-1 hover:bg-primary-hover active:bg-primary-active",
-  secondary: "border border-line-strong bg-surface text-ink-strong shadow-elevation-1 hover:border-ink-subtle hover:bg-surface-hover",
+  primary: "bg-primary text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.14),0_1px_2px_rgb(15_35_69/0.18)] hover:bg-primary-hover active:bg-primary-active",
+  secondary: "border border-line bg-surface text-ink-strong shadow-elevation-1 hover:border-line-strong hover:bg-surface-hover",
   ghost: "text-ink hover:bg-surface-hover hover:text-ink-strong",
-  danger: "bg-danger text-white shadow-elevation-1 hover:brightness-95 active:brightness-90",
+  danger: "bg-danger text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.14),0_1px_2px_rgb(15_35_69/0.18)] hover:brightness-95 active:brightness-90",
   link: "h-auto px-0 text-primary-ink underline-offset-4 hover:underline active:translate-y-0",
   inverse: "bg-white/10 text-white ring-1 ring-inset ring-white/20 hover:bg-white/16",
 };
 
 const sizes: Record<ButtonSize, string> = {
   sm: "h-8 rounded-lg px-3 text-support",
-  md: "h-10 rounded-xl px-4 text-sm",
-  lg: "h-12 rounded-xl px-5 text-body",
+  md: "h-9 rounded-lg px-3.5 text-sm",
+  lg: "h-11 rounded-lg px-5 text-sm",
 };
 
 export function buttonClasses({ variant = "primary", size = "md", block = false, className }: { variant?: ButtonVariant; size?: ButtonSize; block?: boolean; className?: string } = {}): string {
@@ -91,7 +91,7 @@ export interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>
   showTooltip?: boolean;
 }
 
-const iconSizes: Record<ButtonSize, string> = { sm: "h-8 w-8 rounded-lg", md: "h-10 w-10 rounded-xl", lg: "h-12 w-12 rounded-xl" };
+const iconSizes: Record<ButtonSize, string> = { sm: "h-8 w-8 rounded-lg", md: "h-9 w-9 rounded-lg", lg: "h-11 w-11 rounded-lg" };
 
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
   { label, variant = "ghost", size = "md", loading, showTooltip = false, className, children, disabled, type = "button", ...rest },

@@ -54,13 +54,13 @@ export default function PageHeader({ title, description, actions, eyebrow, bread
           {icon && <span className="hidden sm:block"><IconTile icon={icon} accent={resolvedAccent} size="lg" /></span>}
           <div className="min-w-0">
             {resolvedEyebrow && (
-              <p className={cx("flex items-center gap-2 text-support font-semibold", moduleAccents[resolvedAccent].text)}>
+              <p className={cx("mb-1 flex items-center gap-2 text-caption font-semibold", moduleAccents[resolvedAccent].text)}>
                 {!icon && <span aria-hidden="true" className={cx("h-1.5 w-1.5 rounded-full", moduleAccents[resolvedAccent].solid)} />}
                 {resolvedEyebrow}
               </p>
             )}
-            <h1 className="text-balance text-title font-bold tracking-tight text-ink-strong">{title}</h1>
-            {description && <p className="mt-1 max-w-3xl text-body text-ink-muted">{description}</p>}
+            <h1 className="text-balance text-title font-semibold tracking-tight text-ink-strong">{title}</h1>
+            {description && <p className="mt-1.5 max-w-2xl text-body text-ink-muted">{description}</p>}
             {meta && <div className="mt-3 flex flex-wrap items-center gap-2">{meta}</div>}
           </div>
         </div>

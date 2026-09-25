@@ -38,17 +38,17 @@ export default function OnboardingStepper({
             onClick={() => onStepClick(index)}
             className={`flex w-full items-start gap-3 rounded-lg p-3 text-left transition ${
               active
-                ? "bg-slate-950 text-white"
-                : "hover:bg-slate-100"
+                ? "bg-primary text-white"
+                : "hover:bg-surface-hover"
             }`}
           >
             <div
               className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ${
                 active
-                  ? "border-white bg-white text-slate-950"
+                  ? "border-white bg-surface text-ink-strong"
                   : completed
-                  ? "border-slate-950 bg-slate-950 text-white"
-                  : "border-slate-300 text-slate-400"
+                  ? "border-primary bg-primary text-white"
+                  : "border-line-strong text-ink-subtle"
               }`}
             >
               {completed ? (
@@ -70,7 +70,7 @@ export default function OnboardingStepper({
                 className={`text-sm font-medium ${
                   active
                     ? "text-white"
-                    : "text-slate-800"
+                    : "text-ink"
                 }`}
               >
                 {step.title}
@@ -79,8 +79,8 @@ export default function OnboardingStepper({
               <p
                 className={`mt-0.5 text-xs leading-5 ${
                   active
-                    ? "text-slate-300"
-                    : "text-slate-500"
+                    ? "text-ink-subtle"
+                    : "text-ink-muted"
                 }`}
               >
                 {step.description}

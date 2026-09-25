@@ -25,6 +25,7 @@ import type { PaginatedData } from "@/types/api";
 import type { AttendanceRecord, OvertimeRecord } from "@/types/attendance";
 import type { Department, Employee, Employment } from "@/types/hr";
 import { EM_DASH, formatDate, formatNumber } from "@/lib/format";
+import { buttonClasses } from "@/components/ui/Button";
 
 const ALL = "ALL";
 const SEARCH_DEBOUNCE_MS = 350;
@@ -358,16 +359,16 @@ export default function OvertimePage() {
       </section>
 
       {/* Filters */}
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
+      <section className="rounded-xl border border-line bg-surface p-4">
         <div className="flex flex-col gap-3 lg:flex-row">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-subtle" />
 
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search employee or employee number..."
-              className="w-full rounded-lg border border-slate-200 py-2.5 pl-10 pr-3 text-sm outline-none focus:border-slate-400"
+              className="w-full h-9 rounded-lg border border-line-strong pl-10 pr-3 text-sm outline-none focus:border-primary"
             />
           </div>
 
@@ -375,7 +376,7 @@ export default function OvertimePage() {
             value={departmentFilter}
             onChange={(event) => setDepartmentFilter(event.target.value)}
             aria-label="Filter by department"
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none"
+            className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink outline-none"
           >
             <option value={ALL}>All Departments</option>
 
@@ -393,7 +394,7 @@ export default function OvertimePage() {
               setPage(1);
             }}
             aria-label="Filter by status"
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none"
+            className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink outline-none"
           >
             <option value={ALL}>All Statuses</option>
             <option value="PENDING">Pending</option>
@@ -409,7 +410,7 @@ export default function OvertimePage() {
               setDepartmentFilter(ALL);
               setPage(1);
             }}
-            className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            className={buttonClasses({ variant: "secondary" })}
           >
             <Filter className="h-4 w-4" />
             Clear
@@ -418,75 +419,75 @@ export default function OvertimePage() {
       </section>
 
       {/* Desktop table */}
-      <section className="hidden overflow-hidden rounded-xl border border-slate-200 bg-white lg:block">
+      <section className="hidden overflow-hidden rounded-xl border border-line bg-surface lg:block">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
-            <thead className="border-b border-slate-200 bg-slate-50">
+            <thead className="border-b border-line bg-surface-muted">
               <tr>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Employee
                 </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Date
                 </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Clock Out
                 </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Calculated
                 </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Approved
                 </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Rate
                 </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Status
                 </th>
-                <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Action
                 </th>
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-line-soft">
               {filteredRecords.map((record) => {
                 const info = describe(record);
                 const isPending = record.status === "PENDING";
 
                 return (
-                  <tr key={record.id} className="hover:bg-slate-50">
+                  <tr key={record.id} className="hover:bg-surface-hover">
                     <td className="px-5 py-4">
-                      <p className="font-medium text-slate-900">{info.name}</p>
+                      <p className="font-medium text-ink-strong">{info.name}</p>
 
-                      <p className="mt-1 text-xs text-slate-500">
+                      <p className="mt-1 text-xs text-ink-muted">
                         {info.number} · {info.department}
                       </p>
                     </td>
 
                     <td className="px-5 py-4">
-                      <div className="flex items-center gap-2 text-sm text-slate-700">
-                        <CalendarDays className="h-4 w-4 text-slate-400" />
+                      <div className="flex items-center gap-2 text-sm text-ink">
+                        <CalendarDays className="h-4 w-4 text-ink-subtle" />
                         {info.date}
                       </div>
                     </td>
 
-                    <td className="px-5 py-4 text-sm text-slate-700">
+                    <td className="px-5 py-4 text-sm text-ink">
                       {info.checkOut}
                     </td>
 
-                    <td className="px-5 py-4 text-sm font-medium text-slate-700">
+                    <td className="px-5 py-4 text-sm font-medium text-ink">
                       {attendanceApi.formatMinutes(record.calculated_minutes)}
                     </td>
 
-                    <td className="px-5 py-4 text-sm text-slate-700">
+                    <td className="px-5 py-4 text-sm text-ink">
                       {record.approved_minutes > 0
                         ? attendanceApi.formatMinutes(record.approved_minutes)
                         : EM_DASH}
                     </td>
 
-                    <td className="px-5 py-4 text-sm text-slate-700">
+                    <td className="px-5 py-4 text-sm text-ink">
                       ×{formatNumber(record.rate_multiplier)}
                     </td>
 
@@ -501,7 +502,7 @@ export default function OvertimePage() {
                             <button
                               type="button"
                               onClick={() => openReview(record, "reject")}
-                              className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-50"
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-danger/25 px-3 py-2 text-xs font-medium text-danger-ink hover:bg-danger-soft"
                             >
                               <XCircle className="h-4 w-4" />
                               Reject
@@ -510,14 +511,14 @@ export default function OvertimePage() {
                             <button
                               type="button"
                               onClick={() => openReview(record, "approve")}
-                              className="inline-flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
+                              className={buttonClasses({ variant: "primary", size: "sm" })}
                             >
                               <CheckCircle2 className="h-4 w-4" />
                               Approve
                             </button>
                           </>
                         ) : (
-                          <span className="text-xs text-slate-400">
+                          <span className="text-xs text-ink-subtle">
                             Decision recorded
                           </span>
                         )}
@@ -530,12 +531,12 @@ export default function OvertimePage() {
               {filteredRecords.length === 0 && (
                 <tr>
                   <td colSpan={8} className="px-5 py-12 text-center">
-                    <p className="text-sm font-medium text-slate-700">
+                    <p className="text-sm font-medium text-ink">
                       {loading
                         ? "Loading overtime records..."
                         : "No overtime records found"}
                     </p>
-                    <p className="mt-1 text-sm text-slate-500">
+                    <p className="mt-1 text-sm text-ink-muted">
                       {loading
                         ? "Please wait."
                         : "Overtime is generated from attendance; none matches these filters."}
@@ -547,8 +548,8 @@ export default function OvertimePage() {
           </table>
         </div>
 
-        <div className="flex items-center justify-between border-t border-slate-200 px-5 py-3">
-          <p className="text-xs text-slate-500">
+        <div className="flex items-center justify-between border-t border-line px-5 py-3">
+          <p className="text-xs text-ink-muted">
             Page {page} of {totalPages} · {data.count} records
           </p>
 
@@ -557,7 +558,7 @@ export default function OvertimePage() {
               type="button"
               onClick={() => setPage((current) => Math.max(1, current - 1))}
               disabled={loading || !data.previous}
-              className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+              className={buttonClasses({ variant: "secondary", size: "sm" })}
             >
               Previous
             </button>
@@ -566,7 +567,7 @@ export default function OvertimePage() {
               type="button"
               onClick={() => setPage((current) => current + 1)}
               disabled={loading || !data.next}
-              className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+              className={buttonClasses({ variant: "secondary", size: "sm" })}
             >
               Next
             </button>
@@ -583,12 +584,12 @@ export default function OvertimePage() {
           return (
             <div
               key={record.id}
-              className="rounded-xl border border-slate-200 bg-white p-4"
+              className="rounded-xl border border-line bg-surface p-4"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="font-medium text-slate-900">{info.name}</p>
-                  <p className="mt-1 text-xs text-slate-500">
+                  <p className="font-medium text-ink-strong">{info.name}</p>
+                  <p className="mt-1 text-xs text-ink-muted">
                     {info.number} · {info.department}
                   </p>
                 </div>
@@ -618,7 +619,7 @@ export default function OvertimePage() {
                   <button
                     type="button"
                     onClick={() => openReview(record, "reject")}
-                    className="flex-1 rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-700"
+                    className="flex-1 rounded-lg border border-danger/25 px-3 py-2 text-sm font-medium text-danger-ink"
                   >
                     Reject
                   </button>
@@ -626,7 +627,7 @@ export default function OvertimePage() {
                   <button
                     type="button"
                     onClick={() => openReview(record, "approve")}
-                    className="flex-1 rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white"
+                    className={buttonClasses({ variant: "primary", className: "flex-1" })}
                   >
                     Approve
                   </button>
@@ -639,10 +640,10 @@ export default function OvertimePage() {
 
       {/* Review modal */}
       {selected && reviewAction && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-              <h2 className="text-lg font-semibold text-slate-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-surface shadow-xl">
+            <div className="flex items-center justify-between border-b border-line px-6 py-4">
+              <h2 className="text-lg font-semibold text-ink-strong">
                 {reviewAction === "approve"
                   ? "Approve Overtime"
                   : "Reject Overtime"}
@@ -651,7 +652,7 @@ export default function OvertimePage() {
               <button
                 onClick={closeReview}
                 disabled={reviewRunning}
-                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                className="rounded-lg p-2 text-ink-subtle hover:bg-surface-hover hover:text-ink-strong"
                 aria-label="Close"
               >
                 <X className="h-5 w-5" />
@@ -660,16 +661,16 @@ export default function OvertimePage() {
 
             <div className="space-y-4 p-6">
               {reviewError && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <div className="rounded-lg border border-danger/25 bg-danger-soft px-4 py-3 text-sm text-danger-ink">
                   {reviewError}
                 </div>
               )}
 
-              <div className="rounded-lg bg-slate-50 p-4 text-sm">
-                <p className="font-medium text-slate-900">
+              <div className="rounded-lg bg-surface-muted p-4 text-sm">
+                <p className="font-medium text-ink-strong">
                   {describe(selected).name}
                 </p>
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-ink-muted">
                   {describe(selected).date} · Calculated{" "}
                   {attendanceApi.formatMinutes(selected.calculated_minutes)}
                 </p>
@@ -677,7 +678,7 @@ export default function OvertimePage() {
 
               {reviewAction === "approve" ? (
                 <label className="block space-y-1.5">
-                  <span className="text-sm font-medium text-slate-700">
+                  <span className="text-sm font-medium text-ink">
                     Approved minutes
                   </span>
 
@@ -687,27 +688,27 @@ export default function OvertimePage() {
                     max={selected.calculated_minutes}
                     value={approvedMinutes}
                     onChange={(event) => setApprovedMinutes(event.target.value)}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                    className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
                   />
 
-                  <span className="block text-xs text-slate-500">
+                  <span className="block text-xs text-ink-muted">
                     Cannot exceed the calculated{" "}
                     {selected.calculated_minutes} minutes.
                   </span>
                 </label>
               ) : (
-                <p className="text-sm text-slate-600">
+                <p className="text-sm text-ink-muted">
                   Rejecting records the decision against this overtime record.
                   Rejected overtime is not consumed by Payroll.
                 </p>
               )}
             </div>
 
-            <div className="flex justify-end gap-3 border-t border-slate-200 px-6 py-4">
+            <div className="flex justify-end gap-3 border-t border-line px-6 py-4">
               <button
                 onClick={closeReview}
                 disabled={reviewRunning}
-                className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                className={buttonClasses({ variant: "secondary" })}
               >
                 Cancel
               </button>
@@ -717,8 +718,8 @@ export default function OvertimePage() {
                 disabled={reviewRunning}
                 className={`rounded-lg px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50 ${
                   reviewAction === "approve"
-                    ? "bg-slate-900 hover:bg-slate-800"
-                    : "bg-red-600 hover:bg-red-700"
+                    ? "bg-primary hover:bg-primary-hover"
+                    : "bg-danger hover:bg-danger/90"
                 }`}
               >
                 {reviewRunning
@@ -747,17 +748,17 @@ function SummaryCard({
   detail: string;
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5">
+    <div className="rounded-xl border border-line bg-surface p-5">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500">{label}</p>
+        <p className="text-sm text-ink-muted">{label}</p>
 
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-surface-sunken text-ink">
           {icon}
         </span>
       </div>
 
-      <p className="mt-3 text-2xl font-bold text-slate-900">{value}</p>
-      <p className="mt-1 text-xs text-slate-500">{detail}</p>
+      <p className="mt-3 text-2xl font-bold text-ink-strong">{value}</p>
+      <p className="mt-1 text-xs text-ink-muted">{detail}</p>
     </div>
   );
 }
@@ -765,8 +766,8 @@ function SummaryCard({
 function Info({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="mt-1 font-medium text-slate-800">{value}</p>
+      <p className="text-xs text-ink-muted">{label}</p>
+      <p className="mt-1 font-medium text-ink">{value}</p>
     </div>
   );
 }

@@ -9,6 +9,7 @@ import {
   Lock,
   RefreshCw,
 } from "lucide-react";
+import { buttonClasses } from "@/components/ui/Button";
 
 type PostingStatus =
   | "NOT_POSTED"
@@ -50,18 +51,18 @@ export default function PayrollAccountingPosting() {
   };
 
   return (
-    <section className="rounded-2xl border bg-white p-5">
+    <section className="rounded-2xl border bg-surface p-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="font-semibold text-slate-900">
+          <h2 className="font-semibold text-ink-strong">
             Payroll → Accounting
           </h2>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-sm text-ink-muted">
             Review the accounting journal generated from this payroll run.
           </p>
         </div>
 
-        <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold">
+        <span className="rounded-full bg-surface-sunken px-3 py-1.5 text-xs font-semibold">
           {statusLabels[status]}
         </span>
       </div>
@@ -77,8 +78,8 @@ export default function PayrollAccountingPosting() {
                   <div
                     className={`flex h-8 w-8 items-center justify-center rounded-full border text-xs font-bold ${
                       complete
-                        ? "bg-slate-900 text-white"
-                        : "bg-white text-slate-400"
+                        ? "bg-primary text-white"
+                        : "bg-surface text-ink-subtle"
                     }`}
                   >
                     {index < currentIndex ? (
@@ -94,7 +95,7 @@ export default function PayrollAccountingPosting() {
                 </div>
 
                 {index < statusSteps.length - 1 && (
-                  <ArrowRight className="mx-3 h-4 w-4 text-slate-300" />
+                  <ArrowRight className="mx-3 h-4 w-4 text-ink-subtle" />
                 )}
               </div>
             );
@@ -103,35 +104,35 @@ export default function PayrollAccountingPosting() {
       </div>
 
       <div className="mt-6 grid gap-4 md:grid-cols-3">
-        <div className="rounded-xl bg-slate-50 p-4">
-          <p className="text-xs text-slate-500">Payroll Amount</p>
+        <div className="rounded-xl bg-surface-muted p-4">
+          <p className="text-xs text-ink-muted">Payroll Amount</p>
           <p className="mt-1 font-semibold">GHS 486,200.00</p>
         </div>
 
-        <div className="rounded-xl bg-slate-50 p-4">
-          <p className="text-xs text-slate-500">Journal Reference</p>
+        <div className="rounded-xl bg-surface-muted p-4">
+          <p className="text-xs text-ink-muted">Journal Reference</p>
           <p className="mt-1 font-semibold">
             JV-PAY-2026-008
           </p>
         </div>
 
-        <div className="rounded-xl bg-slate-50 p-4">
-          <p className="text-xs text-slate-500">Posting Period</p>
+        <div className="rounded-xl bg-surface-muted p-4">
+          <p className="text-xs text-ink-muted">Posting Period</p>
           <p className="mt-1 font-semibold">August 2026</p>
         </div>
       </div>
 
       {status === "MAPPING_REVIEW" && (
-        <div className="mt-5 rounded-xl border bg-slate-50 p-4">
+        <div className="mt-5 rounded-xl border bg-surface-muted p-4">
           <div className="flex gap-3">
             <FileText className="mt-0.5 h-5 w-5 shrink-0" />
 
             <div>
-              <p className="font-semibold text-slate-900">
+              <p className="font-semibold text-ink-strong">
                 Mapping review required
               </p>
 
-              <p className="mt-1 text-sm leading-6 text-slate-600">
+              <p className="mt-1 text-sm leading-6 text-ink-muted">
                 Review the payroll-to-account mappings before the journal
                 can be posted.
               </p>
@@ -139,14 +140,14 @@ export default function PayrollAccountingPosting() {
               <div className="mt-3 flex flex-wrap gap-2">
                 <Link
                   href="/payroll/configuration"
-                  className="rounded-lg border bg-white px-3 py-2 text-xs font-semibold"
+                  className="rounded-lg border bg-surface px-3 py-2 text-xs font-semibold"
                 >
                   Review Mapping
                 </Link>
 
                 <Link
                   href="/accounting/journals/JV-PAY-2026-008"
-                  className="rounded-lg border bg-white px-3 py-2 text-xs font-semibold"
+                  className="rounded-lg border bg-surface px-3 py-2 text-xs font-semibold"
                 >
                   View Draft Journal
                 </Link>
@@ -157,13 +158,13 @@ export default function PayrollAccountingPosting() {
       )}
 
       {status === "READY" && (
-        <div className="mt-5 rounded-xl border bg-slate-50 p-4">
+        <div className="mt-5 rounded-xl border bg-surface-muted p-4">
           <div className="flex gap-3">
             <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
 
             <div>
               <p className="font-semibold">Ready for posting</p>
-              <p className="mt-1 text-sm text-slate-600">
+              <p className="mt-1 text-sm text-ink-muted">
                 Payroll totals and accounting mappings have been reviewed.
               </p>
             </div>
@@ -172,16 +173,16 @@ export default function PayrollAccountingPosting() {
       )}
 
       {status === "POSTED" && (
-        <div className="mt-5 rounded-xl border bg-slate-50 p-4">
+        <div className="mt-5 rounded-xl border bg-surface-muted p-4">
           <div className="flex gap-3">
             <Lock className="mt-0.5 h-5 w-5 shrink-0" />
 
             <div>
               <p className="font-semibold">Payroll journal posted</p>
-              <p className="mt-1 text-sm text-slate-600">
+              <p className="mt-1 text-sm text-ink-muted">
                 Posting reference: POST-2026-0081
               </p>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-ink-muted">
                 The posted accounting record is historical and read-only.
               </p>
             </div>
@@ -203,7 +204,7 @@ export default function PayrollAccountingPosting() {
         {(status === "MAPPING_REVIEW" || status === "READY") && (
           <button
             onClick={advance}
-            className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white"
+            className={buttonClasses({ variant: "primary" })}
           >
             {status === "MAPPING_REVIEW"
               ? "Mark Ready"

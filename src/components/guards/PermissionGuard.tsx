@@ -52,11 +52,11 @@ export default function PermissionGuard({
   if (!allowed) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="rounded-xl border border-slate-200 bg-white p-8 text-center">
-          <h2 className="text-lg font-semibold text-slate-950">
+        <div className="rounded-xl border border-line bg-surface p-8 text-center">
+          <h2 className="text-lg font-semibold text-ink-strong">
             Access Denied
           </h2>
-          <p className="mt-2 text-sm text-slate-500">
+          <p className="mt-2 text-sm text-ink-muted">
             You do not have permission to access this section.
           </p>
         </div>

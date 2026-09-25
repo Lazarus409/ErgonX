@@ -49,7 +49,7 @@ export interface CardProps extends Omit<SurfaceProps, "title"> {
 export function Card({ title, description, actions, icon, accent, accentLine, children, className, as = "section", ...rest }: CardProps) {
   return (
     <Surface as={as} className={cx("relative min-w-0 overflow-hidden", className)} {...rest}>
-      {accentLine && accent && <span aria-hidden="true" className={cx("absolute inset-x-0 top-0 h-[3px]", moduleAccents[accent].solid)} />}
+      {accentLine && accent && <span aria-hidden="true" className={cx("absolute inset-x-0 top-0 h-[2px]", moduleAccents[accent].solid)} />}
       {(title || actions) && <CardHeader title={title} description={description} actions={actions} icon={icon} accent={accent} />}
       {children}
     </Surface>
@@ -72,7 +72,7 @@ export function CardHeader({ title, description, actions, icon: Icon, accent = "
 }
 
 export function IconTile({ icon: Icon, accent = "brand", size = "md", className }: { icon: LucideIcon; accent?: ModuleAccent; size?: "sm" | "md" | "lg"; className?: string }) {
-  const dims = { sm: "h-9 w-9 rounded-lg [&_svg]:h-[18px] [&_svg]:w-[18px]", md: "h-11 w-11 rounded-xl [&_svg]:h-5 [&_svg]:w-5", lg: "h-14 w-14 rounded-2xl [&_svg]:h-6 [&_svg]:w-6" }[size];
+  const dims = { sm: "h-8 w-8 rounded-lg [&_svg]:h-4 [&_svg]:w-4", md: "h-10 w-10 rounded-lg [&_svg]:h-5 [&_svg]:w-5", lg: "h-12 w-12 rounded-xl [&_svg]:h-[22px] [&_svg]:w-[22px]" }[size];
   return (
     <span className={cx("inline-flex shrink-0 items-center justify-center", moduleAccents[accent].tile, dims, className)} aria-hidden="true">
       <Icon />
@@ -103,7 +103,6 @@ export function MetricCard({ label, value, description, icon, accent = "brand", 
   const TrendIcon = trend?.direction === "up" ? ArrowUpRight : trend?.direction === "down" ? ArrowDownRight : Minus;
   const body = (
     <>
-      <span aria-hidden="true" className={cx("pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full opacity-60 blur-2xl", moduleAccents[accent].soft)} />
       <div className="relative flex items-start justify-between gap-3">
         <p className="text-support font-medium text-ink-muted">{label}</p>
         {icon && <IconTile icon={icon} accent={accent} size="sm" />}
@@ -125,7 +124,7 @@ export function MetricCard({ label, value, description, icon, accent = "brand", 
       {footer && <div className="relative mt-3 border-t border-line-soft pt-3 text-support text-ink-muted">{footer}</div>}
     </>
   );
-  const classes = cx("relative block min-w-0 overflow-hidden rounded-2xl border border-line bg-surface p-5 shadow-elevation-1", href && "transition-[box-shadow,transform,border-color] duration-200 ease-standard hover:-translate-y-0.5 hover:border-line-strong hover:shadow-elevation-2", className);
+  const classes = cx("relative block min-w-0 overflow-hidden rounded-2xl border border-line bg-surface p-5 shadow-elevation-1", href && "transition-[box-shadow,border-color] duration-200 ease-standard hover:border-line-strong hover:shadow-elevation-2", className);
   return href ? <Link href={href} className={classes}>{body}</Link> : <article className={classes}>{body}</article>;
 }
 
@@ -150,8 +149,8 @@ export function InsightCard({ title, children, icon: Icon, accent = "brand", cla
 
 export function ActionCard({ href, title, description, icon, accent = "brand", cta = "Open", className }: { href: string; title: ReactNode; description?: ReactNode; icon?: LucideIcon; accent?: ModuleAccent; cta?: string; className?: string }) {
   return (
-    <Link href={href} className={cx("group relative flex min-h-40 flex-col overflow-hidden rounded-2xl border border-line bg-surface p-5 shadow-elevation-1 transition-[box-shadow,transform,border-color] duration-200 ease-standard hover:-translate-y-0.5 hover:border-line-strong hover:shadow-elevation-2", className)}>
-      <span aria-hidden="true" className={cx("absolute inset-x-0 top-0 h-[3px] origin-left scale-x-0 transition-transform duration-300 ease-standard group-hover:scale-x-100", moduleAccents[accent].solid)} />
+    <Link href={href} className={cx("group relative flex min-h-40 flex-col overflow-hidden rounded-2xl border border-line bg-surface p-5 shadow-elevation-1 transition-[box-shadow,border-color] duration-200 ease-standard hover:border-line-strong hover:shadow-elevation-2", className)}>
+      <span aria-hidden="true" className={cx("absolute inset-x-0 top-0 h-[2px] origin-left scale-x-0 transition-transform duration-300 ease-standard group-hover:scale-x-100", moduleAccents[accent].solid)} />
       <div className="flex items-start justify-between gap-4">
         {icon ? <IconTile icon={icon} accent={accent} /> : <span />}
         <ArrowRight className="h-5 w-5 text-ink-subtle transition-transform duration-200 group-hover:translate-x-1 group-hover:text-ink-strong" aria-hidden="true" />

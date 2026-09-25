@@ -35,6 +35,7 @@ import type {
 } from "@/types/attendance";
 import type { Employee } from "@/types/hr";
 import { formatDate, humanizeEnum, toISODate } from "@/lib/format";
+import { buttonClasses } from "@/components/ui/Button";
 
 const ALL = "ALL";
 
@@ -381,7 +382,7 @@ export default function SchedulesPage() {
         actions={
           <button
             onClick={openCreate}
-            className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
+            className={buttonClasses({ variant: "primary" })}
           >
             <Plus className="h-4 w-4" />
             New Schedule
@@ -409,16 +410,16 @@ export default function SchedulesPage() {
         />
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-4">
+      <div className="rounded-xl border border-line bg-surface p-4">
         <div className="flex flex-col gap-3 lg:flex-row">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-subtle" />
 
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search work schedules..."
-              className="w-full rounded-lg border border-slate-200 py-2.5 pl-10 pr-3 text-sm outline-none focus:border-slate-400"
+              className="w-full h-9 rounded-lg border border-line-strong pl-10 pr-3 text-sm outline-none focus:border-primary"
             />
           </div>
 
@@ -426,7 +427,7 @@ export default function SchedulesPage() {
             value={typeFilter}
             onChange={(event) => setTypeFilter(event.target.value)}
             aria-label="Filter by schedule type"
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none"
+            className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink outline-none"
           >
             <option value={ALL}>All Types</option>
 
@@ -441,7 +442,7 @@ export default function SchedulesPage() {
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value)}
             aria-label="Filter by status"
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none"
+            className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink outline-none"
           >
             <option value={ALL}>All Statuses</option>
             <option value="ACTIVE">Active</option>
@@ -460,60 +461,60 @@ export default function SchedulesPage() {
           }
         />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <div className="overflow-hidden rounded-xl border border-line bg-surface">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] text-left">
-              <thead className="border-b border-slate-200 bg-slate-50">
+              <thead className="border-b border-line bg-surface-muted">
                 <tr>
-                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                     Schedule
                   </th>
-                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                     Type
                   </th>
-                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                     Source
                   </th>
-                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                     Effective From
                   </th>
-                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                     Assigned
                   </th>
-                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                     Status
                   </th>
-                  <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-ink-muted">
                     Action
                   </th>
                 </tr>
               </thead>
 
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-line-soft">
                 {filteredSchedules.map((schedule) => (
-                  <tr key={schedule.id} className="hover:bg-slate-50">
+                  <tr key={schedule.id} className="hover:bg-surface-hover">
                     <td className="px-5 py-4">
-                      <p className="font-medium text-slate-900">
+                      <p className="font-medium text-ink-strong">
                         {schedule.name}
                       </p>
-                      <p className="mt-1 text-xs text-slate-500">
+                      <p className="mt-1 text-xs text-ink-muted">
                         {schedule.code}
                       </p>
                     </td>
 
-                    <td className="px-5 py-4 text-sm text-slate-700">
+                    <td className="px-5 py-4 text-sm text-ink">
                       {humanizeEnum(schedule.schedule_type)}
                     </td>
 
-                    <td className="px-5 py-4 text-sm text-slate-700">
+                    <td className="px-5 py-4 text-sm text-ink">
                       {describeSource(schedule)}
                     </td>
 
-                    <td className="px-5 py-4 text-sm text-slate-700">
+                    <td className="px-5 py-4 text-sm text-ink">
                       {formatDate(schedule.effective_from)}
                     </td>
 
-                    <td className="px-5 py-4 text-sm text-slate-700">
+                    <td className="px-5 py-4 text-sm text-ink">
                       {assignedCounts.get(schedule.id) ?? 0}
                     </td>
 
@@ -532,7 +533,7 @@ export default function SchedulesPage() {
                             setEmployeeSearch("");
                             setFormError("");
                           }}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                          className={buttonClasses({ variant: "secondary", size: "sm" })}
                         >
                           <Users className="h-4 w-4" />
                           Assign
@@ -540,7 +541,7 @@ export default function SchedulesPage() {
 
                         <Link
                           href={`/attendance/schedules/${schedule.id}`}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                          className={buttonClasses({ variant: "secondary", size: "sm" })}
                         >
                           <Eye className="h-4 w-4" />
                           View
@@ -548,7 +549,7 @@ export default function SchedulesPage() {
 
                         <button
                           onClick={() => openEdit(schedule)}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                          className={buttonClasses({ variant: "secondary", size: "sm" })}
                         >
                           <Pencil className="h-4 w-4" />
                           Edit
@@ -565,17 +566,17 @@ export default function SchedulesPage() {
 
       {/* Schedule editor */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-xl">
-            <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
-              <h2 className="text-lg font-semibold text-slate-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
+          <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-surface shadow-xl">
+            <div className="sticky top-0 flex items-center justify-between border-b border-line bg-surface px-6 py-4">
+              <h2 className="text-lg font-semibold text-ink-strong">
                 {editing ? "Edit Work Schedule" : "New Work Schedule"}
               </h2>
 
               <button
                 onClick={() => setModalOpen(false)}
                 disabled={saving}
-                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                className="rounded-lg p-2 text-ink-subtle hover:bg-surface-hover hover:text-ink-strong"
                 aria-label="Close"
               >
                 <X className="h-5 w-5" />
@@ -584,14 +585,14 @@ export default function SchedulesPage() {
 
             <div className="space-y-5 p-6">
               {formError && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <div className="rounded-lg border border-danger/25 bg-danger-soft px-4 py-3 text-sm text-danger-ink">
                   {formError}
                 </div>
               )}
 
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="space-y-1.5">
-                  <span className="text-sm font-medium text-slate-700">
+                  <span className="text-sm font-medium text-ink">
                     Name
                   </span>
                   <input
@@ -600,12 +601,12 @@ export default function SchedulesPage() {
                       setForm({ ...form, name: event.target.value })
                     }
                     placeholder="e.g. Standard Morning Schedule"
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                    className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
                   />
                 </label>
 
                 <label className="space-y-1.5">
-                  <span className="text-sm font-medium text-slate-700">
+                  <span className="text-sm font-medium text-ink">
                     Code
                   </span>
                   <input
@@ -614,13 +615,13 @@ export default function SchedulesPage() {
                       setForm({ ...form, code: event.target.value })
                     }
                     placeholder="e.g. STD-08"
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                    className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
                   />
                 </label>
               </div>
 
               <label className="block space-y-1.5">
-                <span className="text-sm font-medium text-slate-700">
+                <span className="text-sm font-medium text-ink">
                   Schedule Type
                 </span>
                 <select
@@ -631,7 +632,7 @@ export default function SchedulesPage() {
                       scheduleType: event.target.value as ScheduleType,
                     })
                   }
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                  className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
                 >
                   {SCHEDULE_TYPES.map((type) => (
                     <option key={type} value={type}>
@@ -697,7 +698,7 @@ export default function SchedulesPage() {
 
               <div className="grid gap-4 md:grid-cols-3">
                 <label className="space-y-1.5">
-                  <span className="text-sm font-medium text-slate-700">
+                  <span className="text-sm font-medium text-ink">
                     Effective From
                   </span>
                   <input
@@ -706,12 +707,12 @@ export default function SchedulesPage() {
                     onChange={(event) =>
                       setForm({ ...form, effectiveFrom: event.target.value })
                     }
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                    className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
                   />
                 </label>
 
                 <label className="space-y-1.5">
-                  <span className="text-sm font-medium text-slate-700">
+                  <span className="text-sm font-medium text-ink">
                     Effective To
                   </span>
                   <input
@@ -720,12 +721,12 @@ export default function SchedulesPage() {
                     onChange={(event) =>
                       setForm({ ...form, effectiveTo: event.target.value })
                     }
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                    className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
                   />
                 </label>
 
                 <label className="space-y-1.5">
-                  <span className="text-sm font-medium text-slate-700">
+                  <span className="text-sm font-medium text-ink">
                     Timezone
                   </span>
                   <input
@@ -733,12 +734,12 @@ export default function SchedulesPage() {
                     onChange={(event) =>
                       setForm({ ...form, timezone: event.target.value })
                     }
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                    className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
                   />
                 </label>
               </div>
 
-              <label className="flex items-center gap-3 rounded-lg border border-slate-200 p-3">
+              <label className="flex items-center gap-3 rounded-lg border border-line p-3">
                 <input
                   type="checkbox"
                   checked={form.isActive}
@@ -747,17 +748,17 @@ export default function SchedulesPage() {
                   }
                   className="h-4 w-4"
                 />
-                <span className="text-sm font-medium text-slate-700">
+                <span className="text-sm font-medium text-ink">
                   Active
                 </span>
               </label>
             </div>
 
-            <div className="sticky bottom-0 flex justify-end gap-3 border-t border-slate-200 bg-white px-6 py-4">
+            <div className="sticky bottom-0 flex justify-end gap-3 border-t border-line bg-surface px-6 py-4">
               <button
                 onClick={() => setModalOpen(false)}
                 disabled={saving}
-                className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                className={buttonClasses({ variant: "secondary" })}
               >
                 Cancel
               </button>
@@ -765,7 +766,7 @@ export default function SchedulesPage() {
               <button
                 onClick={saveSchedule}
                 disabled={saving}
-                className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+                className={buttonClasses({ variant: "primary" })}
               >
                 <Check className="h-4 w-4" />
                 {saving ? "Saving..." : editing ? "Save Changes" : "Create"}
@@ -777,14 +778,14 @@ export default function SchedulesPage() {
 
       {/* Assignment modal */}
       {assignFor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="flex max-h-[92vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
+          <div className="flex max-h-[92vh] w-full max-w-2xl flex-col rounded-2xl bg-surface shadow-xl">
+            <div className="flex items-center justify-between border-b border-line px-6 py-4">
               <div>
-                <h2 className="text-lg font-semibold text-slate-900">
+                <h2 className="text-lg font-semibold text-ink-strong">
                   Assign Employees
                 </h2>
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="mt-1 text-sm text-ink-muted">
                   {assignFor.name}
                 </p>
               </div>
@@ -792,7 +793,7 @@ export default function SchedulesPage() {
               <button
                 onClick={() => setAssignFor(null)}
                 disabled={saving}
-                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                className="rounded-lg p-2 text-ink-subtle hover:bg-surface-hover hover:text-ink-strong"
                 aria-label="Close"
               >
                 <X className="h-5 w-5" />
@@ -801,43 +802,43 @@ export default function SchedulesPage() {
 
             <div className="space-y-4 overflow-y-auto p-6">
               {formError && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <div className="rounded-lg border border-danger/25 bg-danger-soft px-4 py-3 text-sm text-danger-ink">
                   {formError}
                 </div>
               )}
 
               <label className="block space-y-1.5">
-                <span className="text-sm font-medium text-slate-700">
+                <span className="text-sm font-medium text-ink">
                   Effective From
                 </span>
                 <input
                   type="date"
                   value={assignFrom}
                   onChange={(event) => setAssignFrom(event.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                  className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
                 />
               </label>
 
-              <p className="rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-600">
+              <p className="rounded-lg bg-surface-muted p-3 text-xs leading-5 text-ink-muted">
                 Assigning a current schedule closes each employee&apos;s
                 previous effective-dated assignment. The earlier record is
                 preserved.
               </p>
 
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-subtle" />
 
                 <input
                   value={employeeSearch}
                   onChange={(event) => setEmployeeSearch(event.target.value)}
                   placeholder="Search employees..."
-                  className="w-full rounded-lg border border-slate-200 py-2.5 pl-10 pr-3 text-sm outline-none focus:border-slate-400"
+                  className="w-full h-9 rounded-lg border border-line-strong pl-10 pr-3 text-sm outline-none focus:border-primary"
                 />
               </div>
 
-              <div className="max-h-64 space-y-1 overflow-y-auto rounded-lg border border-slate-200 p-2">
+              <div className="max-h-64 space-y-1 overflow-y-auto rounded-lg border border-line p-2">
                 {filteredEmployees.length === 0 && (
-                  <p className="p-3 text-sm text-slate-500">
+                  <p className="p-3 text-sm text-ink-muted">
                     No employees found.
                   </p>
                 )}
@@ -848,7 +849,7 @@ export default function SchedulesPage() {
                   return (
                     <label
                       key={employee.id}
-                      className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-slate-50"
+                      className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-surface-hover"
                     >
                       <input
                         type="checkbox"
@@ -870,10 +871,10 @@ export default function SchedulesPage() {
                       />
 
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium text-slate-900">
+                        <span className="block truncate text-sm font-medium text-ink-strong">
                           {employeesApi.employeeDisplayName(employee)}
                         </span>
-                        <span className="block truncate text-xs text-slate-500">
+                        <span className="block truncate text-xs text-ink-muted">
                           {employee.employee_number}
                         </span>
                       </span>
@@ -883,8 +884,8 @@ export default function SchedulesPage() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between gap-3 border-t border-slate-200 px-6 py-4">
-              <p className="text-xs text-slate-500">
+            <div className="flex items-center justify-between gap-3 border-t border-line px-6 py-4">
+              <p className="text-xs text-ink-muted">
                 {selectedEmployees.size} selected
               </p>
 
@@ -892,7 +893,7 @@ export default function SchedulesPage() {
                 <button
                   onClick={() => setAssignFor(null)}
                   disabled={saving}
-                  className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  className={buttonClasses({ variant: "secondary" })}
                 >
                   Cancel
                 </button>
@@ -900,7 +901,7 @@ export default function SchedulesPage() {
                 <button
                   onClick={assignEmployees}
                   disabled={saving || selectedEmployees.size === 0}
-                  className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  className={buttonClasses({ variant: "primary" })}
                 >
                   {saving ? "Assigning..." : "Assign"}
                 </button>
@@ -926,12 +927,12 @@ function ReferenceSelect({
 }) {
   return (
     <label className="block space-y-1.5">
-      <span className="text-sm font-medium text-slate-700">{label}</span>
+      <span className="text-sm font-medium text-ink">{label}</span>
 
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+        className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
       >
         <option value="">Select {label.toLowerCase()}</option>
 
@@ -955,16 +956,16 @@ function SummaryCard({
   icon: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-xl border border-line bg-surface p-5 shadow-sm">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500">{title}</p>
+        <p className="text-sm text-ink-muted">{title}</p>
 
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-surface-sunken text-ink">
           {icon}
         </span>
       </div>
 
-      <p className="mt-3 text-2xl font-bold text-slate-900">{value}</p>
+      <p className="mt-3 text-2xl font-bold text-ink-strong">{value}</p>
     </div>
   );
 }

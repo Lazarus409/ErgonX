@@ -84,8 +84,8 @@ export default function ShiftDetailPage() {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="text-center">
-          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-slate-900" />
-          <p className="mt-4 text-sm text-slate-500">Loading shift...</p>
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-line-strong border-t-primary" />
+          <p className="mt-4 text-sm text-ink-muted">Loading shift...</p>
         </div>
       </div>
     );
@@ -149,14 +149,14 @@ export default function ShiftDetailPage() {
       </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <section className="rounded-xl border border-slate-200 bg-white">
-          <div className="border-b border-slate-200 px-5 py-4">
-            <h2 className="text-base font-semibold text-slate-900">
+        <section className="rounded-xl border border-line bg-surface">
+          <div className="border-b border-line px-5 py-4">
+            <h2 className="text-base font-semibold text-ink-strong">
               Shift Configuration
             </h2>
           </div>
 
-          <dl className="divide-y divide-slate-100">
+          <dl className="divide-y divide-line-soft">
             <RuleRow label="Start time" value={time(shift.start_time)} />
             <RuleRow label="End time" value={time(shift.end_time)} />
             <RuleRow
@@ -182,12 +182,12 @@ export default function ShiftDetailPage() {
           </dl>
         </section>
 
-        <section className="rounded-xl border border-slate-200 bg-white">
-          <div className="border-b border-slate-200 px-5 py-4">
-            <h2 className="text-base font-semibold text-slate-900">
+        <section className="rounded-xl border border-line bg-surface">
+          <div className="border-b border-line px-5 py-4">
+            <h2 className="text-base font-semibold text-ink-strong">
               Work Schedules
             </h2>
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-ink-muted">
               Schedules that use this shift as their fixed shift.
             </p>
           </div>
@@ -200,18 +200,18 @@ export default function ShiftDetailPage() {
               />
             </div>
           ) : (
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-line-soft">
               {schedules.map((schedule) => (
                 <Link
                   key={schedule.id}
                   href={`/attendance/schedules/${schedule.id}`}
-                  className="flex items-center justify-between px-5 py-4 transition hover:bg-slate-50"
+                  className="flex items-center justify-between px-5 py-4 transition hover:bg-surface-hover"
                 >
                   <div>
-                    <p className="text-sm font-medium text-slate-900">
+                    <p className="text-sm font-medium text-ink-strong">
                       {schedule.name}
                     </p>
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="mt-1 text-xs text-ink-muted">
                       {schedule.code} · {humanizeEnum(schedule.schedule_type)} ·
                       from {formatDate(schedule.effective_from)}
                     </p>
@@ -227,12 +227,12 @@ export default function ShiftDetailPage() {
         </section>
       </div>
 
-      <section className="rounded-xl border border-slate-200 bg-white">
-        <div className="border-b border-slate-200 px-5 py-4">
-          <h2 className="text-base font-semibold text-slate-900">
+      <section className="rounded-xl border border-line bg-surface">
+        <div className="border-b border-line px-5 py-4">
+          <h2 className="text-base font-semibold text-ink-strong">
             Assigned Employees
           </h2>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-ink-muted">
             Employees whose current schedule assignment resolves to this shift.
           </p>
         </div>
@@ -248,23 +248,23 @@ export default function ShiftDetailPage() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[700px] text-left">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50">
-                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <tr className="border-b border-line bg-surface-muted">
+                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                     Employee
                   </th>
-                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                     Effective From
                   </th>
-                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                     Effective To
                   </th>
-                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                     Current
                   </th>
                 </tr>
               </thead>
 
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-line-soft">
                 {assignments.map((assignment) => {
                   const employee = employees.get(assignment.employee);
 
@@ -274,24 +274,24 @@ export default function ShiftDetailPage() {
                         {employee ? (
                           <Link
                             href={`/hr/employees/${employee.id}`}
-                            className="font-medium text-slate-900 hover:underline"
+                            className="font-medium text-ink-strong hover:underline"
                           >
                             {employeesApi.employeeDisplayName(employee)}
                           </Link>
                         ) : (
-                          <span className="text-slate-500">{EM_DASH}</span>
+                          <span className="text-ink-muted">{EM_DASH}</span>
                         )}
 
-                        <p className="mt-1 text-xs text-slate-500">
+                        <p className="mt-1 text-xs text-ink-muted">
                           {employee?.employee_number ?? EM_DASH}
                         </p>
                       </td>
 
-                      <td className="px-5 py-4 text-sm text-slate-700">
+                      <td className="px-5 py-4 text-sm text-ink">
                         {formatDate(assignment.effective_from)}
                       </td>
 
-                      <td className="px-5 py-4 text-sm text-slate-700">
+                      <td className="px-5 py-4 text-sm text-ink">
                         {assignment.effective_to
                           ? formatDate(assignment.effective_to)
                           : EM_DASH}
@@ -311,16 +311,16 @@ export default function ShiftDetailPage() {
         )}
       </section>
 
-      <section className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4">
+      <section className="rounded-xl border border-line bg-surface-muted px-5 py-4">
         <div className="flex items-start gap-3">
-          <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-slate-600" />
+          <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-ink-muted" />
 
           <div>
-            <p className="text-sm font-semibold text-slate-800">
+            <p className="text-sm font-semibold text-ink">
               Schedule-aware attendance
             </p>
 
-            <p className="mt-1 text-sm leading-6 text-slate-600">
+            <p className="mt-1 text-sm leading-6 text-ink-muted">
               Clock events resolve the employee&apos;s effective schedule and
               are classified against this shift&apos;s start time and grace
               period. Lateness, early departure and overtime are all derived by
@@ -347,16 +347,16 @@ function SummaryCard({
   icon: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5">
+    <div className="rounded-xl border border-line bg-surface p-5">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500">{title}</p>
+        <p className="text-sm text-ink-muted">{title}</p>
 
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-surface-sunken text-ink">
           {icon}
         </span>
       </div>
 
-      <p className="mt-3 text-2xl font-bold text-slate-900">{value}</p>
+      <p className="mt-3 text-2xl font-bold text-ink-strong">{value}</p>
     </div>
   );
 }
@@ -364,8 +364,8 @@ function SummaryCard({
 function RuleRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between px-5 py-3.5">
-      <dt className="text-sm text-slate-600">{label}</dt>
-      <dd className="text-sm font-medium text-slate-900">{value}</dd>
+      <dt className="text-sm text-ink-muted">{label}</dt>
+      <dd className="text-sm font-medium text-ink-strong">{value}</dd>
     </div>
   );
 }

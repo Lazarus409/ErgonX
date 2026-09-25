@@ -79,7 +79,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <div className={cx("min-h-screen min-w-0 transition-[padding] duration-[220ms] ease-standard", sidebarCollapsed ? "lg:pl-[var(--shell-sidebar-collapsed)]" : "lg:pl-[var(--shell-sidebar-expanded)]")}>
           <TopBar onOpenSidebar={() => setMobileNavigationOpen(true)} />
           <main id="main-content" data-shell-main tabIndex={-1} className="px-4 pb-16 pt-6 outline-none sm:px-6 sm:pt-8 xl:px-10">
-            <div className="mx-auto w-full max-w-[1440px] min-w-0">{children}</div>
+            <div className="mx-auto w-full max-w-[1360px] min-w-0">{children}</div>
           </main>
         </div>
       </div>

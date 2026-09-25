@@ -34,7 +34,7 @@ export default function Alert({ tone = "info", title, children, actions, onDismi
         {actions && <div className="mt-3 flex flex-wrap gap-2">{actions}</div>}
       </div>
       {onDismiss && (
-        <button type="button" onClick={onDismiss} aria-label="Dismiss" className="-m-1 rounded-lg p-1 text-ink-muted hover:bg-black/5 hover:text-ink-strong">
+        <button type="button" onClick={onDismiss} aria-label="Dismiss" className="-m-1 rounded-lg p-1 text-ink-muted hover:bg-surface-hover hover:text-ink-strong">
           <X className="h-4 w-4" />
         </button>
       )}

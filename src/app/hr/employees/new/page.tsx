@@ -11,6 +11,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import ErrorState from "@/components/ui/ErrorState";
 import BackNavigation from "@/components/ui/BackNavigation";
+import PageHeader from "@/components/ui/PageHeader";
 import {
   employeesApi,
   getApiErrorMessage,
@@ -19,6 +20,7 @@ import {
 } from "@/lib/api";
 import type { OrganizationLookups } from "@/lib/api/organization";
 import type { EmploymentType, Gender } from "@/types/hr";
+import { buttonClasses } from "@/components/ui/Button";
 
 type FormData = {
   firstName: string;
@@ -280,27 +282,24 @@ export default function CreateEmployeePage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div className="space-y-3">
-        <BackNavigation fallback="/hr/employees" label="Back to employees" />
-        <div>
-          <p className="text-sm text-slate-500">HR / Employees</p>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Add Employee
-          </h1>
-        </div>
-      </div>
+      <PageHeader
+        back={<BackNavigation fallback="/hr/employees" label="Back to employees" />}
+        breadcrumbs={[{ label: "Employees", href: "/hr/employees" }, { label: "Add employee" }]}
+        title="Add Employee"
+        description="Create the employee record. Documents and emergency contacts can be added from the profile afterwards."
+      />
 
       {saved && (
-        <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100">
-            <Check className="h-4 w-4 text-emerald-700" />
+        <div className="flex items-start gap-3 rounded-xl border border-success/25 bg-success-soft p-4">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-success-soft">
+            <Check className="h-4 w-4 text-success-ink" />
           </div>
 
           <div>
-            <p className="text-sm font-semibold text-emerald-900">
+            <p className="text-sm font-semibold text-success-ink">
               Employee record saved
             </p>
-            <p className="mt-0.5 text-sm text-emerald-700">
+            <p className="mt-0.5 text-sm text-success-ink">
               {invitationStatus ?? "The employee and their current employment assignment have been saved."}
             </p>
           </div>
@@ -319,12 +318,12 @@ export default function CreateEmployeePage() {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 px-6 py-5">
-            <h2 className="text-base font-semibold text-slate-900">
+        <section className="rounded-xl border border-line bg-surface shadow-sm">
+          <div className="border-b border-line px-6 py-5">
+            <h2 className="text-base font-semibold text-ink-strong">
               Personal Details
             </h2>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-ink-muted">
               Enter the employee&apos;s basic personal information.
             </p>
           </div>
@@ -363,12 +362,12 @@ export default function CreateEmployeePage() {
           </div>
         </section>
 
-        <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 px-6 py-5">
-            <h2 className="text-base font-semibold text-slate-900">
+        <section className="rounded-xl border border-line bg-surface shadow-sm">
+          <div className="border-b border-line px-6 py-5">
+            <h2 className="text-base font-semibold text-ink-strong">
               Contact Details
             </h2>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-ink-muted">
               Provide the employee&apos;s primary contact information.
             </p>
           </div>
@@ -393,12 +392,12 @@ export default function CreateEmployeePage() {
           </div>
         </section>
 
-        <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 px-6 py-5">
-            <h2 className="text-base font-semibold text-slate-900">
+        <section className="rounded-xl border border-line bg-surface shadow-sm">
+          <div className="border-b border-line px-6 py-5">
+            <h2 className="text-base font-semibold text-ink-strong">
               Employee Details
             </h2>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-ink-muted">
               Assign the employee to the organisation and record their
               employment details.
             </p>
@@ -482,12 +481,12 @@ export default function CreateEmployeePage() {
           </div>
         </section>
 
-        <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 px-6 py-5">
-            <h2 className="text-base font-semibold text-slate-900">
+        <section className="rounded-xl border border-line bg-surface shadow-sm">
+          <div className="border-b border-line px-6 py-5">
+            <h2 className="text-base font-semibold text-ink-strong">
               Account Invitation
             </h2>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-ink-muted">
               An employee does not need a user account to exist in ErgonX.
               You can optionally invite them to use employee self-service.
             </p>
@@ -501,14 +500,14 @@ export default function CreateEmployeePage() {
                 onChange={(event) =>
                   updateField("inviteAccount", event.target.checked)
                 }
-                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400"
+                className="mt-0.5 h-4 w-4 rounded border-line-strong text-ink-strong focus:ring-primary/15"
               />
 
               <span>
-                <span className="block text-sm font-medium text-slate-900">
+                <span className="block text-sm font-medium text-ink-strong">
                   Invite employee to create an account
                 </span>
-                <span className="mt-1 block text-sm text-slate-500">
+                <span className="mt-1 block text-sm text-ink-muted">
                   The employee can later use self-service features such as
                   leave, attendance and payslips when enabled and authorised.
                 </span>
@@ -517,10 +516,10 @@ export default function CreateEmployeePage() {
           </div>
         </section>
 
-        <div className="flex flex-col-reverse gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col-reverse gap-3 border-t border-line pt-5 sm:flex-row sm:items-center sm:justify-between">
           <Link
             href="/hr/employees"
-            className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            className={buttonClasses({ variant: "secondary" })}
           >
             Cancel
           </Link>
@@ -534,7 +533,7 @@ export default function CreateEmployeePage() {
                 setSaved(false);
               }}
               disabled={submitting}
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              className={buttonClasses({ variant: "secondary" })}
             >
               Clear Form
             </button>
@@ -542,7 +541,7 @@ export default function CreateEmployeePage() {
             <button
               type="submit"
               disabled={submitting || lookupsLoading || Boolean(lookupsError)}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
+              className={buttonClasses({ variant: "primary" })}
             >
               <Save className="h-4 w-4" />
               {submitting ? "Creating..." : "Create Employee"}
@@ -575,14 +574,14 @@ function Field({
 }) {
   return (
     <div>
-      <label className="mb-1.5 block text-sm font-medium text-slate-700">
+      <label className="mb-1.5 block text-sm font-medium text-ink">
         {label}
-        {required && <span className="ml-1 text-red-500">*</span>}
+        {required && <span className="ml-1 text-danger-ink">*</span>}
       </label>
 
       <div className="relative">
         {icon && (
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-subtle">
             {icon}
           </span>
         )}
@@ -592,18 +591,18 @@ function Field({
           value={value}
           placeholder={placeholder}
           onChange={(event) => onChange(event.target.value)}
-          className={`h-10 w-full rounded-lg border bg-white px-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:ring-2 ${
+          className={`h-10 w-full rounded-lg border bg-surface px-3 text-sm text-ink-strong outline-none transition placeholder:text-ink-subtle focus:ring-2 ${
             icon ? "pl-10" : ""
           } ${
             error
-              ? "border-red-300 focus:border-red-400 focus:ring-red-100"
-              : "border-slate-300 focus:border-slate-500 focus:ring-slate-200"
+              ? "border-danger/40 focus:border-danger focus:ring-danger/15"
+              : "border-line-strong focus:border-primary focus:ring-primary/15"
           }`}
         />
       </div>
 
       {error && (
-        <p className="mt-1 text-xs text-red-600">
+        <p className="mt-1 text-xs text-danger-ink">
           {error}
         </p>
       )}
@@ -628,19 +627,19 @@ function SelectField({
 }) {
   return (
     <div>
-      <label className="mb-1.5 block text-sm font-medium text-slate-700">
+      <label className="mb-1.5 block text-sm font-medium text-ink">
         {label}
-        {required && <span className="ml-1 text-red-500">*</span>}
+        {required && <span className="ml-1 text-danger-ink">*</span>}
       </label>
 
       <div className="relative">
         <select
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className={`h-10 w-full appearance-none rounded-lg border bg-white px-3 pr-9 text-sm text-slate-900 outline-none transition focus:ring-2 ${
+          className={`h-10 w-full appearance-none rounded-lg border bg-surface px-3 pr-9 text-sm text-ink-strong outline-none transition focus:ring-2 ${
             error
-              ? "border-red-300 focus:border-red-400 focus:ring-red-100"
-              : "border-slate-300 focus:border-slate-500 focus:ring-slate-200"
+              ? "border-danger/40 focus:border-danger focus:ring-danger/15"
+              : "border-line-strong focus:border-primary focus:ring-primary/15"
           }`}
         >
           <option value="">Select {label.toLowerCase()}</option>
@@ -652,11 +651,11 @@ function SelectField({
           ))}
         </select>
 
-        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-subtle" />
       </div>
 
       {error && (
-        <p className="mt-1 text-xs text-red-600">
+        <p className="mt-1 text-xs text-danger-ink">
           {error}
         </p>
       )}

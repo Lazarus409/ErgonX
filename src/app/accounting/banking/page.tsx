@@ -10,6 +10,7 @@ import { accountingApi, getApiErrorMessage } from "@/lib/api";
 import { formatAmount, formatDate } from "@/lib/format";
 import { useApiResource } from "@/lib/useApiResource";
 import { MAX_PAGE_SIZE } from "@/types/api";
+import { buttonClasses } from "@/components/ui/Button";
 
 export default function BankingPage() {
   const [creating, setCreating] = useState<"payment" | "receipt" | null>(null);
@@ -149,7 +150,7 @@ export default function BankingPage() {
                 setFormError("");
                 setCreating("receipt");
               }}
-              className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white"
+              className={buttonClasses({ variant: "primary" })}
             >
               <Plus className="h-4 w-4" />
               Record Receipt
@@ -159,17 +160,17 @@ export default function BankingPage() {
       />
       {error && <ErrorState message={error} onRetry={reload} />}
       {voidError && (
-        <p className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+        <p className="rounded border border-danger/25 bg-danger-soft p-3 text-sm text-danger-ink">
           {voidError}
         </p>
       )}
       {bankFormOpen && <BankAccountForm onClose={() => setBankFormOpen(false)} onSaved={() => { setBankFormOpen(false); reload(); }} />}
-      <section className="rounded-2xl border bg-white p-5">
+      <section className="rounded-2xl border bg-surface p-5">
         <h2 className="font-semibold">Bank Accounts</h2>
         <div className="mt-5 overflow-x-auto">
           <table className="w-full min-w-[650px] text-sm">
             <thead>
-              <tr className="border-b text-left text-xs uppercase text-slate-500">
+              <tr className="border-b text-left text-xs uppercase text-ink-muted">
                 <th className="pb-3">Account</th>
                 <th className="pb-3">Bank</th>
                 <th className="pb-3">Account Number</th>
@@ -238,7 +239,7 @@ export default function BankingPage() {
         }}
       />
       <Reconciliation />
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-ink-muted">
         Balances and allocations are not shown because the available backend
         resources do not expose them. Payment and receipt state is derived by
         the backend.
@@ -265,7 +266,7 @@ export default function BankingPage() {
         />
       )}
       {voiding && (
-        <div className="rounded-2xl border bg-white p-5">
+        <div className="rounded-2xl border bg-surface p-5">
           <label className="block max-w-sm text-sm font-medium">
             Void date
             <input
@@ -334,18 +335,18 @@ function CashModal({
   });
   const update = (change: Partial<CashForm>) => setForm({ ...form, ...change });
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
+      <div className="w-full max-w-lg rounded-2xl bg-surface shadow-xl">
         <div className="border-b p-5">
           <h2 className="text-lg font-bold">
             Record {kind === "payment" ? "Payment" : "Receipt"}
           </h2>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-ink-muted">
             The backend immediately posts the controlled cash journal.
           </p>
         </div>
         {error && (
-          <p className="mx-5 mt-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <p className="mx-5 mt-4 rounded border border-danger/25 bg-danger-soft p-3 text-sm text-danger-ink">
             {error}
           </p>
         )}
@@ -405,7 +406,7 @@ function CashModal({
               value={form.bank_account}
               disabled={form.method === "CASH"}
               onChange={(event) => update({ bank_account: event.target.value })}
-              className="w-full rounded border p-2 disabled:bg-slate-100"
+              className="w-full rounded border p-2 disabled:bg-surface-muted"
             >
               <option value="">
                 {form.method === "CASH"
@@ -452,7 +453,7 @@ function CashModal({
             type="button"
             onClick={() => onSave(form)}
             disabled={saving}
-            className="rounded bg-slate-900 px-4 py-2 text-white disabled:opacity-50"
+            className={buttonClasses({ variant: "primary" })}
           >
             {saving
               ? "Saving..."
@@ -487,7 +488,7 @@ function Input({
   );
 }
 
-function BankAccountForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) { const [form, setForm] = useState({ name: "", bank_name: "", masked_account_number: "", currency: "", ledger_account: "", is_active: true }); const [error, setError] = useState(""); const [saving, setSaving] = useState(false); const { data } = useApiResource(() => accountingApi.listAccounts({ page_size: MAX_PAGE_SIZE, is_active: true, is_postable: true })); const save = async () => { if (!form.name.trim() || !form.bank_name.trim() || !form.masked_account_number.trim() || !form.currency || !form.ledger_account) { setError("Complete every bank account field."); return; } setSaving(true); try { await accountingApi.createBankAccount({ ...form, name: form.name.trim(), bank_name: form.bank_name.trim(), masked_account_number: form.masked_account_number.trim(), currency: form.currency.toUpperCase() }); onSaved(); } catch (caught) { setError(getApiErrorMessage(caught)); } finally { setSaving(false); } }; return <div className="rounded-2xl border bg-white p-5"><h2 className="font-semibold">New Bank Account</h2>{error && <p className="mt-3 text-sm text-red-700">{error}</p>}<div className="mt-4 grid gap-3 sm:grid-cols-2"><input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Account name" className="rounded border p-2" /><input value={form.bank_name} onChange={(event) => setForm({ ...form, bank_name: event.target.value })} placeholder="Bank name" className="rounded border p-2" /><input value={form.masked_account_number} onChange={(event) => setForm({ ...form, masked_account_number: event.target.value })} placeholder="Masked account number" className="rounded border p-2" /><input value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value.toUpperCase() })} placeholder="Currency" className="rounded border p-2" /><select value={form.ledger_account} onChange={(event) => setForm({ ...form, ledger_account: event.target.value })} className="rounded border p-2 sm:col-span-2"><option value="">Cash/bank ledger account</option>{(data?.results ?? []).map((account) => <option key={account.id} value={account.id}>{account.code} — {account.name}</option>)}</select></div><div className="mt-4 flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded border px-3 py-2">Cancel</button><button type="button" disabled={saving} onClick={() => void save()} className="rounded bg-slate-900 px-3 py-2 text-white">{saving ? "Saving..." : "Create Account"}</button></div></div>; }
+function BankAccountForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) { const [form, setForm] = useState({ name: "", bank_name: "", masked_account_number: "", currency: "", ledger_account: "", is_active: true }); const [error, setError] = useState(""); const [saving, setSaving] = useState(false); const { data } = useApiResource(() => accountingApi.listAccounts({ page_size: MAX_PAGE_SIZE, is_active: true, is_postable: true })); const save = async () => { if (!form.name.trim() || !form.bank_name.trim() || !form.masked_account_number.trim() || !form.currency || !form.ledger_account) { setError("Complete every bank account field."); return; } setSaving(true); try { await accountingApi.createBankAccount({ ...form, name: form.name.trim(), bank_name: form.bank_name.trim(), masked_account_number: form.masked_account_number.trim(), currency: form.currency.toUpperCase() }); onSaved(); } catch (caught) { setError(getApiErrorMessage(caught)); } finally { setSaving(false); } }; return <div className="rounded-2xl border bg-surface p-5"><h2 className="font-semibold">New Bank Account</h2>{error && <p className="mt-3 text-sm text-danger-ink">{error}</p>}<div className="mt-4 grid gap-3 sm:grid-cols-2"><input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="Account name" className="rounded border p-2" /><input value={form.bank_name} onChange={(event) => setForm({ ...form, bank_name: event.target.value })} placeholder="Bank name" className="rounded border p-2" /><input value={form.masked_account_number} onChange={(event) => setForm({ ...form, masked_account_number: event.target.value })} placeholder="Masked account number" className="rounded border p-2" /><input value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value.toUpperCase() })} placeholder="Currency" className="rounded border p-2" /><select value={form.ledger_account} onChange={(event) => setForm({ ...form, ledger_account: event.target.value })} className="rounded border p-2 sm:col-span-2"><option value="">Cash/bank ledger account</option>{(data?.results ?? []).map((account) => <option key={account.id} value={account.id}>{account.code} — {account.name}</option>)}</select></div><div className="mt-4 flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded border px-3 py-2">Cancel</button><button type="button" disabled={saving} onClick={() => void save()} className={buttonClasses({ variant: "primary", size: "sm" })}>{saving ? "Saving..." : "Create Account"}</button></div></div>; }
 function Transactions({
   title,
   rows,
@@ -510,12 +511,12 @@ function Transactions({
   onVoid: (row: { id: string; number: string }) => void;
 }) {
   return (
-    <section className="rounded-2xl border bg-white p-5">
+    <section className="rounded-2xl border bg-surface p-5">
       <h2 className="font-semibold">{title}</h2>
       <div className="mt-5 overflow-x-auto">
         <table className="w-full min-w-[700px] text-sm">
           <thead>
-            <tr className="border-b text-left text-xs uppercase text-slate-500">
+            <tr className="border-b text-left text-xs uppercase text-ink-muted">
               <th className="pb-3">Reference</th>
               <th className="pb-3">Date</th>
               <th className="pb-3">Bank Account</th>
@@ -550,12 +551,12 @@ function Transactions({
           </tbody>
         </table>
         {loading && (
-          <p className="py-8 text-center text-sm text-slate-500">
+          <p className="py-8 text-center text-sm text-ink-muted">
             Loading transactions...
           </p>
         )}
         {!loading && !rows.length && (
-          <p className="py-8 text-center text-sm text-slate-500">{empty}</p>
+          <p className="py-8 text-center text-sm text-ink-muted">{empty}</p>
         )}
       </div>
     </section>
@@ -601,11 +602,11 @@ function Reconciliation() {
     }
   };
   return (
-    <section className="rounded-2xl border bg-white p-5">
+    <section className="rounded-2xl border bg-surface p-5">
       <div className="flex items-start justify-between gap-4">
         <div>
         <h2 className="font-semibold">Bank Reconciliation</h2>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-1 text-sm text-ink-muted">
           Match each imported statement movement to one posted journal with the
           same bank-ledger amount.
         </p>
@@ -615,14 +616,14 @@ function Reconciliation() {
       {importing && <StatementImport onClose={() => setImporting(false)} onSaved={() => { setImporting(false); reload(); }} />}
       {error && <ErrorState message={error} onRetry={reload} />}
       {actionError && (
-        <p className="mt-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+        <p className="mt-4 rounded border border-danger/25 bg-danger-soft p-3 text-sm text-danger-ink">
           {actionError}
         </p>
       )}
       <div className="mt-5 overflow-x-auto">
         <table className="w-full min-w-[900px] text-sm">
           <thead>
-            <tr className="border-b text-left text-xs uppercase text-slate-500">
+            <tr className="border-b text-left text-xs uppercase text-ink-muted">
               <th className="pb-3">Date</th>
               <th className="pb-3">External ID</th>
               <th className="pb-3">Amount</th>
@@ -636,7 +637,7 @@ function Reconciliation() {
                 <td className="py-4">{formatDate(line.statement_date)}</td>
                 <td className="py-4">
                   <p className="font-medium">{line.external_id}</p>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-ink-muted">
                     {line.reference || line.description}
                   </p>
                 </td>
@@ -690,12 +691,12 @@ function Reconciliation() {
           </tbody>
         </table>
         {loading && (
-          <p className="py-8 text-center text-sm text-slate-500">
+          <p className="py-8 text-center text-sm text-ink-muted">
             Loading statement lines...
           </p>
         )}
         {!loading && !lines.length && (
-          <p className="py-8 text-center text-sm text-slate-500">
+          <p className="py-8 text-center text-sm text-ink-muted">
             No imported statement lines found.
           </p>
         )}
@@ -709,5 +710,5 @@ function StatementImport({ onClose, onSaved }: { onClose: () => void; onSaved: (
   const [error, setError] = useState(""); const [saving, setSaving] = useState(false);
   const { data } = useApiResource(() => accountingApi.listBankAccounts({ page_size: MAX_PAGE_SIZE, is_active: true }));
   const save = async () => { if (!form.bank_account || !form.external_id.trim() || !form.amount || !form.currency.trim()) { setError("Bank account, external ID, amount, and currency are required."); return; } setSaving(true); try { await accountingApi.createBankStatementLine({ ...form, external_id: form.external_id.trim(), currency: form.currency.trim().toUpperCase() }); onSaved(); } catch (caught) { setError(getApiErrorMessage(caught)); } finally { setSaving(false); } };
-  return <div className="mt-4 rounded-xl border bg-slate-50 p-4"><p className="font-medium">Import statement line</p>{error && <p className="mt-2 text-sm text-red-700">{error}</p>}<div className="mt-3 grid gap-3 sm:grid-cols-2"><select value={form.bank_account} onChange={(event) => setForm({ ...form, bank_account: event.target.value })} className="rounded border p-2"><option value="">Bank account</option>{(data?.results ?? []).map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select><input type="date" value={form.statement_date} onChange={(event) => setForm({ ...form, statement_date: event.target.value })} className="rounded border p-2" /><input value={form.external_id} onChange={(event) => setForm({ ...form, external_id: event.target.value })} placeholder="Bank external ID" className="rounded border p-2" /><input type="number" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} placeholder="Amount (+/-)" className="rounded border p-2" /><input value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value.toUpperCase() })} placeholder="Currency" className="rounded border p-2" /><input value={form.reference} onChange={(event) => setForm({ ...form, reference: event.target.value })} placeholder="Reference (optional)" className="rounded border p-2" /><input value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Description (optional)" className="rounded border p-2 sm:col-span-2" /></div><div className="mt-3 flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded border px-3 py-2 text-sm">Cancel</button><button type="button" onClick={() => void save()} disabled={saving} className="rounded bg-slate-900 px-3 py-2 text-sm text-white">{saving ? "Importing..." : "Import"}</button></div></div>;
+  return <div className="mt-4 rounded-xl border bg-surface-muted p-4"><p className="font-medium">Import statement line</p>{error && <p className="mt-2 text-sm text-danger-ink">{error}</p>}<div className="mt-3 grid gap-3 sm:grid-cols-2"><select value={form.bank_account} onChange={(event) => setForm({ ...form, bank_account: event.target.value })} className="rounded border p-2"><option value="">Bank account</option>{(data?.results ?? []).map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}</select><input type="date" value={form.statement_date} onChange={(event) => setForm({ ...form, statement_date: event.target.value })} className="rounded border p-2" /><input value={form.external_id} onChange={(event) => setForm({ ...form, external_id: event.target.value })} placeholder="Bank external ID" className="rounded border p-2" /><input type="number" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} placeholder="Amount (+/-)" className="rounded border p-2" /><input value={form.currency} onChange={(event) => setForm({ ...form, currency: event.target.value.toUpperCase() })} placeholder="Currency" className="rounded border p-2" /><input value={form.reference} onChange={(event) => setForm({ ...form, reference: event.target.value })} placeholder="Reference (optional)" className="rounded border p-2" /><input value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Description (optional)" className="rounded border p-2 sm:col-span-2" /></div><div className="mt-3 flex justify-end gap-2"><button type="button" onClick={onClose} className="rounded border px-3 py-2 text-sm">Cancel</button><button type="button" onClick={() => void save()} disabled={saving} className={buttonClasses({ variant: "primary" })}>{saving ? "Importing..." : "Import"}</button></div></div>;
 }

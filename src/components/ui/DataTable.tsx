@@ -71,11 +71,11 @@ export function DataTable<Row>({ columns, rows, rowKey, loading, error, onRetry,
     });
   }, [rows, sort, columns]);
 
-  const cellPad = density === "compact" ? "px-4 py-2.5" : "px-5 py-3.5";
+  const cellPad = density === "compact" ? "px-4 py-2" : "px-4 py-3";
 
   return (
     <section className={cx("min-w-0 overflow-hidden rounded-2xl border border-line bg-surface shadow-elevation-1", className)}>
-      {toolbar && <div className="border-b border-line-soft p-4">{toolbar}</div>}
+      {toolbar && <div className="border-b border-line-soft px-4 py-3">{toolbar}</div>}
       {error ? (
         <div className="p-5"><ErrorState message={error} onRetry={onRetry} variant="inline" /></div>
       ) : (
@@ -94,8 +94,8 @@ export function DataTable<Row>({ columns, rows, rowKey, loading, error, onRetry,
                       aria-sort={active ? (sort.direction === "asc" ? "ascending" : "descending") : undefined}
                       style={column.width ? { width: column.width } : undefined}
                       className={cx(
-                        "sticky top-0 z-10 border-b border-line bg-surface-muted/95 text-left text-caption font-semibold text-ink-muted backdrop-blur",
-                        density === "compact" ? "px-4 py-2.5" : "px-5 py-3",
+                        "sticky top-0 z-10 border-b border-line bg-surface-muted/90 text-left text-caption font-medium text-ink-muted backdrop-blur",
+                        density === "compact" ? "px-4 py-2" : "px-4 py-2.5",
                         column.numeric && "text-right",
                         column.hideBelow && hideClasses[column.hideBelow],
                       )}
@@ -160,7 +160,7 @@ export function DataTable<Row>({ columns, rows, rowKey, loading, error, onRetry,
           </table>
         </div>
       )}
-      {footer && <div className="border-t border-line-soft px-5 py-3">{footer}</div>}
+      {footer && <div className="border-t border-line-soft px-4 py-2.5">{footer}</div>}
     </section>
   );
 }
@@ -182,7 +182,7 @@ export function DataToolbar({ search, onSearchChange, searchPlaceholder = "Searc
             onChange={(event) => onSearchChange(event.target.value)}
             placeholder={searchPlaceholder}
             aria-label={searchPlaceholder}
-            className="h-10 w-full rounded-xl border border-line-strong bg-surface pl-9 pr-9 text-sm text-ink-strong placeholder:text-ink-subtle focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/15"
+            className="h-9 w-full rounded-lg border border-line-strong bg-surface pl-9 pr-9 text-sm text-ink-strong placeholder:text-ink-subtle focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/15"
           />
           {search && (
             <button type="button" onClick={() => onSearchChange("")} aria-label="Clear search" className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-ink-subtle hover:text-ink-strong">

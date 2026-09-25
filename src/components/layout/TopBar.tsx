@@ -223,13 +223,13 @@ export default function TopBar({ onOpenSidebar }: TopBarProps) {
     }
   };
 
-  const iconButton = "relative inline-flex h-10 w-10 items-center justify-center rounded-xl text-ink-muted transition-colors duration-150 hover:bg-surface-hover hover:text-ink-strong";
+  const iconButton = "relative inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-surface-hover hover:text-ink-strong";
 
   return (
-    <header data-shell-chrome className="sticky top-0 z-30 h-16 border-b border-line/80 bg-surface/85 backdrop-blur-xl supports-[backdrop-filter]:bg-surface/75">
+    <header data-shell-chrome className="sticky top-0 z-30 h-14 border-b border-line/80 bg-surface/85 backdrop-blur-xl supports-[backdrop-filter]:bg-surface/75">
       <div className="relative flex h-full items-center gap-2 px-4 sm:gap-3 sm:px-6 xl:px-8">
         <button type="button" onClick={onOpenSidebar} className={cx(iconButton, "lg:hidden")} aria-label="Open navigation">
-          <Menu className="h-5 w-5" />
+          <Menu className="h-[18px] w-[18px]" />
         </button>
 
         {/* Context identity: tenant + current area */}
@@ -251,7 +251,7 @@ export default function TopBar({ onOpenSidebar }: TopBarProps) {
           type="button"
           data-search-trigger
           onClick={(event) => { event.stopPropagation(); openSearch(); }}
-          className="hidden h-10 w-64 items-center gap-2.5 rounded-xl border border-line bg-surface-muted/70 px-3 text-left text-sm text-ink-subtle transition-colors hover:border-line-strong hover:bg-surface md:flex xl:w-80"
+          className="hidden h-9 w-64 items-center gap-2.5 rounded-lg border border-line bg-surface-muted/70 px-3 text-left text-sm text-ink-subtle transition-colors hover:border-line-strong hover:bg-surface md:flex xl:w-80"
           aria-label="Search (Ctrl+K)"
         >
           <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -259,15 +259,15 @@ export default function TopBar({ onOpenSidebar }: TopBarProps) {
           <kbd className="rounded-md border border-line bg-surface px-1.5 py-0.5 font-sans text-[0.6875rem] font-semibold text-ink-muted">Ctrl K</kbd>
         </button>
         <button type="button" data-search-trigger onClick={(event) => { event.stopPropagation(); openSearch(); }} className={cx(iconButton, "md:hidden")} aria-label="Search">
-          <Search className="h-5 w-5" />
+          <Search className="h-[18px] w-[18px]" />
         </button>
 
         <span className={cx(iconButton, "hidden cursor-help sm:inline-flex")} title="Help and support is not configured for this release." aria-label="Help and support is not configured for this release" role="img">
-          <CircleHelp className="h-5 w-5" />
+          <CircleHelp className="h-[18px] w-[18px]" />
         </span>
 
         <button type="button" onClick={toggleTheme} className={cx(iconButton, "hidden sm:inline-flex")} title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}>
-          {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          {theme === "dark" ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
         </button>
 
         {/* Notifications */}
@@ -289,7 +289,7 @@ export default function TopBar({ onOpenSidebar }: TopBarProps) {
             aria-expanded={notificationsOpen}
             aria-haspopup="dialog"
           >
-            <Bell className="h-5 w-5" />
+            <Bell className="h-[18px] w-[18px]" />
             {unreadNotificationCount > 0 && (
               <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[0.625rem] font-bold leading-none text-white ring-2 ring-surface">
                 {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
@@ -298,7 +298,7 @@ export default function TopBar({ onOpenSidebar }: TopBarProps) {
           </button>
 
           {notificationsOpen && (
-            <div role="dialog" aria-label="Notifications" className="absolute right-0 top-12 w-[min(calc(100vw-2rem),22rem)] origin-top-right animate-pop-in overflow-hidden rounded-2xl border border-line bg-surface shadow-overlay">
+            <div role="dialog" aria-label="Notifications" className="absolute right-0 top-11 w-[min(calc(100vw-2rem),22rem)] origin-top-right animate-pop-in overflow-hidden rounded-2xl border border-line bg-surface shadow-overlay">
               <div className="flex items-center justify-between gap-3 border-b border-line-soft px-4 py-3.5">
                 <div>
                   <p className="text-sm font-semibold text-ink-strong">Notifications</p>
@@ -377,7 +377,7 @@ export default function TopBar({ onOpenSidebar }: TopBarProps) {
           </button>
 
           {profileOpen && (
-            <div role="menu" aria-label="Profile menu" className="absolute right-0 top-12 z-50 w-[min(calc(100vw-2rem),20rem)] origin-top-right animate-pop-in overflow-hidden rounded-2xl border border-line bg-surface shadow-overlay">
+            <div role="menu" aria-label="Profile menu" className="absolute right-0 top-11 z-50 w-[min(calc(100vw-2rem),20rem)] origin-top-right animate-pop-in overflow-hidden rounded-2xl border border-line bg-surface shadow-overlay">
               <div className="flex items-center gap-3 border-b border-line-soft p-4">
                 <Avatar name={fullName} size="md" />
                 <div className="min-w-0">

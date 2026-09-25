@@ -20,6 +20,7 @@ import { MAX_PAGE_SIZE } from "@/types/api";
 import type { Department, Employee, Employment } from "@/types/hr";
 import type { LeaveRequest, LeaveType } from "@/types/leave";
 import { toISODate } from "@/lib/format";
+import { buttonClasses } from "@/components/ui/Button";
 
 const ALL = "ALL";
 
@@ -258,11 +259,11 @@ export default function LeaveCalendarPage() {
         description="View approved and pending employee leave across the institution."
       />
 
-      <div className="flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-4 rounded-xl border border-line bg-surface p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={previousMonth}
-            className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+            className="flex h-10 w-10 items-center justify-center rounded-lg border border-line text-ink-muted hover:bg-surface-hover"
             aria-label="Previous month"
           >
             <ChevronLeft className="h-5 w-5" />
@@ -270,7 +271,7 @@ export default function LeaveCalendarPage() {
 
           <button
             onClick={nextMonth}
-            className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+            className="flex h-10 w-10 items-center justify-center rounded-lg border border-line text-ink-muted hover:bg-surface-hover"
             aria-label="Next month"
           >
             <ChevronRight className="h-5 w-5" />
@@ -278,20 +279,20 @@ export default function LeaveCalendarPage() {
 
           <button
             onClick={goToToday}
-            className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className={buttonClasses({ variant: "secondary" })}
           >
             Today
           </button>
 
           <div className="ml-1 flex items-center gap-2">
-            <CalendarDays className="h-5 w-5 text-slate-500" />
-            <h2 className="text-lg font-semibold text-slate-900">
+            <CalendarDays className="h-5 w-5 text-ink-muted" />
+            <h2 className="text-lg font-semibold text-ink-strong">
               {monthNames[month]} {year}
             </h2>
           </div>
 
           {loading && (
-            <span className="text-xs text-slate-400">Loading...</span>
+            <span className="text-xs text-ink-subtle">Loading...</span>
           )}
         </div>
 
@@ -300,7 +301,7 @@ export default function LeaveCalendarPage() {
             value={department}
             onChange={(event) => setDepartment(event.target.value)}
             aria-label="Filter by department"
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-slate-400"
+            className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink outline-none focus:border-primary"
           >
             <option value={ALL}>All Departments</option>
 
@@ -315,7 +316,7 @@ export default function LeaveCalendarPage() {
             value={leaveType}
             onChange={(event) => setLeaveType(event.target.value)}
             aria-label="Filter by leave type"
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-slate-400"
+            className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink outline-none focus:border-primary"
           >
             <option value={ALL}>All Types</option>
 
@@ -330,12 +331,12 @@ export default function LeaveCalendarPage() {
 
       {error && <ErrorState message={error} onRetry={retry} />}
 
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50">
+      <div className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
+        <div className="grid grid-cols-7 border-b border-line bg-surface-muted">
           {weekDays.map((day) => (
             <div
               key={day}
-              className="border-r border-slate-200 px-3 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500 last:border-r-0"
+              className="border-r border-line px-3 py-3 text-center text-xs font-semibold uppercase tracking-wide text-ink-muted last:border-r-0"
             >
               {day}
             </div>
@@ -355,25 +356,25 @@ export default function LeaveCalendarPage() {
             return (
               <div
                 key={`${dateString}-${index}`}
-                className={`min-h-[145px] border-r border-b border-slate-200 p-2 last:border-r-0 ${
-                  currentMonth ? "bg-white" : "bg-slate-50/70"
+                className={`min-h-[145px] border-r border-b border-line p-2 last:border-r-0 ${
+                  currentMonth ? "bg-surface" : "bg-surface-muted/70"
                 }`}
               >
                 <div className="mb-2 flex items-center justify-between">
                   <span
                     className={`flex h-7 w-7 items-center justify-center rounded-full text-sm ${
                       isToday
-                        ? "bg-slate-900 font-semibold text-white"
+                        ? "bg-primary font-semibold text-white"
                         : currentMonth
-                          ? "text-slate-700"
-                          : "text-slate-400"
+                          ? "text-ink"
+                          : "text-ink-subtle"
                     }`}
                   >
                     {date.getDate()}
                   </span>
 
                   {dayEvents.length > 0 && (
-                    <span className="text-xs text-slate-400">
+                    <span className="text-xs text-ink-subtle">
                       {dayEvents.length}
                     </span>
                   )}
@@ -389,16 +390,16 @@ export default function LeaveCalendarPage() {
                         href={`/leave/requests/${event.id}`}
                         className={`block rounded-md border px-2 py-1.5 text-left transition hover:shadow-sm ${
                           event.status === "APPROVED"
-                            ? "border-slate-200 bg-slate-50"
-                            : "border-amber-200 bg-amber-50"
+                            ? "border-line bg-surface-muted"
+                            : "border-warning/30 bg-warning-soft"
                         }`}
                       >
-                        <p className="truncate text-xs font-semibold text-slate-800">
+                        <p className="truncate text-xs font-semibold text-ink">
                           {employee
                             ? employeesApi.employeeDisplayName(employee)
                             : "Employee"}
                         </p>
-                        <p className="truncate text-[11px] text-slate-500">
+                        <p className="truncate text-[11px] text-ink-muted">
                           {leaveTypeNames.get(event.leave_type) ?? "Leave"}
                         </p>
                       </Link>
@@ -411,18 +412,18 @@ export default function LeaveCalendarPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex items-center gap-2 text-sm text-slate-600">
-          <span className="h-3 w-3 rounded-sm bg-slate-200" />
+      <div className="flex flex-wrap items-center gap-5 rounded-xl border border-line bg-surface p-4 shadow-sm">
+        <div className="flex items-center gap-2 text-sm text-ink-muted">
+          <span className="h-3 w-3 rounded-sm bg-line" />
           Approved Leave
         </div>
 
-        <div className="flex items-center gap-2 text-sm text-slate-600">
-          <span className="h-3 w-3 rounded-sm bg-amber-100 ring-1 ring-amber-200" />
+        <div className="flex items-center gap-2 text-sm text-ink-muted">
+          <span className="h-3 w-3 rounded-sm bg-warning-soft ring-1 border-warning/30" />
           Pending Leave
         </div>
 
-        <div className="ml-auto flex items-center gap-2 text-sm text-slate-500">
+        <div className="ml-auto flex items-center gap-2 text-sm text-ink-muted">
           <Users className="h-4 w-4" />
           {filteredEvents.length} leave request
           {filteredEvents.length !== 1 ? "s" : ""}

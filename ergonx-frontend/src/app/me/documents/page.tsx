@@ -2,11 +2,45 @@
 
 import { useEffect, useState } from "react";
 import { FileText } from "lucide-react";
+
+import { Badge } from "@/components/ui/Badge";
+import { IconTile } from "@/components/ui/Card";
+import EmptyState from "@/components/ui/EmptyState";
+import ErrorState from "@/components/ui/ErrorState";
+import PageHeader from "@/components/ui/PageHeader";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { employeesApi, getApiErrorMessage } from "@/lib/api";
+import { humanizeEnum } from "@/lib/format";
 import type { SelfServiceDocument } from "@/lib/api/employees";
 
 export default function MyDocumentsPage() {
-  const [items, setItems] = useState<SelfServiceDocument[]>([]); const [error, setError] = useState<string | null>(null);
-  useEffect(() => { employeesApi.listMyDocuments().then(setItems).catch((caught) => setError(getApiErrorMessage(caught))); }, []);
-  return <div className="mx-auto max-w-4xl space-y-6"><section className="rounded-2xl bg-slate-950 px-7 py-8 text-white shadow-lg"><p className="text-sm font-semibold text-sky-300">EMPLOYEE SELF-SERVICE</p><h1 className="mt-2 text-3xl font-bold">My documents</h1><p className="mt-2 text-slate-300">Documents shared with you by your organisation.</p></section>{error && <p className="rounded-xl bg-rose-50 p-4 text-rose-700">{error}</p>}<section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">{items.length ? items.map((item) => <div key={item.id} className="flex items-center gap-3 border-b border-slate-100 p-5 last:border-0"><FileText className="text-sky-700" /><div><p className="font-semibold text-slate-900">{item.original_filename}</p><p className="text-sm text-slate-500">{item.category || "Employee document"} · {item.classification}</p></div></div>) : <div className="p-10 text-center text-slate-500">No documents have been shared with you yet.</div>}</section></div>;
+  const [items, setItems] = useState<SelfServiceDocument[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => { employeesApi.listMyDocuments().then(setItems).catch((caught) => { setItems([]); setError(getApiErrorMessage(caught)); }); }, []);
+  return (
+    <div className="mx-auto max-w-4xl space-y-6">
+      <PageHeader title="My documents" description="Documents shared with you by your organisation." icon={FileText} accent="brand" />
+      {error && <ErrorState variant="inline" title="Unable to load your documents" message={error} />}
+      <section className="overflow-hidden rounded-2xl border border-line bg-surface shadow-elevation-1" aria-label="Documents">
+        {items === null ? (
+          <div className="space-y-3 p-5">{[0, 1, 2].map((index) => <Skeleton key={index} className="h-12 rounded-xl" />)}</div>
+        ) : items.length ? (
+          <ul className="divide-y divide-line-soft">
+            {items.map((item) => (
+              <li key={item.id} className="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-surface-hover">
+                <IconTile icon={FileText} accent="brand" size="sm" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold text-ink-strong" title={item.original_filename}>{item.original_filename}</p>
+                  <p className="text-caption text-ink-muted">{item.category || "Employee document"}</p>
+                </div>
+                <Badge size="sm" tone={item.classification === "RESTRICTED" ? "danger" : item.classification === "CONFIDENTIAL" ? "warning" : "neutral"}>{humanizeEnum(item.classification)}</Badge>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <EmptyState size="compact" icon={FileText} title="No documents yet" description="Documents shared with you by HR will appear here." />
+        )}
+      </section>
+    </div>
+  );
 }

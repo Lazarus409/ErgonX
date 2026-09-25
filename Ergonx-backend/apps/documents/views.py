@@ -58,7 +58,8 @@ class ImageAssetViewSet(TenantModelViewSet):
     http_method_names = ("get", "post", "delete", "head", "options")
 
     def get_queryset(self):
-        return super().get_queryset().filter(is_active=True)
+        # filter_backends omits OrderingFilter, so order explicitly for stable pagination.
+        return super().get_queryset().filter(is_active=True).order_by("-created_at", "id")
 
     @property
     def required_module(self):
@@ -80,6 +81,10 @@ class ImageAssetViewSet(TenantModelViewSet):
         if owner_type == ImageAsset.OwnerType.EMPLOYEE and Employee.objects.for_institution(self.request.institution).filter(id=owner_id, user=self.request.user).exists():
             return "home.view"
         if owner_type == ImageAsset.OwnerType.INSTITUTION and owner_id == str(self.request.institution.id):
+            # Every member sees the institution logo in the shell and on
+            # documents; only institution managers may replace or remove it.
+            if self.action in ("retrieve", "content"):
+                return "home.view"
             return "settings.institution.manage"
         return "employee.update"
 

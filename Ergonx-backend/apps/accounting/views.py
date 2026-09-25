@@ -641,7 +641,8 @@ class ExpenseViewSet(TenantModelViewSet):
 
 
 class PayrollAccountMappingTemplateViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = PayrollAccountMappingTemplate.objects.select_related("accounting_preset_version")
+    # Stable order so pagination never repeats or skips templates.
+    queryset = PayrollAccountMappingTemplate.objects.select_related("accounting_preset_version").order_by("accounting_preset_version_id", "payroll_component_code", "id")
     serializer_class = PayrollAccountMappingTemplateSerializer
     permission_classes = (TenantContextPermission, TenantRBACPermission)
     required_module = "ACCOUNTING"

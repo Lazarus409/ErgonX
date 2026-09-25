@@ -4,23 +4,32 @@ import Link from "next/link";
 import { BriefcaseBusiness, Building2, MapPin, UserCheck, UserMinus, UserPlus, Users } from "lucide-react";
 import { useCallback } from "react";
 
-import ErrorState from "@/components/ui/ErrorState";
+import ChartCard from "@/components/charts/ChartCard";
+import { BarsChart, DonutChart, donutLegend } from "@/components/charts/Charts";
+import { RankingBars, SegmentedBar } from "@/components/charts/Visuals";
 import { useAuth } from "@/components/guards/AuthProvider";
-import KPIStatCard from "@/components/ui/KPIStatCard";
+import { ButtonLink } from "@/components/ui/Button";
+import { ActionCard, Avatar, Card, MetricCard, SummaryList } from "@/components/ui/Card";
+import { DataTable } from "@/components/ui/DataTable";
+import ErrorState from "@/components/ui/ErrorState";
 import PageHeader from "@/components/ui/PageHeader";
 import { dashboardsApi } from "@/lib/api";
-import { EM_DASH, formatNumber } from "@/lib/format";
+import { EM_DASH, formatDate, formatNumber, humanizeEnum } from "@/lib/format";
 import { useApiResource } from "@/lib/useApiResource";
-import type { NamedCount } from "@/types/dashboards";
+import type { NamedCount, RecentHire } from "@/types/dashboards";
 import { hasModule } from "@/types/institutions";
 
-function label(value: string) {
-  return value.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
+const statusColors: Record<string, string> = {
+  ACTIVE: "var(--success)",
+  ON_LEAVE: "var(--mod-leave)",
+  PROBATION: "var(--chart-1)",
+  SUSPENDED: "var(--warning)",
+  TERMINATED: "var(--danger)",
+  INACTIVE: "var(--ink-subtle)",
+};
 
-function CountBars({ title, description, items, valueKey, tone = "bg-indigo-500" }: { title: string; description: string; items: NamedCount[]; valueKey: keyof NamedCount; tone?: string }) {
-  const maximum = Math.max(...items.map((item) => item.count), 1);
-  return <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"><h2 className="font-semibold text-slate-950">{title}</h2><p className="mt-1 text-sm text-slate-500">{description}</p>{items.length ? <div className="mt-6 space-y-4">{items.map((item) => { const name = String(item[valueKey] ?? "Not assigned"); return <div key={name}><div className="mb-1.5 flex justify-between gap-3 text-sm"><span className="truncate text-slate-600">{label(name)}</span><span className="font-semibold text-slate-950">{formatNumber(item.count)}</span></div><div className="h-2.5 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full ${tone}`} style={{ width: `${Math.max((item.count / maximum) * 100, 3)}%` }} /></div></div>; })}</div> : <p className="mt-6 text-sm text-slate-500">No current employment records are available.</p>}</section>;
+function named(items: NamedCount[] | undefined, key: keyof NamedCount) {
+  return (items ?? []).map((item) => ({ label: humanizeEnum(String(item[key] ?? "Not assigned")), value: item.count }));
 }
 
 /** Source-backed HR rollup. No workforce values are manufactured in the browser. */
@@ -28,19 +37,146 @@ export default function HRDashboardPage() {
   const { institution, user } = useAuth();
   const load = useCallback(() => dashboardsApi.getHrDashboard(), []);
   const { data, loading, error, reload } = useApiResource(load);
-  const placeholder = loading ? "…" : EM_DASH;
+  const initial = loading && !data;
   const statusCount = (status: string) => data?.by_status.find((item) => item.status === status)?.count ?? 0;
   const currentYear = new Date().getFullYear();
   const hiresThisYear = data?.by_hire_year.find((item) => item.year === currentYear)?.count ?? 0;
   const can = (permission: string) => hasModule(institution?.enabledModules, "HR") && (user?.permissions.includes("*") || user?.permissions.includes(permission));
   const quickActions = [
-    { href: "/hr/employees", label: "Employees", icon: Users, permission: "employee.view" },
-    { href: "/hr/departments", label: "Departments", icon: Building2, permission: "organization.view" },
-    { href: "/hr/positions", label: "Positions", icon: BriefcaseBusiness, permission: "organization.view" },
-    { href: "/hr/locations", label: "Locations", icon: MapPin, permission: "organization.view" },
+    { href: "/hr/employees", label: "Employees", description: "Records, employment and lifecycle", icon: Users, permission: "employee.view" },
+    { href: "/hr/departments", label: "Departments", description: "Organization structure", icon: Building2, permission: "organization.view" },
+    { href: "/hr/positions", label: "Positions", description: "Roles and reporting lines", icon: BriefcaseBusiness, permission: "organization.view" },
+    { href: "/hr/locations", label: "Locations", description: "Work sites", icon: MapPin, permission: "organization.view" },
   ].filter((action) => can(action.permission));
 
-  return <main className="space-y-6"><PageHeader title="HR Dashboard" description="Live workforce composition, staffing activity, and employee records for this institution." actions={<div className="flex flex-wrap gap-2">{can("employee.create") && <Link href="/hr/employees/new" className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700">Add employee</Link>}{can("employee.view") && <Link href="/hr/employees" className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">View employees</Link>}</div>} />{error && <ErrorState title="Unable to load HR dashboard" message={error} onRetry={reload} />}<section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><KPIStatCard title="Workforce" value={data ? formatNumber(data.total_employees) : placeholder} subtitle="Employee records" icon={<Users className="h-5 w-5 text-indigo-600" />} /><KPIStatCard title="Active employees" value={data ? formatNumber(data.active_employees) : placeholder} subtitle={data?.total_employees ? `${Math.round((data.active_employees / data.total_employees) * 100)}% of workforce` : "Current active records"} icon={<UserCheck className="h-5 w-5 text-emerald-600" />} /><KPIStatCard title="New hires" value={data ? formatNumber(hiresThisYear) : placeholder} subtitle={`Hired in ${currentYear}`} icon={<UserPlus className="h-5 w-5 text-sky-600" />} /><KPIStatCard title="Terminated" value={data ? formatNumber(statusCount("TERMINATED")) : placeholder} subtitle="Employee status records" icon={<UserMinus className="h-5 w-5 text-rose-600" />} /></section><section className="grid gap-5 xl:grid-cols-2"><CountBars title="Department distribution" description="Active employees with a current department." items={data?.by_department ?? []} valueKey="department__name" /><CountBars title="Grade distribution" description="Active employees with a current grade." items={data?.by_grade ?? []} valueKey="grade__name" tone="bg-violet-500" /></section><section className="grid gap-5 xl:grid-cols-2"><CountBars title="Location distribution" description="Active employees by current location." items={data?.by_location ?? []} valueKey="location__name" tone="bg-cyan-500" /><CountBars title="Employment type" description="Current active employments by type." items={data?.by_employment_type ?? []} valueKey="employment_type" tone="bg-blue-500" /></section><section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="flex flex-col justify-between gap-2 border-b border-slate-100 px-6 py-5 sm:flex-row sm:items-center"><div><h2 className="font-semibold text-slate-950">Recent hires</h2><p className="mt-1 text-sm text-slate-500">Most recently hired active employees with a current employment record.</p></div>{can("employee.view") && <Link href="/hr/employees" className="text-sm font-semibold text-indigo-700 hover:text-indigo-900">View employees</Link>}</div>{data?.recent_hires.length ? <div className="divide-y divide-slate-100">{data.recent_hires.map((employee) => can("employee.view") ? <Link href={`/hr/employees/${employee.id}`} key={employee.id} className="flex items-center gap-4 px-6 py-4 hover:bg-slate-50"><HireRow employee={employee} /></Link> : <div key={employee.id} className="flex items-center gap-4 px-6 py-4"><HireRow employee={employee} /></div>)}</div> : <p className="px-6 py-10 text-center text-sm text-slate-500">No current employee hires are available.</p>}</section>{quickActions.length > 0 && <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{quickActions.map(({ href, label: actionLabel, icon: Icon }) => <Link key={href} href={href} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-indigo-200 hover:bg-indigo-50"><Icon className="h-5 w-5 text-indigo-600" />{actionLabel}</Link>)}</section>}</main>;
-}
+  const statusData = (data?.by_status ?? []).map((item) => ({ label: humanizeEnum(item.status), value: item.count, color: statusColors[item.status.toUpperCase()] }));
+  const hireYears = (data?.by_hire_year ?? []).filter((item) => item.year !== null).sort((a, b) => (a.year ?? 0) - (b.year ?? 0)).map((item) => ({ year: String(item.year), hires: item.count }));
+  const grades = named(data?.by_grade, "grade__name");
+  const employmentTypes = named(data?.by_employment_type, "employment_type");
 
-function HireRow({ employee }: { employee: { first_name: string; last_name: string; employments__position__title: string; employments__department__name: string; hire_date: string } }) { return <><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-sm font-semibold text-indigo-700">{`${employee.first_name[0] ?? ""}${employee.last_name[0] ?? ""}`}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-slate-950">{employee.first_name} {employee.last_name}</span><span className="block truncate text-xs text-slate-500">{employee.employments__position__title} · {employee.employments__department__name}</span></span><time className="hidden shrink-0 text-xs text-slate-500 sm:block">{new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(employee.hire_date))}</time></>; }
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Human Resources"
+        title="HR Dashboard"
+        description="Live workforce composition, staffing activity and employee records for this institution."
+        icon={Users}
+        accent="hr"
+        actions={
+          <>
+            {can("employee.view") && <ButtonLink href="/hr/employees" variant="secondary">View employees</ButtonLink>}
+            {can("employee.create") && <ButtonLink href="/hr/employees/new" leadingIcon={<UserPlus className="h-4 w-4" />}>Add employee</ButtonLink>}
+          </>
+        }
+      />
+
+      {error && <ErrorState variant="inline" title="Unable to load HR dashboard" message={error} onRetry={reload} />}
+
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Workforce indicators">
+        <MetricCard label="Workforce" value={data ? formatNumber(data.total_employees) : EM_DASH} description="Employee records" icon={Users} accent="hr" loading={initial} />
+        <MetricCard label="Active employees" value={data ? formatNumber(data.active_employees) : EM_DASH} description={data?.total_employees ? `${Math.round((data.active_employees / data.total_employees) * 100)}% of workforce` : "Current active records"} icon={UserCheck} accent="accounting" loading={initial} />
+        <MetricCard label="New hires" value={data ? formatNumber(hiresThisYear) : EM_DASH} description={`Hired in ${currentYear}`} icon={UserPlus} accent="attendance" loading={initial} />
+        <MetricCard label="Terminated" value={data ? formatNumber(statusCount("TERMINATED")) : EM_DASH} description="Employee status records" icon={UserMinus} accent="audit" loading={initial} />
+      </section>
+
+      <div className="grid gap-5 xl:grid-cols-5">
+        <ChartCard
+          className="xl:col-span-2"
+          title="Workforce composition"
+          description="Employee records by current status."
+          accent="hr"
+          loading={initial}
+          error={!data && error ? "This data is unavailable right now." : null}
+          empty={!statusData.length}
+          emptyDescription="Employee records will appear here."
+          data={{ columns: ["Status", "Employees"], rows: statusData.map((item) => [item.label, item.value]) }}
+        >
+          <div className="grid items-center gap-5 sm:grid-cols-[180px_1fr] xl:grid-cols-1 2xl:grid-cols-[180px_1fr]">
+            <DonutChart data={statusData} height={180} centerValue={data ? formatNumber(data.total_employees) : undefined} centerLabel="employees" />
+            <SummaryList items={donutLegend(statusData).map((item) => ({ label: <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ background: item.color }} />{item.label}</span>, value: item.value }))} />
+          </div>
+        </ChartCard>
+        <ChartCard
+          className="xl:col-span-3"
+          title="Hiring by year"
+          description="Employees by hire year (current records)."
+          accent="hr"
+          loading={initial}
+          error={!data && error ? "This data is unavailable right now." : null}
+          empty={!hireYears.length}
+          emptyDescription="Hire dates will appear here as employees are added."
+          data={{ columns: ["Year", "Hires"], rows: hireYears.map((item) => [item.year, item.hires]) }}
+        >
+          <BarsChart data={hireYears} xKey="year" series={[{ key: "hires", label: "Hires", color: "var(--mod-hr)" }]} height={240} />
+        </ChartCard>
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-2">
+        <Card title="Department distribution" description="Active employees with a current department." icon={Building2} accent="hr">
+          {initial ? <div className="skeleton h-48 rounded-xl" /> : data?.by_department.length ? <RankingBars items={named(data.by_department, "department__name")} color="var(--mod-hr)" /> : <p className="text-support text-ink-muted">No current employment records are available.</p>}
+        </Card>
+        <Card title="Location distribution" description="Active employees by current location." icon={MapPin} accent="attendance">
+          {initial ? <div className="skeleton h-48 rounded-xl" /> : data?.by_location.length ? <RankingBars items={named(data.by_location, "location__name")} color="var(--mod-attendance)" /> : <p className="text-support text-ink-muted">No location assignments are available.</p>}
+        </Card>
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-5">
+        <ChartCard
+          className="xl:col-span-3"
+          title="Grade distribution"
+          description="Active employees with a current grade."
+          accent="hr"
+          loading={initial}
+          error={!data && error ? "This data is unavailable right now." : null}
+          empty={!grades.length}
+          emptyDescription="Grades will appear once employments reference them."
+          data={{ columns: ["Grade", "Employees"], rows: grades.map((item) => [item.label, item.value]) }}
+        >
+          <BarsChart data={grades.map((item) => ({ grade: item.label, count: item.value }))} xKey="grade" series={[{ key: "count", label: "Employees", color: "var(--chart-3)" }]} height={240} />
+        </ChartCard>
+        <Card className="xl:col-span-2" title="Employment type" description="Current active employments by type." icon={BriefcaseBusiness} accent="hr">
+          {initial ? <div className="skeleton h-24 rounded-xl" /> : employmentTypes.length ? <SegmentedBar segments={employmentTypes} height="h-3.5" /> : <p className="text-support text-ink-muted">No active employments are available.</p>}
+        </Card>
+      </div>
+
+      <DataTable<RecentHire>
+        caption="Recent hires"
+        rows={data?.recent_hires}
+        rowKey={(employee) => employee.id}
+        loading={initial}
+        error={!data && error ? "This data is unavailable right now." : null}
+        minWidth={620}
+        toolbar={
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-card-title font-semibold text-ink-strong">Recent hires</h2>
+              <p className="text-support text-ink-muted">Most recently hired active employees with a current employment record.</p>
+            </div>
+            {can("employee.view") && <Link href="/hr/employees" className="shrink-0 text-support font-semibold text-primary-ink hover:underline">View all</Link>}
+          </div>
+        }
+        empty={{ title: "No recent hires", description: "Employees hired with a current employment record will appear here.", icon: UserPlus }}
+        columns={[
+          {
+            key: "name",
+            header: "Employee",
+            cell: (employee) => {
+              const name = `${employee.first_name} ${employee.last_name}`;
+              const body = <span className="flex items-center gap-3"><Avatar name={name} size="sm" /><span className="min-w-0"><span className="block truncate font-semibold text-ink-strong">{name}</span><span className="block truncate text-caption text-ink-muted">{employee.employee_number}</span></span></span>;
+              return can("employee.view") ? <Link href={`/hr/employees/${employee.id}`} className="hover:underline">{body}</Link> : body;
+            },
+          },
+          { key: "position", header: "Position", cell: (employee) => employee.employments__position__title || EM_DASH },
+          { key: "department", header: "Department", cell: (employee) => employee.employments__department__name || EM_DASH, hideBelow: "md" },
+          { key: "hired", header: "Hire date", cell: (employee) => formatDate(employee.hire_date), sortValue: (employee) => employee.hire_date },
+        ]}
+      />
+
+      {quickActions.length > 0 && (
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="HR areas">
+          {quickActions.map((action) => <ActionCard key={action.href} href={action.href} title={action.label} description={action.description} icon={action.icon} accent="hr" />)}
+        </section>
+      )}
+    </div>
+  );
+}

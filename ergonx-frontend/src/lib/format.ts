@@ -129,3 +129,9 @@ export function humanizeEnum(value: string | null | undefined): string {
     .map((word) => word[0].toUpperCase() + word.slice(1).toLowerCase())
     .join(" ");
 }
+
+/** "1 record" / "3 records"; an unknown count renders as an em dash with the plural noun. */
+export function formatCount(value: number | string | null | undefined, singular: string, plural = `${singular}s`): string {
+  if (value === null || value === undefined || value === "") return `${EM_DASH} ${plural}`;
+  return `${formatNumber(value)} ${Number(value) === 1 ? singular : plural}`;
+}

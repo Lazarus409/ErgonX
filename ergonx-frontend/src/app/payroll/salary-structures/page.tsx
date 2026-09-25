@@ -1,25 +1,43 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { Edit3, Link2, Plus, Search, Trash2, X } from "lucide-react";
+import { Edit3, Link2, Plus, Trash2, WalletCards } from "lucide-react";
+
+import Alert from "@/components/ui/Alert";
+import { Badge } from "@/components/ui/Badge";
+import { Button, IconButton } from "@/components/ui/Button";
+import { MetricCard } from "@/components/ui/Card";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
-import ErrorState from "@/components/ui/ErrorState";
+import { DataTable, DataToolbar } from "@/components/ui/DataTable";
+import { Checkbox, Field, Input, Select, Textarea } from "@/components/ui/Field";
+import { Dialog } from "@/components/ui/Overlay";
 import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { getApiErrorMessage, payrollApi } from "@/lib/api";
+import { cx } from "@/lib/cx";
+import { formatNumber, humanizeEnum } from "@/lib/format";
 import { useApiResource } from "@/lib/useApiResource";
 import { MAX_PAGE_SIZE } from "@/types/api";
-import type { PayComponent, SalaryStructure, SalaryStructureComponent } from "@/types/payroll";
+import type { SalaryStructure, SalaryStructureComponent } from "@/types/payroll";
 
 const ALL = "ALL";
 type StructureForm = { code: string; name: string; description: string; is_active: boolean; components: string[] };
 const emptyForm: StructureForm = { code: "", name: "", description: "", is_active: true, components: [] };
 
 export default function SalaryStructuresPage() {
-  const [search, setSearch] = useState(""); const [status, setStatus] = useState(ALL); const [modalOpen, setModalOpen] = useState(false); const [editing, setEditing] = useState<SalaryStructure | null>(null); const [deleting, setDeleting] = useState<SalaryStructure | null>(null); const [form, setForm] = useState<StructureForm>(emptyForm); const [formError, setFormError] = useState(""); const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState(ALL);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<SalaryStructure | null>(null);
+  const [deleting, setDeleting] = useState<SalaryStructure | null>(null);
+  const [form, setForm] = useState<StructureForm>(emptyForm);
+  const [formError, setFormError] = useState("");
+  const [saving, setSaving] = useState(false);
   const load = useCallback(async () => Promise.all([payrollApi.listSalaryStructures({ page_size: MAX_PAGE_SIZE, is_active: status === ALL ? undefined : status === "ACTIVE", ordering: "name" }), payrollApi.listPayComponents({ page_size: MAX_PAGE_SIZE, is_active: true, ordering: "name" }), payrollApi.listSalaryStructureComponents({ page_size: MAX_PAGE_SIZE, ordering: "sequence" })]), [status]);
   const { data, loading, error, reload } = useApiResource(load);
-  const structures = useMemo(() => data?.[0].results ?? [], [data]); const payComponents = useMemo(() => data?.[1].results ?? [], [data]); const assignments = useMemo(() => data?.[2].results ?? [], [data]);
+  const structures = useMemo(() => data?.[0].results ?? [], [data]);
+  const payComponents = useMemo(() => data?.[1].results ?? [], [data]);
+  const assignments = useMemo(() => data?.[2].results ?? [], [data]);
   const componentById = useMemo(() => new Map(payComponents.map((item) => [item.id, item])), [payComponents]);
   const assignmentsByStructure = useMemo(() => { const result = new Map<string, SalaryStructureComponent[]>(); assignments.forEach((item) => result.set(item.salary_structure, [...(result.get(item.salary_structure) ?? []), item])); return result; }, [assignments]);
   const filtered = useMemo(() => { const query = search.trim().toLowerCase(); return structures.filter((item) => !query || item.code.toLowerCase().includes(query) || item.name.toLowerCase().includes(query)); }, [structures, search]);
@@ -27,8 +45,81 @@ export default function SalaryStructuresPage() {
   const openEdit = (item: SalaryStructure) => { setEditing(item); setForm({ code: item.code, name: item.name, description: item.description, is_active: item.is_active, components: (assignmentsByStructure.get(item.id) ?? []).sort((a, b) => a.sequence - b.sequence).map((entry) => entry.pay_component) }); setFormError(""); setModalOpen(true); };
   const save = async () => { if (!form.code.trim() || !form.name.trim() || !form.components.length) { setFormError("Code, name, and at least one pay component are required."); return; } setSaving(true); setFormError(""); try { const payload = { code: form.code.trim().toUpperCase(), name: form.name.trim(), description: form.description.trim(), is_active: form.is_active }; const structure = editing ? await payrollApi.updateSalaryStructure(editing.id, payload) : await payrollApi.createSalaryStructure(payload); const existing = assignmentsByStructure.get(structure.id) ?? []; const selected = new Set(form.components); await Promise.all(existing.filter((entry) => !selected.has(entry.pay_component)).map((entry) => payrollApi.deleteSalaryStructureComponent(entry.id))); let nextSequence = Math.max(0, ...existing.map((entry) => entry.sequence)) + 1; for (const componentId of form.components) { if (!existing.some((entry) => entry.pay_component === componentId)) { await payrollApi.createSalaryStructureComponent({ salary_structure: structure.id, pay_component: componentId, default_amount: null, default_percentage: null, percentage_base_component: null, sequence: nextSequence++, is_required: true }); } } setModalOpen(false); reload(); } catch (caught) { setFormError(getApiErrorMessage(caught)); } finally { setSaving(false); } };
   const remove = async () => { if (!deleting) return; setSaving(true); try { await payrollApi.deleteSalaryStructure(deleting.id); setDeleting(null); reload(); } catch (caught) { setFormError(getApiErrorMessage(caught)); setDeleting(null); } finally { setSaving(false); } };
-  return <main className="space-y-6 p-4 md:p-6"><PageHeader title="Salary Structures" description="Define reusable salary structures and associate approved pay components." actions={<button type="button" onClick={openCreate} className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"><Plus size={17} />Add Structure</button>} /><div className="grid gap-4 sm:grid-cols-3"><Metric label="Total Structures" value={data?.[0].count ?? 0} /><Metric label="Active" value={structures.filter((item) => item.is_active).length} /><Metric label="Component Assignments" value={assignments.length} /></div>{error && <ErrorState message={error} onRetry={reload} />}<section className="rounded-xl border bg-white"><div className="flex flex-col gap-3 border-b p-4 sm:flex-row"><div className="relative flex-1"><Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search salary structures..." className="w-full rounded-lg border px-10 py-2.5 text-sm" /></div><select value={status} onChange={(event) => setStatus(event.target.value)} className="rounded-lg border px-3 py-2.5 text-sm"><option value={ALL}>All Statuses</option><option value="ACTIVE">Active</option><option value="INACTIVE">Inactive</option></select></div><div className="overflow-x-auto"><table className="w-full min-w-[780px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Code</th><th className="px-4 py-3">Structure</th><th className="px-4 py-3">Components</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Actions</th></tr></thead><tbody className="divide-y">{filtered.map((item) => { const entries = assignmentsByStructure.get(item.id) ?? []; return <tr key={item.id} className="hover:bg-slate-50"><td className="px-4 py-4 font-semibold">{item.code}</td><td className="px-4 py-4"><p className="font-medium">{item.name}</p>{item.description && <p className="mt-1 text-xs text-slate-500">{item.description}</p>}</td><td className="px-4 py-4"><div className="flex flex-wrap gap-1">{entries.slice(0, 3).map((entry) => <span key={entry.id} className="rounded bg-slate-100 px-2 py-1 text-xs">{componentById.get(entry.pay_component)?.code ?? entry.pay_component}</span>)}{entries.length > 3 && <span className="rounded bg-slate-100 px-2 py-1 text-xs">+{entries.length - 3}</span>}</div></td><td className="px-4 py-4"><StatusBadge status={item.is_active ? "ACTIVE" : "INACTIVE"} /></td><td className="px-4 py-4"><div className="flex justify-end gap-2"><button type="button" onClick={() => openEdit(item)} className="rounded-lg border p-2 hover:bg-slate-100" title="Edit"><Edit3 size={16} /></button><button type="button" onClick={() => setDeleting(item)} className="rounded-lg border p-2 text-red-600 hover:bg-red-50" title="Delete"><Trash2 size={16} /></button></div></td></tr>; })}</tbody></table>{loading && <p className="p-10 text-center text-sm text-slate-500">Loading salary structures...</p>}{!loading && !filtered.length && <p className="p-10 text-center text-sm text-slate-500">No salary structures found.</p>}</div></section>{modalOpen && <StructureModal editing={editing} form={form} payComponents={payComponents} error={formError} saving={saving} onChange={setForm} onClose={() => setModalOpen(false)} onSave={() => void save()} />}{deleting && <ConfirmDialog open title="Delete salary structure" description={`Delete ${deleting.name}? Structures used in employee compensation records cannot be deleted by the backend.`} confirmLabel="Delete" destructive loading={saving} onCancel={() => setDeleting(null)} onConfirm={() => void remove()} />}</main>;
+  const toggle = (id: string) => setForm((current) => ({ ...current, components: current.components.includes(id) ? current.components.filter((item) => item !== id) : [...current.components, id] }));
+
+  return (
+    <div className="space-y-6">
+      <PageHeader eyebrow="Payroll" title="Salary structures" description="Define reusable salary structures and associate approved pay components." icon={WalletCards} accent="payroll" actions={<Button leadingIcon={<Plus className="h-4 w-4" />} onClick={openCreate}>Add structure</Button>} />
+      <section className="grid gap-4 sm:grid-cols-3" aria-label="Structure summary">
+        <MetricCard size="sm" label="Total structures" value={formatNumber(data?.[0].count ?? 0)} accent="payroll" loading={loading && !data} />
+        <MetricCard size="sm" label="Active" value={formatNumber(structures.filter((item) => item.is_active).length)} accent="accounting" loading={loading && !data} />
+        <MetricCard size="sm" label="Component assignments" value={formatNumber(assignments.length)} accent="hr" loading={loading && !data} />
+      </section>
+      {formError && !modalOpen && <Alert tone="danger" onDismiss={() => setFormError("")}>{formError}</Alert>}
+      <DataTable<SalaryStructure>
+        caption="Salary structures"
+        rows={filtered}
+        rowKey={(item) => item.id}
+        loading={loading && !data}
+        error={error}
+        onRetry={reload}
+        minWidth={780}
+        toolbar={
+          <DataToolbar
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search salary structures…"
+            filters={<Select size="sm" aria-label="Status" value={status} onChange={(event) => setStatus(event.target.value)}><option value={ALL}>All statuses</option><option value="ACTIVE">Active</option><option value="INACTIVE">Inactive</option></Select>}
+            onClear={search || status !== ALL ? () => { setSearch(""); setStatus(ALL); } : undefined}
+          />
+        }
+        empty={{ title: "No salary structures found", description: "Create a structure and attach the pay components it uses.", icon: WalletCards, action: <Button variant="secondary" leadingIcon={<Plus className="h-4 w-4" />} onClick={openCreate}>Add structure</Button> }}
+        columns={[
+          { key: "code", header: "Code", sortValue: (item) => item.code, cell: (item) => <span className="font-mono font-semibold text-ink-strong">{item.code}</span> },
+          { key: "name", header: "Structure", sortValue: (item) => item.name, cell: (item) => <span><span className="block font-semibold text-ink-strong">{item.name}</span>{item.description && <span className="block max-w-sm truncate text-caption text-ink-muted" title={item.description}>{item.description}</span>}</span> },
+          { key: "components", header: "Components", cell: (item) => { const entries = assignmentsByStructure.get(item.id) ?? []; return <span className="flex flex-wrap gap-1">{entries.slice(0, 3).map((entry) => <Badge key={entry.id} size="sm" accent="payroll">{componentById.get(entry.pay_component)?.code ?? entry.pay_component}</Badge>)}{entries.length > 3 && <Badge size="sm">+{entries.length - 3}</Badge>}{!entries.length && <span className="text-caption text-ink-subtle">None</span>}</span>; } },
+          { key: "status", header: "Status", cell: (item) => <StatusBadge status={item.is_active ? "ACTIVE" : "INACTIVE"} size="sm" /> },
+          { key: "actions", header: <span className="sr-only">Actions</span>, cell: (item) => <div className="flex justify-end gap-1"><IconButton size="sm" label={`Edit ${item.name}`} onClick={() => openEdit(item)}><Edit3 className="h-4 w-4" /></IconButton><IconButton size="sm" label={`Delete ${item.name}`} className="text-danger-ink hover:bg-danger-soft" onClick={() => setDeleting(item)}><Trash2 className="h-4 w-4" /></IconButton></div> },
+        ]}
+      />
+
+      <Dialog
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        dismissible={!saving}
+        size="lg"
+        title={editing ? "Edit salary structure" : "Add salary structure"}
+        description="Associate reusable pay components with this structure."
+        footer={<><Button variant="secondary" onClick={() => setModalOpen(false)} disabled={saving}>Cancel</Button><Button onClick={() => void save()} loading={saving} loadingLabel="Saving…">{editing ? "Save changes" : "Create structure"}</Button></>}
+      >
+        <div className="space-y-5">
+          {formError && <Alert tone="danger">{formError}</Alert>}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Code" required><Input value={form.code} onChange={(event) => setForm({ ...form, code: event.target.value.toUpperCase() })} className="font-mono" data-autofocus /></Field>
+            <Field label="Name" required><Input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></Field>
+          </div>
+          <Field label="Description" optional><Textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} rows={3} /></Field>
+          <Checkbox label="Active" description="Inactive structures cannot be assigned to new compensation records." checked={form.is_active} onChange={(event) => setForm({ ...form, is_active: event.target.checked })} />
+          <div>
+            <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-ink-strong"><Link2 className="h-4 w-4 text-mod-payroll" aria-hidden="true" />Associated components <span className="font-normal text-ink-muted">({form.components.length} selected)</span></p>
+            {!payComponents.length ? <p className="text-support text-ink-muted">No active pay components are available.</p> : (
+              <div className="grid gap-2 sm:grid-cols-2">
+                {payComponents.map((component) => {
+                  const selected = form.components.includes(component.id);
+                  return (
+                    <label key={component.id} className={cx("flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition-colors", selected ? "border-mod-payroll bg-mod-payroll-soft" : "border-line hover:bg-surface-hover")}>
+                      <input type="checkbox" checked={selected} onChange={() => toggle(component.id)} className="h-4 w-4" />
+                      <span className="min-w-0"><span className="block truncate text-sm font-semibold text-ink-strong">{component.name}</span><span className="block text-caption text-ink-muted">{component.code} · {humanizeEnum(component.component_type)}</span></span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </Dialog>
+
+      <ConfirmDialog open={deleting !== null} title="Delete salary structure" description={deleting ? `Delete ${deleting.name}? Structures used in employee compensation records cannot be deleted by the backend.` : ""} confirmLabel="Delete" destructive loading={saving} onCancel={() => setDeleting(null)} onConfirm={() => void remove()} />
+    </div>
+  );
 }
-function Metric({ label, value }: { label: string; value: number }) { return <div className="rounded-xl border bg-white p-4"><p className="text-sm text-slate-500">{label}</p><p className="mt-1 text-2xl font-bold">{value}</p></div>; }
-function StructureModal({ editing, form, payComponents, error, saving, onChange, onClose, onSave }: { editing: SalaryStructure | null; form: StructureForm; payComponents: PayComponent[]; error: string; saving: boolean; onChange: (form: StructureForm) => void; onClose: () => void; onSave: () => void }) { const toggle = (id: string) => onChange({ ...form, components: form.components.includes(id) ? form.components.filter((item) => item !== id) : [...form.components, id] }); return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-xl"><div className="flex items-center justify-between border-b p-5"><div><h2 className="text-lg font-bold">{editing ? "Edit Salary Structure" : "Add Salary Structure"}</h2><p className="text-sm text-slate-500">Associate reusable pay components with this structure.</p></div><button type="button" onClick={onClose} className="rounded-lg p-2 hover:bg-slate-100"><X size={19} /></button></div>{error && <p className="mx-5 mt-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}<div className="space-y-5 p-5"><div className="grid gap-4 sm:grid-cols-2"><Field label="Code"><input value={form.code} onChange={(event) => onChange({ ...form, code: event.target.value.toUpperCase() })} className="w-full rounded-lg border px-3 py-2.5 text-sm" /></Field><Field label="Name"><input value={form.name} onChange={(event) => onChange({ ...form, name: event.target.value })} className="w-full rounded-lg border px-3 py-2.5 text-sm" /></Field><label className="flex items-center gap-2 self-end rounded-lg border p-3 text-sm"><input type="checkbox" checked={form.is_active} onChange={(event) => onChange({ ...form, is_active: event.target.checked })} />Active</label></div><Field label="Description"><textarea value={form.description} onChange={(event) => onChange({ ...form, description: event.target.value })} rows={3} className="w-full rounded-lg border px-3 py-2.5 text-sm" /></Field><div><div className="mb-3 flex items-center gap-2"><Link2 size={17} /><h3 className="font-semibold">Associated Components</h3></div>{!payComponents.length ? <p className="text-sm text-slate-500">No active pay components are available.</p> : <div className="grid gap-2 sm:grid-cols-2">{payComponents.map((component) => { const selected = form.components.includes(component.id); return <label key={component.id} className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 ${selected ? "border-slate-900 bg-slate-50" : ""}`}><input type="checkbox" checked={selected} onChange={() => toggle(component.id)} /><span><span className="block text-sm font-medium">{component.name}</span><span className="text-xs text-slate-500">{component.code} · {component.component_type.replaceAll("_", " ")}</span></span></label>; })}</div>}</div></div><div className="flex justify-end gap-3 border-t p-5"><button type="button" onClick={onClose} className="rounded-lg border px-4 py-2.5 text-sm font-medium">Cancel</button><button type="button" onClick={onSave} disabled={saving} className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{saving ? "Saving..." : editing ? "Save Changes" : "Create Structure"}</button></div></div></div>; }
-function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="space-y-1"><span className="text-sm font-medium">{label}</span>{children}</label>; }

@@ -14,5 +14,5 @@ const areas = [
 ];
 
 export default function HRHomePage() {
-  return <ModuleLanding title="Human Resources" description="Manage people and organization data for the active institution." module="HR" accentClassName="border-indigo-200 bg-indigo-50 text-indigo-950" areas={areas} />;
+  return <ModuleLanding title="Human Resources" description="Manage people and organization data for the active institution." module="HR" accent="hr" icon={Users} eyebrow="Human Resources" areas={areas} />;
 }

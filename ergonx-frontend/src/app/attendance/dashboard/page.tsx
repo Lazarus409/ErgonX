@@ -5,17 +5,23 @@ import {
   AlertTriangle,
   CalendarDays,
   Clock3,
+  Grid3X3,
   Timer,
   UserCheck,
-  UserMinus,
   Users,
   UserX,
 } from "lucide-react";
-import Link from "next/link";
 import { useCallback } from "react";
+
+import ChartCard from "@/components/charts/ChartCard";
+import { BarsChart, TrendChart } from "@/components/charts/Charts";
+import { HeatmapGrid, ProgressMeter } from "@/components/charts/Visuals";
+import { hasValues } from "@/components/charts/format";
+import { ButtonLink } from "@/components/ui/Button";
+import { Sparkline } from "@/components/charts/Visuals";
+import { AttentionItem, Avatar, Card, MetricCard } from "@/components/ui/Card";
+import { DataTable } from "@/components/ui/DataTable";
 import PageHeader from "@/components/ui/PageHeader";
-import KPIStatCard from "@/components/ui/KPIStatCard";
-import StatusBadge from "@/components/ui/StatusBadge";
 import ErrorState from "@/components/ui/ErrorState";
 import {
   attendanceApi,
@@ -25,7 +31,7 @@ import {
 import { useApiResource } from "@/lib/useApiResource";
 import { MAX_PAGE_SIZE } from "@/types/api";
 import type { AttendanceDashboard } from "@/types/dashboards";
-import { EM_DASH, formatNumber } from "@/lib/format";
+import { EM_DASH, formatNumber, formatCount } from "@/lib/format";
 
 /** Only the envelope `count` is needed for these reads. */
 const COUNT_ONLY = { page_size: 1 } as const;
@@ -38,6 +44,8 @@ interface AttendanceOverview {
   overtimePending: number | null;
   adjustmentsPending: number | null;
 }
+
+type LatenessRow = AttendanceDashboard["repeated_lateness"][number];
 
 export default function AttendanceDashboardPage() {
   const load = useCallback(async (): Promise<AttendanceOverview> => {
@@ -87,258 +95,173 @@ export default function AttendanceDashboardPage() {
   }, []);
 
   const { data, loading, error, reload } = useApiResource(load);
-
-  const placeholder = loading ? "…" : EM_DASH;
+  const initial = loading && !data;
 
   const value = (count: number | null | undefined): string =>
-    count === null || count === undefined ? placeholder : formatNumber(count);
+    count === null || count === undefined ? EM_DASH : formatNumber(count);
+
+  const weekly = data?.today.weekly_attendance ?? [];
+  const departments = data?.today.by_department ?? [];
+  const lateness = data?.today.repeated_lateness ?? [];
+  const maxLate = Math.max(...lateness.map((item) => item.late_occurrences), 1);
+  const heatColumns = ["Present", "Late", "Absent", "On leave"];
 
   return (
     <div className="space-y-6">
       <PageHeader
+        eyebrow="Attendance"
         title="Attendance Dashboard"
         description="Monitor workforce attendance, schedules, shifts and attendance exceptions."
+        icon={Clock3}
+        accent="attendance"
+        meta={<span className="inline-flex items-center gap-1.5 text-caption text-ink-muted"><span className={loading ? "h-2 w-2 animate-pulse rounded-full bg-warning" : "h-2 w-2 rounded-full bg-success"} aria-hidden="true" />{loading ? "Refreshing…" : "Institution-wide snapshot for today"}</span>}
         actions={
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href="/attendance/live"
-              className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
-            >
-              <Activity className="h-4 w-4" />
-              Live Attendance
-            </Link>
-
-            <Link
-              href="/attendance/schedules"
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              <CalendarDays className="h-4 w-4" />
-              Schedules
-            </Link>
-          </div>
+          <>
+            <ButtonLink href="/attendance/schedules" variant="secondary" leadingIcon={<CalendarDays className="h-4 w-4" />}>Schedules</ButtonLink>
+            <ButtonLink href="/attendance/live" leadingIcon={<Activity className="h-4 w-4" />}>Live attendance</ButtonLink>
+          </>
         }
       />
 
-      {error && <ErrorState message={error} onRetry={reload} />}
+      {error && <ErrorState variant="inline" title="Unable to load attendance dashboard" message={error} onRetry={reload} />}
 
-      <div className="rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-semibold text-slate-900">
-              Today&apos;s Attendance
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              Current institution-wide attendance snapshot.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2 text-sm text-slate-500">
-            <Clock3 className="h-4 w-4" />
-            {loading ? "Refreshing..." : "Updated today"}
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <KPIStatCard
-          title="Present Today"
-          value={value(data?.today.present)}
-          icon={<UserCheck className="h-5 w-5" />}
-        />
-
-        <KPIStatCard
-          title="Absent Today"
-          value={value(data?.today.absent)}
-          icon={<UserX className="h-5 w-5" />}
-        />
-
-        <KPIStatCard
-          title="Late Today"
-          value={value(data?.today.late)}
-          icon={<Clock3 className="h-5 w-5" />}
-        />
-
-        <KPIStatCard
-          title="Currently on Leave"
-          value={value(data?.onLeave)}
-          icon={<CalendarDays className="h-5 w-5" />}
-        />
-
-        <KPIStatCard
-          title="Scheduled Today"
-          value={value(data?.scheduledToday)}
-          subtitle="Current schedule assignments"
-          icon={<Users className="h-5 w-5" />}
-        />
-
-        <KPIStatCard
-          title="Active Shifts"
-          value={value(data?.activeShifts)}
-          icon={<Activity className="h-5 w-5" />}
-        />
-
-        <KPIStatCard
-          title="Overtime Pending"
-          value={value(data?.overtimePending)}
-          icon={<Timer className="h-5 w-5" />}
-        />
-
-        <KPIStatCard
-          title="Adjustments Pending"
-          value={value(data?.adjustmentsPending)}
-          icon={<AlertTriangle className="h-5 w-5" />}
-        />
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-3">
-        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm xl:col-span-2">
-          <div className="mb-6">
-            <h2 className="text-base font-semibold text-slate-900">
-              Attendance Trend
-            </h2>
-            <p className="mt-1 text-xs text-slate-500">
-              Seven-day attendance pattern.
-            </p>
-          </div>
-
-          <WeeklyAttendanceTrend points={data?.today.weekly_attendance ?? []} loading={loading} />
-        </section>
-
-        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-6">
-            <h2 className="text-base font-semibold text-slate-900">
-              Department Attendance
-            </h2>
-            <p className="mt-1 text-xs text-slate-500">
-              Current attendance rate by department.
-            </p>
-          </div>
-
-          <DepartmentAttendance items={data?.today.by_department ?? []} loading={loading} />
-        </section>
-      </div>
-
-      <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="mb-5 flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
-          <div>
-            <h2 className="text-base font-semibold text-slate-900">Repeated Lateness</h2>
-            <p className="mt-1 text-xs text-slate-500">Employees with repeated late arrivals in the last 90 days, including total minutes late.</p>
-          </div>
-          <span className="text-xs text-slate-500">Attendance and HR permissions apply</span>
-        </div>
-        {!data && loading ? <p className="py-8 text-sm text-slate-500">Loading lateness analytics…</p> : !data?.today.repeated_lateness.length ? <p className="py-8 text-sm text-slate-500">No repeated late arrivals have been recorded in the selected period.</p> : <div className="overflow-x-auto"><table className="w-full min-w-[680px] text-left text-sm"><thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-3 font-semibold">Employee</th><th className="px-3 py-3 font-semibold">Employee number</th><th className="px-3 py-3 font-semibold">Department</th><th className="px-3 py-3 text-right font-semibold">Late arrivals</th><th className="px-3 py-3 text-right font-semibold">Minutes late</th></tr></thead><tbody className="divide-y divide-slate-100">{data.today.repeated_lateness.map((item) => <tr key={item.employee_id}><td className="max-w-[220px] px-3 py-3 font-medium text-slate-900"><span className="block truncate" title={`${item.employee__first_name} ${item.employee__last_name}`}>{item.employee__first_name} {item.employee__last_name}</span></td><td className="px-3 py-3 font-mono text-xs text-slate-600">{item.employee__employee_number}</td><td className="max-w-[180px] px-3 py-3 text-slate-600"><span className="block truncate" title={item.employee__employments__department__name}>{item.employee__employments__department__name || "Unassigned"}</span></td><td className="px-3 py-3 text-right font-semibold text-amber-700">{formatNumber(item.late_occurrences)}</td><td className="px-3 py-3 text-right text-slate-700">{formatNumber(item.total_minutes_late)}</td></tr>)}</tbody></table></div>}
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Today's attendance">
+        <MetricCard label="Present today" value={value(data?.today.present)} icon={UserCheck} accent="accounting" loading={initial} chart={<Sparkline values={weekly.map((day) => day.present)} color="var(--mod-accounting)" height={32} label="Present this week" />} />
+        <MetricCard label="Late today" value={value(data?.today.late)} icon={Clock3} accent="payroll" loading={initial} chart={<Sparkline values={weekly.map((day) => day.late)} color="var(--mod-payroll)" height={32} label="Late arrivals this week" />} />
+        <MetricCard label="Absent today" value={value(data?.today.absent)} icon={UserX} accent="audit" loading={initial} />
+        <MetricCard label="Currently on leave" value={value(data?.onLeave)} icon={CalendarDays} accent="leave" loading={initial} />
+      </section>
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Scheduling and exceptions">
+        <MetricCard size="sm" label="Scheduled today" value={value(data?.scheduledToday)} description="Current schedule assignments" icon={Users} accent="attendance" loading={initial} />
+        <MetricCard size="sm" label="Active shifts" value={value(data?.activeShifts)} icon={Activity} accent="attendance" loading={initial} href="/attendance/shifts" />
+        <MetricCard size="sm" label="Overtime pending" value={value(data?.overtimePending)} icon={Timer} accent="attendance" loading={initial} href="/attendance/overtime" />
+        <MetricCard size="sm" label="Adjustments pending" value={value(data?.adjustmentsPending)} icon={AlertTriangle} accent="attendance" loading={initial} href="/attendance/adjustments" />
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-6 flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-semibold text-slate-900">
-                Overtime Today
-              </h2>
-              <p className="mt-1 text-xs text-slate-500">
-                Overtime minutes recorded across today&apos;s attendance.
-              </p>
-            </div>
-
-            <Link
-              href="/attendance/overtime"
-              className="text-sm font-medium text-slate-700 hover:text-slate-900"
-            >
-              Review overtime
-            </Link>
-          </div>
-
-          <div className="rounded-lg bg-slate-50 p-5">
-            <p className="text-xs text-slate-500">Recorded today</p>
-            <p className="mt-2 text-3xl font-semibold text-slate-900">
-              {data
-                ? attendanceApi.formatMinutes(data.today.overtime_minutes)
-                : placeholder}
-            </p>
-            <p className="mt-2 text-xs text-slate-500">
-              Only approved overtime is consumed by Payroll.
-            </p>
-          </div>
-        </section>
-
-        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="mb-5 flex items-center justify-between">
-            <div>
-              <h2 className="text-base font-semibold text-slate-900">
-                Action Required
-              </h2>
-              <p className="mt-1 text-xs text-slate-500">
-                Attendance items awaiting operational attention.
-              </p>
-            </div>
-
-            <AlertTriangle className="h-5 w-5 text-slate-500" />
-          </div>
-
-          <div className="space-y-3">
-            <Link
-              href="/attendance/overtime"
-              className="flex items-center justify-between rounded-lg border border-slate-200 p-4 transition hover:bg-slate-50"
-            >
-              <div>
-                <p className="text-sm font-medium text-slate-900">
-                  Overtime awaiting approval
-                </p>
-                <p className="mt-1 text-xs text-slate-500">
-                  {value(data?.overtimePending)} overtime records require
-                  review.
-                </p>
-              </div>
-              <StatusBadge status="PENDING" />
-            </Link>
-
-            <Link
-              href="/attendance/adjustments"
-              className="flex items-center justify-between rounded-lg border border-slate-200 p-4 transition hover:bg-slate-50"
-            >
-              <div>
-                <p className="text-sm font-medium text-slate-900">
-                  Attendance adjustments
-                </p>
-                <p className="mt-1 text-xs text-slate-500">
-                  {value(data?.adjustmentsPending)} correction requests require
-                  review.
-                </p>
-              </div>
-              <StatusBadge status="PENDING" />
-            </Link>
-
-            <Link
-              href="/attendance/live"
-              className="flex items-center justify-between rounded-lg border border-slate-200 p-4 transition hover:bg-slate-50"
-            >
-              <div>
-                <p className="text-sm font-medium text-slate-900">
-                  Attendance exceptions
-                </p>
-                <p className="mt-1 text-xs text-slate-500">
-                  Review today&apos;s late and absent employees.
-                </p>
-              </div>
-              <UserMinus className="h-5 w-5 text-slate-400" />
-            </Link>
-          </div>
-        </section>
+      <div className="grid gap-5 xl:grid-cols-5">
+        <ChartCard
+          className="xl:col-span-3"
+          title="Seven-day attendance"
+          description="Daily attendance outcomes across the last week."
+          accent="attendance"
+          loading={initial}
+          error={!data && error ? "This data is unavailable right now." : null}
+          empty={!hasValues(weekly, ["present", "late", "absent", "on_leave"])}
+          emptyTitle="No attendance this week"
+          emptyDescription="No clock-ins, absences or leave were recorded in the last seven days."
+          legend={[{ label: "Present", color: "var(--success)", shape: "square" }, { label: "Late", color: "var(--warning)", shape: "square" }, { label: "Absent", color: "var(--danger)", shape: "square" }, { label: "On leave", color: "var(--mod-leave)", shape: "square" }]}
+          data={{ columns: ["Date", "Present", "Late", "Absent", "On leave"], rows: weekly.map((day) => [day.date, day.present, day.late, day.absent, day.on_leave]) }}
+        >
+          <BarsChart data={weekly} xKey="date" xFormat="weekday" mode="stacked" height={250} series={[
+            { key: "present", label: "Present", color: "var(--success)" },
+            { key: "late", label: "Late", color: "var(--warning)" },
+            { key: "absent", label: "Absent", color: "var(--danger)" },
+            { key: "on_leave", label: "On leave", color: "var(--mod-leave)" },
+          ]} />
+        </ChartCard>
+        <ChartCard
+          className="xl:col-span-2"
+          title="Overtime this week"
+          description="Recorded overtime minutes per day. Only approved overtime is consumed by Payroll."
+          accent="attendance"
+          icon={Timer}
+          loading={initial}
+          error={!data && error ? "This data is unavailable right now." : null}
+          empty={!hasValues(weekly, ["overtime_minutes"])}
+          emptyTitle="No overtime this week"
+          emptyDescription="No overtime minutes were recorded in the last seven days."
+          footer={data ? <span>Recorded today: <strong className="text-ink-strong">{attendanceApi.formatMinutes(data.today.overtime_minutes)}</strong></span> : undefined}
+          data={{ columns: ["Date", "Overtime minutes"], rows: weekly.map((day) => [day.date, day.overtime_minutes]) }}
+        >
+          <TrendChart variant="area" data={weekly} xKey="date" xFormat="weekday" format="minutes" height={210} series={[{ key: "overtime_minutes", label: "Overtime", color: "var(--chart-3)" }]} />
+        </ChartCard>
       </div>
 
+      <div className="grid gap-5 xl:grid-cols-5">
+        <Card className="xl:col-span-3" title="Department attendance heatmap" description="Today's outcomes by department. Darker cells mean more employees." icon={Grid3X3} accent="attendance">
+          {initial ? <div className="skeleton h-48 rounded-xl" /> : departments.length ? (
+            <HeatmapGrid
+              rows={departments.map((item) => item.employee__employments__department__name || "Unassigned")}
+              columns={heatColumns}
+              cells={departments.map((item) => [item.present, item.late, item.absent, item.on_leave].map((count) => ({ value: count })))}
+            />
+          ) : <p className="text-support text-ink-muted">No department-linked attendance has been recorded today.</p>}
+        </Card>
+        <Card className="xl:col-span-2" title="Action required" description="Attendance items awaiting operational attention." icon={AlertTriangle} accent="attendance">
+          {data && data.scheduledToday ? (
+            <div className="mb-4 border-b border-line-soft pb-4">
+              <ProgressMeter
+                label="Shift coverage today"
+                value={Math.min(data.today.present + data.today.late, data.scheduledToday)}
+                max={data.scheduledToday}
+                color="var(--mod-attendance)"
+                detail={`${formatNumber(data.today.present + data.today.late)} clocked in (present or late) against ${formatCount(data.scheduledToday, "current schedule assignment")}.`}
+              />
+            </div>
+          ) : null}
+          <div className="-mx-3 -mb-2 space-y-1">
+            <AttentionItem title="Overtime awaiting approval" description={`${formatCount(data?.overtimePending, "overtime record")} awaiting review.`} severity={data?.overtimePending ? "warning" : "info"} href="/attendance/overtime" />
+            <AttentionItem title="Attendance adjustments" description={`${formatCount(data?.adjustmentsPending, "correction request")} awaiting review.`} severity={data?.adjustmentsPending ? "warning" : "info"} href="/attendance/adjustments" />
+            <AttentionItem title="Attendance exceptions" description="Review today's late and absent employees." severity={data && data.today.absent > 0 ? "high" : "info"} href="/attendance/live" />
+          </div>
+        </Card>
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-5">
+        <DataTable<LatenessRow>
+          className="xl:col-span-3"
+          caption="Repeated lateness"
+          rows={lateness}
+          rowKey={(item) => item.employee_id}
+          loading={initial}
+          error={!data && error ? "This data is unavailable right now." : null}
+          minWidth={620}
+          toolbar={
+            <div>
+              <h2 className="text-card-title font-semibold text-ink-strong">Repeated lateness</h2>
+              <p className="text-support text-ink-muted">Employees with repeated late arrivals in the last 90 days.</p>
+            </div>
+          }
+          empty={{ title: "No repeated lateness", description: "No repeated late arrivals have been recorded in the selected period.", icon: Clock3 }}
+          columns={[
+            {
+              key: "employee",
+              header: "Employee",
+              cell: (item) => {
+                const name = `${item.employee__first_name} ${item.employee__last_name}`;
+                return <span className="flex min-w-0 items-center gap-3"><Avatar name={name} size="sm" /><span className="min-w-0"><span className="block max-w-[14rem] truncate font-semibold text-ink-strong" title={name}>{name}</span><span className="block font-mono text-caption text-ink-muted">{item.employee__employee_number}</span></span></span>;
+              },
+            },
+            { key: "department", header: "Department", hideBelow: "md", cell: (item) => <span className="block max-w-[12rem] truncate" title={item.employee__employments__department__name}>{item.employee__employments__department__name || "Unassigned"}</span> },
+            {
+              key: "late",
+              header: "Late arrivals",
+              numeric: true,
+              sortValue: (item) => item.late_occurrences,
+              cell: (item) => (
+                <span className="inline-flex items-center justify-end gap-2">
+                  <span className="hidden h-1.5 w-16 overflow-hidden rounded-full bg-surface-muted sm:block" aria-hidden="true"><span className="block h-full rounded-full bg-warning" style={{ width: `${(item.late_occurrences / maxLate) * 100}%` }} /></span>
+                  <span className="font-semibold text-warning-ink">{formatNumber(item.late_occurrences)}</span>
+                </span>
+              ),
+            },
+            { key: "minutes", header: "Minutes late", numeric: true, sortValue: (item) => item.total_minutes_late, cell: (item) => formatNumber(item.total_minutes_late) },
+          ]}
+        />
+        <ChartCard
+          className="xl:col-span-2"
+          title="Lateness trend"
+          description="Late arrivals per month."
+          accent="attendance"
+          loading={initial}
+          error={!data && error ? "This data is unavailable right now." : null}
+          empty={!data?.today.lateness_trend.length}
+          emptyDescription="Monthly lateness will appear here."
+          data={{ columns: ["Month", "Late arrivals", "Minutes late"], rows: (data?.today.lateness_trend ?? []).map((point) => [point.month, point.late_occurrences, point.total_minutes_late]) }}
+        >
+          <TrendChart data={data?.today.lateness_trend ?? []} xKey="month" height={230} series={[{ key: "late_occurrences", label: "Late arrivals", color: "var(--warning)" }]} />
+        </ChartCard>
+      </div>
     </div>
   );
-}
-
-function WeeklyAttendanceTrend({ points, loading }: { points: AttendanceDashboard["weekly_attendance"]; loading: boolean }) {
-  const maximum = Math.max(...points.map((point) => point.present + point.late + point.absent + point.on_leave), 1);
-  if (loading) return <p className="flex h-64 items-center justify-center text-sm text-slate-500">Loading weekly attendance…</p>;
-  return <div className="mt-6 flex h-64 items-end gap-2" aria-label="Seven-day attendance trend">{points.map((point) => { const total = point.present + point.late + point.absent + point.on_leave; const height = total ? Math.max((total / maximum) * 100, 5) : 2; return <div key={point.date} className="flex min-w-0 flex-1 flex-col justify-end gap-2"><span className="text-center text-xs font-medium text-slate-600">{total}</span><div className="overflow-hidden rounded-t-lg bg-slate-100" style={{ height: `${height}%` }} title={`${point.date}: ${point.present} present, ${point.late} late, ${point.absent} absent, ${point.on_leave} on leave`}><div className="bg-emerald-500" style={{ height: `${total ? (point.present / total) * 100 : 0}%` }} /><div className="bg-amber-400" style={{ height: `${total ? (point.late / total) * 100 : 0}%` }} /><div className="bg-rose-500" style={{ height: `${total ? (point.absent / total) * 100 : 0}%` }} /><div className="bg-sky-500" style={{ height: `${total ? (point.on_leave / total) * 100 : 0}%` }} /></div><span className="text-center text-[10px] text-slate-500">{new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(new Date(`${point.date}T00:00:00`))}</span></div>; })}</div>;
-}
-
-function DepartmentAttendance({ items, loading }: { items: AttendanceDashboard["by_department"]; loading: boolean }) {
-  if (loading) return <p className="flex h-64 items-center justify-center text-sm text-slate-500">Loading department attendance…</p>;
-  if (!items.length) return <p className="flex h-64 items-center justify-center px-4 text-center text-sm text-slate-500">No department-linked attendance has been recorded today.</p>;
-  return <div className="mt-6 space-y-4">{items.map((item) => { const rate = item.total ? Math.round(((item.present + item.late) / item.total) * 100) : 0; return <div key={item.employee__employments__department__name}><div className="mb-1.5 flex justify-between gap-3 text-sm"><span className="truncate text-slate-600">{item.employee__employments__department__name}</span><span className="font-semibold text-slate-950">{rate}%</span></div><div className="h-2.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-cyan-500" style={{ width: `${rate}%` }} /></div><p className="mt-1 text-xs text-slate-500">{item.present + item.late} present or late of {item.total} records</p></div>; })}</div>;
 }

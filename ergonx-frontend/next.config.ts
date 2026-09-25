@@ -46,7 +46,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/favicon.ico",
-        destination: "/ergonx-logo.png",
+        destination: "/brand/favicon-48.png",
         permanent: false,
       },
     ];

@@ -1,22 +1,17 @@
-"use client";
-
 import { ShieldX } from "lucide-react";
 
-export default function AccessDenied() {
+import { ButtonLink } from "@/components/ui/Button";
+
+export default function AccessDenied({ title = "You don't have access to this area", description = "Your current role in this institution does not include the permission this page requires. Contact an institution administrator if you need access." }: { title?: string; description?: string }) {
   return (
-    <div className="flex min-h-[360px] items-center justify-center rounded-2xl border bg-white p-6">
+    <div className="flex min-h-[420px] items-center justify-center rounded-3xl border border-line bg-surface p-6 shadow-elevation-1">
       <div className="max-w-md text-center">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-          <ShieldX className="h-5 w-5 text-slate-600" />
-        </div>
-
-        <h2 className="mt-4 text-lg font-semibold text-slate-900">
-          Access denied
-        </h2>
-
-        <p className="mt-2 text-sm leading-6 text-slate-500">
-          You do not have permission to access this resource.
-        </p>
+        <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-mod-audit-soft text-mod-audit" aria-hidden="true">
+          <ShieldX className="h-6 w-6" />
+        </span>
+        <h2 className="mt-5 text-heading font-semibold text-ink-strong">{title}</h2>
+        <p className="mt-2 text-support text-ink-muted">{description}</p>
+        <ButtonLink href="/" variant="secondary" className="mt-6">Return home</ButtonLink>
       </div>
     </div>
   );

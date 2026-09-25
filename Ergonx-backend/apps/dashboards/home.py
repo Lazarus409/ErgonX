@@ -1,5 +1,5 @@
 from collections import Counter
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from django.utils import timezone
@@ -157,6 +157,90 @@ def _attention_items(*, institution, permission_codes):
     return items
 
 
+def _personal_snapshot(*, user, institution, permission_codes):
+    """Self-service context for a user who is also an employee here.
+
+    Everything is scoped to the user's own employee record and gated by the
+    enabled modules and the user's effective permissions; no performance,
+    productivity or ranking metric is produced.
+    """
+    from django.core.exceptions import ValidationError as DjangoValidationError
+    from rest_framework.exceptions import ValidationError as ApiValidationError
+
+    from apps.attendance.models import AttendanceAdjustment, AttendanceRecord
+    from apps.documents.models import Document
+    from apps.leave.models import LeaveRequest
+    from apps.scheduling.services import schedule_assignment_for, schedule_expectation
+
+    employee = Employee.objects.for_institution(institution).filter(user=user).first()
+    if employee is None:
+        return None
+    permissions = set(permission_codes)
+    enabled = set(institution.modules.filter(is_enabled=True).values_list("module_code", flat=True))
+    try:
+        local_now = timezone.now().astimezone(ZoneInfo(institution.timezone))
+    except Exception:
+        local_now = timezone.localtime()
+    today = local_now.date()
+
+    upcoming_shifts = []
+    today_expectation = None
+    if "ATTENDANCE" in enabled and "schedule.view" in permissions:
+        for offset in range(7):
+            day = today + timedelta(days=offset)
+            assignment = schedule_assignment_for(employee, day)
+            if assignment is None:
+                continue
+            try:
+                expectation = schedule_expectation(assignment, day)
+            except (DjangoValidationError, ApiValidationError):
+                continue
+            if offset == 0:
+                today_expectation = expectation
+            upcoming_shifts.append({
+                "date": day.isoformat(),
+                "schedule": assignment.work_schedule.name,
+                "off_day": expectation["off_day"],
+                "flexible": expectation["flexible_rule"] is not None,
+                "start": expectation["start"].isoformat() if expectation["start"] else None,
+                "end": expectation["end"].isoformat() if expectation["end"] else None,
+                "required_minutes": expectation["required_minutes"],
+            })
+
+    attention = []
+
+    def add(code, severity, title, description, route):
+        attention.append({"code": code, "severity": severity, "title": title, "description": description, "route": route})
+
+    activity = {}
+    if "LEAVE" in enabled and "leave.request" in permissions:
+        mine = LeaveRequest.objects.for_institution(institution).filter(employee=employee)
+        pending = mine.filter(status=LeaveRequest.Status.PENDING).count()
+        if pending:
+            add("MY_LEAVE_PENDING", "NORMAL", "Leave request awaiting approval", f"{pending} of your leave requests are waiting for a decision.", "/me/leave")
+        activity["leave_requests_this_year"] = mine.filter(start_date__year=today.year).count()
+    if "ATTENDANCE" in enabled and "attendance.clock" in permissions:
+        if today_expectation and not today_expectation["off_day"] and today_expectation["start"] and local_now >= today_expectation["start"]:
+            clocked_in = AttendanceRecord.objects.for_institution(institution).filter(employee=employee, attendance_date=today, check_in__isnull=False).exists()
+            if not clocked_in:
+                add("MY_CLOCK_IN_MISSING", "HIGH", "You haven't clocked in yet", f"Your shift started at {today_expectation['start'].strftime('%H:%M')}.", "/me/attendance")
+    if "ATTENDANCE" in enabled and "attendance.adjust" in permissions:
+        adjustments = AttendanceAdjustment.objects.for_institution(institution).filter(attendance_record__employee=employee)
+        pending_adjustments = adjustments.filter(status=AttendanceAdjustment.Status.PENDING).count()
+        if pending_adjustments:
+            add("MY_ADJUSTMENT_PENDING", "NORMAL", "Attendance correction awaiting review", f"{pending_adjustments} of your correction requests are waiting for review.", "/me/attendance")
+        rejected = adjustments.filter(status=AttendanceAdjustment.Status.REJECTED, acted_at__date__gte=today - timedelta(days=14)).count()
+        if rejected:
+            add("MY_ADJUSTMENT_REJECTED", "HIGH", "Attendance correction was not approved", f"{rejected} correction request(s) were rejected in the last two weeks.", "/me/attendance")
+        activity["attendance_corrections_pending"] = pending_adjustments
+    unread = Notification.objects.for_institution(institution).filter(user=user, status__in=(Notification.Status.PENDING, Notification.Status.SENT)).count()
+    if unread:
+        add("MY_NOTIFICATIONS_UNREAD", "NORMAL", "Unread notifications", f"You have {unread} unread update(s).", "/notifications")
+    activity["documents_on_file"] = Document.objects.for_institution(institution).filter(entity_type="EMPLOYEE", entity_id=employee.id, is_active=True).count()
+
+    return {"upcoming_shifts": upcoming_shifts, "attention": attention, "activity": activity}
+
+
 def home_payload(*, user, institution, permission_codes):
     unread = Notification.objects.for_institution(institution).filter(
         user=user, status__in=(Notification.Status.PENDING, Notification.Status.SENT)
@@ -167,5 +251,5 @@ def home_payload(*, user, institution, permission_codes):
         "recent_work": _recent_work(user=user, institution=institution, permission_codes=permission_codes),
         "attention_items": _attention_items(institution=institution, permission_codes=permission_codes),
         "notifications_summary": {"unread_count": unread.count(), "latest": list(unread.values("id", "notification_type", "title", "message", "created_at")[:5])},
-        "optional_personal_snapshot": None,
+        "optional_personal_snapshot": _personal_snapshot(user=user, institution=institution, permission_codes=permission_codes),
     }

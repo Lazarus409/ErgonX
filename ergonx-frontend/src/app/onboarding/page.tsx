@@ -8,7 +8,6 @@ import {
   BadgeCheck,
   Building2,
   CheckCircle2,
-  CircleAlert,
   ClipboardCheck,
   CreditCard,
   CalendarDays,
@@ -20,12 +19,17 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "@/components/guards/AuthProvider";
+import HomeHero from "@/components/home/HomeHero";
+import Alert from "@/components/ui/Alert";
+import { Button } from "@/components/ui/Button";
+import { SectionHeading } from "@/components/ui/Card";
 import ErrorState from "@/components/ui/ErrorState";
 import LoadingState from "@/components/ui/LoadingState";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { getApiErrorMessage, institutionsApi } from "@/lib/api";
 import { useApiResource } from "@/lib/useApiResource";
 import type { InstitutionOnboardingStep } from "@/types/institutions";
+import { cx } from "@/lib/cx";
 
 type StepAction = { href: string; label: string };
 
@@ -108,50 +112,92 @@ export default function OnboardingPage() {
     };
   }, [data, visibleSteps]);
 
-  if (loading) return <LoadingState />;
-  if (error || !data) return <ErrorState message={error ?? "You may not have permission to view institution onboarding."} onRetry={reload} />;
+  if (loading) return <LoadingState variant="dashboard" label="Loading setup" />;
+  if (error || !data) return <div className="mx-auto max-w-6xl"><ErrorState message={error ?? "You may not have permission to view institution onboarding."} onRetry={reload} /></div>;
 
   const blockers = (data.validation_summary.blockers ?? []).filter((blocker) =>
     !isInstitutionSetupOwner || institutionAdminSteps.has(blocker.step),
   );
+  const percent = setupSummary.required ? Math.round((setupSummary.complete / setupSummary.required) * 100) : 100;
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
-      <div className="mx-auto max-w-6xl">
-        <section className="relative overflow-hidden rounded-3xl bg-slate-950 px-6 py-7 text-white shadow-[0_22px_55px_rgba(15,23,42,0.18)] sm:px-8 sm:py-9">
-          <div className="absolute -right-16 -top-20 h-64 w-64 rounded-full bg-sky-500/20 blur-3xl" />
-          <div className="absolute bottom-0 right-24 h-28 w-28 rounded-full border border-sky-300/20" />
-          <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-2xl"><h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Set up {institution?.name ?? "your institution"}.</h1><p className="mt-3 max-w-xl text-sm leading-6 text-slate-300">Complete the essentials to prepare your organization.</p></div>
-            {canManageOnboarding && <button type="button" disabled={validating} onClick={() => void validate()} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-slate-950 shadow-lg transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"><RefreshCw className={validating ? "h-4 w-4 animate-spin" : "h-4 w-4"} />{validating ? "Validating…" : "Validate setup"}</button>}
-          </div>
-        </section>
-
-        <section className="mt-6 max-w-3xl">
-          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_12px_35px_rgba(15,23,42,0.04)] sm:p-7">
-            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-              <div><div className="flex flex-wrap items-center gap-3"><h2 className="text-xl font-semibold tracking-tight text-slate-950">Setup progress</h2><StatusBadge status={data.status} /></div><p className="mt-2 text-sm text-slate-500">{setupSummary.complete} of {setupSummary.required} required setup items completed.</p></div>
-              <p className="text-4xl font-semibold tracking-tight text-slate-950">{setupSummary.required ? Math.round((setupSummary.complete / setupSummary.required) * 100) : 100}<span className="text-xl text-slate-400">%</span></p>
+    <div className="mx-auto max-w-6xl space-y-6">
+      <HomeHero
+        eyebrow="Guided setup"
+        title={`Set up ${institution?.name ?? "your institution"}.`}
+        subtitle="Complete the essentials to prepare your organization. Each step is verified by the server."
+        aside={
+          <div className="rounded-2xl bg-white/[0.08] p-5 ring-1 ring-inset ring-white/15 backdrop-blur-sm">
+            <p className="text-caption font-semibold text-accent-aqua">Setup progress</p>
+            <p className="mt-1 text-display font-bold tabular-nums">{percent}<span className="text-heading text-white/60">%</span></p>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/15" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} aria-label="Setup progress">
+              <div className="bg-signature h-full rounded-full transition-[width] duration-500 ease-standard" style={{ width: `${percent}%` }} />
             </div>
-            <div className="mt-6 h-3 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-gradient-to-r from-sky-500 to-cyan-400 transition-all duration-500" style={{ width: `${setupSummary.required ? Math.round((setupSummary.complete / setupSummary.required) * 100) : 100}%` }} /></div>
-            <div className="mt-5 flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3"><ClipboardCheck className="h-5 w-5 shrink-0 text-sky-700" /><p className="text-sm text-slate-600"><span className="font-semibold text-slate-900">Current focus:</span> {isInstitutionSetupOwner ? "Institution profile, module selection, and setup owners" : formatStep(data.current_step)}</p></div>
+            <p className="mt-2 text-caption text-white/65">{setupSummary.complete} of {setupSummary.required} required items complete</p>
+            {canManageOnboarding && (
+              <Button variant="inverse" size="sm" className="mt-4" loading={validating} loadingLabel="Validating…" leadingIcon={<RefreshCw className="h-4 w-4" />} onClick={() => void validate()}>Validate setup</Button>
+            )}
           </div>
-        </section>
+        }
+      >
+        <div className="flex flex-wrap items-center gap-3">
+          <StatusBadge status={data.status} />
+          <span className="inline-flex items-center gap-2 text-support text-white/70"><ClipboardCheck className="h-4 w-4 text-accent-aqua" aria-hidden="true" />Current focus: <span className="font-semibold text-white">{isInstitutionSetupOwner ? "Institution profile, module selection, and setup owners" : formatStep(data.current_step)}</span></span>
+        </div>
+      </HomeHero>
 
-        {actionError && <div className="mt-6"><ErrorState title="Setup validation failed" message={actionError} onRetry={reload} /></div>}
-        {blockers.length > 0 && <section className="mt-6 rounded-3xl border border-amber-200 bg-amber-50 p-5 sm:p-6"><div className="flex gap-3"><CircleAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" /><div><h2 className="font-semibold text-amber-950">Attention needed before setup can be completed</h2><p className="mt-1 text-sm text-amber-800">Resolve these server-identified requirements, then validate again.</p><ul className="mt-4 space-y-2 text-sm text-amber-900">{blockers.map((blocker) => <li key={`${blocker.step}-${blocker.code}`} className="rounded-xl bg-white/60 px-3 py-2"><span className="font-semibold">{formatStep(blocker.step)}:</span> {blocker.message}</li>)}</ul></div></div></section>}
-        {data.status === "READY" && <section className="mt-6 flex items-start gap-3 rounded-3xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-900 sm:p-6"><CheckCircle2 className="mt-0.5 h-6 w-6 shrink-0" /><div><h2 className="font-semibold">Your institution is ready</h2><p className="mt-1 text-sm text-emerald-800">All enabled-module setup requirements have passed server validation.</p></div></section>}
+      {actionError && <ErrorState variant="inline" title="Setup validation failed" message={actionError} onRetry={reload} />}
+      {blockers.length > 0 && (
+        <Alert tone="warning" title="Attention needed before setup can be completed">
+          <p>Resolve these server-identified requirements, then validate again.</p>
+          <ul className="mt-3 space-y-1.5">
+            {blockers.map((blocker) => <li key={`${blocker.step}-${blocker.code}`} className="rounded-lg bg-surface/70 px-3 py-2"><span className="font-semibold text-ink-strong">{formatStep(blocker.step)}:</span> {blocker.message}</li>)}
+          </ul>
+        </Alert>
+      )}
+      {data.status === "READY" && <Alert tone="success" title="Your institution is ready">All enabled-module setup requirements have passed server validation.</Alert>}
 
-        <section className="mt-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_12px_35px_rgba(15,23,42,0.04)] sm:p-7"><div className="flex flex-col gap-2 border-b border-slate-100 pb-5 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-sky-700">Guided checklist</p><h2 className="mt-2 text-xl font-semibold tracking-tight text-slate-950">{isInstitutionSetupOwner ? "Prepare your organization" : "Complete your setup"}</h2><p className="mt-1 text-sm text-slate-500">{isInstitutionSetupOwner ? "Role owners complete their own authorized configuration after you invite them." : "Complete the setup items assigned to your permissions."}</p></div><p className="text-sm text-slate-500">{visibleSteps.length} setup steps</p></div><div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{visibleSteps.map((step) => <SetupStepCard key={step.code} step={step} validating={validating} canValidate={Boolean(canManageOnboarding)} onValidate={validate} />)}</div></section>
-      </div>
-    </main>
+      <section aria-labelledby="checklist-heading" className="space-y-4">
+        <SectionHeading
+          title={<span id="checklist-heading">{isInstitutionSetupOwner ? "Prepare your organization" : "Complete your setup"}</span>}
+          description={isInstitutionSetupOwner ? "Role owners complete their own authorized configuration after you invite them." : "Complete the setup items assigned to your permissions."}
+          actions={<span className="text-support text-ink-muted">{visibleSteps.length} setup steps</span>}
+        />
+        <ol className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {visibleSteps.map((step, index) => <SetupStepCard key={step.code} index={index + 1} step={step} validating={validating} canValidate={Boolean(canManageOnboarding)} onValidate={validate} />)}
+        </ol>
+      </section>
+    </div>
   );
 }
 
-function SetupStepCard({ step, validating, canValidate, onValidate }: { step: InstitutionOnboardingStep; validating: boolean; canValidate: boolean; onValidate: () => Promise<void> }) {
+function SetupStepCard({ index, step, validating, canValidate, onValidate }: { index: number; step: InstitutionOnboardingStep; validating: boolean; canValidate: boolean; onValidate: () => Promise<void> }) {
   const presentation = stepPresentation[step.code] ?? { title: formatStep(step.code), description: "Complete this setup requirement.", icon: ClipboardCheck };
   const Icon = presentation.icon;
   const complete = isFinished(step.status);
   const needsAttention = step.status === "BLOCKED";
+  const linkClass = "inline-flex items-center gap-1.5 text-support font-semibold text-primary-ink hover:underline";
 
-  return <article className={`flex min-h-44 flex-col rounded-2xl border p-5 transition ${needsAttention ? "border-red-200 bg-red-50/40" : complete ? "border-slate-200 bg-slate-50/70" : "border-slate-200 bg-white shadow-sm"}`}><div className="flex items-start justify-between gap-3"><div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${needsAttention ? "bg-red-100 text-red-700" : complete ? "bg-emerald-100 text-emerald-700" : "bg-sky-100 text-sky-700"}`}><Icon className="h-5 w-5" /></div><StatusBadge status={step.status} /></div><h3 className="mt-5 font-semibold text-slate-950">{presentation.title}</h3>{step.blocker_message && <p className="mt-2 text-sm leading-5 text-red-700">{step.blocker_message}</p>}{step.required_module && <p className="mt-2 text-xs font-medium text-slate-400">Required for {formatStep(step.required_module)}</p>}<div className="mt-auto flex flex-wrap items-center gap-4 pt-5">{step.code === "VALIDATION" && !complete && canValidate ? <button type="button" disabled={validating} onClick={() => void onValidate()} className="inline-flex items-center gap-2 text-sm font-semibold text-sky-700 hover:text-sky-900 disabled:opacity-60">{validating ? "Validating…" : "Validate setup"} <ArrowRight className="h-4 w-4" /></button> : presentation.action ? <Link href={presentation.action.href} className="inline-flex items-center gap-2 text-sm font-semibold text-sky-700 hover:text-sky-900">{complete ? "Manage" : presentation.action.label} <ArrowRight className="h-4 w-4" /></Link> : <span className={`inline-flex items-center gap-2 text-sm font-semibold ${step.status === "SKIPPED" ? "text-slate-400" : "text-emerald-700"}`}>{step.status === "SKIPPED" ? "Skipped" : complete ? "Completed" : "View only"}{complete && step.status !== "SKIPPED" && <CheckCircle2 className="h-4 w-4" />}</span>}</div></article>;
+  return (
+    <li className={cx("relative flex min-h-48 flex-col overflow-hidden rounded-2xl border p-5 transition-shadow", needsAttention ? "border-danger/30 bg-danger-soft/40" : complete ? "border-line bg-surface-muted/50" : "border-line bg-surface shadow-elevation-1 hover:shadow-elevation-2")}>
+      <span aria-hidden="true" className={cx("absolute inset-x-0 top-0 h-[3px]", needsAttention ? "bg-danger" : complete ? "bg-success" : "bg-primary")} />
+      <div className="flex items-start justify-between gap-3">
+        <span className={cx("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl", needsAttention ? "bg-danger-soft text-danger" : complete ? "bg-success-soft text-success" : "bg-primary-soft text-primary")} aria-hidden="true"><Icon className="h-5 w-5" /></span>
+        <StatusBadge status={step.status} size="sm" />
+      </div>
+      <p className="mt-4 text-caption font-semibold text-ink-subtle">Step {index}</p>
+      <h3 className="text-card-title font-semibold text-ink-strong">{presentation.title}</h3>
+      <p className="mt-1 text-support text-ink-muted">{presentation.description}</p>
+      {step.blocker_message && <p className="mt-2 text-support font-medium text-danger-ink">{step.blocker_message}</p>}
+      {step.required_module && <p className="mt-2 text-caption text-ink-subtle">Required for {formatStep(step.required_module)}</p>}
+      <div className="mt-auto pt-5">
+        {step.code === "VALIDATION" && !complete && canValidate ? (
+          <button type="button" disabled={validating} onClick={() => void onValidate()} className={cx(linkClass, "disabled:opacity-60")}>{validating ? "Validating…" : "Validate setup"} <ArrowRight className="h-4 w-4" aria-hidden="true" /></button>
+        ) : presentation.action ? (
+          <Link href={presentation.action.href} className={linkClass}>{complete ? "Manage" : presentation.action.label} <ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
+        ) : (
+          <span className={cx("inline-flex items-center gap-1.5 text-support font-semibold", step.status === "SKIPPED" ? "text-ink-subtle" : "text-success-ink")}>{step.status === "SKIPPED" ? "Skipped" : complete ? "Completed" : "View only"}{complete && step.status !== "SKIPPED" && <CheckCircle2 className="h-4 w-4" aria-hidden="true" />}</span>
+        )}
+      </div>
+    </li>
+  );
 }

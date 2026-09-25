@@ -19,5 +19,5 @@ const areas = [
 ];
 
 export default function AccountingPage() {
-  return <ModuleLanding title="Accounting" description="Manage financial configuration, controlled workflows, and reporting." module="ACCOUNTING" accentClassName="border-emerald-200 bg-emerald-50 text-emerald-950" areas={areas} />;
+  return <ModuleLanding title="Accounting" description="Manage financial configuration, controlled workflows, and reporting." module="ACCOUNTING" accent="accounting" icon={Landmark} eyebrow="Finance" areas={areas} />;
 }

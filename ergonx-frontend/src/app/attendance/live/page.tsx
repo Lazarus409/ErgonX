@@ -34,6 +34,7 @@ import type {
 } from "@/types/attendance";
 import type { Department, Employee, Employment, Location } from "@/types/hr";
 import { EM_DASH, humanizeEnum, toISODate } from "@/lib/format";
+import { buttonClasses } from "@/components/ui/Button";
 
 const ALL = "ALL";
 const SEARCH_DEBOUNCE_MS = 350;
@@ -322,7 +323,7 @@ export default function LiveAttendancePage() {
           <button
             onClick={refresh}
             disabled={loading}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            className={buttonClasses({ variant: "secondary" })}
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             Refresh
@@ -331,25 +332,25 @@ export default function LiveAttendancePage() {
       />
 
       {actionError && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-lg border border-danger/25 bg-danger-soft px-4 py-3 text-sm text-danger-ink">
           {actionError}
         </div>
       )}
 
       {error && <ErrorState message={error} onRetry={refresh} />}
 
-      <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-xl border border-line bg-surface px-5 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-semibold text-slate-900">
+          <p className="text-sm font-semibold text-ink-strong">
             Today&apos;s Attendance
           </p>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-ink-muted">
             Live attendance monitoring for the current institution.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 text-xs text-slate-500">
-          <span className="h-2 w-2 rounded-full bg-green-500" />
+        <div className="flex items-center gap-2 text-xs text-ink-muted">
+          <span className="h-2 w-2 rounded-full bg-success" />
           Live
           <span className="ml-2">{lastUpdated ?? "Loading..."}</span>
         </div>
@@ -381,16 +382,16 @@ export default function LiveAttendancePage() {
         />
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-col gap-3 border-b border-slate-200 p-4 xl:flex-row xl:items-center">
+      <div className="rounded-xl border border-line bg-surface shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-line p-4 xl:flex-row xl:items-center">
           <div className="relative min-w-0 flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-subtle" />
 
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search employee or employee number..."
-              className="w-full rounded-lg border border-slate-200 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-slate-400"
+              className="w-full h-9 rounded-lg border border-line-strong pl-10 pr-4 text-sm outline-none focus:border-primary"
             />
           </div>
 
@@ -398,7 +399,7 @@ export default function LiveAttendancePage() {
             value={status}
             onChange={(event) => setStatus(event.target.value)}
             aria-label="Filter by status"
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none"
+            className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink outline-none"
           >
             <option value={ALL}>All Statuses</option>
 
@@ -413,7 +414,7 @@ export default function LiveAttendancePage() {
             value={department}
             onChange={(event) => setDepartment(event.target.value)}
             aria-label="Filter by department"
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none"
+            className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink outline-none"
           >
             <option value={ALL}>All Departments</option>
 
@@ -428,7 +429,7 @@ export default function LiveAttendancePage() {
             value={location}
             onChange={(event) => setLocation(event.target.value)}
             aria-label="Filter by location"
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none"
+            className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink outline-none"
           >
             <option value={ALL}>All Locations</option>
 
@@ -443,32 +444,32 @@ export default function LiveAttendancePage() {
         <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[1100px]">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-left">
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <tr className="border-b border-line bg-surface-muted text-left">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Employee
                 </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Department
                 </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Schedule
                 </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Scheduled
                 </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Check In
                 </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Check Out
                 </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Hours
                 </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Status
                 </th>
-                <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Action
                 </th>
               </tr>
@@ -484,44 +485,44 @@ export default function LiveAttendancePage() {
                 return (
                   <tr
                     key={record.id}
-                    className="border-b border-slate-100 last:border-0"
+                    className="border-b border-line-soft last:border-0"
                   >
                     <td className="px-5 py-4">
-                      <p className="font-medium text-slate-900">
+                      <p className="font-medium text-ink-strong">
                         {employee.name}
                       </p>
-                      <p className="mt-1 text-xs text-slate-500">
+                      <p className="mt-1 text-xs text-ink-muted">
                         {employee.number}
                       </p>
                     </td>
 
-                    <td className="px-5 py-4 text-sm text-slate-700">
+                    <td className="px-5 py-4 text-sm text-ink">
                       <p>{departmentName(record)}</p>
-                      <p className="mt-1 text-xs text-slate-500">
+                      <p className="mt-1 text-xs text-ink-muted">
                         {locationName(record)}
                       </p>
                     </td>
 
-                    <td className="px-5 py-4 text-sm text-slate-700">
+                    <td className="px-5 py-4 text-sm text-ink">
                       {schedule.name}
                     </td>
 
-                    <td className="px-5 py-4 text-sm text-slate-700">
+                    <td className="px-5 py-4 text-sm text-ink">
                       <p>{schedule.start}</p>
-                      <p className="mt-1 text-xs text-slate-400">
+                      <p className="mt-1 text-xs text-ink-subtle">
                         to {schedule.end}
                       </p>
                     </td>
 
-                    <td className="px-5 py-4 text-sm text-slate-700">
+                    <td className="px-5 py-4 text-sm text-ink">
                       {clockTime(record.check_in)}
                     </td>
 
-                    <td className="px-5 py-4 text-sm text-slate-700">
+                    <td className="px-5 py-4 text-sm text-ink">
                       {clockTime(record.check_out)}
                     </td>
 
-                    <td className="px-5 py-4 text-sm text-slate-700">
+                    <td className="px-5 py-4 text-sm text-ink">
                       {attendanceApi.formatMinutes(record.worked_minutes)}
                     </td>
 
@@ -535,7 +536,7 @@ export default function LiveAttendancePage() {
                           <button
                             type="button"
                             onClick={() => setClockOutTarget(record)}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                            className={buttonClasses({ variant: "secondary" })}
                           >
                             <LogOut className="h-4 w-4" />
                             Clock out
@@ -544,7 +545,7 @@ export default function LiveAttendancePage() {
 
                         <Link
                           href={`/attendance/live/${record.id}`}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                          className={buttonClasses({ variant: "secondary" })}
                         >
                           <Eye className="h-4 w-4" />
                           View
@@ -558,12 +559,12 @@ export default function LiveAttendancePage() {
               {filteredRecords.length === 0 && (
                 <tr>
                   <td colSpan={9} className="px-5 py-12 text-center">
-                    <p className="text-sm font-medium text-slate-700">
+                    <p className="text-sm font-medium text-ink">
                       {loading
                         ? "Loading attendance..."
                         : "No attendance records found"}
                     </p>
-                    <p className="mt-1 text-sm text-slate-500">
+                    <p className="mt-1 text-sm text-ink-muted">
                       {loading
                         ? "Please wait."
                         : "No attendance has been recorded for today with these filters."}
@@ -575,7 +576,7 @@ export default function LiveAttendancePage() {
           </table>
         </div>
 
-        <div className="divide-y divide-slate-100 md:hidden">
+        <div className="divide-y divide-line-soft md:hidden">
           {filteredRecords.map((record) => {
             const expanded = expandedId === record.id;
             const employee = employeeLabel(record);
@@ -588,16 +589,16 @@ export default function LiveAttendancePage() {
                   className="flex w-full items-center justify-between text-left"
                 >
                   <div>
-                    <p className="font-medium text-slate-900">
+                    <p className="font-medium text-ink-strong">
                       {employee.name}
                     </p>
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="mt-1 text-xs text-ink-muted">
                       {employee.number} · {departmentName(record)}
                     </p>
                   </div>
 
                   <ChevronDown
-                    className={`h-5 w-5 text-slate-400 transition-transform ${
+                    className={`h-5 w-5 text-ink-subtle transition-transform ${
                       expanded ? "rotate-180" : ""
                     }`}
                   />
@@ -608,14 +609,14 @@ export default function LiveAttendancePage() {
 
                   <Link
                     href={`/attendance/live/${record.id}`}
-                    className="text-sm font-medium text-slate-700"
+                    className="text-sm font-medium text-ink"
                   >
                     View
                   </Link>
                 </div>
 
                 {expanded && (
-                  <div className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3 text-sm">
+                  <div className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-surface-muted p-3 text-sm">
                     <Info label="Schedule" value={schedule.name} />
                     <Info label="Location" value={locationName(record)} />
                     <Info label="Scheduled In" value={schedule.start} />
@@ -636,20 +637,20 @@ export default function LiveAttendancePage() {
 
           {filteredRecords.length === 0 && !loading && (
             <div className="px-5 py-12 text-center">
-              <p className="text-sm font-medium text-slate-700">
+              <p className="text-sm font-medium text-ink">
                 No attendance records found
               </p>
             </div>
           )}
         </div>
 
-        <div className="flex items-center justify-between border-t border-slate-200 px-5 py-3">
-          <p className="text-xs text-slate-500">
+        <div className="flex items-center justify-between border-t border-line px-5 py-3">
+          <p className="text-xs text-ink-muted">
             Showing {filteredRecords.length} of {records.length} records
           </p>
 
-          <div className="flex items-center gap-2 text-xs text-slate-500">
-            <span className="h-2 w-2 rounded-full bg-green-500" />
+          <div className="flex items-center gap-2 text-xs text-ink-muted">
+            <span className="h-2 w-2 rounded-full bg-success" />
             Live monitoring
           </div>
         </div>
@@ -678,16 +679,16 @@ function SummaryCard({
   icon: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-xl border border-line bg-surface p-5 shadow-sm">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500">{title}</p>
+        <p className="text-sm text-ink-muted">{title}</p>
 
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-surface-sunken text-ink">
           {icon}
         </span>
       </div>
 
-      <p className="mt-3 text-2xl font-bold text-slate-900">{value}</p>
+      <p className="mt-3 text-2xl font-bold text-ink-strong">{value}</p>
     </div>
   );
 }
@@ -695,8 +696,8 @@ function SummaryCard({
 function Info({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="mt-1 font-medium text-slate-800">{value}</p>
+      <p className="text-xs text-ink-muted">{label}</p>
+      <p className="mt-1 font-medium text-ink">{value}</p>
     </div>
   );
 }

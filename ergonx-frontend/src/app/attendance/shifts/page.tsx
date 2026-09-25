@@ -19,6 +19,8 @@ import ErrorState from "@/components/ui/ErrorState";
 import { attendanceApi, getApiErrorMessage, schedulingApi } from "@/lib/api";
 import { MAX_PAGE_SIZE } from "@/types/api";
 import type { Shift } from "@/types/attendance";
+import { buttonClasses } from "@/components/ui/Button";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 
 const ALL = "ALL";
 
@@ -211,7 +213,7 @@ export default function AttendanceShiftsPage() {
         actions={
           <button
             onClick={openCreate}
-            className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
+            className={buttonClasses({ variant: "primary" })}
           >
             <Plus className="h-4 w-4" />
             Add Shift
@@ -247,16 +249,16 @@ export default function AttendanceShiftsPage() {
         />
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-col gap-3 border-b border-slate-200 p-4 lg:flex-row lg:items-center">
+      <div className="rounded-xl border border-line bg-surface shadow-sm">
+        <div className="flex flex-col gap-3 border-b border-line p-4 lg:flex-row lg:items-center">
           <div className="relative min-w-0 flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-subtle" />
 
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search shifts..."
-              className="w-full rounded-lg border border-slate-200 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-slate-400"
+              className="w-full h-9 rounded-lg border border-line-strong pl-10 pr-4 text-sm outline-none focus:border-primary"
             />
           </div>
 
@@ -268,51 +270,47 @@ export default function AttendanceShiftsPage() {
             value={overnightFilter}
             onChange={(event) => setOvernightFilter(event.target.value)}
             aria-label="Filter by overnight"
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none"
+            className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink outline-none"
           >
             <option value={ALL}>All Shifts</option>
             <option value="SAME_DAY">Same day</option>
             <option value="OVERNIGHT">Crosses midnight</option>
           </select>
 
-          <select
+          <SegmentedControl
+            label="Filter by status"
             value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
-            aria-label="Filter by status"
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none"
-          >
-            <option value={ALL}>All Statuses</option>
-            <option value="ACTIVE">ACTIVE</option>
-            <option value="INACTIVE">INACTIVE</option>
-          </select>
+            onChange={(next) => setStatusFilter(next)}
+            options={[{ value: ALL, label: "All" }, { value: "ACTIVE", label: "ACTIVE" }, { value: "INACTIVE", label: "INACTIVE" }]}
+          />
         </div>
 
         <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[950px]">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-left">
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <tr className="border-b border-line bg-surface-muted text-left">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Shift
                 </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Start
                 </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   End
                 </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Break
                 </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Grace
                 </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Scheduled
                 </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Status
                 </th>
-                <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Action
                 </th>
               </tr>
@@ -322,36 +320,36 @@ export default function AttendanceShiftsPage() {
               {filteredShifts.map((shift) => (
                 <tr
                   key={shift.id}
-                  className="border-b border-slate-100 last:border-0"
+                  className="border-b border-line-soft last:border-0"
                 >
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-2">
-                      <p className="font-medium text-slate-900">{shift.name}</p>
+                      <p className="font-medium text-ink-strong">{shift.name}</p>
 
                       {shift.crosses_midnight && (
-                        <Moon className="h-3.5 w-3.5 text-slate-400" />
+                        <Moon className="h-3.5 w-3.5 text-ink-subtle" />
                       )}
                     </div>
-                    <p className="mt-1 text-xs text-slate-500">{shift.code}</p>
+                    <p className="mt-1 text-xs text-ink-muted">{shift.code}</p>
                   </td>
 
-                  <td className="px-5 py-4 text-sm text-slate-700">
+                  <td className="px-5 py-4 text-sm text-ink">
                     {toInputTime(shift.start_time)}
                   </td>
 
-                  <td className="px-5 py-4 text-sm text-slate-700">
+                  <td className="px-5 py-4 text-sm text-ink">
                     {toInputTime(shift.end_time)}
                   </td>
 
-                  <td className="px-5 py-4 text-sm text-slate-700">
+                  <td className="px-5 py-4 text-sm text-ink">
                     {attendanceApi.formatMinutes(shift.break_minutes)}
                   </td>
 
-                  <td className="px-5 py-4 text-sm text-slate-700">
+                  <td className="px-5 py-4 text-sm text-ink">
                     {attendanceApi.formatMinutes(shift.grace_period_minutes)}
                   </td>
 
-                  <td className="px-5 py-4 text-sm font-medium text-slate-900">
+                  <td className="px-5 py-4 text-sm font-medium text-ink-strong">
                     {attendanceApi.formatMinutes(shift.scheduled_minutes)}
                   </td>
 
@@ -365,7 +363,7 @@ export default function AttendanceShiftsPage() {
                     <div className="flex items-center justify-end gap-2">
                       <Link
                         href={`/attendance/shifts/${shift.id}`}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                        className={buttonClasses({ variant: "secondary" })}
                       >
                         <Eye className="h-4 w-4" />
                         View
@@ -373,7 +371,7 @@ export default function AttendanceShiftsPage() {
 
                       <button
                         onClick={() => openEdit(shift)}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                        className={buttonClasses({ variant: "secondary" })}
                       >
                         <Pencil className="h-4 w-4" />
                         Edit
@@ -386,10 +384,10 @@ export default function AttendanceShiftsPage() {
               {filteredShifts.length === 0 && (
                 <tr>
                   <td colSpan={8} className="px-5 py-12 text-center">
-                    <p className="text-sm font-medium text-slate-700">
+                    <p className="text-sm font-medium text-ink">
                       {loading ? "Loading shifts..." : "No shifts found"}
                     </p>
-                    <p className="mt-1 text-sm text-slate-500">
+                    <p className="mt-1 text-sm text-ink-muted">
                       {loading
                         ? "Please wait."
                         : "Create a shift to start building work schedules."}
@@ -401,7 +399,7 @@ export default function AttendanceShiftsPage() {
           </table>
         </div>
 
-        <div className="divide-y divide-slate-100 md:hidden">
+        <div className="divide-y divide-line-soft md:hidden">
           {filteredShifts.map((shift) => {
             const expanded = expandedId === shift.id;
 
@@ -412,15 +410,15 @@ export default function AttendanceShiftsPage() {
                   className="flex w-full items-center justify-between text-left"
                 >
                   <div>
-                    <p className="font-medium text-slate-900">{shift.name}</p>
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="font-medium text-ink-strong">{shift.name}</p>
+                    <p className="mt-1 text-xs text-ink-muted">
                       {shift.code} · {toInputTime(shift.start_time)}–
                       {toInputTime(shift.end_time)}
                     </p>
                   </div>
 
                   <ChevronDown
-                    className={`h-5 w-5 text-slate-400 transition-transform ${
+                    className={`h-5 w-5 text-ink-subtle transition-transform ${
                       expanded ? "rotate-180" : ""
                     }`}
                   />
@@ -433,14 +431,14 @@ export default function AttendanceShiftsPage() {
 
                   <button
                     onClick={() => openEdit(shift)}
-                    className="text-sm font-medium text-slate-700"
+                    className="text-sm font-medium text-ink"
                   >
                     Edit
                   </button>
                 </div>
 
                 {expanded && (
-                  <div className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3 text-sm">
+                  <div className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-surface-muted p-3 text-sm">
                     <Info
                       label="Break"
                       value={attendanceApi.formatMinutes(shift.break_minutes)}
@@ -470,14 +468,14 @@ export default function AttendanceShiftsPage() {
       </div>
 
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-xl">
-            <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
+          <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-surface shadow-xl">
+            <div className="sticky top-0 flex items-center justify-between border-b border-line bg-surface px-6 py-4">
               <div>
-                <h2 className="text-lg font-semibold text-slate-900">
+                <h2 className="text-lg font-semibold text-ink-strong">
                   {editingShift ? "Edit Shift" : "Add Shift"}
                 </h2>
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="mt-1 text-sm text-ink-muted">
                   Scheduled hours are derived by the backend from these values.
                 </p>
               </div>
@@ -485,7 +483,7 @@ export default function AttendanceShiftsPage() {
               <button
                 onClick={closeModal}
                 disabled={saving}
-                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                className="rounded-lg p-2 text-ink-subtle hover:bg-surface-hover hover:text-ink-strong"
                 aria-label="Close"
               >
                 <X className="h-5 w-5" />
@@ -494,14 +492,14 @@ export default function AttendanceShiftsPage() {
 
             <div className="space-y-5 p-6">
               {formError && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <div className="rounded-lg border border-danger/25 bg-danger-soft px-4 py-3 text-sm text-danger-ink">
                   {formError}
                 </div>
               )}
 
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="space-y-1.5">
-                  <span className="text-sm font-medium text-slate-700">
+                  <span className="text-sm font-medium text-ink">
                     Shift Name
                   </span>
                   <input
@@ -510,12 +508,12 @@ export default function AttendanceShiftsPage() {
                       setForm({ ...form, name: event.target.value })
                     }
                     placeholder="e.g. Morning Shift"
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                    className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
                   />
                 </label>
 
                 <label className="space-y-1.5">
-                  <span className="text-sm font-medium text-slate-700">
+                  <span className="text-sm font-medium text-ink">
                     Code
                   </span>
                   <input
@@ -524,12 +522,12 @@ export default function AttendanceShiftsPage() {
                       setForm({ ...form, code: event.target.value })
                     }
                     placeholder="e.g. MORNING"
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                    className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
                   />
                 </label>
 
                 <label className="space-y-1.5">
-                  <span className="text-sm font-medium text-slate-700">
+                  <span className="text-sm font-medium text-ink">
                     Start Time
                   </span>
                   <input
@@ -538,12 +536,12 @@ export default function AttendanceShiftsPage() {
                     onChange={(event) =>
                       setForm({ ...form, startTime: event.target.value })
                     }
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                    className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
                   />
                 </label>
 
                 <label className="space-y-1.5">
-                  <span className="text-sm font-medium text-slate-700">
+                  <span className="text-sm font-medium text-ink">
                     End Time
                   </span>
                   <input
@@ -552,12 +550,12 @@ export default function AttendanceShiftsPage() {
                     onChange={(event) =>
                       setForm({ ...form, endTime: event.target.value })
                     }
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                    className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
                   />
                 </label>
 
                 <label className="space-y-1.5">
-                  <span className="text-sm font-medium text-slate-700">
+                  <span className="text-sm font-medium text-ink">
                     Break (minutes)
                   </span>
                   <input
@@ -570,12 +568,12 @@ export default function AttendanceShiftsPage() {
                         breakMinutes: Number(event.target.value),
                       })
                     }
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                    className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
                   />
                 </label>
 
                 <label className="space-y-1.5">
-                  <span className="text-sm font-medium text-slate-700">
+                  <span className="text-sm font-medium text-ink">
                     Grace Period (minutes)
                   </span>
                   <input
@@ -588,13 +586,13 @@ export default function AttendanceShiftsPage() {
                         gracePeriodMinutes: Number(event.target.value),
                       })
                     }
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                    className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
                   />
                 </label>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
-                <label className="flex items-center gap-3 rounded-lg border border-slate-200 p-3">
+                <label className="flex items-center gap-3 rounded-lg border border-line p-3">
                   <input
                     type="checkbox"
                     checked={form.crossesMidnight}
@@ -607,16 +605,16 @@ export default function AttendanceShiftsPage() {
                     className="h-4 w-4"
                   />
                   <span>
-                    <span className="block text-sm font-medium text-slate-700">
+                    <span className="block text-sm font-medium text-ink">
                       Crosses midnight
                     </span>
-                    <span className="block text-xs text-slate-500">
+                    <span className="block text-xs text-ink-muted">
                       The shift ends on the following day.
                     </span>
                   </span>
                 </label>
 
-                <label className="flex items-center gap-3 rounded-lg border border-slate-200 p-3">
+                <label className="flex items-center gap-3 rounded-lg border border-line p-3">
                   <input
                     type="checkbox"
                     checked={form.isActive}
@@ -626,10 +624,10 @@ export default function AttendanceShiftsPage() {
                     className="h-4 w-4"
                   />
                   <span>
-                    <span className="block text-sm font-medium text-slate-700">
+                    <span className="block text-sm font-medium text-ink">
                       Active
                     </span>
-                    <span className="block text-xs text-slate-500">
+                    <span className="block text-xs text-ink-muted">
                       Available for assignment to work schedules.
                     </span>
                   </span>
@@ -637,11 +635,11 @@ export default function AttendanceShiftsPage() {
               </div>
             </div>
 
-            <div className="sticky bottom-0 flex justify-end gap-3 border-t border-slate-200 bg-white px-6 py-4">
+            <div className="sticky bottom-0 flex justify-end gap-3 border-t border-line bg-surface px-6 py-4">
               <button
                 onClick={closeModal}
                 disabled={saving}
-                className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                className={buttonClasses({ variant: "secondary" })}
               >
                 Cancel
               </button>
@@ -649,7 +647,7 @@ export default function AttendanceShiftsPage() {
               <button
                 onClick={saveShift}
                 disabled={saving || !form.name.trim() || !form.code.trim()}
-                className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                className={buttonClasses({ variant: "primary" })}
               >
                 {saving
                   ? "Saving..."
@@ -675,16 +673,16 @@ function SummaryCard({
   icon: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="rounded-xl border border-line bg-surface p-5 shadow-sm">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500">{title}</p>
+        <p className="text-sm text-ink-muted">{title}</p>
 
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-surface-sunken text-ink">
           {icon}
         </span>
       </div>
 
-      <p className="mt-3 text-2xl font-bold text-slate-900">{value}</p>
+      <p className="mt-3 text-2xl font-bold text-ink-strong">{value}</p>
     </div>
   );
 }
@@ -692,8 +690,8 @@ function SummaryCard({
 function Info({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="mt-1 font-medium text-slate-800">{value}</p>
+      <p className="text-xs text-ink-muted">{label}</p>
+      <p className="mt-1 font-medium text-ink">{value}</p>
     </div>
   );
 }

@@ -1,124 +1,99 @@
-﻿"use client";
+import {
+  Ban,
+  CheckCircle2,
+  Circle,
+  CircleDashed,
+  CircleDot,
+  Clock3,
+  Lock,
+  TriangleAlert,
+  XCircle,
+  type LucideIcon,
+} from "lucide-react";
+
+import { Badge, type BadgeTone } from "@/components/ui/Badge";
 
 interface StatusBadgeProps {
   status: string;
+  size?: "sm" | "md";
+  className?: string;
 }
 
-const statusConfig: Record<
-  string,
-  {
-    label: string;
-    className: string;
-  }
-> = {
-  ACTIVE: {
-    label: "Active",
-    className: "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20",
-  },
-  INACTIVE: {
-    label: "Inactive",
-    className: "bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-500/20",
-  },
-  SUSPENDED: {
-    label: "Suspended",
-    className: "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20",
-  },
-  TERMINATED: {
-    label: "Terminated",
-    className: "bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20",
-  },
-  PENDING: {
-    label: "Pending",
-    className: "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-600/20",
-  },
-  NOT_STARTED: {
-    label: "Not started",
-    className: "bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-500/20",
-  },
-  IN_PROGRESS: {
-    label: "In progress",
-    className: "bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-600/20",
-  },
-  COMPLETED: {
-    label: "Completed",
-    className: "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20",
-  },
-  SKIPPED: {
-    label: "Not required",
-    className: "bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-500/20",
-  },
-  BLOCKED: {
-    label: "Needs attention",
-    className: "bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20",
-  },
-  READY: {
-    label: "Ready",
-    className: "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20",
-  },
-  DRAFT: {
-    label: "Draft",
-    className: "bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-500/20",
-  },
-  APPROVED: {
-    label: "Approved",
-    className: "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20",
-  },
-  REJECTED: {
-    label: "Rejected",
-    className: "bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20",
-  },
-  CANCELLED: {
-    label: "Cancelled",
-    className: "bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20",
-  },
-  FINALIZED: {
-    label: "Finalized",
-    className: "bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-600/20",
-  },
-  PRESENT: {
-    label: "Present",
-    className: "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20",
-  },
-  LATE: {
-    label: "Late",
-    className: "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20",
-  },
-  ABSENT: {
-    label: "Absent",
-    className: "bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20",
-  },
-  ON_LEAVE: {
-    label: "On Leave",
-    className: "bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-600/20",
-  },
-  HOLIDAY: {
-    label: "Holiday",
-    className: "bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-600/20",
-  },
-  OFF_DAY: {
-    label: "Off Day",
-    className: "bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-500/20",
-  },
-  REMOTE: {
-    label: "Remote",
-    className: "bg-cyan-50 text-cyan-700 ring-1 ring-inset ring-cyan-600/20",
-  },
+/**
+ * Canonical workflow/status chip. Meaning is carried by colour, icon and
+ * label together so it never depends on colour alone.
+ */
+const toneIcon: Record<BadgeTone, LucideIcon> = {
+  success: CheckCircle2,
+  warning: Clock3,
+  danger: XCircle,
+  info: CircleDot,
+  neutral: Circle,
+  brand: Lock,
+  violet: CircleDot,
 };
 
-export default function StatusBadge({ status }: StatusBadgeProps) {
-  const normalizedStatus = status.toUpperCase();
-  const config = statusConfig[normalizedStatus] ?? {
-    label: status,
-    className:
-      "bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-500/20",
-  };
+const statusConfig: Record<string, { label: string; tone: BadgeTone; icon?: LucideIcon }> = {
+  ACTIVE: { label: "Active", tone: "success" },
+  INACTIVE: { label: "Inactive", tone: "neutral" },
+  SUSPENDED: { label: "Suspended", tone: "warning", icon: TriangleAlert },
+  TERMINATED: { label: "Terminated", tone: "danger", icon: Ban },
+  PENDING: { label: "Pending", tone: "warning" },
+  SUBMITTED: { label: "Submitted", tone: "warning" },
+  PENDING_APPROVAL: { label: "Pending approval", tone: "warning" },
+  NOT_STARTED: { label: "Not started", tone: "neutral", icon: CircleDashed },
+  IN_PROGRESS: { label: "In progress", tone: "info" },
+  COMPLETED: { label: "Completed", tone: "success" },
+  SKIPPED: { label: "Not required", tone: "neutral", icon: CircleDashed },
+  BLOCKED: { label: "Needs attention", tone: "danger", icon: TriangleAlert },
+  READY: { label: "Ready", tone: "success" },
+  DRAFT: { label: "Draft", tone: "neutral", icon: CircleDashed },
+  APPROVED: { label: "Approved", tone: "success" },
+  REJECTED: { label: "Rejected", tone: "danger" },
+  CANCELLED: { label: "Cancelled", tone: "danger", icon: Ban },
+  FINALIZED: { label: "Finalized", tone: "success", icon: Lock },
+  POSTED: { label: "Posted", tone: "brand" },
+  CLOSED: { label: "Closed", tone: "neutral", icon: Lock },
+  OPEN: { label: "Open", tone: "info" },
+  PAID: { label: "Paid", tone: "success" },
+  PARTIALLY_PAID: { label: "Partially paid", tone: "info" },
+  PART_PAID: { label: "Part paid", tone: "info" },
+  ISSUED: { label: "Issued", tone: "info" },
+  OVERDUE: { label: "Overdue", tone: "danger", icon: TriangleAlert },
+  SCHEDULED: { label: "Scheduled", tone: "violet", icon: Clock3 },
+  VOID: { label: "Void", tone: "danger", icon: Ban },
+  VOIDED: { label: "Voided", tone: "danger", icon: Ban },
+  REVERSED: { label: "Reversed", tone: "neutral" },
+  EXPIRED: { label: "Expired", tone: "neutral" },
+  ACCEPTED: { label: "Accepted", tone: "success" },
+  DECLINED: { label: "Declined", tone: "danger" },
+  WITHDRAWN: { label: "Withdrawn", tone: "neutral" },
+  HIRED: { label: "Hired", tone: "success" },
+  PUBLISHED: { label: "Published", tone: "success" },
+  FAILED: { label: "Failed", tone: "danger" },
+  PRESENT: { label: "Present", tone: "success" },
+  LATE: { label: "Late", tone: "warning", icon: TriangleAlert },
+  ABSENT: { label: "Absent", tone: "danger" },
+  ON_LEAVE: { label: "On leave", tone: "info" },
+  HOLIDAY: { label: "Holiday", tone: "violet" },
+  OFF_DAY: { label: "Off day", tone: "neutral" },
+  REMOTE: { label: "Remote", tone: "info" },
+  UNMATCHED: { label: "Unmatched", tone: "warning", icon: TriangleAlert },
+  MATCHED: { label: "Matched", tone: "success" },
+  EXCEPTION: { label: "Exception", tone: "danger", icon: TriangleAlert },
+};
 
+function humanize(value: string): string {
+  const words = value.replaceAll("_", " ").toLowerCase();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+export default function StatusBadge({ status, size = "md", className }: StatusBadgeProps) {
+  const normalizedStatus = (status ?? "").toUpperCase();
+  const config = statusConfig[normalizedStatus] ?? { label: humanize(status ?? ""), tone: "neutral" as BadgeTone };
   return (
-    <span
-      className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${config.className}`}
-    >
-      <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-current" />
+    <Badge tone={config.tone} icon={config.icon ?? toneIcon[config.tone]} size={size} className={className}>
       {config.label}
-    </span>
+    </Badge>
   );
 }

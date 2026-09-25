@@ -6,9 +6,9 @@
  * institution data from being replayed across sessions. It only stores static
  * same-origin assets and the generic offline fallback.
  */
-const CACHE_NAME = "ergonx-static-v1";
+const CACHE_NAME = "ergonx-static-v2";
 const OFFLINE_URL = "/offline";
-const PRE_CACHE = [OFFLINE_URL, "/manifest.webmanifest", "/ergonx-logo.png"];
+const PRE_CACHE = [OFFLINE_URL, "/manifest.webmanifest", "/brand/ergonx-mark.png", "/brand/ergonx-logo-primary.png", "/brand/icon-192.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(PRE_CACHE)));

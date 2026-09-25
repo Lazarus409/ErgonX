@@ -102,23 +102,23 @@ export default function ModuleSelector({
             onClick={() => toggleModule(selectedModule.id)}
             className={`rounded-xl border p-5 text-left transition ${
               enabled
-                ? "border-slate-950 bg-slate-50 ring-1 ring-slate-950"
-                : "border-slate-200 bg-white hover:border-slate-400"
+                ? "border-primary bg-surface-muted ring-1 ring-primary"
+                : "border-line bg-surface hover:border-line-strong"
             }`}
           >
             <div className="flex items-start justify-between">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-surface-sunken">
                 <Icon
                   size={19}
-                  className="text-slate-700"
+                  className="text-ink"
                 />
               </div>
 
               <span
                 className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${
                   enabled
-                    ? "bg-slate-950 text-white"
-                    : "bg-slate-100 text-slate-500"
+                    ? "bg-primary text-white"
+                    : "bg-surface-sunken text-ink-muted"
                 }`}
               >
                 {selectedModule.required
@@ -129,11 +129,11 @@ export default function ModuleSelector({
               </span>
             </div>
 
-            <h3 className="mt-4 text-sm font-semibold text-slate-950">
+            <h3 className="mt-4 text-sm font-semibold text-ink-strong">
               {selectedModule.name}
             </h3>
 
-            <p className="mt-1 text-xs leading-5 text-slate-500">
+            <p className="mt-1 text-xs leading-5 text-ink-muted">
               {selectedModule.description}
             </p>
           </button>

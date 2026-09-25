@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { Bell, Building2, BriefcaseBusiness, CalendarDays, Clock3, GitPullRequest, KeyRound, type LucideIcon, Puzzle, ShieldCheck, SlidersHorizontal, UserRound } from "lucide-react";
 
 import { useAuth } from "@/components/guards/AuthProvider";
+import { ActionCard } from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import PageHeader from "@/components/ui/PageHeader";
 import { hasModule } from "@/types/institutions";
@@ -30,5 +30,16 @@ export default function SettingsPage() {
     const authorized = permissions.includes("*") || (area.permission ? permissions.includes(area.permission) : Boolean(area.anyPermissions?.some((permission) => permissions.includes(permission))));
     return authorized && (!area.module || hasModule(institution?.enabledModules, area.module));
   });
-  return <div className="space-y-7"><PageHeader title="Settings" description="Only settings authorized by your active institution membership are shown." />{visibleAreas.length ? <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">{visibleAreas.map((area) => { const Icon = area.icon; return <Link key={area.href} href={area.href} className="flex min-h-44 flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-sky-100"><Icon className="h-6 w-6 text-slate-700" /><h2 className="mt-5 font-semibold text-slate-950">{area.title}</h2><p className="mt-2 text-sm leading-6 text-slate-500">{area.description}</p></Link>; })}</div> : <EmptyState title="No settings are available" description="Your current role does not grant a settings area in this institution." />}</div>;
+  return (
+    <div className="mx-auto max-w-7xl space-y-6">
+      <PageHeader eyebrow="Administration" title="Settings" description="Only settings authorized by your active institution membership are shown." icon={SlidersHorizontal} accent="settings" />
+      {visibleAreas.length ? (
+        <section aria-label="Settings areas" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {visibleAreas.map((area) => <ActionCard key={area.href} href={area.href} title={area.title} description={area.description} icon={area.icon} accent="settings" />)}
+        </section>
+      ) : (
+        <EmptyState icon={SlidersHorizontal} accent="settings" title="No settings are available" description="Your current role does not grant a settings area in this institution." />
+      )}
+    </div>
+  );
 }

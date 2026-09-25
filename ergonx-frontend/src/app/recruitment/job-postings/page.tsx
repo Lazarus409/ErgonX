@@ -2,11 +2,14 @@
 
 import Link from "next/link";
 import { useCallback, useState } from "react";
-import { BriefcaseBusiness, Inbox, Plus, Search } from "lucide-react";
-import ErrorState from "@/components/ui/ErrorState";
-import LoadingState from "@/components/ui/LoadingState";
+import { BriefcaseBusiness, Plus } from "lucide-react";
+
+import { ButtonLink } from "@/components/ui/Button";
+import { DataTable, DataToolbar } from "@/components/ui/DataTable";
+import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { recruitmentApi } from "@/lib/api";
+import { formatDate, humanizeEnum } from "@/lib/format";
 import { useApiResource } from "@/lib/useApiResource";
 
 export default function JobPostingsPage() {
@@ -14,5 +17,32 @@ export default function JobPostingsPage() {
   const load = useCallback(() => recruitmentApi.listJobPostings({ search: search.trim() || undefined, ordering: "-created_at" }), [search]);
   const { data, loading, error, reload } = useApiResource(load);
 
-  return <main className="space-y-6"><section className="rounded-2xl bg-slate-950 p-6 text-white sm:p-8"><div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-sm font-medium text-slate-300">Recruitment</p><h1 className="mt-2 text-3xl font-semibold tracking-tight">Job postings</h1><p className="mt-2 text-sm text-slate-300">Manage your organization&apos;s open roles.</p></div><Link href="/recruitment/job-postings/new" className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-slate-100"><Plus className="h-4 w-4" />New job posting</Link></div></section><section className="flex gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm"><Search className="mt-2 h-4 w-4 shrink-0 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => event.key === "Enter" && void reload()} placeholder="Search job postings..." className="min-w-0 flex-1 bg-transparent py-1 text-sm text-slate-900 outline-none placeholder:text-slate-400" /><button type="button" onClick={() => void reload()} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Search</button></section>{error && <ErrorState message={error} onRetry={reload} />}{loading && !data ? <LoadingState /> : data && <section className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-[0_12px_35px_rgba(15,23,42,0.04)]"><table className="w-full min-w-[760px] text-left text-sm"><thead><tr className="border-b border-slate-200 bg-slate-50 text-slate-500"><th className="px-5 py-3.5 font-semibold">Posting</th><th className="px-5 py-3.5 font-semibold">Openings</th><th className="px-5 py-3.5 font-semibold">Employment</th><th className="px-5 py-3.5 font-semibold">Closes</th><th className="px-5 py-3.5 font-semibold">Status</th></tr></thead><tbody>{data.results.length === 0 ? <tr><td colSpan={5} className="px-5 py-14 text-center"><div className="mx-auto flex max-w-sm flex-col items-center"><div className="rounded-2xl bg-slate-100 p-3 text-slate-500"><Inbox className="h-6 w-6" /></div><p className="mt-4 font-semibold text-slate-900">No job postings yet</p><p className="mt-1 text-sm leading-6 text-slate-500">Create a draft vacancy to begin your recruitment process.</p><Link href="/recruitment/job-postings/new" className="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"><BriefcaseBusiness className="h-4 w-4" />Create job posting</Link></div></td></tr> : data.results.map((posting) => <tr key={posting.id} className="border-b border-slate-100 transition hover:bg-slate-50/70 last:border-0"><td className="px-5 py-4"><Link href={`/recruitment/job-postings/${posting.id}`} className="font-semibold text-slate-900 transition hover:text-sky-700">{posting.title}<span className="mt-1 block text-xs font-normal text-slate-500">{posting.code}</span></Link></td><td className="px-5 py-4 font-medium text-slate-700">{posting.openings}</td><td className="px-5 py-4 text-slate-700">{posting.employment_type.replaceAll("_", " ")}</td><td className="px-5 py-4 text-slate-700">{posting.closes_on ?? "Not set"}</td><td className="px-5 py-4"><StatusBadge status={posting.status} /></td></tr>)}</tbody></table></section>}</main>;
+  return (
+    <div className="space-y-6">
+      <PageHeader eyebrow="Recruitment" title="Job postings" description="Manage your organization's open roles." icon={BriefcaseBusiness} accent="recruitment" actions={<ButtonLink href="/recruitment/job-postings/new" leadingIcon={<Plus className="h-4 w-4" />}>New job posting</ButtonLink>} />
+      <DataTable
+        caption="Job postings"
+        rows={data?.results}
+        rowKey={(posting) => posting.id}
+        loading={loading}
+        error={error}
+        onRetry={reload}
+        minWidth={760}
+        toolbar={<DataToolbar search={search} onSearchChange={setSearch} searchPlaceholder="Search job postings…" />}
+        empty={{
+          title: search ? "No matching job postings" : "No job postings yet",
+          description: search ? "Try a different search term." : "Create a draft vacancy to begin your recruitment process.",
+          icon: BriefcaseBusiness,
+          action: search ? undefined : <ButtonLink href="/recruitment/job-postings/new" size="sm" leadingIcon={<Plus className="h-4 w-4" />}>Create job posting</ButtonLink>,
+        }}
+        columns={[
+          { key: "posting", header: "Posting", sortValue: (posting) => posting.title, cell: (posting) => <Link href={`/recruitment/job-postings/${posting.id}`} className="group block"><span className="block font-semibold text-ink-strong group-hover:text-primary-ink">{posting.title}</span><span className="block text-caption text-ink-muted">{posting.code}</span></Link> },
+          { key: "openings", header: "Openings", numeric: true, sortValue: (posting) => posting.openings, cell: (posting) => posting.openings },
+          { key: "employment", header: "Employment", cell: (posting) => humanizeEnum(posting.employment_type) },
+          { key: "closes", header: "Closes", sortValue: (posting) => posting.closes_on ?? "", cell: (posting) => (posting.closes_on ? formatDate(posting.closes_on) : <span className="text-ink-subtle">Not set</span>) },
+          { key: "status", header: "Status", cell: (posting) => <StatusBadge status={posting.status} size="sm" /> },
+        ]}
+      />
+    </div>
+  );
 }

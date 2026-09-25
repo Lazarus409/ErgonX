@@ -1,30 +1,497 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { ArrowRight, CalendarDays, ClipboardCheck, Contact, FileText, Pencil, UserRound } from "lucide-react";
-import { employeesApi, getApiErrorMessage } from "@/lib/api";
+import { useCallback } from "react";
+import {
+  ArrowRight,
+  Bell,
+  CalendarClock,
+  CheckCircle2,
+  CalendarDays,
+  CalendarPlus,
+  CircleDollarSign,
+  Clock3,
+  Contact,
+  FileText,
+  LogIn,
+  Pencil,
+  Timer,
+  UserRound,
+  type LucideIcon,
+} from "lucide-react";
+
+import HomeHero, { HeroStat } from "@/components/home/HomeHero";
+import ChartCard from "@/components/charts/ChartCard";
+import { BarsChart, DonutChart, TrendChart, donutLegend } from "@/components/charts/Charts";
+import { Timeline } from "@/components/charts/Visuals";
+import { ButtonLink } from "@/components/ui/Button";
+import { AttentionItem, Card, IconTile, SectionHeading, SummaryList } from "@/components/ui/Card";
+import ErrorState from "@/components/ui/ErrorState";
+import StatusBadge from "@/components/ui/StatusBadge";
+import { attendanceApi, employeesApi, homeApi, leaveApi, notificationsApi, payrollApi } from "@/lib/api";
+import { useAccess } from "@/lib/access";
+import { useApiResource } from "@/lib/useApiResource";
+import { EM_DASH, formatAmount, formatDate, formatDateTime, formatNumber, toISODate } from "@/lib/format";
+import { cx } from "@/lib/cx";
+import type { ModuleAccent } from "@/lib/moduleTheme";
+import { MAX_PAGE_SIZE } from "@/types/api";
+import type { AttendanceRecord } from "@/types/attendance";
 import type { Employee } from "@/types/hr";
+import type { HomePayload } from "@/types/home";
+import type { LeaveBalance, LeaveRequest, LeaveType } from "@/types/leave";
+import type { Payslip } from "@/types/payroll";
+import type { AppNotification } from "@/types/notifications";
 
-const tools = [
-  { href: "/me/profile", label: "My profile", description: "View and update your details", icon: UserRound },
-  { href: "/me/leave", label: "Leave", description: "Balances and requests", icon: CalendarDays },
-  { href: "/me/attendance", label: "Attendance", description: "Time and attendance activity", icon: ClipboardCheck },
-  { href: "/me/emergency-contacts", label: "Emergency contacts", description: "Keep your contacts current", icon: Contact },
-  { href: "/me/documents", label: "Documents", description: "Your shared documents", icon: FileText },
-];
-
-export default function SelfServiceHome() {
-  const [employee, setEmployee] = useState<Employee | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => { employeesApi.getCurrentEmployee().then(setEmployee).catch((caught) => setError(getApiErrorMessage(caught))); }, []);
-  const name = employee?.first_name || "there";
-  return <div className="mx-auto max-w-6xl space-y-6">
-    <section className="rounded-3xl bg-gradient-to-br from-slate-950 via-slate-950 to-sky-950 px-7 py-8 text-white shadow-xl sm:px-9"><p className="text-sm font-semibold tracking-[0.16em] text-sky-300">EMPLOYEE HOME</p><div className="mt-3 flex flex-col justify-between gap-5 sm:flex-row sm:items-end"><div><h1 className="text-3xl font-bold tracking-tight">Welcome, {name}.</h1><p className="mt-2 max-w-xl text-slate-300">Manage your personal information and everyday work services in one place.</p></div><Link href="/me/profile" className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-sky-50"><Pencil className="h-4 w-4" />Edit my details</Link></div></section>
-    {error && <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</div>}
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"><div className="flex items-center gap-3"><span className="rounded-xl bg-sky-50 p-3 text-sky-700"><UserRound className="h-5 w-5" /></span><div><h2 className="font-semibold text-slate-950">My details</h2><p className="text-sm text-slate-500">Your employee account information.</p></div></div><div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><Detail label="Employee number" value={employee?.employee_number ?? "—"} /><Detail label="Work email" value={employee?.work_email ?? "—"} /><Detail label="Personal email" value={employee?.personal_email || "Add in profile"} /><Detail label="Phone" value={employee?.phone || "Add in profile"} /></div></section>
-    <section><div className="mb-4"><h2 className="text-lg font-bold text-slate-950">Self-Service</h2><p className="mt-1 text-sm text-slate-500">Choose what you need to manage today.</p></div><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{tools.map((tool) => { const Icon = tool.icon; return <Link key={tool.href} href={tool.href} className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-sky-200 hover:shadow-md"><span className="inline-flex rounded-xl bg-sky-50 p-3 text-sky-700"><Icon className="h-5 w-5" /></span><div className="mt-5 flex items-center justify-between"><div><h3 className="font-semibold text-slate-950">{tool.label}</h3><p className="mt-1 text-sm text-slate-500">{tool.description}</p></div><ArrowRight className="h-4 w-4 text-slate-400 transition group-hover:translate-x-1 group-hover:text-sky-700" /></div></Link>; })}</div></section>
-  </div>;
+interface PersonalData {
+  employee: Employee | null;
+  home: HomePayload | null;
+  attendance: AttendanceRecord[] | null;
+  leave: { balances: LeaveBalance[]; requests: LeaveRequest[]; types: Map<string, LeaveType> } | null;
+  payslips: Payslip[] | null;
+  updates: AppNotification[] | null;
 }
 
-function Detail({ label, value }: { label: string; value: string }) { return <div className="rounded-xl border border-slate-100 bg-slate-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p><p className="mt-2 truncate text-sm font-semibold text-slate-900">{value}</p></div>; }
+function clockTime(value: string | null | undefined): string {
+  if (!value) return EM_DASH;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+}
+
+function hours(minutes: number): number {
+  return Math.round((minutes / 60) * 10) / 10;
+}
+
+/**
+ * Employee / Self-Service Home: a personal dashboard, not a managerial one.
+ * Every section is module- and permission-aware and reuses the same
+ * self-scoped reads as the dedicated self-service pages. No performance,
+ * productivity or peer-ranking metric is shown or derived.
+ */
+export default function SelfServiceHome() {
+  const { user, can, moduleEnabled } = useAccess();
+  const showAttendance = moduleEnabled("ATTENDANCE") && (can("attendance.view") || can("attendance.clock"));
+  const showLeave = moduleEnabled("LEAVE") && can("leave.request");
+  const showPayroll = moduleEnabled("PAYROLL") && can("payslip.view");
+  const showSchedule = moduleEnabled("ATTENDANCE") && can("schedule.view");
+
+  const load = useCallback(async (): Promise<PersonalData> => {
+    const [employee, home] = await Promise.all([
+      employeesApi.getCurrentEmployee(),
+      homeApi.getHome().catch(() => null),
+    ]);
+    if (!employee) return { employee: null, home, attendance: null, leave: null, payslips: null, updates: null };
+
+    const [attendance, leave, payslips, updates] = await Promise.all([
+      showAttendance
+        ? attendanceApi.listAttendanceRecords({ employee: employee.id, page_size: 35, ordering: "-attendance_date" }).then((page) => page.results).catch(() => null)
+        : Promise.resolve(null),
+      showLeave
+        ? Promise.all([
+            leaveApi.listLeaveTypes({ page_size: MAX_PAGE_SIZE }).then((page) => page.results).catch(() => [] as LeaveType[]),
+            leaveApi.listLeaveBalances({ employee: employee.id, year: new Date().getFullYear(), page_size: MAX_PAGE_SIZE }).then((page) => page.results).catch(() => [] as LeaveBalance[]),
+            leaveApi.listLeaveRequests({ employee: employee.id, page_size: 20, ordering: "-start_date" }).then((page) => page.results).catch(() => [] as LeaveRequest[]),
+          ]).then(([types, balances, requests]) => ({ types: new Map(types.map((type) => [type.id, type])), balances, requests }))
+        : Promise.resolve(null),
+      showPayroll
+        ? payrollApi.listPayslips({ page_size: 6, ordering: "-generated_at" }).then((page) => page.results).catch(() => null)
+        : Promise.resolve(null),
+      notificationsApi.getNotifications().then((items) => items.slice(0, 4)).catch(() => null),
+    ]);
+    return { employee, home, attendance, leave, payslips, updates };
+  }, [showAttendance, showLeave, showPayroll]);
+
+  const { data, loading, error, reload } = useApiResource(load);
+  const employee = data?.employee ?? null;
+  const todayIso = toISODate(new Date());
+  const history = data?.attendance ?? [];
+  const today = history.find((record) => record.attendance_date === todayIso) ?? null;
+  const week = [...history].slice(0, 7).reverse();
+  const weekMinutes = week.reduce((sum, record) => sum + record.worked_minutes, 0);
+  const weekOvertime = week.reduce((sum, record) => sum + record.overtime_minutes, 0);
+  const balances = data?.leave?.balances ?? [];
+  const leaveAvailable = balances.reduce((sum, balance) => sum + Number(balance.available), 0);
+  const typeName = (id: string) => data?.leave?.types.get(id)?.name ?? "Leave";
+  const requests = data?.leave?.requests ?? [];
+  const pendingLeave = requests.filter((request) => ["PENDING", "SUBMITTED", "DRAFT"].includes(String(request.status).toUpperCase()));
+  const upcomingLeave = requests.filter((request) => String(request.status).toUpperCase() === "APPROVED" && request.end_date >= todayIso).sort((a, b) => a.start_date.localeCompare(b.start_date));
+  const payslips = [...(data?.payslips ?? [])].sort((a, b) => a.payroll_period.pay_date.localeCompare(b.payroll_period.pay_date));
+  const snapshot = data?.home?.optional_personal_snapshot ?? null;
+  const upcomingShifts = snapshot?.upcoming_shifts ?? [];
+  const nextShift = upcomingShifts.find((shift) => !shift.off_day && shift.end && new Date(shift.end) > new Date());
+  const overtimeWeeks = overtimeByWeek(history);
+  const latestPayslip = payslips.at(-1);
+  const firstName = employee?.first_name || user?.firstName || "there";
+  const greeting = data?.home?.greeting_context.greeting ?? `Welcome, ${firstName}`;
+
+  const todayStatus = today ? (today.check_out ? "Clocked out" : today.check_in ? "Clocked in" : String(today.status).replaceAll("_", " ").toLowerCase()) : "Not clocked in yet";
+
+  const quickActions: Array<{ href: string; label: string; description: string; icon: LucideIcon; accent: ModuleAccent; show: boolean }> = [
+    { href: "/me/attendance", label: today?.check_in && !today.check_out ? "Clock out" : "Clock in", description: "Record your attendance for today", icon: LogIn, accent: "attendance", show: showAttendance && can("attendance.clock") },
+    { href: "/me/leave/request", label: "Request leave", description: "Start a new leave request", icon: CalendarPlus, accent: "leave", show: showLeave },
+    { href: "/me/payslips", label: "My payslips", description: "View your payroll statements", icon: CircleDollarSign, accent: "payroll", show: showPayroll },
+    { href: "/me/profile", label: "My profile", description: "Keep your details current", icon: UserRound, accent: "brand", show: true },
+    { href: "/me/emergency-contacts", label: "Emergency contacts", description: "Who to call if needed", icon: Contact, accent: "hr", show: true },
+    { href: "/me/documents", label: "My documents", description: "Your shared documents", icon: FileText, accent: "settings", show: true },
+  ];
+
+  return (
+    <div className="mx-auto max-w-7xl space-y-8">
+      <HomeHero
+        eyebrow="Employee Home"
+        title={<>{greeting} <span aria-hidden="true">👋</span></>}
+        subtitle="Here's your workday at a glance."
+        aside={
+          showAttendance ? (
+            <div className="rounded-2xl bg-white/[0.08] p-5 ring-1 ring-inset ring-white/15 backdrop-blur-sm">
+              <p className="flex items-center gap-1.5 text-caption font-semibold text-accent-aqua"><Clock3 className="h-3.5 w-3.5" aria-hidden="true" />Today</p>
+              <p className="mt-2 text-heading font-semibold text-white first-letter:uppercase">{loading && !data ? "Loading…" : todayStatus}</p>
+              <dl className="mt-3 grid grid-cols-2 gap-3 text-support">
+                <div><dt className="text-white/55">Check-in</dt><dd className="font-semibold text-white tabular-nums">{clockTime(today?.check_in)}</dd></div>
+                <div><dt className="text-white/55">Check-out</dt><dd className="font-semibold text-white tabular-nums">{clockTime(today?.check_out)}</dd></div>
+              </dl>
+              <Link href="/me/attendance" className="mt-4 inline-flex items-center gap-1.5 text-support font-semibold text-white hover:underline">Open attendance<ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
+            </div>
+          ) : undefined
+        }
+      >
+        <div className="grid max-w-xl grid-cols-3 gap-3">
+          {showLeave && <HeroStat label="Leave days available" value={data ? formatNumber(leaveAvailable) : "–"} />}
+          {showSchedule && <HeroStat label="Next shift" value={data ? shiftLabel(nextShift) : "–"} />}
+          {showPayroll && <HeroStat label="Latest net pay" value={latestPayslip ? formatAmount(latestPayslip.payload.net_pay, latestPayslip.payload.currency) : data ? EM_DASH : "–"} />}
+          {!showAttendance && !showLeave && !showPayroll && <HeroStat label="Employee number" value={employee?.employee_number ?? "–"} />}
+        </div>
+      </HomeHero>
+
+      {error && <ErrorState variant="inline" title="Unable to load your workspace" message={error} onRetry={reload} />}
+      {!loading && data && !employee && (
+        <ErrorState variant="inline" title="No employee record is linked to your account" message="Ask your HR administrator to link your user account to your employee record to see attendance, leave and pay." />
+      )}
+
+      {/* Personal quick actions */}
+      <section aria-labelledby="my-actions" className="space-y-4">
+        <SectionHeading title={<span id="my-actions">What would you like to do?</span>} />
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {quickActions.filter((action) => action.show).map((action) => (
+            <Link key={action.href + action.label} href={action.href} className="group flex items-center gap-4 rounded-2xl border border-line bg-surface p-4 shadow-elevation-1 transition-[box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-elevation-2">
+              <IconTile icon={action.icon} accent={action.accent} />
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-ink-strong">{action.label}</span>
+                <span className="block truncate text-caption text-ink-muted">{action.description}</span>
+              </span>
+              <ArrowRight className="h-4 w-4 text-ink-subtle transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* Attendance */}
+      {showAttendance && employee && (
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+          <ChartCard
+            title="My week"
+            description="Hours worked and overtime across your last seven recorded days."
+            accent="attendance"
+            icon={Timer}
+            loading={loading && !data}
+            error={!data && error ? "This data is unavailable right now." : null}
+            empty={week.length === 0}
+            emptyTitle="No attendance recorded yet"
+            emptyDescription="Your recorded days will appear here after you clock in."
+            legend={[{ label: "Worked", color: "var(--mod-attendance)", value: `${hours(weekMinutes)}h` }, { label: "Overtime", color: "var(--chart-3)", value: `${hours(weekOvertime)}h` }]}
+            summary={`You worked ${hours(weekMinutes)} hours across your last ${week.length} recorded days, including ${hours(weekOvertime)} hours of overtime.`}
+            data={{ columns: ["Date", "Worked (h)", "Overtime (h)"], rows: week.map((record) => [formatDate(record.attendance_date), hours(record.worked_minutes), hours(record.overtime_minutes)]) }}
+          >
+            <TrendChart
+              variant="area"
+              xKey="date"
+              xFormat="weekday"
+              data={week.map((record) => ({ date: record.attendance_date, worked: hours(record.worked_minutes), overtime: hours(record.overtime_minutes) }))}
+              series={[{ key: "worked", label: "Worked (h)", color: "var(--mod-attendance)" }, { key: "overtime", label: "Overtime (h)", color: "var(--chart-3)" }]}
+              height={220}
+            />
+          </ChartCard>
+          <Card title="Attendance calendar" description="Your last four weeks at a glance." icon={CalendarDays} accent="attendance">
+            <AttendanceCalendar records={history} todayIso={todayIso} />
+          </Card>
+        </div>
+      )}
+
+      {/* Leave + pay */}
+      {(showLeave || showPayroll) && employee && (
+        <div className={cx("grid gap-5", showLeave && showPayroll && "xl:grid-cols-2")}>
+          {showLeave && (
+            <ChartCard
+              title="My leave balances"
+              description={`Days available for ${new Date().getFullYear()}, by leave type.`}
+              accent="leave"
+              icon={CalendarDays}
+              loading={loading && !data}
+              error={!data && error ? "This data is unavailable right now." : null}
+              empty={balances.length === 0}
+              emptyTitle="No leave balances yet"
+              emptyDescription="Balances appear once your leave entitlement is set up."
+              actions={<ButtonLink href="/me/leave/request" size="sm" variant="secondary" leadingIcon={<CalendarPlus className="h-3.5 w-3.5" />}>Request</ButtonLink>}
+              data={{ columns: ["Leave type", "Available", "Used"], rows: balances.map((balance) => [typeName(balance.leave_type), Number(balance.available), Number(balance.used)]) }}
+            >
+              <div className="grid items-center gap-5 sm:grid-cols-[180px_1fr]">
+                <DonutChart data={balances.map((balance) => ({ label: typeName(balance.leave_type), value: Math.max(Number(balance.available), 0) }))} centerValue={formatNumber(leaveAvailable)} centerLabel="days left" height={180} format="days" />
+                <SummaryList items={donutLegend(balances.map((balance) => ({ label: typeName(balance.leave_type), value: Math.max(Number(balance.available), 0) })), "days").map((item) => ({ label: <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ background: item.color }} />{item.label}</span>, value: item.value }))} />
+              </div>
+            </ChartCard>
+          )}
+          {showPayroll && (
+            <ChartCard
+              title="Pay trend"
+              description="Net pay across your latest payslips."
+              accent="payroll"
+              icon={CircleDollarSign}
+              loading={loading && !data}
+              error={!data && error ? "This data is unavailable right now." : null}
+              empty={payslips.length === 0}
+              emptyTitle="No payslips yet"
+              emptyDescription="Your payslips will appear after your first finalized payroll."
+              actions={<Link href="/me/payslips" className="text-support font-semibold text-primary-ink hover:underline">All payslips</Link>}
+              data={{ columns: ["Period", "Net pay"], rows: payslips.map((slip) => [slip.payroll_period.name, formatAmount(slip.payload.net_pay, slip.payload.currency)]) }}
+              footer={latestPayslip ? <span>Latest: <Link href={`/payroll/payslips/${latestPayslip.id}`} className="font-semibold text-primary-ink hover:underline">{latestPayslip.payroll_period.name}</Link> · paid {formatDate(latestPayslip.payroll_period.pay_date)}</span> : undefined}
+            >
+              <TrendChart
+                data={payslips.map((slip) => ({ period: slip.payroll_period.name, net: Number(slip.payload.net_pay) }))}
+                xKey="period"
+                xFormat="label"
+                series={[{ key: "net", label: "Net pay", color: "var(--mod-payroll)" }]}
+                format="currency"
+                currency={latestPayslip?.payload.currency}
+                height={220}
+              />
+            </ChartCard>
+          )}
+        </div>
+      )}
+
+      {/* Leave requests */}
+      {showLeave && employee && (pendingLeave.length > 0 || upcomingLeave.length > 0) && (
+        <div className="grid gap-5 lg:grid-cols-2">
+          <Card title="Pending requests" description="Awaiting a decision." icon={Clock3} accent="leave">
+            {pendingLeave.length ? (
+              <ul className="divide-y divide-line-soft">
+                {pendingLeave.slice(0, 4).map((request) => (
+                  <li key={request.id} className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-ink-strong">{typeName(request.leave_type)}</p>
+                      <p className="text-caption text-ink-muted">{formatDate(request.start_date)} – {formatDate(request.end_date)} · {formatNumber(request.requested_days)} days</p>
+                    </div>
+                    <StatusBadge status={String(request.status)} size="sm" />
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="text-support text-ink-muted">No requests awaiting a decision.</p>}
+          </Card>
+          <Card title="Upcoming time off" description="Approved leave ahead of you." icon={CalendarDays} accent="leave">
+            {upcomingLeave.length ? (
+              <Timeline items={upcomingLeave.slice(0, 4).map((request) => ({ id: request.id, title: typeName(request.leave_type), time: `${formatNumber(request.requested_days)} days`, description: `${formatDate(request.start_date)} – ${formatDate(request.end_date)}`, tone: "success" as const }))} />
+            ) : <p className="text-support text-ink-muted">No approved leave coming up.</p>}
+          </Card>
+        </div>
+      )}
+
+      {/* Schedule + overtime */}
+      {employee && (showSchedule || showAttendance) && (
+        <div className={cx("grid gap-5", showSchedule && showAttendance && "lg:grid-cols-2")}>
+          {showSchedule && (
+            <Card title="Upcoming schedule" description={upcomingShifts[0] ? `Your next seven days on ${upcomingShifts[0].schedule}.` : "Your shifts for the next seven days."} icon={CalendarClock} accent="attendance">
+              {upcomingShifts.length ? (
+                <Timeline items={upcomingShifts.map((shift) => ({ id: shift.date, title: dayLabel(shift.date), time: shift.off_day ? "Day off" : shift.flexible ? `Flexible · ${hours(shift.required_minutes)}h` : `${clockTime(shift.start)} – ${clockTime(shift.end)}`, description: shift.off_day ? undefined : shift.flexible ? `Between ${clockTime(shift.start)} and ${clockTime(shift.end)}` : undefined, tone: shift.off_day ? ("neutral" as const) : ("brand" as const) }))} />
+              ) : (
+                <p className="text-support text-ink-muted">{loading && !data ? "Loading…" : "No schedule is assigned to you for the coming week. Your manager or HR assigns schedules."}</p>
+              )}
+            </Card>
+          )}
+          {showAttendance && (
+            <ChartCard
+              title="Overtime by week"
+              description="Recorded overtime hours in each of your recent weeks."
+              accent="attendance"
+              icon={Timer}
+              loading={loading && !data}
+              error={!data && error ? "This data is unavailable right now." : null}
+              empty={!overtimeWeeks.some((week) => week.overtime > 0)}
+              emptyTitle="No overtime recorded"
+              emptyDescription="Overtime you work will appear here."
+              data={{ columns: ["Week of", "Overtime (h)"], rows: overtimeWeeks.map((week) => [week.label, week.overtime]) }}
+            >
+              <BarsChart data={overtimeWeeks} xKey="label" height={220} series={[{ key: "overtime", label: "Overtime (h)", color: "var(--chart-3)" }]} />
+            </ChartCard>
+          )}
+        </div>
+      )}
+
+      {/* Attention + updates */}
+      {employee && (
+        <div className="grid gap-5 lg:grid-cols-2">
+          <Card title="Needs your attention" description="Things waiting on you or about you." icon={CheckCircle2} accent="brand">
+            {snapshot?.attention.length ? (
+              <div className="-mx-3 space-y-1">
+                {snapshot.attention.map((item) => (
+                  <AttentionItem key={item.code} title={item.title} description={item.description} severity={item.severity === "HIGH" ? "high" : "info"} href={item.route} />
+                ))}
+              </div>
+            ) : (
+              <p className="text-support text-ink-muted">{loading && !data ? "Loading…" : "Nothing needs your attention right now."}</p>
+            )}
+            {snapshot && (
+              <SummaryList
+                className="mt-4 border-t border-line-soft pt-4"
+                items={[
+                  ...(snapshot.activity.leave_requests_this_year !== undefined ? [{ label: "Leave requests this year", value: formatNumber(snapshot.activity.leave_requests_this_year) }] : []),
+                  ...(snapshot.activity.attendance_corrections_pending !== undefined ? [{ label: "Attendance corrections pending", value: formatNumber(snapshot.activity.attendance_corrections_pending) }] : []),
+                  { label: "Documents on file", value: formatNumber(snapshot.activity.documents_on_file) },
+                ]}
+              />
+            )}
+          </Card>
+          <Card
+            title="Recent updates"
+            description="Your latest notifications."
+            icon={Bell}
+            accent="brand"
+            actions={<Link href="/notifications" className="text-support font-semibold text-primary-ink hover:underline">View all</Link>}
+          >
+            {data?.updates?.length ? (
+              <ul className="divide-y divide-line-soft">
+                {data.updates.map((item) => (
+                  <li key={item.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+                    <span className={cx("mt-1.5 h-2 w-2 shrink-0 rounded-full", item.is_read ? "bg-line-strong" : "bg-primary")} aria-hidden="true" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-ink-strong">{item.title}<span className="sr-only">{item.is_read ? "" : " (unread)"}</span></p>
+                      <p className="line-clamp-2 text-support text-ink-muted">{item.message}</p>
+                      <p className="mt-0.5 text-caption text-ink-subtle">{formatDateTime(item.created_at)}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-support text-ink-muted">{loading && !data ? "Loading…" : "You're all caught up."}</p>
+            )}
+          </Card>
+        </div>
+      )}
+
+      {/* Profile summary */}
+      <Card
+        title="My details"
+        description="Your employee account information."
+        icon={UserRound}
+        accent="brand"
+        actions={<ButtonLink href="/me/profile" size="sm" variant="secondary" leadingIcon={<Pencil className="h-3.5 w-3.5" />}>Edit details</ButtonLink>}
+      >
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Detail label="Employee number" value={employee?.employee_number ?? EM_DASH} />
+          <Detail label="Work email" value={employee?.work_email ?? EM_DASH} />
+          <Detail label="Personal email" value={employee?.personal_email || "Add in profile"} muted={!employee?.personal_email} />
+          <Detail label="Phone" value={employee?.phone || "Add in profile"} muted={!employee?.phone} />
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function Detail({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
+  return (
+    <div className="min-w-0 rounded-xl bg-surface-muted/70 p-4">
+      <p className="text-caption font-medium text-ink-muted">{label}</p>
+      <p className={cx("mt-1 truncate text-sm font-semibold", muted ? "text-ink-subtle" : "text-ink-strong")} title={value}>{value}</p>
+    </div>
+  );
+}
+
+const calendarStatus: Record<string, { label: string; short: string; className: string }> = {
+  PRESENT: { label: "Present", short: "P", className: "bg-success text-white" },
+  LATE: { label: "Late", short: "L", className: "bg-warning text-white" },
+  ABSENT: { label: "Absent", short: "A", className: "bg-danger text-white" },
+  ON_LEAVE: { label: "On leave", short: "LV", className: "bg-mod-leave text-white" },
+  HOLIDAY: { label: "Holiday", short: "H", className: "bg-mod-recruitment-soft text-mod-recruitment" },
+  REMOTE: { label: "Remote", short: "R", className: "bg-info text-white" },
+  OFF_DAY: { label: "Off day", short: "–", className: "bg-surface-sunken text-ink-muted" },
+};
+
+/** Four-week calendar; each cell shows a letter so meaning never depends on colour. */
+function AttendanceCalendar({ records, todayIso }: { records: AttendanceRecord[]; todayIso: string }) {
+  const byDate = new Map(records.map((record) => [record.attendance_date, record]));
+  const today = new Date(`${todayIso}T00:00:00`);
+  const mondayOffset = (today.getDay() + 6) % 7;
+  const start = new Date(today);
+  start.setDate(today.getDate() - mondayOffset - 21);
+  const days = Array.from({ length: 28 }, (_, index) => {
+    const date = new Date(start);
+    date.setDate(start.getDate() + index);
+    return date;
+  });
+  const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const used = new Set(records.map((record) => String(record.status).toUpperCase()));
+  return (
+    <div>
+      <div className="grid grid-cols-7 gap-1.5">
+        {weekdays.map((day) => <span key={day} className="pb-1 text-center text-caption font-medium text-ink-subtle">{day}</span>)}
+        {days.map((date) => {
+          const iso = toISODate(date);
+          const record = byDate.get(iso);
+          const status = record ? calendarStatus[String(record.status).toUpperCase()] : undefined;
+          const future = iso > todayIso;
+          return (
+            <span
+              key={iso}
+              title={`${formatDate(iso)}: ${status?.label ?? (future ? "Upcoming" : "No record")}`}
+              className={cx(
+                "flex aspect-square items-center justify-center rounded-lg text-caption font-semibold",
+                status ? status.className : future ? "border border-dashed border-line text-ink-subtle" : "bg-surface-muted text-ink-subtle",
+                iso === todayIso && "ring-2 ring-primary ring-offset-2 ring-offset-surface",
+              )}
+            >
+              {status ? status.short : date.getDate()}
+            </span>
+          );
+        })}
+      </div>
+      <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5" aria-label="Calendar legend">
+        {Object.entries(calendarStatus).filter(([key]) => used.has(key)).map(([key, item]) => (
+          <li key={key} className="inline-flex items-center gap-1.5 text-caption text-ink-muted">
+            <span aria-hidden="true" className={cx("flex h-4 min-w-4 items-center justify-center rounded px-0.5 text-[0.625rem] font-bold", item.className)}>{item.short}</span>
+            {item.label}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** "Today 08:00", "Tomorrow 08:00", "Tue 08:00", or a flexible window. */
+function shiftLabel(shift: { date: string; start: string | null; flexible: boolean } | undefined): string {
+  if (!shift) return "None scheduled";
+  const day = dayLabel(shift.date, true);
+  return shift.flexible ? `${day}, flexible` : `${day} ${clockTime(shift.start)}`;
+}
+
+function dayLabel(iso: string, short = false): string {
+  const date = new Date(`${iso}T00:00:00`);
+  const todayIso = toISODate(new Date());
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  if (iso === todayIso) return "Today";
+  if (iso === toISODate(tomorrow)) return "Tomorrow";
+  return date.toLocaleDateString("en-GB", short ? { weekday: "short" } : { weekday: "long", day: "numeric", month: "short" });
+}
+
+/** Recorded overtime grouped into Monday-start weeks, oldest first (at most five). */
+function overtimeByWeek(records: AttendanceRecord[]): Array<{ label: string; overtime: number }> {
+  const weeks = new Map<string, number>();
+  for (const record of records) {
+    const date = new Date(`${record.attendance_date}T00:00:00`);
+    date.setDate(date.getDate() - ((date.getDay() + 6) % 7));
+    const key = toISODate(date);
+    weeks.set(key, (weeks.get(key) ?? 0) + record.overtime_minutes);
+  }
+  return [...weeks.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .slice(-5)
+    .map(([key, minutes]) => ({ label: new Date(`${key}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" }), overtime: hours(minutes) }));
+}

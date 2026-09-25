@@ -23,6 +23,7 @@ import { EMPLOYMENT_TYPES } from "@/types/hr";
 import { ACCRUAL_METHODS } from "@/types/leave";
 import type { LeavePolicy, LeavePolicyPayload, LeaveType } from "@/types/leave";
 import { formatDate, formatNumber, humanizeEnum } from "@/lib/format";
+import { buttonClasses } from "@/components/ui/Button";
 
 const ALL_TYPES = "ALL_TYPES";
 const ALL_STATUSES = "ALL_STATUSES";
@@ -355,7 +356,7 @@ export default function LeavePoliciesPage() {
         actions={
           <button
             onClick={openCreate}
-            className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
+            className={buttonClasses({ variant: "primary" })}
           >
             <Plus className="h-4 w-4" />
             Add Policy
@@ -366,37 +367,37 @@ export default function LeavePoliciesPage() {
       {error && <ErrorState message={error} onRetry={reload} />}
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-slate-500">Total Policies</p>
-          <p className="mt-2 text-2xl font-bold text-slate-900">
+        <div className="rounded-xl border border-line bg-surface p-5 shadow-sm">
+          <p className="text-sm text-ink-muted">Total Policies</p>
+          <p className="mt-2 text-2xl font-bold text-ink-strong">
             {policies.length}
           </p>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-slate-500">Active Policies</p>
-          <p className="mt-2 text-2xl font-bold text-slate-900">
+        <div className="rounded-xl border border-line bg-surface p-5 shadow-sm">
+          <p className="text-sm text-ink-muted">Active Policies</p>
+          <p className="mt-2 text-2xl font-bold text-ink-strong">
             {activeCount}
           </p>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-slate-500">Leave Types</p>
-          <p className="mt-2 text-2xl font-bold text-slate-900">
+        <div className="rounded-xl border border-line bg-surface p-5 shadow-sm">
+          <p className="text-sm text-ink-muted">Leave Types</p>
+          <p className="mt-2 text-2xl font-bold text-ink-strong">
             {distinctTypes}
           </p>
         </div>
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-col gap-4 border-b border-slate-200 p-4 lg:flex-row lg:items-center">
+      <div className="rounded-xl border border-line bg-surface shadow-sm">
+        <div className="flex flex-col gap-4 border-b border-line p-4 lg:flex-row lg:items-center">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-subtle" />
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search policies..."
-              className="w-full rounded-lg border border-slate-200 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-slate-400"
+              className="w-full h-9 rounded-lg border border-line-strong pl-10 pr-4 text-sm outline-none focus:border-primary"
             />
           </div>
 
@@ -404,7 +405,7 @@ export default function LeavePoliciesPage() {
             value={typeFilter}
             onChange={(event) => setTypeFilter(event.target.value)}
             aria-label="Filter by leave type"
-            className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none"
+            className="h-9 rounded-lg border border-line-strong px-3 text-sm text-ink outline-none"
           >
             <option value={ALL_TYPES}>All Types</option>
 
@@ -419,7 +420,7 @@ export default function LeavePoliciesPage() {
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value)}
             aria-label="Filter by status"
-            className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 outline-none"
+            className="h-9 rounded-lg border border-line-strong px-3 text-sm text-ink outline-none"
           >
             <option value={ALL_STATUSES}>All Statuses</option>
             <option value="ACTIVE">ACTIVE</option>
@@ -430,26 +431,26 @@ export default function LeavePoliciesPage() {
         <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[1000px]">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-left">
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <tr className="border-b border-line bg-surface-muted text-left">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Policy
                 </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Entitlement
                 </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Accrual
                 </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Carry Forward
                 </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Effective From
                 </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Status
                 </th>
-                <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Action
                 </th>
               </tr>
@@ -459,28 +460,28 @@ export default function LeavePoliciesPage() {
               {filteredPolicies.map((policy) => (
                 <tr
                   key={policy.id}
-                  className="border-b border-slate-100 last:border-0"
+                  className="border-b border-line-soft last:border-0"
                 >
                   <td className="px-5 py-4">
-                    <p className="font-medium text-slate-900">{policy.name}</p>
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="font-medium text-ink-strong">{policy.name}</p>
+                    <p className="mt-1 text-xs text-ink-muted">
                       {leaveTypeNames.get(policy.leave_type) ?? "—"}
                     </p>
                   </td>
 
-                  <td className="px-5 py-4 text-sm text-slate-700">
+                  <td className="px-5 py-4 text-sm text-ink">
                     {formatNumber(policy.annual_entitlement)} days
                   </td>
 
-                  <td className="px-5 py-4 text-sm text-slate-700">
+                  <td className="px-5 py-4 text-sm text-ink">
                     {humanizeEnum(policy.accrual_method)}
                   </td>
 
-                  <td className="px-5 py-4 text-sm text-slate-700">
+                  <td className="px-5 py-4 text-sm text-ink">
                     {formatNumber(policy.max_carry_forward)} days
                   </td>
 
-                  <td className="px-5 py-4 text-sm text-slate-700">
+                  <td className="px-5 py-4 text-sm text-ink">
                     {formatDate(policy.effective_from)}
                   </td>
 
@@ -493,7 +494,7 @@ export default function LeavePoliciesPage() {
                   <td className="px-5 py-4 text-right">
                     <button
                       onClick={() => openEdit(policy)}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                      className={buttonClasses({ variant: "secondary" })}
                     >
                       <Pencil className="h-4 w-4" />
                       Edit
@@ -505,12 +506,12 @@ export default function LeavePoliciesPage() {
               {filteredPolicies.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-5 py-12 text-center">
-                    <p className="text-sm font-medium text-slate-700">
+                    <p className="text-sm font-medium text-ink">
                       {loading
                         ? "Loading leave policies..."
                         : "No leave policies found"}
                     </p>
-                    <p className="mt-1 text-sm text-slate-500">
+                    <p className="mt-1 text-sm text-ink-muted">
                       {loading
                         ? "Please wait."
                         : "Try changing your filters or search term."}
@@ -522,7 +523,7 @@ export default function LeavePoliciesPage() {
           </table>
         </div>
 
-        <div className="divide-y divide-slate-100 md:hidden">
+        <div className="divide-y divide-line-soft md:hidden">
           {filteredPolicies.map((policy) => {
             const expanded = expandedPolicy === policy.id;
 
@@ -535,14 +536,14 @@ export default function LeavePoliciesPage() {
                   className="flex w-full items-center justify-between text-left"
                 >
                   <div>
-                    <p className="font-medium text-slate-900">{policy.name}</p>
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="font-medium text-ink-strong">{policy.name}</p>
+                    <p className="mt-1 text-xs text-ink-muted">
                       {leaveTypeNames.get(policy.leave_type) ?? "—"}
                     </p>
                   </div>
 
                   <ChevronDown
-                    className={`h-5 w-5 text-slate-400 transition-transform ${
+                    className={`h-5 w-5 text-ink-subtle transition-transform ${
                       expanded ? "rotate-180" : ""
                     }`}
                   />
@@ -554,34 +555,34 @@ export default function LeavePoliciesPage() {
                   />
                   <button
                     onClick={() => openEdit(policy)}
-                    className="text-sm font-medium text-slate-700"
+                    className="text-sm font-medium text-ink"
                   >
                     Edit
                   </button>
                 </div>
 
                 {expanded && (
-                  <div className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3 text-sm">
+                  <div className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-surface-muted p-3 text-sm">
                     <div>
-                      <p className="text-xs text-slate-500">Entitlement</p>
+                      <p className="text-xs text-ink-muted">Entitlement</p>
                       <p className="font-medium">
                         {formatNumber(policy.annual_entitlement)} days
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-slate-500">Accrual</p>
+                      <p className="text-xs text-ink-muted">Accrual</p>
                       <p className="font-medium">
                         {humanizeEnum(policy.accrual_method)}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-slate-500">Carry Forward</p>
+                      <p className="text-xs text-ink-muted">Carry Forward</p>
                       <p className="font-medium">
                         {formatNumber(policy.max_carry_forward)} days
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-slate-500">Min Service</p>
+                      <p className="text-xs text-ink-muted">Min Service</p>
                       <p className="font-medium">
                         {policy.min_service_days} days
                       </p>
@@ -595,21 +596,21 @@ export default function LeavePoliciesPage() {
       </div>
 
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white shadow-xl">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
+          <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-surface shadow-xl">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-surface px-6 py-4">
               <div>
-                <h2 className="text-lg font-semibold text-slate-900">
+                <h2 className="text-lg font-semibold text-ink-strong">
                   {editingPolicy ? "Edit Leave Policy" : "Add Leave Policy"}
                 </h2>
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="mt-1 text-sm text-ink-muted">
                   Configure the policy rules and eligibility.
                 </p>
               </div>
 
               <button
                 onClick={closeModal}
-                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                className="rounded-lg p-2 text-ink-subtle hover:bg-surface-hover hover:text-ink-strong"
                 aria-label="Close"
               >
                 <X className="h-5 w-5" />
@@ -618,19 +619,19 @@ export default function LeavePoliciesPage() {
 
             <div className="space-y-6 p-6">
               {formError && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <div className="rounded-lg border border-danger/25 bg-danger-soft px-4 py-3 text-sm text-danger-ink">
                   {formError}
                 </div>
               )}
 
               <section>
-                <h3 className="mb-4 text-sm font-semibold text-slate-900">
+                <h3 className="mb-4 text-sm font-semibold text-ink-strong">
                   Basic Information
                 </h3>
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className="space-y-1.5">
-                    <span className="text-sm font-medium text-slate-700">
+                    <span className="text-sm font-medium text-ink">
                       Policy Name
                     </span>
                     <input
@@ -639,12 +640,12 @@ export default function LeavePoliciesPage() {
                         setForm({ ...form, name: event.target.value })
                       }
                       placeholder="e.g. Annual Leave Policy"
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                      className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
                     />
                   </label>
 
                   <label className="space-y-1.5">
-                    <span className="text-sm font-medium text-slate-700">
+                    <span className="text-sm font-medium text-ink">
                       Leave Type
                     </span>
                     <select
@@ -652,7 +653,7 @@ export default function LeavePoliciesPage() {
                       onChange={(event) =>
                         setForm({ ...form, leaveType: event.target.value })
                       }
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                      className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
                     >
                       <option value="">Select leave type</option>
 
@@ -667,13 +668,13 @@ export default function LeavePoliciesPage() {
               </section>
 
               <section>
-                <h3 className="mb-4 text-sm font-semibold text-slate-900">
+                <h3 className="mb-4 text-sm font-semibold text-ink-strong">
                   Entitlement &amp; Accrual
                 </h3>
 
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
                   <label className="space-y-1.5">
-                    <span className="text-sm font-medium text-slate-700">
+                    <span className="text-sm font-medium text-ink">
                       Entitlement (days)
                     </span>
                     <input
@@ -687,12 +688,12 @@ export default function LeavePoliciesPage() {
                           entitlement: Number(event.target.value),
                         })
                       }
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none"
+                      className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none"
                     />
                   </label>
 
                   <label className="space-y-1.5">
-                    <span className="text-sm font-medium text-slate-700">
+                    <span className="text-sm font-medium text-ink">
                       Accrual Method
                     </span>
                     <select
@@ -703,7 +704,7 @@ export default function LeavePoliciesPage() {
                           accrualMethod: event.target.value,
                         })
                       }
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none"
+                      className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none"
                     >
                       {ACCRUAL_METHODS.map((method) => (
                         <option key={method} value={method}>
@@ -714,7 +715,7 @@ export default function LeavePoliciesPage() {
                   </label>
 
                   <label className="space-y-1.5">
-                    <span className="text-sm font-medium text-slate-700">
+                    <span className="text-sm font-medium text-ink">
                       Accrual Rate
                     </span>
                     <input
@@ -728,12 +729,12 @@ export default function LeavePoliciesPage() {
                           accrualRate: Number(event.target.value),
                         })
                       }
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none"
+                      className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none"
                     />
                   </label>
 
                   <label className="space-y-1.5">
-                    <span className="text-sm font-medium text-slate-700">
+                    <span className="text-sm font-medium text-ink">
                       Carry Forward (days)
                     </span>
                     <input
@@ -747,12 +748,12 @@ export default function LeavePoliciesPage() {
                           carryForward: Number(event.target.value),
                         })
                       }
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none"
+                      className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none"
                     />
                   </label>
 
                   <label className="space-y-1.5">
-                    <span className="text-sm font-medium text-slate-700">
+                    <span className="text-sm font-medium text-ink">
                       Max Consecutive Days
                     </span>
                     <input
@@ -767,14 +768,14 @@ export default function LeavePoliciesPage() {
                           maxConsecutive: event.target.value,
                         })
                       }
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none"
+                      className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none"
                     />
                   </label>
                 </div>
               </section>
 
               <section>
-                <h3 className="mb-4 text-sm font-semibold text-slate-900">
+                <h3 className="mb-4 text-sm font-semibold text-ink-strong">
                   Service &amp; Requirements
                 </h3>
 
@@ -784,7 +785,7 @@ export default function LeavePoliciesPage() {
                     stored and evaluated in days, not months.
                   */}
                   <label className="space-y-1.5">
-                    <span className="text-sm font-medium text-slate-700">
+                    <span className="text-sm font-medium text-ink">
                       Minimum Service (days)
                     </span>
                     <input
@@ -797,11 +798,11 @@ export default function LeavePoliciesPage() {
                           minServiceDays: Number(event.target.value),
                         })
                       }
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none"
+                      className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none"
                     />
                   </label>
 
-                  <label className="flex items-center gap-3 rounded-lg border border-slate-200 p-3">
+                  <label className="flex items-center gap-3 rounded-lg border border-line p-3">
                     <input
                       type="checkbox"
                       checked={form.negativeBalance}
@@ -814,16 +815,16 @@ export default function LeavePoliciesPage() {
                       className="h-4 w-4"
                     />
                     <span>
-                      <span className="block text-sm font-medium text-slate-700">
+                      <span className="block text-sm font-medium text-ink">
                         Negative balance
                       </span>
-                      <span className="block text-xs text-slate-500">
+                      <span className="block text-xs text-ink-muted">
                         Allow leave beyond available balance.
                       </span>
                     </span>
                   </label>
 
-                  <label className="flex items-center gap-3 rounded-lg border border-slate-200 p-3">
+                  <label className="flex items-center gap-3 rounded-lg border border-line p-3">
                     <input
                       type="checkbox"
                       checked={form.documentsRequired}
@@ -836,10 +837,10 @@ export default function LeavePoliciesPage() {
                       className="h-4 w-4"
                     />
                     <span>
-                      <span className="block text-sm font-medium text-slate-700">
+                      <span className="block text-sm font-medium text-ink">
                         Documents required
                       </span>
-                      <span className="block text-xs text-slate-500">
+                      <span className="block text-xs text-ink-muted">
                         Require supporting documents.
                       </span>
                     </span>
@@ -848,13 +849,13 @@ export default function LeavePoliciesPage() {
               </section>
 
               <section>
-                <h3 className="mb-4 text-sm font-semibold text-slate-900">
+                <h3 className="mb-4 text-sm font-semibold text-ink-strong">
                   Effective Dates
                 </h3>
 
                 <div className="grid gap-4 md:grid-cols-3">
                   <label className="space-y-1.5">
-                    <span className="text-sm font-medium text-slate-700">
+                    <span className="text-sm font-medium text-ink">
                       Effective From
                     </span>
                     <input
@@ -866,12 +867,12 @@ export default function LeavePoliciesPage() {
                           effectiveFrom: event.target.value,
                         })
                       }
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none"
+                      className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none"
                     />
                   </label>
 
                   <label className="space-y-1.5">
-                    <span className="text-sm font-medium text-slate-700">
+                    <span className="text-sm font-medium text-ink">
                       Effective To
                     </span>
                     <input
@@ -883,11 +884,11 @@ export default function LeavePoliciesPage() {
                           effectiveTo: event.target.value,
                         })
                       }
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none"
+                      className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none"
                     />
                   </label>
 
-                  <label className="flex items-center gap-3 rounded-lg border border-slate-200 p-3">
+                  <label className="flex items-center gap-3 rounded-lg border border-line p-3">
                     <input
                       type="checkbox"
                       checked={form.isActive}
@@ -897,10 +898,10 @@ export default function LeavePoliciesPage() {
                       className="h-4 w-4"
                     />
                     <span>
-                      <span className="block text-sm font-medium text-slate-700">
+                      <span className="block text-sm font-medium text-ink">
                         Active
                       </span>
-                      <span className="block text-xs text-slate-500">
+                      <span className="block text-xs text-ink-muted">
                         Policy is available for evaluation.
                       </span>
                     </span>
@@ -909,10 +910,10 @@ export default function LeavePoliciesPage() {
               </section>
 
               <section>
-                <h3 className="mb-1 text-sm font-semibold text-slate-900">
+                <h3 className="mb-1 text-sm font-semibold text-ink-strong">
                   Eligibility
                 </h3>
-                <p className="mb-4 text-xs text-slate-500">
+                <p className="mb-4 text-xs text-ink-muted">
                   Leaving a dimension unselected means the policy applies to
                   everyone in that dimension. Employment-type and gender
                   eligibility are write-only in the current API and will not
@@ -965,11 +966,11 @@ export default function LeavePoliciesPage() {
               </section>
             </div>
 
-            <div className="sticky bottom-0 flex justify-end gap-3 border-t border-slate-200 bg-white px-6 py-4">
+            <div className="sticky bottom-0 flex justify-end gap-3 border-t border-line bg-surface px-6 py-4">
               <button
                 onClick={closeModal}
                 disabled={saving}
-                className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                className={buttonClasses({ variant: "secondary" })}
               >
                 Cancel
               </button>
@@ -982,7 +983,7 @@ export default function LeavePoliciesPage() {
                   !form.leaveType ||
                   !form.effectiveFrom
                 }
-                className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                className={buttonClasses({ variant: "primary" })}
               >
                 <Check className="h-4 w-4" />
                 {saving
@@ -1013,15 +1014,15 @@ function MultiSelectGroup({
   allText: string;
 }) {
   return (
-    <div className="rounded-lg border border-slate-200 p-4">
+    <div className="rounded-lg border border-line p-4">
       <div className="mb-3 flex items-center justify-between">
-        <p className="text-sm font-medium text-slate-700">{title}</p>
-        <span className="text-xs text-slate-400">{allText}</span>
+        <p className="text-sm font-medium text-ink">{title}</p>
+        <span className="text-xs text-ink-subtle">{allText}</span>
       </div>
 
       <div className="flex flex-wrap gap-2">
         {options.length === 0 && (
-          <span className="text-xs text-slate-400">
+          <span className="text-xs text-ink-subtle">
             No options configured.
           </span>
         )}
@@ -1036,8 +1037,8 @@ function MultiSelectGroup({
               onClick={() => onToggle(option.value)}
               className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
                 selected
-                  ? "border-slate-900 bg-slate-900 text-white"
-                  : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                  ? "border-primary bg-primary text-white"
+                  : "border-line bg-surface text-ink-muted hover:bg-surface-hover"
               }`}
             >
               {option.label}

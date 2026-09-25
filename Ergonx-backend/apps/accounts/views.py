@@ -39,6 +39,7 @@ from apps.institutions.services import create_membership, effective_permission_c
 from apps.institutions.models import Institution, InstitutionInvitation, InstitutionMembership, InstitutionModule, Role
 from apps.accounts.models import InstitutionAdminInvitation, User, UserMFA
 from apps.employees.models import Employee
+from apps.documents.models import ImageAsset
 from apps.accounts.emails import send_institution_admin_invitation, send_password_reset
 from apps.audit.services import record_audit_event
 from common.permissions import TenantContextPermission
@@ -284,6 +285,21 @@ class PasswordResetConfirmView(APIView):
         return Response({"reset": True})
 
 
+def _active_institution_logo_id(institution):
+    """The institution's current logo image, if one has been uploaded."""
+    logo_id = (
+        ImageAsset.objects.filter(
+            institution=institution,
+            owner_type=ImageAsset.OwnerType.INSTITUTION,
+            owner_id=institution.id,
+            is_active=True,
+        )
+        .values_list("id", flat=True)
+        .first()
+    )
+    return str(logo_id) if logo_id else None
+
+
 class AuthBootstrapView(APIView):
     permission_classes = [TenantContextPermission]
 
@@ -313,6 +329,7 @@ class AuthBootstrapView(APIView):
                 "code": request.institution.code,
                 "name": request.institution.name,
                 "timezone": request.institution.timezone,
+                "logo_image_id": _active_institution_logo_id(request.institution),
             },
             "active_membership": {
                 "id": str(request.membership.id),

@@ -1,36 +1,79 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
+  ArrowRight,
   Bell,
+  Building2,
+  CheckCheck,
   ChevronDown,
   CircleHelp,
+  LogOut,
   Menu,
-  Search,
-  X,
+  Monitor,
   Moon,
+  Search,
+  ShieldCheck,
+  SlidersHorizontal,
   Sun,
+  UserRound,
+  X,
 } from "lucide-react";
+
 import { getApiErrorMessage, institutionsApi, notificationsApi, searchApi } from "@/lib/api";
 import type { AppNotification } from "@/types/notifications";
 import type { SearchResult } from "@/types/search";
 import type { InstitutionMembership } from "@/types/institutions";
 import { useAuth } from "@/components/guards/AuthProvider";
-import { useTheme } from "@/components/context/ThemeProvider";
-
+import { useTheme, type ThemePreference } from "@/components/context/ThemeProvider";
+import { navigation, selfServiceNavigation } from "@/components/navigation/navigation";
+import { Avatar } from "@/components/ui/Card";
+import { cx } from "@/lib/cx";
+import { accentForPath, moduleAccents } from "@/lib/moduleTheme";
+import { formatDateTime } from "@/lib/format";
 
 interface TopBarProps {
   onOpenSidebar?: () => void;
 }
 
-export default function TopBar({
-  onOpenSidebar,
-}: TopBarProps) {
+/** Resolves the most specific navigation label for the current route. */
+function routeContext(pathname: string): { section: string; page?: string } {
+  {
+    const matches = (href: string) => (href === "/" || href === "/dashboard" || href === "/me" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`));
+    const rootOf = (href: string) => `/${href.split("/")[1] ?? ""}`;
+    for (const item of navigation) {
+      for (const child of item.children ?? []) {
+        // A child owns its exact route tree, or — when it lives in a different
+        // module root than its parent (e.g. HR › Leave) — that whole root.
+        const foreignRoot = rootOf(child.href) !== rootOf(item.href) ? rootOf(child.href) : null;
+        if (matches(child.href) || (foreignRoot && matches(foreignRoot))) return { section: item.label, page: child.label };
+      }
+      if (matches(item.href)) return { section: item.label };
+    }
+    for (const item of selfServiceNavigation) if (matches(item.href)) return { section: "My workspace", page: item.label };
+    if (pathname.startsWith("/notifications")) return { section: "Notifications" };
+    if (pathname.startsWith("/approvals")) return { section: "Approvals" };
+    if (pathname.startsWith("/documents")) return { section: "Documents" };
+    if (pathname.startsWith("/operations")) return { section: "Operations" };
+    return { section: "Workspace" };
+  }
+}
+
+const themeOptions: Array<{ value: ThemePreference; label: string; icon: typeof Sun }> = [
+  { value: "light", label: "Light", icon: Sun },
+  { value: "dark", label: "Dark", icon: Moon },
+  { value: "system", label: "System", icon: Monitor },
+];
+
+export default function TopBar({ onOpenSidebar }: TopBarProps) {
   const router = useRouter();
+  const pathname = usePathname() ?? "/";
   const { institution, logout, switchInstitution, user } = useAuth();
-  const { theme, toggleTheme } = useTheme();
+  const { theme, preference, setTheme, toggleTheme } = useTheme();
+  const context = routeContext(pathname);
+  const accent = moduleAccents[accentForPath(pathname)];
+
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -39,19 +82,25 @@ export default function TopBar({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
-  const [notificationsOpen, setNotificationsOpen] =
-    useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [notificationsError, setNotificationsError] = useState<string | null>(null);
   const [memberships, setMemberships] = useState<InstitutionMembership[]>([]);
   const [switchingInstitutionId, setSwitchingInstitutionId] = useState<string | null>(null);
+  const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || "ErgonX user";
+
   const closeSearch = () => {
     setSearchOpen(false);
     setSearchQuery("");
     setSearchResults([]);
     setSearchError(null);
+  };
+
+  const openSearch = () => {
+    setSearchOpen(true);
+    window.setTimeout(() => searchInputRef.current?.focus(), 0);
   };
 
   const navigateFromProfile = (path: string) => {
@@ -69,38 +118,38 @@ export default function TopBar({
 
   useEffect(() => {
     const query = searchQuery.trim();
-    if (!searchOpen || query.length < 2) {
-      return;
-    }
-
+    if (!searchOpen || query.length < 2) return;
     let active = true;
     const timer = window.setTimeout(() => {
       setSearchLoading(true);
       setSearchError(null);
       searchApi.universalSearch({ query })
-        .then((response) => {
-          if (active) setSearchResults(response.results);
-        })
+        .then((response) => { if (active) setSearchResults(response.results); })
         .catch((caught) => {
           if (active) {
             setSearchResults([]);
             setSearchError(getApiErrorMessage(caught));
           }
         })
-        .finally(() => {
-          if (active) setSearchLoading(false);
-        });
+        .finally(() => { if (active) setSearchLoading(false); });
     }, 250);
-
     return () => {
       active = false;
       window.clearTimeout(timer);
     };
   }, [searchOpen, searchQuery]);
 
+  // Unread badge is available before the popover is first opened.
+  useEffect(() => {
+    let active = true;
+    notificationsApi.getNotifications({ unread: true })
+      .then((items) => { if (active) setUnreadNotificationCount(items.length); })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, [institution?.id]);
+
   useEffect(() => {
     if (!notificationsOpen) return;
-
     let active = true;
     notificationsApi.getNotifications({ unread: true })
       .then((items) => {
@@ -108,16 +157,9 @@ export default function TopBar({
         setNotifications(items.slice(0, 5));
         setUnreadNotificationCount(items.length);
       })
-      .catch((caught) => {
-        if (active) setNotificationsError(getApiErrorMessage(caught));
-      })
-      .finally(() => {
-        if (active) setNotificationsLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
+      .catch((caught) => { if (active) setNotificationsError(getApiErrorMessage(caught)); })
+      .finally(() => { if (active) setNotificationsLoading(false); });
+    return () => { active = false; };
   }, [notificationsOpen]);
 
   useEffect(() => {
@@ -136,7 +178,11 @@ export default function TopBar({
         setSearchOpen(true);
         window.setTimeout(() => searchInputRef.current?.focus(), 0);
       }
-      if (event.key === "Escape") closeSearch();
+      if (event.key === "Escape") {
+        closeSearch();
+        setProfileOpen(false);
+        setNotificationsOpen(false);
+      }
     };
     document.addEventListener("keydown", handleShortcut);
     return () => document.removeEventListener("keydown", handleShortcut);
@@ -159,7 +205,7 @@ export default function TopBar({
     if (notification.is_read) return;
     try {
       const updated = await notificationsApi.markNotificationRead(notification.id);
-      setNotifications((current) => current.map((item) => item.id === updated.id ? updated : item));
+      setNotifications((current) => current.map((item) => (item.id === updated.id ? updated : item)));
       setUnreadNotificationCount((current) => Math.max(0, current - 1));
       window.dispatchEvent(new CustomEvent("ergonx:toast", { detail: { title: "Notification updated", message: "Notification marked as read.", tone: "success" } }));
     } catch (caught) {
@@ -177,119 +223,54 @@ export default function TopBar({
     }
   };
 
+  const iconButton = "relative inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-surface-hover hover:text-ink-strong";
+
   return (
-    <header className="sticky top-0 z-30 h-16 border-b border-slate-800 bg-slate-950/95 text-slate-100 backdrop-blur">
-      <div className="relative flex h-full items-center gap-2 px-4 sm:gap-3 sm:px-6 lg:px-8">
-        <button
-          onClick={onOpenSidebar}
-          className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white lg:hidden"
-          aria-label="Open navigation"
-        >
-          <Menu className="h-5 w-5" />
+    <header data-shell-chrome className="sticky top-0 z-30 h-14 border-b border-line/80 bg-surface/85 backdrop-blur-xl supports-[backdrop-filter]:bg-surface/75">
+      <div className="relative flex h-full items-center gap-2 px-4 sm:gap-3 sm:px-6 xl:px-8">
+        <button type="button" onClick={onOpenSidebar} className={cx(iconButton, "lg:hidden")} aria-label="Open navigation">
+          <Menu className="h-[18px] w-[18px]" />
         </button>
 
-        <div className="hidden min-w-0 items-center gap-3 sm:flex">
-          <div className="h-6 w-px bg-slate-200 dark:bg-slate-700" />
-
-          <div className="flex min-w-0 items-center gap-2.5">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white ring-1 ring-slate-200 dark:ring-slate-600">
-              <Image
-                src="/ergonx-logo.png"
-                alt="ErgonX"
-                width={28}
-                height={28}
-                className="h-full w-full object-contain p-1"
-              />
-            </div>
-
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-white">
-                {institution?.name ?? "No active institution"}
-              </p>
-
-              <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
-                Active Institution
-              </p>
-            </div>
+        {/* Context identity: tenant + current area */}
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span aria-hidden="true" className={cx("hidden h-2 w-2 shrink-0 rounded-full sm:block", accent.solid)} />
+          <div className="min-w-0 leading-tight">
+            <p className="truncate text-sm font-semibold text-ink-strong">
+              {context.section}
+              {context.page && <span className="font-medium text-ink-muted"> <span className="text-ink-subtle">/</span> {context.page}</span>}
+            </p>
+            <p className="hidden truncate text-caption text-ink-muted sm:block">{institution?.name ?? "No active institution"}</p>
           </div>
         </div>
 
         <div className="flex-1" />
 
-        {searchOpen ? (
-          <div data-search-popover className="absolute left-1/2 flex h-11 w-[min(42vw,560px)] -translate-x-1/2 items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-4 shadow-lg sm:w-[min(48vw,620px)]" onClick={(event) => event.stopPropagation()}>
-            <Search className="h-4 w-4 shrink-0 text-slate-400" />
-
-              <input
-                ref={searchInputRef}
-              autoFocus
-              placeholder="Search employees, payroll, leave..."
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
-            />
-
-            <button
-              onClick={closeSearch}
-              className="text-slate-400 hover:text-slate-700 dark:hover:text-white"
-              aria-label="Close search"
-            >
-              <X className="h-4 w-4" />
-            </button>
-
-            {(searchQuery.trim().length >= 2 || searchLoading || searchError) && (
-              <div className="absolute left-0 top-14 w-full overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-2xl">
-                {searchLoading && <p className="px-4 py-3 text-sm text-slate-400">Searching…</p>}
-                {searchError && <p className="px-4 py-3 text-sm text-red-300">{searchError}</p>}
-                {!searchLoading && !searchError && searchResults.length === 0 && (
-                  <p className="px-4 py-3 text-sm text-slate-400">No results found.</p>
-                )}
-                {!searchLoading && searchResults.map((result) => (
-                  <button
-                    key={`${result.type}-${result.id}`}
-                    type="button"
-                    onClick={() => {
-                      router.push(result.route_hint);
-                      closeSearch();
-                    }}
-                    className="flex w-full items-center gap-3 border-b border-slate-800 px-4 py-3 text-left last:border-0 hover:bg-slate-800"
-                  >
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-800 text-[10px] font-semibold text-slate-300">
-                      {result.type.slice(0, 2)}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium text-white">{result.title}</span>
-                      <span className="block truncate text-xs text-slate-400">{result.subtitle || result.reference || result.module}</span>
-                    </span>
-                    <span className="shrink-0 text-[10px] font-medium text-slate-500">{result.status.replaceAll("_", " ")}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : (
-          <button
-            onClick={(event) => {
-              event.stopPropagation();
-              setSearchOpen(true);
-            }}
-            data-search-trigger
-            className="rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
-            title="Search"
-            aria-label="Search"
-          >
-            <Search className="h-5 w-5" />
-          </button>
-        )}
-
-        <span
-          className="hidden rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white sm:block"
-          title="Help and support is not configured for this release."
-          aria-label="Help and support is not configured for this release"
+        {/* Universal search trigger */}
+        <button
+          type="button"
+          data-search-trigger
+          onClick={(event) => { event.stopPropagation(); openSearch(); }}
+          className="hidden h-9 w-64 items-center gap-2.5 rounded-lg border border-line bg-surface-muted/70 px-3 text-left text-sm text-ink-subtle transition-colors hover:border-line-strong hover:bg-surface md:flex xl:w-80"
+          aria-label="Search (Ctrl+K)"
         >
-          <CircleHelp className="h-5 w-5" />
+          <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <span className="flex-1 truncate">Search people, payroll, leave…</span>
+          <kbd className="rounded-md border border-line bg-surface px-1.5 py-0.5 font-sans text-[0.6875rem] font-semibold text-ink-muted">Ctrl K</kbd>
+        </button>
+        <button type="button" data-search-trigger onClick={(event) => { event.stopPropagation(); openSearch(); }} className={cx(iconButton, "md:hidden")} aria-label="Search">
+          <Search className="h-[18px] w-[18px]" />
+        </button>
+
+        <span className={cx(iconButton, "hidden cursor-help sm:inline-flex")} title="Help and support is not configured for this release." aria-label="Help and support is not configured for this release" role="img">
+          <CircleHelp className="h-[18px] w-[18px]" />
         </span>
 
+        <button type="button" onClick={toggleTheme} className={cx(iconButton, "hidden sm:inline-flex")} title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}>
+          {theme === "dark" ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
+        </button>
+
+        {/* Notifications */}
         <div className="relative" data-topbar-popover onClick={(event) => event.stopPropagation()}>
           <button
             type="button"
@@ -302,140 +283,247 @@ export default function TopBar({
               setNotificationsOpen(opening);
               setProfileOpen(false);
             }}
-            className="relative rounded-xl p-2.5 text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
+            className={cx(iconButton, notificationsOpen && "bg-surface-hover text-ink-strong")}
             title="Notifications"
-            aria-label="Notifications"
+            aria-label={unreadNotificationCount ? `Notifications, ${unreadNotificationCount} unread` : "Notifications"}
+            aria-expanded={notificationsOpen}
+            aria-haspopup="dialog"
           >
-            <Bell className="h-5 w-5" />
-
+            <Bell className="h-[18px] w-[18px]" />
             {unreadNotificationCount > 0 && (
-              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white dark:ring-slate-900" />
+              <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[0.625rem] font-bold leading-none text-white ring-2 ring-surface">
+                {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
+              </span>
             )}
           </button>
 
           {notificationsOpen && (
-            <div className="absolute right-0 top-12 w-[320px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-800">
-              <div className="flex items-center justify-between border-b border-slate-200 p-4 dark:border-slate-700">
+            <div role="dialog" aria-label="Notifications" className="absolute right-0 top-11 w-[min(calc(100vw-2rem),22rem)] origin-top-right animate-pop-in overflow-hidden rounded-2xl border border-line bg-surface shadow-overlay">
+              <div className="flex items-center justify-between gap-3 border-b border-line-soft px-4 py-3.5">
                 <div>
-                  <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                    Notifications
-                  </p>
-
-                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                    Updates for your active institution
-                  </p>
+                  <p className="text-sm font-semibold text-ink-strong">Notifications</p>
+                  <p className="text-caption text-ink-muted">Updates for your active institution</p>
                 </div>
-
-                <span className="rounded-full bg-slate-900 px-2 py-1 text-[10px] font-bold text-white dark:bg-white dark:text-slate-900">
-                  {unreadNotificationCount}
-                </span>
+                <span className="rounded-full bg-primary-soft px-2 py-0.5 text-caption font-bold text-primary-ink tabular-nums">{unreadNotificationCount} new</span>
               </div>
 
-              <div className="divide-y divide-slate-200 dark:divide-slate-700">
-                {notificationsLoading && <p className="p-4 text-sm text-slate-500 dark:text-slate-400">Loading notifications…</p>}
-                {notificationsError && <p className="p-4 text-sm text-red-600 dark:text-red-300">{notificationsError}</p>}
+              <div className="max-h-[22rem] divide-y divide-line-soft overflow-y-auto">
+                {notificationsLoading && (
+                  <div className="space-y-3 p-4" role="status" aria-label="Loading notifications">
+                    {[0, 1, 2].map((index) => <div key={index} className="space-y-1.5"><span className="skeleton block h-3.5 w-3/5 rounded" /><span className="skeleton block h-3 w-4/5 rounded" /></div>)}
+                  </div>
+                )}
+                {notificationsError && <p className="p-4 text-support text-danger-ink" role="alert">{notificationsError}</p>}
                 {!notificationsLoading && !notificationsError && notifications.length === 0 && (
-                  <p className="p-4 text-sm text-slate-500 dark:text-slate-400">You have no notifications.</p>
+                  <div className="flex flex-col items-center px-4 py-8 text-center">
+                    <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-success-soft text-success"><CheckCheck className="h-5 w-5" aria-hidden="true" /></span>
+                    <p className="mt-3 text-sm font-semibold text-ink-strong">You&apos;re all caught up</p>
+                    <p className="mt-0.5 text-caption text-ink-muted">New updates will appear here.</p>
+                  </div>
                 )}
                 {!notificationsLoading && !notificationsError && notifications.map((notification) => (
-                  <button key={notification.id} type="button" onClick={async () => { await markNotificationRead(notification); if (notification.route_hint) { setNotificationsOpen(false); router.push(notification.route_hint); } }} className={`block w-full p-4 text-left hover:bg-slate-50 dark:hover:bg-slate-700 ${notification.is_read ? "" : "bg-sky-50/70 dark:bg-sky-950/20"}`} aria-label={`Open ${notification.title}`}>
-                    <div className="flex items-start gap-2"><span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${notification.is_read ? "bg-slate-300" : "bg-sky-500"}`} aria-hidden="true" /><span><p className="text-sm font-medium text-slate-900 dark:text-white">{notification.title}</p><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{notification.message}</p></span></div>
+                  <button
+                    key={notification.id}
+                    type="button"
+                    onClick={async () => {
+                      await markNotificationRead(notification);
+                      if (notification.route_hint) {
+                        setNotificationsOpen(false);
+                        router.push(notification.route_hint);
+                      }
+                    }}
+                    className={cx("block w-full px-4 py-3 text-left transition-colors hover:bg-surface-hover", !notification.is_read && "bg-primary-soft/40")}
+                    aria-label={`Open ${notification.title}`}
+                  >
+                    <span className="flex items-start gap-3">
+                      <span className={cx("mt-1.5 h-2 w-2 shrink-0 rounded-full", notification.is_read ? "bg-line-strong" : "bg-primary")} aria-hidden="true" />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold text-ink-strong">{notification.title}</span>
+                        <span className="mt-0.5 line-clamp-2 block text-support text-ink-muted">{notification.message}</span>
+                        {notification.created_at && <span className="mt-1 block text-caption text-ink-subtle">{formatDateTime(notification.created_at)}</span>}
+                      </span>
+                    </span>
                   </button>
                 ))}
               </div>
 
-              <div className="flex items-center justify-between border-t border-slate-200 p-3 text-xs dark:border-slate-700"><button type="button" onClick={markAllNotificationsRead} disabled={!unreadNotificationCount} className="font-medium text-sky-700 hover:text-sky-900 disabled:text-slate-400 dark:text-sky-300">Mark all read</button><button type="button" onClick={() => { setNotificationsOpen(false); router.push("/notifications"); }} className="font-medium text-sky-700 hover:text-sky-900 dark:text-sky-300">View all</button></div>
+              <div className="flex items-center justify-between border-t border-line-soft px-4 py-2.5 text-support">
+                <button type="button" onClick={markAllNotificationsRead} disabled={!unreadNotificationCount} className="font-semibold text-primary-ink hover:underline disabled:text-ink-subtle disabled:no-underline">Mark all read</button>
+                <button type="button" onClick={() => { setNotificationsOpen(false); router.push("/notifications"); }} className="inline-flex items-center gap-1 font-semibold text-primary-ink hover:underline">View all<ArrowRight className="h-3.5 w-3.5" aria-hidden="true" /></button>
+              </div>
             </div>
           )}
         </div>
 
+        {/* Profile */}
         <div className="relative" data-topbar-popover onClick={(event) => event.stopPropagation()}>
           <button
+            type="button"
             onClick={() => {
-              setProfileOpen(
-                (current) => !current,
-              );
+              setProfileOpen((current) => !current);
               setNotificationsOpen(false);
             }}
-            className="flex items-center gap-2 rounded-xl p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800"
+            className={cx("flex items-center gap-2.5 rounded-xl p-1 pr-1.5 transition-colors hover:bg-surface-hover xl:pr-2.5", profileOpen && "bg-surface-hover")}
             aria-label="Open profile menu"
             aria-haspopup="menu"
             aria-expanded={profileOpen}
           >
-            <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-white ring-1 ring-slate-200 dark:ring-slate-600">
-              <Image
-                src="/ergonx-logo.png"
-                alt="ErgonX"
-                width={32}
-                height={32}
-                className="h-full w-full object-contain p-1"
-              />
-            </div>
-
-            <div className="hidden text-left xl:block">
-              <p className="text-xs font-semibold text-white">
-                {[user?.firstName, user?.lastName].filter(Boolean).join(" ") || "ErgonX user"}
-              </p>
-
-              <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                {user?.role?.replaceAll("_", " ") ?? ""}
-              </p>
-            </div>
-
-            <ChevronDown className="hidden h-4 w-4 text-slate-400 xl:block" />
+            <Avatar name={fullName} size="sm" />
+            <span className="hidden min-w-0 text-left leading-tight xl:block">
+              <span className="block max-w-36 truncate text-support font-semibold text-ink-strong">{fullName}</span>
+              <span className="block max-w-36 truncate text-caption text-ink-muted">{user?.role ? user.role.replaceAll("_", " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase()) : ""}</span>
+            </span>
+            <ChevronDown className={cx("hidden h-4 w-4 text-ink-subtle transition-transform xl:block", profileOpen && "rotate-180")} aria-hidden="true" />
           </button>
 
           {profileOpen && (
-            <div role="menu" aria-label="Profile menu" className="absolute right-0 top-12 z-50 w-[330px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-800">
-              <div className="border-b border-slate-200 p-4 dark:border-slate-700">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white ring-1 ring-slate-200 dark:ring-slate-600">
-                    <Image
-                      src="/ergonx-logo.png"
-                      alt="ErgonX"
-                      width={40}
-                      height={40}
-                      className="h-full w-full object-contain p-1"
-                    />
-                  </div>
-
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">
-                      {[user?.firstName, user?.lastName].filter(Boolean).join(" ") || "ErgonX user"}
-                    </p>
-
-                    <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-                      {user?.email ?? ""}
-                    </p>
-                  </div>
+            <div role="menu" aria-label="Profile menu" className="absolute right-0 top-11 z-50 w-[min(calc(100vw-2rem),20rem)] origin-top-right animate-pop-in overflow-hidden rounded-2xl border border-line bg-surface shadow-overlay">
+              <div className="flex items-center gap-3 border-b border-line-soft p-4">
+                <Avatar name={fullName} size="md" />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-ink-strong">{fullName}</p>
+                  <p className="truncate text-caption text-ink-muted">{user?.email ?? ""}</p>
                 </div>
               </div>
 
-              <div className="border-t border-slate-200 p-2 dark:border-slate-700">
-                <button type="button" role="menuitem" onClick={() => navigateFromProfile("/me/profile")} className="w-full rounded-xl px-3 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700">My Profile</button>
-                <button type="button" role="menuitem" onClick={() => navigateFromProfile("/settings/profile")} className="w-full rounded-xl px-3 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700">Personal Preferences</button>
-                <button type="button" role="menuitem" onClick={() => navigateFromProfile("/settings/security")} className="w-full rounded-xl px-3 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700">Security</button>
+              <div className="p-1.5">
+                <ProfileItem icon={UserRound} label="My Profile" onClick={() => navigateFromProfile("/me/profile")} />
+                <ProfileItem icon={SlidersHorizontal} label="Personal Preferences" onClick={() => navigateFromProfile("/settings/profile")} />
+                <ProfileItem icon={ShieldCheck} label="Security" onClick={() => navigateFromProfile("/settings/security")} />
               </div>
-              {memberships.length > 1 && <div className="border-t border-slate-200 p-2 dark:border-slate-700"><p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Switch institution</p>{memberships.map((membership) => <button key={membership.id} type="button" disabled={membership.institution.id === institution?.id || switchingInstitutionId !== null} onClick={async () => { setSwitchingInstitutionId(membership.institution.id); try { await switchInstitution(membership.institution.id); setProfileOpen(false); router.replace("/"); router.refresh(); } finally { setSwitchingInstitutionId(null); } }} className="flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:text-slate-200 dark:hover:bg-slate-700"><span className="truncate">{membership.institution.name}</span><span className="shrink-0 text-xs text-slate-400">{membership.institution.id === institution?.id ? "Active" : switchingInstitutionId === membership.institution.id ? "Switching…" : "Switch"}</span></button>)}</div>}
-              <div className="border-t border-slate-200 p-2 dark:border-slate-700">
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={handleSignOut}
-                  disabled={signingOut}
-                  className="w-full rounded-xl px-3 py-2.5 text-left text-sm font-medium text-red-600 hover:bg-red-50 disabled:cursor-wait disabled:opacity-60 dark:hover:bg-red-950/30"
-                >
+
+              <div className="border-t border-line-soft px-4 py-3">
+                <p className="mb-2 text-caption font-semibold text-ink-subtle" id="theme-label">Appearance</p>
+                <div role="radiogroup" aria-labelledby="theme-label" className="grid grid-cols-3 gap-1 rounded-xl bg-surface-muted p-1">
+                  {themeOptions.map((option) => {
+                    const Icon = option.icon;
+                    const selected = preference === option.value;
+                    return (
+                      <button key={option.value} type="button" role="radio" aria-checked={selected} onClick={() => setTheme(option.value)} className={cx("inline-flex h-8 items-center justify-center gap-1.5 rounded-lg text-caption font-semibold transition-colors", selected ? "bg-surface text-ink-strong shadow-elevation-1" : "text-ink-muted hover:text-ink-strong")}>
+                        <Icon className="h-3.5 w-3.5" aria-hidden="true" />{option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {memberships.length > 1 && (
+                <div className="border-t border-line-soft p-1.5">
+                  <p className="px-3 pb-1 pt-2 text-caption font-semibold text-ink-subtle">Switch institution</p>
+                  {memberships.map((membership) => {
+                    const current = membership.institution.id === institution?.id;
+                    return (
+                      <button
+                        key={membership.id}
+                        type="button"
+                        role="menuitem"
+                        disabled={current || switchingInstitutionId !== null}
+                        onClick={async () => {
+                          setSwitchingInstitutionId(membership.institution.id);
+                          try {
+                            await switchInstitution(membership.institution.id);
+                            setProfileOpen(false);
+                            router.replace("/");
+                            router.refresh();
+                          } finally {
+                            setSwitchingInstitutionId(null);
+                          }
+                        }}
+                        className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-ink transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-70"
+                      >
+                        <Building2 className="h-4 w-4 shrink-0 text-ink-subtle" aria-hidden="true" />
+                        <span className="min-w-0 flex-1 truncate">{membership.institution.name}</span>
+                        <span className={cx("shrink-0 text-caption font-semibold", current ? "text-success-ink" : "text-ink-subtle")}>
+                          {current ? "Active" : switchingInstitutionId === membership.institution.id ? "Switching…" : "Switch"}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="border-t border-line-soft p-1.5">
+                <button type="button" role="menuitem" onClick={handleSignOut} disabled={signingOut} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-danger-ink transition-colors hover:bg-danger-soft disabled:cursor-wait disabled:opacity-60">
+                  <LogOut className="h-4 w-4" aria-hidden="true" />
                   {signingOut ? "Signing out…" : "Sign out"}
                 </button>
               </div>
             </div>
           )}
         </div>
-
-        <button type="button" onClick={toggleTheme} className="rounded-xl p-2.5 text-slate-300 hover:bg-slate-800 hover:text-white" title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}>
-          {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-        </button>
       </div>
+
+      {/* Universal search palette */}
+      {searchOpen && (
+        <div className="fixed inset-0 z-[120] flex items-start justify-center px-4 pt-[12vh]">
+          <div className="absolute inset-0 animate-fade-in bg-overlay backdrop-blur-[2px]" aria-hidden="true" />
+          <div data-search-popover role="dialog" aria-modal="true" aria-label="Universal search" className="relative w-full max-w-2xl animate-pop-in overflow-hidden rounded-2xl border border-line bg-surface shadow-overlay" onClick={(event) => event.stopPropagation()}>
+            <div className="flex h-14 items-center gap-3 border-b border-line-soft px-4">
+              <Search className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+              <input
+                ref={searchInputRef}
+                autoFocus
+                data-ui="input"
+                placeholder="Search employees, payroll, leave, accounting…"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                aria-label="Search"
+                className="min-w-0 flex-1 bg-transparent text-body text-ink-strong outline-none placeholder:text-ink-subtle"
+              />
+              <kbd className="hidden rounded-md border border-line px-1.5 py-0.5 text-[0.6875rem] font-semibold text-ink-muted sm:block">Esc</kbd>
+              <button type="button" onClick={closeSearch} className="rounded-lg p-1.5 text-ink-muted hover:bg-surface-hover hover:text-ink-strong" aria-label="Close search">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="max-h-[55vh] overflow-y-auto" aria-live="polite">
+              {searchQuery.trim().length < 2 && !searchLoading && (
+                <p className="px-5 py-6 text-support text-ink-muted">Type at least two characters. References such as <span className="font-semibold text-ink">PR-…</span> and <span className="font-semibold text-ink">LR-…</span> are supported.</p>
+              )}
+              {searchLoading && <p className="px-5 py-4 text-support text-ink-muted">Searching…</p>}
+              {searchError && <p className="px-5 py-4 text-support text-danger-ink" role="alert">{searchError}</p>}
+              {!searchLoading && !searchError && searchQuery.trim().length >= 2 && searchResults.length === 0 && (
+                <p className="px-5 py-6 text-support text-ink-muted">No results found for “{searchQuery.trim()}”.</p>
+              )}
+              {!searchLoading && searchResults.length > 0 && (
+                <ul className="p-2">
+                  {searchResults.map((result) => (
+                    <li key={`${result.type}-${result.id}`}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          router.push(result.route_hint);
+                          closeSearch();
+                        }}
+                        className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-surface-hover focus-visible:bg-surface-hover"
+                      >
+                        <span className={cx("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-caption font-bold uppercase", moduleAccents[accentForPath(result.route_hint || "/")].tile)}>
+                          {result.type.slice(0, 2)}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold text-ink-strong">{result.title}</span>
+                          <span className="block truncate text-caption text-ink-muted">{result.subtitle || result.reference || result.module}</span>
+                        </span>
+                        <span className="shrink-0 rounded-full bg-surface-muted px-2 py-0.5 text-caption font-medium text-ink-muted">{result.status.replaceAll("_", " ").toLowerCase()}</span>
+                        <ArrowRight className="h-4 w-4 shrink-0 text-ink-subtle opacity-0 transition-opacity group-hover:opacity-100" aria-hidden="true" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </header>
+  );
+}
+
+function ProfileItem({ icon: Icon, label, onClick }: { icon: typeof UserRound; label: string; onClick: () => void }) {
+  return (
+    <button type="button" role="menuitem" onClick={onClick} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-ink transition-colors hover:bg-surface-hover hover:text-ink-strong">
+      <Icon className="h-4 w-4 text-ink-subtle" aria-hidden="true" />
+      {label}
+    </button>
   );
 }

@@ -5,10 +5,13 @@ import { Clock3, Edit3, Plus, Search, X } from "lucide-react";
 import StatusBadge from "@/components/ui/StatusBadge";
 import ErrorState from "@/components/ui/ErrorState";
 import EmptyState from "@/components/ui/EmptyState";
+import PageHeader from "@/components/ui/PageHeader";
+import { Button, buttonClasses } from "@/components/ui/Button";
 import { attendanceApi, getApiErrorMessage, schedulingApi } from "@/lib/api";
 import { MAX_PAGE_SIZE } from "@/types/api";
 import type { FlexibleWorkRule } from "@/types/attendance";
 import { EM_DASH } from "@/lib/format";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 
 const ALL = "ALL";
 
@@ -197,62 +200,38 @@ export default function FlexibleWorkPage() {
   };
 
   return (
-    <main className="space-y-6">
-      <section className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-sm font-medium text-slate-500">
-            Attendance &amp; Scheduling
-          </p>
-
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900">
-            Flexible Work
-          </h1>
-
-          <p className="mt-1 text-sm text-slate-600">
-            Configure flexible working windows while defining required working
-            time and optional core hours.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={openNew}
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"
-        >
-          <Plus className="h-4 w-4" />
-          New Rule
-        </button>
-      </section>
+    <div className="space-y-6">
+      <PageHeader
+        title="Flexible Work"
+        description="Configure flexible working windows while defining required working time and optional core hours."
+        actions={<Button onClick={openNew} leadingIcon={<Plus className="h-4 w-4" />}>New Rule</Button>}
+      />
 
       {error && <ErrorState message={error} onRetry={reload} />}
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
+      <section className="rounded-xl border border-line bg-surface p-4">
         <div className="flex flex-col gap-3 sm:flex-row">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-subtle" />
 
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search flexible work rules..."
-              className="w-full rounded-lg border border-slate-200 py-2.5 pl-10 pr-3 text-sm outline-none focus:border-slate-400"
+              className="w-full h-9 rounded-lg border border-line-strong pl-10 pr-3 text-sm outline-none focus:border-primary"
             />
           </div>
 
-          <select
+          <SegmentedControl
+            label="Filter by status"
             value={status}
-            onChange={(event) => setStatus(event.target.value)}
-            aria-label="Filter by status"
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none"
-          >
-            <option value={ALL}>All Statuses</option>
-            <option value="ACTIVE">Active</option>
-            <option value="INACTIVE">Inactive</option>
-          </select>
+            onChange={(next) => setStatus(next)}
+            options={[{ value: ALL, label: "All" }, { value: "ACTIVE", label: "Active" }, { value: "INACTIVE", label: "Inactive" }]}
+          />
         </div>
       </section>
 
-      {filteredRules.length === 0 ? (
+      {error ? null : filteredRules.length === 0 ? (
         <EmptyState
           title={loading ? "Loading rules..." : "No flexible work rules"}
           description={
@@ -266,15 +245,15 @@ export default function FlexibleWorkPage() {
           {filteredRules.map((rule) => (
             <article
               key={rule.id}
-              className="rounded-xl border border-slate-200 bg-white p-5"
+              className="rounded-xl border border-line bg-surface p-5"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-base font-semibold text-slate-900">
+                  <h2 className="text-base font-semibold text-ink-strong">
                     {rule.name}
                   </h2>
 
-                  <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                  <p className="mt-1 flex items-center gap-1.5 text-xs text-ink-muted">
                     <Clock3 className="h-3.5 w-3.5" />
                     Requires{" "}
                     {attendanceApi.formatMinutes(rule.required_minutes)} per day
@@ -284,7 +263,7 @@ export default function FlexibleWorkPage() {
                 <StatusBadge status={rule.is_active ? "ACTIVE" : "INACTIVE"} />
               </div>
 
-              <dl className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-4 text-sm">
+              <dl className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-surface-muted p-4 text-sm">
                 <Detail
                   label="Start window"
                   value={window(rule.earliest_start, rule.latest_start)}
@@ -311,7 +290,7 @@ export default function FlexibleWorkPage() {
                 <button
                   type="button"
                   onClick={() => openEdit(rule)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  className={buttonClasses({ variant: "secondary" })}
                 >
                   <Edit3 className="h-4 w-4" />
                   Edit
@@ -323,17 +302,17 @@ export default function FlexibleWorkPage() {
       )}
 
       {showEditor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-xl">
-            <div className="sticky top-0 flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
-              <h2 className="text-lg font-semibold text-slate-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
+          <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-surface shadow-xl">
+            <div className="sticky top-0 flex items-center justify-between border-b border-line bg-surface px-6 py-4">
+              <h2 className="text-lg font-semibold text-ink-strong">
                 {editing ? "Edit Flexible Work Rule" : "New Flexible Work Rule"}
               </h2>
 
               <button
                 onClick={() => setShowEditor(false)}
                 disabled={saving}
-                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                className="rounded-lg p-2 text-ink-subtle hover:bg-surface-hover hover:text-ink-strong"
                 aria-label="Close"
               >
                 <X className="h-5 w-5" />
@@ -342,7 +321,7 @@ export default function FlexibleWorkPage() {
 
             <div className="space-y-5 p-6">
               {formError && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <div className="rounded-lg border border-danger/25 bg-danger-soft px-4 py-3 text-sm text-danger-ink">
                   {formError}
                 </div>
               )}
@@ -352,14 +331,14 @@ export default function FlexibleWorkPage() {
                 effectivity is held on the work schedule that references it.
               */}
               <label className="block space-y-1.5">
-                <span className="text-sm font-medium text-slate-700">
+                <span className="text-sm font-medium text-ink">
                   Rule Name
                 </span>
                 <input
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                   placeholder="e.g. Standard Flexible Work"
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                  className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
                 />
               </label>
 
@@ -387,7 +366,7 @@ export default function FlexibleWorkPage() {
               </div>
 
               <fieldset className="space-y-1.5">
-                <legend className="text-sm font-medium text-slate-700">
+                <legend className="text-sm font-medium text-ink">
                   Required Working Time
                 </legend>
 
@@ -400,7 +379,7 @@ export default function FlexibleWorkPage() {
                       value={requiredHours}
                       onChange={(event) => setRequiredHours(event.target.value)}
                       placeholder="Hours"
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                      className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
                     />
                   </label>
 
@@ -415,13 +394,13 @@ export default function FlexibleWorkPage() {
                         setRequiredMinutes(event.target.value)
                       }
                       placeholder="Minutes"
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                      className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
                     />
                   </label>
                 </div>
               </fieldset>
 
-              <label className="flex items-center gap-3 rounded-lg border border-slate-200 p-3">
+              <label className="flex items-center gap-3 rounded-lg border border-line p-3">
                 <input
                   type="checkbox"
                   checked={hasCoreHours}
@@ -429,10 +408,10 @@ export default function FlexibleWorkPage() {
                   className="h-4 w-4"
                 />
                 <span>
-                  <span className="block text-sm font-medium text-slate-700">
+                  <span className="block text-sm font-medium text-ink">
                     Core hours
                   </span>
-                  <span className="block text-xs text-slate-500">
+                  <span className="block text-xs text-ink-muted">
                     Employees must be present during this window.
                   </span>
                 </span>
@@ -453,24 +432,24 @@ export default function FlexibleWorkPage() {
                 </div>
               )}
 
-              <label className="flex items-center gap-3 rounded-lg border border-slate-200 p-3">
+              <label className="flex items-center gap-3 rounded-lg border border-line p-3">
                 <input
                   type="checkbox"
                   checked={isActive}
                   onChange={(event) => setIsActive(event.target.checked)}
                   className="h-4 w-4"
                 />
-                <span className="text-sm font-medium text-slate-700">
+                <span className="text-sm font-medium text-ink">
                   Active
                 </span>
               </label>
             </div>
 
-            <div className="sticky bottom-0 flex justify-end gap-3 border-t border-slate-200 bg-white px-6 py-4">
+            <div className="sticky bottom-0 flex justify-end gap-3 border-t border-line bg-surface px-6 py-4">
               <button
                 onClick={() => setShowEditor(false)}
                 disabled={saving}
-                className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                className={buttonClasses({ variant: "secondary" })}
               >
                 Cancel
               </button>
@@ -478,7 +457,7 @@ export default function FlexibleWorkPage() {
               <button
                 onClick={saveRule}
                 disabled={saving || !name.trim()}
-                className="rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                className={buttonClasses({ variant: "primary" })}
               >
                 {saving ? "Saving..." : editing ? "Save Changes" : "Create Rule"}
               </button>
@@ -486,15 +465,15 @@ export default function FlexibleWorkPage() {
           </div>
         </div>
       )}
-    </main>
+    </div>
   );
 }
 
 function Detail({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs text-slate-500">{label}</dt>
-      <dd className="mt-1 font-medium text-slate-800">{value}</dd>
+      <dt className="text-xs text-ink-muted">{label}</dt>
+      <dd className="mt-1 font-medium text-ink">{value}</dd>
     </div>
   );
 }
@@ -510,12 +489,12 @@ function TimeField({
 }) {
   return (
     <label className="space-y-1.5">
-      <span className="text-sm font-medium text-slate-700">{label}</span>
+      <span className="text-sm font-medium text-ink">{label}</span>
       <input
         type="time"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+        className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
       />
     </label>
   );

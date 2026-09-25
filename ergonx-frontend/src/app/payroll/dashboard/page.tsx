@@ -2,63 +2,139 @@
 
 import Link from "next/link";
 import { useCallback } from "react";
-import { ArrowRight, CheckCircle2, Clock3, WalletCards } from "lucide-react";
+import { ArrowRight, Building2, Clock3, HandCoins, ListChecks, MinusCircle, WalletCards } from "lucide-react";
 
+import ChartCard from "@/components/charts/ChartCard";
+import { BarsChart, TrendChart } from "@/components/charts/Charts";
+import PayrollWorkflow from "@/components/payroll/PayrollWorkflow";
+import { ButtonLink } from "@/components/ui/Button";
+import { RankingBars, Sparkline } from "@/components/charts/Visuals";
+import { Card, InsightCard, MetricCard } from "@/components/ui/Card";
 import ErrorState from "@/components/ui/ErrorState";
-import KPIStatCard from "@/components/ui/KPIStatCard";
 import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { dashboardsApi } from "@/lib/api";
 import { EM_DASH, formatAmount, formatNumber } from "@/lib/format";
 import { useApiResource } from "@/lib/useApiResource";
 
-const workflow = ["DRAFT", "CALCULATING", "CALCULATED", "UNDER_REVIEW", "APPROVED", "FINALIZED"];
-
 export default function PayrollDashboardPage() {
   const load = useCallback(() => dashboardsApi.getPayrollDashboard(), []);
   const { data, loading, error, reload } = useApiResource(load);
-  const placeholder = loading ? "…" : EM_DASH;
+  const initial = loading && !data;
   const latestStatus = data?.latest_run_status ?? null;
-  const latestIndex = latestStatus ? workflow.indexOf(latestStatus) : -1;
+  const periods = data?.payroll_by_period ?? [];
+  const costByDepartment = data?.cost_by_department ?? { period: null, departments: [] };
+  const latest = periods.at(-1);
+  const previous = periods.at(-2);
+  const grossDelta = latest && previous ? Number(latest.gross_pay) - Number(previous.gross_pay) : null;
+  const grossDeltaPct = grossDelta !== null && previous && Number(previous.gross_pay) ? (grossDelta / Number(previous.gross_pay)) * 100 : null;
 
   return (
-    <main className="space-y-6">
-      <PageHeader title="Payroll Dashboard" description="Monitor payroll runs, approvals and finalisation." />
-      {error && <ErrorState message={error} onRetry={reload} />}
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Payroll"
+        title="Payroll Dashboard"
+        description="Monitor payroll runs, approvals and finalisation."
+        icon={WalletCards}
+        accent="payroll"
+        actions={<ButtonLink href="/payroll/runs" leadingIcon={<ListChecks className="h-4 w-4" />}>Payroll runs</ButtonLink>}
+      />
+      {error && <ErrorState variant="inline" title="Unable to load payroll dashboard" message={error} onRetry={reload} />}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <KPIStatCard title="Finalized gross pay" value={data ? formatAmount(data.finalized_gross_pay) : placeholder} subtitle="Across finalized payroll runs" icon={<WalletCards size={20} />} />
-        <KPIStatCard title="Finalized net pay" value={data ? formatAmount(data.finalized_net_pay) : placeholder} subtitle="Across finalized payroll runs" icon={<WalletCards size={20} />} />
-        <KPIStatCard title="Deductions" value={data ? formatAmount(data.finalized_deductions) : placeholder} subtitle="Across finalized payroll runs" icon={<WalletCards size={20} />} />
-        <KPIStatCard title="Employer contributions" value={data ? formatAmount(data.employer_contributions) : placeholder} subtitle="Across finalized payroll runs" icon={<WalletCards size={20} />} />
-        <KPIStatCard title="Runs awaiting action" value={data ? formatNumber(data.pending_runs) : placeholder} subtitle={latestStatus ? `Latest: ${latestStatus.replaceAll("_", " ")}` : "No payroll run"} icon={<Clock3 size={20} />} />
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-3">
-        <section className="rounded-xl border bg-white p-5 xl:col-span-2">
-          <div className="mb-5 flex items-center justify-between">
-            <div><h2 className="font-semibold text-slate-900">Latest Payroll Run</h2><p className="text-sm text-slate-500">Current backend-reported payroll workflow state.</p></div>
-            {latestStatus ? <StatusBadge status={latestStatus} /> : null}
-          </div>
-          {data?.latest_run_id ? (
-            <><div className="rounded-lg bg-slate-50 p-4"><p className="text-xs text-slate-500">Run reference</p><p className="mt-1 text-xl font-bold text-slate-900">{data.latest_run_id}</p></div><Link href={`/payroll/runs/${data.latest_run_id}`} className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-slate-900 hover:underline">Open payroll run <ArrowRight size={16} /></Link></>
-          ) : <p className="text-sm text-slate-500">No payroll run is available for this institution yet.</p>}
-        </section>
-
-        <section className="rounded-xl border bg-white p-5">
-          <div className="mb-5 flex items-center gap-2"><CheckCircle2 size={19} /><h2 className="font-semibold">Payroll Workflow</h2></div>
-          <div className="space-y-3">{workflow.map((status, index) => <div key={status} className="flex items-center gap-3 rounded-lg border p-3"><span className={`h-2.5 w-2.5 rounded-full ${latestIndex >= index ? "bg-slate-900" : "bg-slate-300"}`} /><span className="text-sm font-medium">{status}</span></div>)}</div>
-        </section>
-      </div>
-
-      <section className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
-        <PayrollTrend points={data?.payroll_by_period ?? []} loading={loading} />
-        <RunStatuses items={data?.runs_by_status ?? []} loading={loading} />
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Finalized payroll totals">
+        <MetricCard size="sm" label="Finalized gross pay" value={data ? formatAmount(data.finalized_gross_pay) : EM_DASH} description="Across finalized runs" icon={WalletCards} accent="payroll" loading={initial} chart={<Sparkline values={periods.map((point) => point.gross_pay)} color="var(--mod-payroll)" height={32} label="Gross pay by period" />} />
+        <MetricCard size="sm" label="Finalized net pay" value={data ? formatAmount(data.finalized_net_pay) : EM_DASH} description="Paid to employees" icon={HandCoins} accent="accounting" loading={initial} chart={<Sparkline values={periods.map((point) => point.net_pay)} color="var(--mod-accounting)" height={32} label="Net pay by period" />} />
+        <MetricCard size="sm" label="Deductions" value={data ? formatAmount(data.finalized_deductions) : EM_DASH} description="Statutory and voluntary" icon={MinusCircle} accent="audit" loading={initial} />
+        <MetricCard size="sm" label="Employer contributions" value={data ? formatAmount(data.employer_contributions) : EM_DASH} description="Employer-side cost" icon={Building2} accent="hr" loading={initial} />
       </section>
 
-    </main>
+      <Card
+        title="Latest payroll run"
+        description="Backend-reported workflow state of the most recent run."
+        icon={Clock3}
+        accent="payroll"
+        accentLine
+        actions={latestStatus ? <StatusBadge status={latestStatus} /> : undefined}
+      >
+        {initial ? <div className="skeleton h-16 rounded-xl" /> : data?.latest_run_id ? (
+          <div className="space-y-4">
+            <PayrollWorkflow current={latestStatus} />
+            <div className="flex flex-wrap items-center justify-between gap-3 text-support">
+              <span className="text-ink-muted">{formatNumber(data.pending_runs)} run{data.pending_runs === 1 ? "" : "s"} awaiting action · Reference <span className="font-mono text-ink">{data.latest_run_id.slice(0, 8)}</span></span>
+              <Link href={`/payroll/runs/${data.latest_run_id}`} className="inline-flex items-center gap-1.5 font-semibold text-primary-ink hover:underline">Open payroll run<ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
+            </div>
+          </div>
+        ) : <p className="text-support text-ink-muted">No payroll run is available for this institution yet.</p>}
+      </Card>
+
+      <div className="grid gap-5 xl:grid-cols-5">
+        <ChartCard
+          className="xl:col-span-3"
+          title="Payroll cost trend"
+          description="Gross payroll by finalized pay period."
+          accent="payroll"
+          loading={initial}
+          error={!data && error ? "This data is unavailable right now." : null}
+          empty={!periods.length}
+          emptyDescription="Gross, net and deductions will appear after a payroll run is finalized."
+          data={{ columns: ["Period", "Gross", "Net", "Deductions"], rows: periods.map((point) => [point.label, formatAmount(point.gross_pay), formatAmount(point.net_pay), formatAmount(point.total_deductions)]) }}
+        >
+          <TrendChart variant="area" data={periods} xKey="label" xFormat="label" format="currency" height={250} series={[{ key: "gross_pay", label: "Gross pay", color: "var(--mod-payroll)" }]} />
+        </ChartCard>
+        <div className="grid content-start gap-4 xl:col-span-2">
+          <InsightCard title="Period-over-period change" icon={WalletCards} accent="payroll">
+            {grossDelta !== null ? (
+              <p>
+                Gross pay {grossDelta >= 0 ? "increased" : "decreased"} by <strong className="text-ink-strong tabular-nums">{formatAmount(Math.abs(grossDelta))}</strong>
+                {grossDeltaPct !== null && <> ({grossDelta >= 0 ? "+" : "-"}{Math.abs(grossDeltaPct).toFixed(1)}%)</>} from {previous?.label} to {latest?.label}.
+              </p>
+            ) : <p>At least two finalized periods are needed to compare payroll cost.</p>}
+          </InsightCard>
+          <Card title="Runs by status" description="Payroll runs grouped by current workflow status." padding="md">
+            {initial ? <div className="skeleton h-24 rounded-xl" /> : data?.runs_by_status.length ? (
+              <ul className="divide-y divide-line-soft">
+                {data.runs_by_status.map((item) => (
+                  <li key={item.status} className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0">
+                    <StatusBadge status={item.status} size="sm" />
+                    <span className="text-sm font-semibold text-ink-strong tabular-nums">{formatNumber(item.count)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="text-support text-ink-muted">No payroll runs are available yet.</p>}
+          </Card>
+        </div>
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-5">
+        <ChartCard
+          className="xl:col-span-3"
+          title="Earnings and deductions"
+          description="Net pay and deductions that make up gross pay for each finalized period."
+          accent="payroll"
+          loading={initial}
+          error={!data && error ? "This data is unavailable right now." : null}
+          empty={!periods.length}
+          emptyDescription="Finalized payroll periods will appear here."
+          legend={[{ label: "Net pay", color: "var(--chart-2)", shape: "square" }, { label: "Deductions", color: "var(--chart-6)", shape: "square" }]}
+          data={{ columns: ["Period", "Net pay", "Deductions"], rows: periods.map((point) => [point.label, formatAmount(point.net_pay), formatAmount(point.total_deductions)]) }}
+        >
+          <BarsChart data={periods} xKey="label" mode="stacked" format="currency" height={250} series={[{ key: "net_pay", label: "Net pay", color: "var(--chart-2)" }, { key: "total_deductions", label: "Deductions", color: "var(--chart-6)" }]} />
+        </ChartCard>
+        <ChartCard
+          className="xl:col-span-2"
+          title="Cost by department"
+          description={costByDepartment.period ? `Gross pay by current department, ${costByDepartment.period}.` : "Gross pay by current department for the latest finalized run."}
+          accent="payroll"
+          icon={Building2}
+          loading={initial}
+          error={!data && error ? "This data is unavailable right now." : null}
+          empty={!costByDepartment.departments.length}
+          emptyDescription="Department costs appear after a payroll run is finalized."
+          data={{ columns: ["Department", "Gross pay"], rows: costByDepartment.departments.map((item) => [item.department, formatAmount(item.gross_pay)]) }}
+        >
+          <RankingBars items={costByDepartment.departments.map((item) => ({ label: item.department, value: item.gross_pay }))} format="currency" color="var(--mod-payroll)" limit={8} />
+        </ChartCard>
+      </div>
+    </div>
   );
 }
-
-function PayrollTrend({ points, loading }: { points: Array<{ label: string; gross_pay: string | number; net_pay: string | number; total_deductions: string | number }>; loading: boolean }) { if (loading) return <section className="rounded-2xl border bg-white p-6"><p className="text-sm text-slate-500">Loading payroll trend…</p></section>; if (!points.length) return <section className="rounded-2xl border bg-white p-6"><h2 className="font-semibold">Payroll cost trend</h2><p className="mt-1 text-sm text-slate-500">Gross, net, and deductions will appear after a payroll run is finalized.</p></section>; const maximum = Math.max(...points.map((point) => Number(point.gross_pay)), 1); return <section className="rounded-2xl border bg-white p-6"><h2 className="font-semibold">Payroll cost trend</h2><p className="mt-1 text-sm text-slate-500">Gross payroll by finalized pay period.</p><div className="mt-7 flex h-52 items-end gap-3">{points.map((point) => <div key={point.label} className="flex min-w-0 flex-1 flex-col justify-end gap-2"><span className="truncate text-center text-xs font-medium text-slate-600">{formatAmount(point.gross_pay)}</span><div className="rounded-t-lg bg-gradient-to-t from-amber-600 to-amber-300" style={{ height: `${Math.max((Number(point.gross_pay) / maximum) * 100, 4)}%` }} title={`${point.label}: gross ${formatAmount(point.gross_pay)}, net ${formatAmount(point.net_pay)}, deductions ${formatAmount(point.total_deductions)}`} /><span className="truncate text-center text-xs text-slate-500">{point.label}</span></div>)}</div></section>; }
-function RunStatuses({ items, loading }: { items: Array<{ status: string; count: number }>; loading: boolean }) { if (loading) return <section className="rounded-2xl border bg-white p-6"><p className="text-sm text-slate-500">Loading payroll status…</p></section>; return <section className="rounded-2xl border bg-white p-6"><h2 className="font-semibold">Run status</h2><p className="mt-1 text-sm text-slate-500">Payroll runs grouped by current workflow status.</p>{items.length ? <div className="mt-6 space-y-3">{items.map((item) => <div key={item.status} className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3"><span className="text-sm text-slate-600">{item.status.replaceAll("_", " ")}</span><span className="font-semibold text-slate-950">{formatNumber(item.count)}</span></div>)}</div> : <p className="mt-6 text-sm text-slate-500">No payroll runs are available yet.</p>}</section>; }

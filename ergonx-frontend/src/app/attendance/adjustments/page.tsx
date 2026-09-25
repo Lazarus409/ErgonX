@@ -30,6 +30,8 @@ import type {
 } from "@/types/attendance";
 import type { Department, Employee, Employment } from "@/types/hr";
 import { EM_DASH, formatDate, formatDateTime, formatNumber } from "@/lib/format";
+import { buttonClasses } from "@/components/ui/Button";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
 
 const ALL = "ALL";
 const SEARCH_DEBOUNCE_MS = 350;
@@ -321,7 +323,7 @@ export default function AttendanceAdjustmentsPage() {
   const totalPages = Math.max(1, Math.ceil(data.count / DEFAULT_PAGE_SIZE));
 
   return (
-    <main className="space-y-6">
+    <div className="space-y-6">
       <PageHeader
         title="Attendance Adjustments"
         description="Review requested corrections to attendance records."
@@ -352,16 +354,16 @@ export default function AttendanceAdjustmentsPage() {
         />
       </section>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4">
+      <section className="rounded-xl border border-line bg-surface p-4">
         <div className="flex flex-col gap-3 lg:flex-row">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-subtle" />
 
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search employee or employee number..."
-              className="w-full rounded-lg border border-slate-200 py-2.5 pl-10 pr-3 text-sm outline-none focus:border-slate-400"
+              className="w-full h-9 rounded-lg border border-line-strong pl-10 pr-3 text-sm outline-none focus:border-primary"
             />
           </div>
 
@@ -369,7 +371,7 @@ export default function AttendanceAdjustmentsPage() {
             value={departmentFilter}
             onChange={(event) => setDepartmentFilter(event.target.value)}
             aria-label="Filter by department"
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none"
+            className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink outline-none"
           >
             <option value={ALL}>All Departments</option>
 
@@ -380,21 +382,15 @@ export default function AttendanceAdjustmentsPage() {
             ))}
           </select>
 
-          <select
+          <SegmentedControl
+            label="Filter by status"
             value={statusFilter}
-            onChange={(event) => {
-              setStatusFilter(event.target.value);
+            onChange={(next) => {
+              setStatusFilter(next);
               setPage(1);
             }}
-            aria-label="Filter by status"
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none"
-          >
-            <option value={ALL}>All Statuses</option>
-            <option value="DRAFT">Draft</option>
-            <option value="PENDING">Pending</option>
-            <option value="APPROVED">Approved</option>
-            <option value="REJECTED">Rejected</option>
-          </select>
+            options={[{ value: ALL, label: "All" }, { value: "DRAFT", label: "Draft" }, { value: "PENDING", label: "Pending" }, { value: "APPROVED", label: "Approved" }, { value: "REJECTED", label: "Rejected" }]}
+          />
 
           <button
             type="button"
@@ -404,7 +400,7 @@ export default function AttendanceAdjustmentsPage() {
               setDepartmentFilter(ALL);
               setPage(1);
             }}
-            className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            className={buttonClasses({ variant: "secondary" })}
           >
             <Filter className="h-4 w-4" />
             Clear
@@ -412,66 +408,66 @@ export default function AttendanceAdjustmentsPage() {
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+      <section className="overflow-hidden rounded-xl border border-line bg-surface">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-left">
-            <thead className="border-b border-slate-200 bg-slate-50">
+            <thead className="border-b border-line bg-surface-muted">
               <tr>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Employee
                 </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Date
                 </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Original
                 </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Proposed
                 </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Requested
                 </th>
-                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Status
                 </th>
-                <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-ink-muted">
                   Action
                 </th>
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-line-soft">
               {filteredAdjustments.map((adjustment) => {
                 const info = describe(adjustment);
 
                 return (
-                  <tr key={adjustment.id} className="hover:bg-slate-50">
+                  <tr key={adjustment.id} className="hover:bg-surface-hover">
                     <td className="px-5 py-4">
-                      <p className="font-medium text-slate-900">{info.name}</p>
-                      <p className="mt-1 text-xs text-slate-500">
+                      <p className="font-medium text-ink-strong">{info.name}</p>
+                      <p className="mt-1 text-xs text-ink-muted">
                         {info.number} · {info.department}
                       </p>
                     </td>
 
                     <td className="px-5 py-4">
-                      <div className="flex items-center gap-2 text-sm text-slate-700">
-                        <CalendarDays className="h-4 w-4 text-slate-400" />
+                      <div className="flex items-center gap-2 text-sm text-ink">
+                        <CalendarDays className="h-4 w-4 text-ink-subtle" />
                         {info.date}
                       </div>
                     </td>
 
-                    <td className="px-5 py-4 text-sm text-slate-700">
+                    <td className="px-5 py-4 text-sm text-ink">
                       {adjustmentTime(adjustment.old_values, "check_in")} –{" "}
                       {adjustmentTime(adjustment.old_values, "check_out")}
                     </td>
 
-                    <td className="px-5 py-4 text-sm font-medium text-slate-900">
+                    <td className="px-5 py-4 text-sm font-medium text-ink-strong">
                       {adjustmentTime(adjustment.proposed_values, "check_in")} –{" "}
                       {adjustmentTime(adjustment.proposed_values, "check_out")}
                     </td>
 
-                    <td className="px-5 py-4 text-sm text-slate-700">
+                    <td className="px-5 py-4 text-sm text-ink">
                       {formatDateTime(adjustment.created_at)}
                     </td>
 
@@ -483,7 +479,7 @@ export default function AttendanceAdjustmentsPage() {
                       <button
                         type="button"
                         onClick={() => openReview(adjustment)}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                        className={buttonClasses({ variant: "secondary", size: "sm" })}
                       >
                         <Eye className="h-4 w-4" />
                         Review
@@ -496,12 +492,12 @@ export default function AttendanceAdjustmentsPage() {
               {filteredAdjustments.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-5 py-12 text-center">
-                    <p className="text-sm font-medium text-slate-700">
+                    <p className="text-sm font-medium text-ink">
                       {loading
                         ? "Loading adjustments..."
                         : "No attendance adjustments found"}
                     </p>
-                    <p className="mt-1 text-sm text-slate-500">
+                    <p className="mt-1 text-sm text-ink-muted">
                       {loading
                         ? "Please wait."
                         : "No correction requests match these filters."}
@@ -513,8 +509,8 @@ export default function AttendanceAdjustmentsPage() {
           </table>
         </div>
 
-        <div className="flex items-center justify-between border-t border-slate-200 px-5 py-3">
-          <p className="text-xs text-slate-500">
+        <div className="flex items-center justify-between border-t border-line px-5 py-3">
+          <p className="text-xs text-ink-muted">
             Page {page} of {totalPages} · {data.count} records
           </p>
 
@@ -523,7 +519,7 @@ export default function AttendanceAdjustmentsPage() {
               type="button"
               onClick={() => setPage((current) => Math.max(1, current - 1))}
               disabled={loading || !data.previous}
-              className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+              className={buttonClasses({ variant: "secondary", size: "sm" })}
             >
               Previous
             </button>
@@ -532,7 +528,7 @@ export default function AttendanceAdjustmentsPage() {
               type="button"
               onClick={() => setPage((current) => current + 1)}
               disabled={loading || !data.next}
-              className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+              className={buttonClasses({ variant: "secondary", size: "sm" })}
             >
               Next
             </button>
@@ -542,15 +538,15 @@ export default function AttendanceAdjustmentsPage() {
 
       {/* Review modal */}
       {selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-xl">
-            <div className="sticky top-0 flex items-start justify-between border-b border-slate-200 bg-white px-5 py-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
+          <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-surface shadow-xl">
+            <div className="sticky top-0 flex items-start justify-between border-b border-line bg-surface px-5 py-4">
               <div>
-                <h2 className="mt-1 text-lg font-semibold text-slate-900">
+                <h2 className="mt-1 text-lg font-semibold text-ink-strong">
                   Review Attendance Adjustment
                 </h2>
 
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="mt-1 text-sm text-ink-muted">
                   Review the requested change before taking action.
                 </p>
               </div>
@@ -559,7 +555,7 @@ export default function AttendanceAdjustmentsPage() {
                 type="button"
                 onClick={closeReview}
                 disabled={reviewRunning}
-                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+                className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover"
                 aria-label="Close"
               >
                 <X className="h-5 w-5" />
@@ -568,23 +564,23 @@ export default function AttendanceAdjustmentsPage() {
 
             <div className="space-y-5 p-5">
               {reviewError && (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <div className="rounded-lg border border-danger/25 bg-danger-soft px-4 py-3 text-sm text-danger-ink">
                   {reviewError}
                 </div>
               )}
 
-              <section className="rounded-xl border border-slate-200 p-4">
+              <section className="rounded-xl border border-line p-4">
                 <div className="flex items-start gap-3">
-                  <div className="rounded-lg bg-slate-100 p-2">
-                    <UserCheck className="h-5 w-5 text-slate-600" />
+                  <div className="rounded-lg bg-surface-sunken p-2">
+                    <UserCheck className="h-5 w-5 text-ink-muted" />
                   </div>
 
                   <div>
-                    <p className="font-semibold text-slate-900">
+                    <p className="font-semibold text-ink-strong">
                       {describe(selected).name}
                     </p>
 
-                    <p className="mt-1 text-sm text-slate-500">
+                    <p className="mt-1 text-sm text-ink-muted">
                       {describe(selected).number} ·{" "}
                       {describe(selected).department} ·{" "}
                       {describe(selected).date}
@@ -594,7 +590,7 @@ export default function AttendanceAdjustmentsPage() {
               </section>
 
               <section>
-                <h3 className="text-sm font-semibold text-slate-900">
+                <h3 className="text-sm font-semibold text-ink-strong">
                   Attendance Comparison
                 </h3>
 
@@ -620,36 +616,36 @@ export default function AttendanceAdjustmentsPage() {
                 </div>
               </section>
 
-              <section className="rounded-xl bg-slate-50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+              <section className="rounded-xl bg-surface-muted p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-ink-subtle">
                   Reason
                 </p>
 
-                <p className="mt-2 text-sm leading-6 text-slate-700">
+                <p className="mt-2 text-sm leading-6 text-ink">
                   {selected.reason || EM_DASH}
                 </p>
 
-                <p className="mt-3 text-xs text-slate-500">
+                <p className="mt-3 text-xs text-ink-muted">
                   Requested on {formatDateTime(selected.created_at)}
                 </p>
               </section>
 
-              <div className="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-3">
-                <span className="text-sm text-slate-600">Current status</span>
+              <div className="flex items-center justify-between rounded-lg border border-line px-4 py-3">
+                <span className="text-sm text-ink-muted">Current status</span>
 
                 <StatusBadge status={selected.status} />
               </div>
 
               {selected.status === "PENDING" ? (
-                <section className="space-y-4 border-t border-slate-200 pt-5">
+                <section className="space-y-4 border-t border-line pt-5">
                   <div className="flex gap-2">
                     <button
                       type="button"
                       onClick={() => setReviewAction("APPROVE")}
                       className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-medium ${
                         reviewAction === "APPROVE"
-                          ? "bg-emerald-600 text-white"
-                          : "border border-slate-200 text-slate-700 hover:bg-slate-50"
+                          ? "bg-success text-white"
+                          : "border border-line text-ink hover:bg-surface-hover"
                       }`}
                     >
                       <CheckCircle2 className="mr-2 inline h-4 w-4" />
@@ -661,8 +657,8 @@ export default function AttendanceAdjustmentsPage() {
                       onClick={() => setReviewAction("REJECT")}
                       className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-medium ${
                         reviewAction === "REJECT"
-                          ? "bg-red-600 text-white"
-                          : "border border-slate-200 text-slate-700 hover:bg-slate-50"
+                          ? "bg-danger text-white"
+                          : "border border-line text-ink hover:bg-surface-hover"
                       }`}
                     >
                       <XCircle className="mr-2 inline h-4 w-4" />
@@ -671,7 +667,7 @@ export default function AttendanceAdjustmentsPage() {
                   </div>
 
                   {reviewAction === "APPROVE" && (
-                    <p className="rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-600">
+                    <p className="rounded-lg bg-surface-muted p-3 text-xs leading-5 text-ink-muted">
                       Approving applies the proposed values to the attendance
                       record, recalculates worked, late and overtime minutes,
                       and re-syncs the related overtime record.
@@ -683,7 +679,7 @@ export default function AttendanceAdjustmentsPage() {
                     comment can be recorded against an adjustment.
                   */}
                   {reviewAction === "REJECT" && (
-                    <p className="rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-600">
+                    <p className="rounded-lg bg-surface-muted p-3 text-xs leading-5 text-ink-muted">
                       The attendance record is left unchanged. The API records
                       no rejection comment for adjustments.
                     </p>
@@ -694,7 +690,7 @@ export default function AttendanceAdjustmentsPage() {
                       type="button"
                       onClick={submitReview}
                       disabled={reviewRunning}
-                      className="w-full rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                      className={buttonClasses({ variant: "primary", className: "w-full" })}
                     >
                       {reviewRunning
                         ? "Processing..."
@@ -707,7 +703,7 @@ export default function AttendanceAdjustmentsPage() {
                   )}
                 </section>
               ) : (
-                <div className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">
+                <div className="rounded-lg bg-surface-muted p-4 text-sm text-ink-muted">
                   This adjustment has already been processed and is read-only.
                 </div>
               )}
@@ -716,16 +712,16 @@ export default function AttendanceAdjustmentsPage() {
         </div>
       )}
 
-      <section className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4">
+      <section className="rounded-xl border border-line bg-surface-muted px-5 py-4">
         <div className="flex items-start gap-3">
-          <Clock3 className="mt-0.5 h-5 w-5 shrink-0 text-slate-600" />
+          <Clock3 className="mt-0.5 h-5 w-5 shrink-0 text-ink-muted" />
 
           <div>
-            <p className="text-sm font-semibold text-slate-800">
+            <p className="text-sm font-semibold text-ink">
               Historical attendance integrity
             </p>
 
-            <p className="mt-1 text-sm leading-6 text-slate-600">
+            <p className="mt-1 text-sm leading-6 text-ink-muted">
               An approved adjustment represents a controlled correction to an
               attendance record. The original values are retained on the
               adjustment so the change stays auditable.
@@ -733,7 +729,7 @@ export default function AttendanceAdjustmentsPage() {
           </div>
         </div>
       </section>
-    </main>
+    </div>
   );
 }
 
@@ -749,16 +745,16 @@ function SummaryCard({
   detail: string;
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5">
+    <div className="rounded-xl border border-line bg-surface p-5">
       <div className="flex items-center gap-3">
-        <div className="rounded-lg bg-slate-100 p-2 text-slate-600">{icon}</div>
+        <div className="rounded-lg bg-surface-sunken p-2 text-ink-muted">{icon}</div>
 
-        <p className="text-sm font-medium text-slate-500">{label}</p>
+        <p className="text-sm font-medium text-ink-muted">{label}</p>
       </div>
 
-      <p className="mt-4 text-2xl font-semibold text-slate-900">{value}</p>
+      <p className="mt-4 text-2xl font-semibold text-ink-strong">{value}</p>
 
-      <p className="mt-1 text-xs text-slate-500">{detail}</p>
+      <p className="mt-1 text-xs text-ink-muted">{detail}</p>
     </div>
   );
 }
@@ -778,23 +774,23 @@ function ComparisonCard({
     <div
       className={`rounded-xl border p-4 ${
         highlight
-          ? "border-slate-300 bg-slate-50"
-          : "border-slate-200 bg-white"
+          ? "border-line-strong bg-surface-muted"
+          : "border-line bg-surface"
       }`}
     >
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+      <p className="text-xs font-semibold uppercase tracking-wide text-ink-subtle">
         {title}
       </p>
 
       <div className="mt-4 grid grid-cols-2 gap-4">
         <div>
-          <p className="text-xs text-slate-500">Check-in</p>
-          <p className="mt-1 text-lg font-semibold text-slate-900">{checkIn}</p>
+          <p className="text-xs text-ink-muted">Check-in</p>
+          <p className="mt-1 text-lg font-semibold text-ink-strong">{checkIn}</p>
         </div>
 
         <div>
-          <p className="text-xs text-slate-500">Check-out</p>
-          <p className="mt-1 text-lg font-semibold text-slate-900">
+          <p className="text-xs text-ink-muted">Check-out</p>
+          <p className="mt-1 text-lg font-semibold text-ink-strong">
             {checkOut}
           </p>
         </div>

@@ -11,6 +11,7 @@ import StatusBadge from "@/components/ui/StatusBadge";
 import { getApiErrorMessage, institutionsApi } from "@/lib/api";
 import { useApiResource } from "@/lib/useApiResource";
 import type { InstitutionRole } from "@/types/institutions";
+import { buttonClasses } from "@/components/ui/Button";
 
 function moduleLabel(code: string): string {
   return code.replaceAll("_", " ");
@@ -85,39 +86,39 @@ export default function RoleSettingsPage() {
         description="Create and maintain custom roles. Reserved system roles remain protected by the backend."
       />
 
-      <div className="flex justify-end"><button onClick={openCreate} className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">Create custom role</button></div>
+      <div className="flex justify-end"><button onClick={openCreate} className={buttonClasses({ variant: "primary" })}>Create custom role</button></div>
 
       {editorRole !== undefined && (
-        <form onSubmit={requestSave} className="rounded-2xl border border-slate-200 bg-white p-5">
-          <div className="flex items-start justify-between gap-4"><div><h2 className="font-semibold text-slate-900">{editorRole ? `Edit ${editorRole.name}` : "Create custom role"}</h2><p className="mt-1 text-sm text-slate-500">Only custom roles can be changed after creation.</p></div><button type="button" onClick={() => setEditorRole(undefined)} className="text-sm font-medium text-slate-600">Cancel</button></div>
-          <div className="mt-5 grid gap-4 md:grid-cols-2"><label className="text-sm font-medium text-slate-700">Role name<input value={name} onChange={(event) => setName(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5" /></label><label className="text-sm font-medium text-slate-700">Role code<input value={code} disabled={Boolean(editorRole)} onChange={(event) => setCode(event.target.value.toUpperCase())} placeholder="PEOPLE_MANAGER" className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 disabled:bg-slate-100" /></label><label className="text-sm font-medium text-slate-700 md:col-span-2">Description<textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={2} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5" /></label></div>
-          {editorRole && <label className="mt-4 inline-flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={isActive} onChange={(event) => setIsActive(event.target.checked)} /> Active role</label>}
-          <fieldset className="mt-5"><legend className="text-sm font-semibold text-slate-900">Permissions</legend><div className="mt-3 grid max-h-64 gap-2 overflow-auto rounded-xl border border-slate-200 p-3 sm:grid-cols-2 lg:grid-cols-3">{data.permissions.map((permission) => <label key={permission.code} className="flex items-start gap-2 rounded-lg p-2 text-sm text-slate-700 hover:bg-slate-50"><input type="checkbox" checked={permissionCodes.includes(permission.code)} onChange={() => togglePermission(permission.code)} className="mt-1" /><span><span className="block font-medium">{permission.name}</span><span className="text-xs text-slate-500">{permission.code}</span></span></label>)}</div></fieldset>
-          {actionError && <p className="mt-3 text-sm text-red-600">{actionError}</p>}<div className="mt-5 flex justify-end"><button className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white">Review changes</button></div>
+        <form onSubmit={requestSave} className="rounded-2xl border border-line bg-surface p-5">
+          <div className="flex items-start justify-between gap-4"><div><h2 className="font-semibold text-ink-strong">{editorRole ? `Edit ${editorRole.name}` : "Create custom role"}</h2><p className="mt-1 text-sm text-ink-muted">Only custom roles can be changed after creation.</p></div><button type="button" onClick={() => setEditorRole(undefined)} className="text-sm font-medium text-ink-muted">Cancel</button></div>
+          <div className="mt-5 grid gap-4 md:grid-cols-2"><label className="text-sm font-medium text-ink">Role name<input value={name} onChange={(event) => setName(event.target.value)} className="mt-1 w-full h-9 rounded-lg border border-line-strong px-3" /></label><label className="text-sm font-medium text-ink">Role code<input value={code} disabled={Boolean(editorRole)} onChange={(event) => setCode(event.target.value.toUpperCase())} placeholder="PEOPLE_MANAGER" className="mt-1 w-full h-9 rounded-lg border border-line-strong px-3 disabled:bg-surface-muted" /></label><label className="text-sm font-medium text-ink md:col-span-2">Description<textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={2} className="mt-1 w-full rounded-lg border border-line-strong px-3 py-2.5" /></label></div>
+          {editorRole && <label className="mt-4 inline-flex items-center gap-2 text-sm text-ink"><input type="checkbox" checked={isActive} onChange={(event) => setIsActive(event.target.checked)} /> Active role</label>}
+          <fieldset className="mt-5"><legend className="text-sm font-semibold text-ink-strong">Permissions</legend><div className="mt-3 grid max-h-64 gap-2 overflow-auto rounded-xl border border-line p-3 sm:grid-cols-2 lg:grid-cols-3">{data.permissions.map((permission) => <label key={permission.code} className="flex items-start gap-2 rounded-lg p-2 text-sm text-ink hover:bg-surface-hover"><input type="checkbox" checked={permissionCodes.includes(permission.code)} onChange={() => togglePermission(permission.code)} className="mt-1" /><span><span className="block font-medium">{permission.name}</span><span className="text-xs text-ink-muted">{permission.code}</span></span></label>)}</div></fieldset>
+          {actionError && <p className="mt-3 text-sm text-danger-ink">{actionError}</p>}<div className="mt-5 flex justify-end"><button className={buttonClasses({ variant: "primary" })}>Review changes</button></div>
         </form>
       )}
 
-      <section className="rounded-2xl border border-slate-200 bg-white">
-        <div className="border-b border-slate-100 px-5 py-4">
-          <h2 className="font-semibold text-slate-900">Institution roles</h2>
-          <p className="mt-1 text-sm text-slate-500">{data.roles.length} role{data.roles.length === 1 ? "" : "s"} available in this institution.</p>
+      <section className="rounded-2xl border border-line bg-surface">
+        <div className="border-b border-line-soft px-5 py-4">
+          <h2 className="font-semibold text-ink-strong">Institution roles</h2>
+          <p className="mt-1 text-sm text-ink-muted">{data.roles.length} role{data.roles.length === 1 ? "" : "s"} available in this institution.</p>
         </div>
         {data.roles.length === 0 ? (
           <EmptyState title="No roles found" description="Roles created for this institution will appear here." />
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-line-soft">
             {data.roles.map((role) => (
               <div key={role.id} className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium text-slate-950">{role.name}</p>
+                    <p className="font-medium text-ink-strong">{role.name}</p>
                     <StatusBadge status={role.is_active ? "ACTIVE" : "INACTIVE"} />
-                    {role.is_system_role && <span className="text-xs font-medium text-slate-500">System role</span>}
-                    {role.is_custom && <span className="text-xs font-medium text-slate-500">Custom role</span>}
+                    {role.is_system_role && <span className="text-xs font-medium text-ink-muted">System role</span>}
+                    {role.is_custom && <span className="text-xs font-medium text-ink-muted">Custom role</span>}
                   </div>
-                  <p className="mt-1 text-sm text-slate-500">{role.description || role.code}</p>
+                  <p className="mt-1 text-sm text-ink-muted">{role.description || role.code}</p>
                 </div>
-                <div className="flex shrink-0 items-center gap-3"><span className="text-sm text-slate-500">{role.permissions.length} permission{role.permissions.length === 1 ? "" : "s"}</span>{role.is_custom && <button onClick={() => openEdit(role)} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700">Edit</button>}</div>
+                <div className="flex shrink-0 items-center gap-3"><span className="text-sm text-ink-muted">{role.permissions.length} permission{role.permissions.length === 1 ? "" : "s"}</span>{role.is_custom && <button onClick={() => openEdit(role)} className="rounded-lg border border-line-strong px-3 py-2 text-sm font-medium text-ink">Edit</button>}</div>
               </div>
             ))}
           </div>
@@ -126,12 +127,12 @@ export default function RoleSettingsPage() {
 
       <ConfirmDialog open={confirming} title={editorRole ? "Update custom role?" : "Create custom role?"} description={editorRole ? "The selected permissions and status will immediately apply to memberships using this custom role." : "The new role will be available for institution membership assignment."} confirmLabel={editorRole ? "Update role" : "Create role"} loading={saving} onConfirm={() => void save()} onCancel={() => setConfirming(false)} />
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-5">
-        <h2 className="font-semibold text-slate-900">Permission catalogue</h2>
-        <p className="mt-1 text-sm text-slate-500">Available permissions by module. This is read-only so current access can be reviewed safely.</p>
+      <section className="rounded-2xl border border-line bg-surface p-5">
+        <h2 className="font-semibold text-ink-strong">Permission catalogue</h2>
+        <p className="mt-1 text-sm text-ink-muted">Available permissions by module. This is read-only so current access can be reviewed safely.</p>
         <div className="mt-4 flex flex-wrap gap-2">
           {Object.entries(permissionGroups).map(([module, count]) => (
-            <span key={module} className="rounded-full bg-slate-100 px-3 py-1.5 text-sm text-slate-700">
+            <span key={module} className="rounded-full bg-surface-sunken px-3 py-1.5 text-sm text-ink">
               {moduleLabel(module)} · {count}
             </span>
           ))}

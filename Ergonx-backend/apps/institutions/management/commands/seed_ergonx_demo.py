@@ -255,13 +255,53 @@ class Command(BaseCommand):
         self._validate_organization(institution)
         if institution.employees.count() != len(EMPLOYEES):
             raise CommandError("APEX-DEMO employee baseline is incomplete.")
-        if institution.job_postings.count() != 3 or institution.candidates.count() != 8:
+        required_job_codes = {"JOB-2026-00018", "JOB-2026-00019", "JOB-2026-00020"}
+        required_candidate_emails = {
+            "amina.bello@apexdemo.example",
+            "david.asamoah@apexdemo.example",
+            "grace.nartey@apexdemo.example",
+            "ibrahim.sule@apexdemo.example",
+            "lydia.mensima@apexdemo.example",
+            "mark.ofori@apexdemo.example",
+            "linda.bonsu.candidate@apexdemo.example",
+            "rita.adu@apexdemo.example",
+        }
+        seeded_job_codes = set(
+            institution.job_postings.filter(code__in=required_job_codes).values_list(
+                "code", flat=True
+            )
+        )
+        seeded_candidate_emails = set(
+            institution.candidates.filter(
+                email__in=required_candidate_emails
+            ).values_list("email", flat=True)
+        )
+        # The rolling activity seed intentionally adds historical candidates.
+        # Verify the fixed recruitment fixtures by their stable identities
+        # instead of rejecting those additional, dashboard-supporting records.
+        if seeded_job_codes != required_job_codes or seeded_candidate_emails != required_candidate_emails:
             raise CommandError("APEX-DEMO recruitment baseline is incomplete.")
-        if institution.leave_requests.count() != 4:
+        required_leave_references = {
+            "LR-2026-00041",
+            "LR-2026-00042",
+            "LR-2026-00043",
+            "LR-2026-00044",
+        }
+        seeded_leave_references = set(
+            institution.leave_requests.filter(
+                reason__in=required_leave_references
+            ).values_list("reason", flat=True)
+        )
+        # Rolling activity adds operational leave requests for dashboard data.
+        # The fixed seed is complete when its named scenarios remain present.
+        if seeded_leave_references != required_leave_references:
             raise CommandError("APEX-DEMO leave baseline is incomplete.")
         if institution.schedule_assignments.filter(is_current=True).count() != len(EMPLOYEES):
             raise CommandError("APEX-DEMO current schedule-assignment baseline is incomplete.")
-        if institution.overtime_records.count() != 2:
+        if not institution.overtime_records.filter(
+            employee__employee_number="EMP-000113",
+            attendance_record__attendance_date=date(2026, 9, 12),
+        ).exists():
             raise CommandError("APEX-DEMO overtime baseline is incomplete.")
         run = institution.payroll_runs.filter(
             payroll_period__start_date=date(2026, 9, 1),
@@ -772,7 +812,14 @@ class Command(BaseCommand):
             run = approve_payroll_run(payroll_run=run, actor=admin)
         if run.status == PayrollRun.Status.APPROVED:
             run = finalize_payroll_run(payroll_run=run, actor=admin)
-        overtime = OvertimeRecord.objects.get(attendance_record__employee__institution=institution, attendance_record__employee__employee_number="EMP-000113")
+        # The rolling activity seed creates additional overtime records for this
+        # employee.  The integrated fixture must only decide its fixed September
+        # payroll scenario, not whichever record happens to be returned first.
+        overtime = OvertimeRecord.objects.get(
+            institution=institution,
+            attendance_record__employee__employee_number="EMP-000113",
+            attendance_record__attendance_date=date(2026, 9, 12),
+        )
         if overtime.status == OvertimeRecord.Status.PENDING:
             decide_overtime(overtime_record=overtime, actor=institution.employees.get(employee_number="EMP-000115").user, approve=True, approved_minutes=240)
 
@@ -816,7 +863,13 @@ class Command(BaseCommand):
             raise CommandError(
                 "GH_CASUAL_WORKER_TAX preset mapping has drifted; refusing to rewrite it."
             )
-        run = institution.payroll_runs.get(status=PayrollRun.Status.FINALIZED)
+        # Activity seeding deliberately adds finalized historical runs.  The
+        # accounting fixture is tied to the fixed September 2026 demo run.
+        run = institution.payroll_runs.get(
+            status=PayrollRun.Status.FINALIZED,
+            payroll_period__start_date=date(2026, 9, 1),
+            payroll_period__end_date=date(2026, 9, 30),
+        )
         journal = run.accounting_journal_entry or generate_payroll_journal(payroll_run=run, actor=admin)
         if journal.status == journal.Status.DRAFT:
             journal = submit_journal(journal=journal, actor=admin)

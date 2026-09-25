@@ -16,6 +16,7 @@ import { MAX_PAGE_SIZE } from "@/types/api";
 import type { Employee } from "@/types/hr";
 import type { LeaveType } from "@/types/leave";
 import type { DocumentRecord } from "@/types/operations";
+import { buttonClasses } from "@/components/ui/Button";
 
 export default function RequestLeavePage() {
   const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
@@ -174,23 +175,23 @@ export default function RequestLeavePage() {
           description="Your leave request has been submitted for review."
         />
 
-        <div className="mt-6 max-w-2xl rounded-xl border border-green-200 bg-green-50 p-6">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-100 text-green-700">
+        <div className="mt-6 max-w-2xl rounded-xl border border-success/25 bg-success-soft p-6">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success-soft text-success-ink">
             ✓
           </div>
 
-          <h2 className="mt-4 text-lg font-semibold text-green-900">
+          <h2 className="mt-4 text-lg font-semibold text-success-ink">
             Request submitted successfully
           </h2>
 
-          <p className="mt-2 text-sm text-green-800">
+          <p className="mt-2 text-sm text-success-ink">
             Your request is now pending approval. You can monitor its status
             from your My Leave page.
           </p>
 
           <Link
             href="/me/leave"
-            className="mt-5 inline-flex rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
+            className={buttonClasses({ variant: "primary", className: "mt-5" })}
           >
             View My Leave
           </Link>
@@ -209,7 +210,7 @@ export default function RequestLeavePage() {
         actions={
           <Link
             href="/me/leave"
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className={buttonClasses({ variant: "secondary" })}
           >
             <ArrowLeft size={16} />
             Back to My Leave
@@ -225,20 +226,20 @@ export default function RequestLeavePage() {
           />
         )}
 
-        <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 px-6 py-5">
-            <h2 className="text-base font-semibold text-slate-900">
+        <section className="rounded-xl border border-line bg-surface shadow-sm">
+          <div className="border-b border-line px-6 py-5">
+            <h2 className="text-base font-semibold text-ink-strong">
               Leave Details
             </h2>
 
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-ink-muted">
               Select the type and period of leave you are requesting.
             </p>
           </div>
 
           <div className="space-y-6 p-6">
             {error && (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <div className="rounded-lg border border-danger/25 bg-danger-soft px-4 py-3 text-sm text-danger-ink">
                 {error}
               </div>
             )}
@@ -246,7 +247,7 @@ export default function RequestLeavePage() {
             <div>
               <label
                 htmlFor="leave-type"
-                className="mb-1.5 block text-sm font-medium text-slate-700"
+                className="mb-1.5 block text-sm font-medium text-ink"
               >
                 Leave Type
               </label>
@@ -256,7 +257,7 @@ export default function RequestLeavePage() {
                 value={leaveType}
                 onChange={(event) => setLeaveType(event.target.value)}
                 disabled={referenceLoading || leaveTypes.length === 0}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400 disabled:bg-slate-50 sm:max-w-md"
+                className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary disabled:bg-surface-muted sm:max-w-md"
               >
                 {referenceLoading && <option value="">Loading...</option>}
 
@@ -273,19 +274,19 @@ export default function RequestLeavePage() {
             </div>
 
             <div>
-              <label htmlFor="leave-supporting-document" className="mb-1.5 block text-sm font-medium text-slate-700">
+              <label htmlFor="leave-supporting-document" className="mb-1.5 block text-sm font-medium text-ink">
                 Supporting Document{selectedLeaveType?.requires_attachment ? " *" : " (optional)"}
               </label>
-              <p className="mb-2 text-xs text-slate-500">PDF, JPEG, or PNG up to 10 MB. The document is stored in your institution&apos;s protected document area.</p>
-              {attachment ? <div className="flex items-center justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm"><span className="min-w-0 truncate text-emerald-900">{attachment.original_filename}</span><button type="button" onClick={() => setAttachment(null)} className="shrink-0 font-medium text-emerald-800 underline">Remove</button></div> : <input id="leave-supporting-document" type="file" accept="application/pdf,image/jpeg,image/png" onChange={(event) => void selectAttachment(event.target.files?.[0])} disabled={uploading} className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm" />}
-              {uploading && <div className="mt-2" aria-live="polite"><div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full bg-sky-600 transition-all" style={{ width: `${uploadProgress}%` }} /></div><p className="mt-1 text-xs text-slate-500">Uploading… {uploadProgress}%</p></div>}
+              <p className="mb-2 text-xs text-ink-muted">PDF, JPEG, or PNG up to 10 MB. The document is stored in your institution&apos;s protected document area.</p>
+              {attachment ? <div className="flex items-center justify-between gap-3 rounded-lg border border-success/25 bg-success-soft px-3 py-2.5 text-sm"><span className="min-w-0 truncate text-success-ink">{attachment.original_filename}</span><button type="button" onClick={() => setAttachment(null)} className="shrink-0 font-medium text-success-ink underline">Remove</button></div> : <input id="leave-supporting-document" type="file" accept="application/pdf,image/jpeg,image/png" onChange={(event) => void selectAttachment(event.target.files?.[0])} disabled={uploading} className="block w-full rounded-lg border border-line px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-surface-sunken file:px-3 file:py-1.5 file:text-sm" />}
+              {uploading && <div className="mt-2" aria-live="polite"><div className="h-2 overflow-hidden rounded-full bg-surface-sunken"><div className="h-full bg-primary transition-all" style={{ width: `${uploadProgress}%` }} /></div><p className="mt-1 text-xs text-ink-muted">Uploading… {uploadProgress}%</p></div>}
             </div>
 
             <div className="grid gap-5 sm:grid-cols-2">
               <div>
                 <label
                   htmlFor="start-date"
-                  className="mb-1.5 block text-sm font-medium text-slate-700"
+                  className="mb-1.5 block text-sm font-medium text-ink"
                 >
                   Start Date
                 </label>
@@ -295,14 +296,14 @@ export default function RequestLeavePage() {
                   type="date"
                   value={startDate}
                   onChange={(event) => setStartDate(event.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                  className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
                 />
               </div>
 
               <div>
                 <label
                   htmlFor="end-date"
-                  className="mb-1.5 block text-sm font-medium text-slate-700"
+                  className="mb-1.5 block text-sm font-medium text-ink"
                 >
                   End Date
                 </label>
@@ -312,18 +313,18 @@ export default function RequestLeavePage() {
                   type="date"
                   value={endDate}
                   onChange={(event) => setEndDate(event.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                  className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
                 />
               </div>
             </div>
 
             {startDate && endDate && (
-              <div className="flex items-center gap-3 rounded-lg bg-slate-50 p-4">
-                <CalendarDays size={19} className="text-slate-500" />
+              <div className="flex items-center gap-3 rounded-lg bg-surface-muted p-4">
+                <CalendarDays size={19} className="text-ink-muted" />
 
-                <p className="text-sm text-slate-700">
+                <p className="text-sm text-ink">
                   Requested duration:{" "}
-                  <span className="font-semibold text-slate-950">
+                  <span className="font-semibold text-ink-strong">
                     {days} day{days === 1 ? "" : "s"}
                   </span>
                 </p>
@@ -333,7 +334,7 @@ export default function RequestLeavePage() {
             <div>
               <label
                 htmlFor="leave-reason"
-                className="mb-1.5 block text-sm font-medium text-slate-700"
+                className="mb-1.5 block text-sm font-medium text-ink"
               >
                 Reason
               </label>
@@ -344,17 +345,17 @@ export default function RequestLeavePage() {
                 onChange={(event) => setReason(event.target.value)}
                 rows={5}
                 placeholder="Provide a reason for your leave request..."
-                className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                className="w-full resize-none rounded-lg border border-line px-3 py-2.5 text-sm outline-none focus:border-primary"
               />
             </div>
           </div>
 
-          <div className="flex justify-end border-t border-slate-200 px-6 py-4">
+          <div className="flex justify-end border-t border-line px-6 py-4">
             <button
               type="button"
               onClick={submitRequest}
               disabled={saving || referenceLoading || !employee}
-              className="rounded-lg bg-slate-950 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              className={buttonClasses({ variant: "primary" })}
             >
               {saving ? "Submitting..." : "Submit Leave Request"}
             </button>

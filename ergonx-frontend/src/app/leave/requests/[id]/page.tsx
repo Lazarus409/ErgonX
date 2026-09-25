@@ -33,6 +33,8 @@ import type {
 } from "@/types/leave";
 import type { DocumentRecord } from "@/types/operations";
 import { EM_DASH, formatDate, formatDateTime, formatNumber } from "@/lib/format";
+import { buttonClasses } from "@/components/ui/Button";
+import { PrintButton, PrintFooter, PrintMasthead } from "@/components/brand/PrintDocument";
 
 type PendingAction = "submit" | "approve" | "reject" | "cancel" | null;
 
@@ -202,8 +204,8 @@ export default function LeaveRequestDetailPage() {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="text-center">
-          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-slate-900" />
-          <p className="mt-4 text-sm text-slate-500">
+          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-line-strong border-t-primary" />
+          <p className="mt-4 text-sm text-ink-muted">
             Loading leave request...
           </p>
         </div>
@@ -267,37 +269,38 @@ export default function LeaveRequestDetailPage() {
 
   return (
     <>
+      <PrintMasthead documentTitle="Leave request form" />
       <PageHeader
         title="Leave Request"
         description="Review the employee leave request and take the appropriate authorised action."
-        actions={<BackNavigation fallback="/leave/requests" label="Back to Requests" />}
+        actions={<div className="flex flex-wrap items-center gap-2 print:hidden"><PrintButton /><BackNavigation fallback="/leave/requests" label="Back to Requests" /></div>}
       />
 
       <div className="mt-6 space-y-6">
         {actionError && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="rounded-lg border border-danger/25 bg-danger-soft px-4 py-3 text-sm text-danger-ink">
             {actionError}
           </div>
         )}
 
         {/* Request header */}
-        <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <section className="rounded-xl border border-line bg-surface p-5 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-start gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-100">
-                <CalendarDays size={23} className="text-slate-600" />
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-surface-sunken">
+                <CalendarDays size={23} className="text-ink-muted" />
               </div>
 
               <div>
                 <div className="flex flex-wrap items-center gap-3">
-                  <h2 className="text-lg font-semibold text-slate-950">
+                  <h2 className="text-lg font-semibold text-ink-strong">
                     {leaveType?.name ?? EM_DASH}
                   </h2>
 
                   <StatusBadge status={status} />
                 </div>
 
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="mt-1 text-sm text-ink-muted">
                   {request.submitted_at
                     ? `Submitted on ${formatDate(request.submitted_at)}`
                     : "Not yet submitted"}
@@ -306,11 +309,11 @@ export default function LeaveRequestDetailPage() {
             </div>
 
             <div className="text-left lg:text-right">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+              <p className="text-xs font-medium uppercase tracking-wide text-ink-subtle">
                 Requested Duration
               </p>
 
-              <p className="mt-1 text-xl font-semibold text-slate-950">
+              <p className="mt-1 text-xl font-semibold text-ink-strong">
                 {requestedDays} days
               </p>
             </div>
@@ -319,14 +322,14 @@ export default function LeaveRequestDetailPage() {
 
         {/* Workflow action bar */}
         {(canApprove || canCancel) && (
-          <section className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <section className="rounded-xl border border-warning/30 bg-warning-soft p-4">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <p className="text-sm font-semibold text-amber-900">
+                <p className="text-sm font-semibold text-warning-ink">
                   {isDraft ? "Submission Required" : "Approval Required"}
                 </p>
 
-                <p className="mt-1 text-sm text-amber-800">
+                <p className="mt-1 text-sm text-warning-ink">
                   {isDraft
                     ? "This request is still a draft and has not entered the approval workflow."
                     : "This request is waiting for an authorised approver to review it."}
@@ -338,7 +341,7 @@ export default function LeaveRequestDetailPage() {
                   <button
                     type="button"
                     onClick={() => setPendingAction("cancel")}
-                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    className={buttonClasses({ variant: "secondary" })}
                   >
                     <XCircle size={17} />
                     Cancel Request
@@ -349,7 +352,7 @@ export default function LeaveRequestDetailPage() {
                   <button
                     type="button"
                     onClick={() => setPendingAction("submit")}
-                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
+                    className={buttonClasses({ variant: "primary" })}
                   >
                     <Send size={17} />
                     Submit
@@ -361,7 +364,7 @@ export default function LeaveRequestDetailPage() {
                     <button
                       type="button"
                       onClick={openDeclineForm}
-                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2.5 text-sm font-medium text-red-700 hover:bg-red-50"
+                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-danger/25 bg-surface px-4 py-2.5 text-sm font-medium text-danger-ink hover:bg-danger-soft"
                     >
                       <XCircle size={17} />
                       Decline
@@ -370,7 +373,7 @@ export default function LeaveRequestDetailPage() {
                     <button
                       type="button"
                       onClick={() => setPendingAction("approve")}
-                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
+                      className={buttonClasses({ variant: "primary" })}
                     >
                       <CheckCircle2 size={17} />
                       Approve
@@ -384,28 +387,28 @@ export default function LeaveRequestDetailPage() {
 
         {/* Employee and request summary */}
         <div className="grid gap-6 lg:grid-cols-3">
-          <section className="rounded-xl border border-slate-200 bg-white shadow-sm lg:col-span-2">
-            <div className="border-b border-slate-200 px-5 py-4">
-              <h2 className="text-sm font-semibold text-slate-900">
+          <section className="rounded-xl border border-line bg-surface shadow-sm lg:col-span-2">
+            <div className="border-b border-line px-5 py-4">
+              <h2 className="text-sm font-semibold text-ink-strong">
                 Request Summary
               </h2>
             </div>
 
             <div className="grid gap-5 p-5 sm:grid-cols-2">
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                <p className="text-xs font-medium uppercase tracking-wide text-ink-subtle">
                   Employee
                 </p>
 
                 <div className="mt-2 flex items-center gap-2">
-                  <User size={16} className="text-slate-400" />
+                  <User size={16} className="text-ink-subtle" />
 
                   <div>
-                    <p className="text-sm font-medium text-slate-900">
+                    <p className="text-sm font-medium text-ink-strong">
                       {employeeName}
                     </p>
 
-                    <p className="text-xs text-slate-400">
+                    <p className="text-xs text-ink-subtle">
                       {employee?.employee_number ?? EM_DASH}
                     </p>
                   </div>
@@ -413,51 +416,51 @@ export default function LeaveRequestDetailPage() {
               </div>
 
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                <p className="text-xs font-medium uppercase tracking-wide text-ink-subtle">
                   Leave Type
                 </p>
 
-                <p className="mt-2 text-sm text-slate-800">
+                <p className="mt-2 text-sm text-ink">
                   {leaveType?.name ?? EM_DASH}
                 </p>
               </div>
 
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                <p className="text-xs font-medium uppercase tracking-wide text-ink-subtle">
                   Start Date
                 </p>
 
-                <p className="mt-2 text-sm text-slate-800">
+                <p className="mt-2 text-sm text-ink">
                   {formatDate(request.start_date)}
                 </p>
               </div>
 
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                <p className="text-xs font-medium uppercase tracking-wide text-ink-subtle">
                   End Date
                 </p>
 
-                <p className="mt-2 text-sm text-slate-800">
+                <p className="mt-2 text-sm text-ink">
                   {formatDate(request.end_date)}
                 </p>
               </div>
 
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                <p className="text-xs font-medium uppercase tracking-wide text-ink-subtle">
                   Duration
                 </p>
 
-                <p className="mt-2 text-sm font-medium text-slate-900">
+                <p className="mt-2 text-sm font-medium text-ink-strong">
                   {requestedDays} days
                 </p>
               </div>
 
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                <p className="text-xs font-medium uppercase tracking-wide text-ink-subtle">
                   Submitted
                 </p>
 
-                <p className="mt-2 text-sm text-slate-800">
+                <p className="mt-2 text-sm text-ink">
                   {request.submitted_at
                     ? formatDateTime(request.submitted_at)
                     : EM_DASH}
@@ -465,11 +468,11 @@ export default function LeaveRequestDetailPage() {
               </div>
 
               <div className="sm:col-span-2">
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                <p className="text-xs font-medium uppercase tracking-wide text-ink-subtle">
                   Reason
                 </p>
 
-                <p className="mt-2 text-sm leading-6 text-slate-700">
+                <p className="mt-2 text-sm leading-6 text-ink">
                   {request.reason || EM_DASH}
                 </p>
               </div>
@@ -482,9 +485,9 @@ export default function LeaveRequestDetailPage() {
             endpoint. The configured leave-type rules are shown instead of a
             derived verdict.
           */}
-          <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="border-b border-slate-200 px-5 py-4">
-              <h2 className="text-sm font-semibold text-slate-900">
+          <section className="rounded-xl border border-line bg-surface shadow-sm">
+            <div className="border-b border-line px-5 py-4">
+              <h2 className="text-sm font-semibold text-ink-strong">
                 Policy Eligibility
               </h2>
             </div>
@@ -494,34 +497,34 @@ export default function LeaveRequestDetailPage() {
                 <>
                   <dl className="space-y-3 text-sm">
                     <div className="flex items-center justify-between">
-                      <dt className="text-slate-500">Paid leave</dt>
-                      <dd className="font-medium text-slate-900">
+                      <dt className="text-ink-muted">Paid leave</dt>
+                      <dd className="font-medium text-ink-strong">
                         {leaveType.is_paid ? "Yes" : "No"}
                       </dd>
                     </div>
 
                     <div className="flex items-center justify-between">
-                      <dt className="text-slate-500">Requires approval</dt>
-                      <dd className="font-medium text-slate-900">
+                      <dt className="text-ink-muted">Requires approval</dt>
+                      <dd className="font-medium text-ink-strong">
                         {leaveType.requires_approval ? "Yes" : "No"}
                       </dd>
                     </div>
 
                     <div className="flex items-center justify-between">
-                      <dt className="text-slate-500">Requires attachment</dt>
-                      <dd className="font-medium text-slate-900">
+                      <dt className="text-ink-muted">Requires attachment</dt>
+                      <dd className="font-medium text-ink-strong">
                         {leaveType.requires_attachment ? "Yes" : "No"}
                       </dd>
                     </div>
                   </dl>
 
-                  <p className="mt-4 text-xs leading-5 text-slate-500">
+                  <p className="mt-4 text-xs leading-5 text-ink-muted">
                     Policy eligibility is validated by the backend when the
                     request is submitted and approved.
                   </p>
                 </>
               ) : (
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-ink-muted">
                   Leave type configuration is unavailable.
                 </p>
               )}
@@ -530,13 +533,13 @@ export default function LeaveRequestDetailPage() {
         </div>
 
         {/* Balance impact */}
-        <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 px-5 py-4">
-            <h2 className="text-sm font-semibold text-slate-900">
+        <section className="rounded-xl border border-line bg-surface shadow-sm">
+          <div className="border-b border-line px-5 py-4">
+            <h2 className="text-sm font-semibold text-ink-strong">
               Leave Balance Impact
             </h2>
 
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-ink-muted">
               {showsProjection
                 ? "Projected balance if this request is approved."
                 : "The reported balance already reflects this decision."}
@@ -544,32 +547,32 @@ export default function LeaveRequestDetailPage() {
           </div>
 
           <div className="grid gap-4 p-5 sm:grid-cols-3">
-            <div className="rounded-lg bg-slate-50 p-4">
-              <p className="text-xs text-slate-400">
+            <div className="rounded-lg bg-surface-muted p-4">
+              <p className="text-xs text-ink-subtle">
                 {showsProjection ? "Balance Before" : "Current Balance"}
               </p>
 
-              <p className="mt-2 text-xl font-semibold text-slate-950">
+              <p className="mt-2 text-xl font-semibold text-ink-strong">
                 {available === null
                   ? EM_DASH
                   : `${formatNumber(available)} days`}
               </p>
             </div>
 
-            <div className="rounded-lg bg-amber-50 p-4">
-              <p className="text-xs text-amber-600">Requested</p>
+            <div className="rounded-lg bg-warning-soft p-4">
+              <p className="text-xs text-warning-ink">Requested</p>
 
-              <p className="mt-2 text-xl font-semibold text-amber-900">
+              <p className="mt-2 text-xl font-semibold text-warning-ink">
                 -{requestedDays} days
               </p>
             </div>
 
-            <div className="rounded-lg bg-green-50 p-4">
-              <p className="text-xs text-green-600">
+            <div className="rounded-lg bg-success-soft p-4">
+              <p className="text-xs text-success-ink">
                 {showsProjection ? "Projected Balance" : "Balance Source"}
               </p>
 
-              <p className="mt-2 text-xl font-semibold text-green-900">
+              <p className="mt-2 text-xl font-semibold text-success-ink">
                 {projected !== null
                   ? `${formatNumber(projected)} days`
                   : available === null
@@ -581,63 +584,63 @@ export default function LeaveRequestDetailPage() {
         </section>
 
         {/* Approval history */}
-        <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 px-5 py-4">
-            <h2 className="text-sm font-semibold text-slate-900">
+        <section className="rounded-xl border border-line bg-surface shadow-sm">
+          <div className="border-b border-line px-5 py-4">
+            <h2 className="text-sm font-semibold text-ink-strong">
               Approval History
             </h2>
 
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-ink-muted">
               Timeline of actions taken on this request.
             </p>
           </div>
 
           <div className="p-5">
             <div className="relative pl-8">
-              <div className="absolute bottom-0 left-2 top-0 w-px bg-slate-200" />
+              <div className="absolute bottom-0 left-2 top-0 w-px bg-line" />
 
               <div className="relative pb-6">
-                <div className="absolute -left-8 flex h-5 w-5 items-center justify-center rounded-full bg-slate-950">
+                <div className="absolute -left-8 flex h-5 w-5 items-center justify-center rounded-full bg-primary">
                   <Clock3 size={11} className="text-white" />
                 </div>
 
-                <p className="text-sm font-medium text-slate-900">
+                <p className="text-sm font-medium text-ink-strong">
                   {request.submitted_at
                     ? "Leave request submitted"
                     : "Leave request created"}
                 </p>
 
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-ink-muted">
                   {formatDateTime(request.submitted_at ?? request.created_at)}
                 </p>
 
-                <p className="mt-2 text-xs text-slate-500">
+                <p className="mt-2 text-xs text-ink-muted">
                   Raised for {employeeName}.
                 </p>
               </div>
 
               {approvals.map((approval) => (
                 <div key={approval.id} className="relative pb-6">
-                  <div className="absolute -left-8 flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 bg-white">
-                    <Clock3 size={11} className="text-slate-400" />
+                  <div className="absolute -left-8 flex h-5 w-5 items-center justify-center rounded-full border border-line-strong bg-surface">
+                    <Clock3 size={11} className="text-ink-subtle" />
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-medium text-slate-900">
+                    <p className="text-sm font-medium text-ink-strong">
                       Approval step {approval.sequence}
                     </p>
 
                     <StatusBadge status={approval.status} />
                   </div>
 
-                  <p className="mt-1 text-xs text-slate-500">
+                  <p className="mt-1 text-xs text-ink-muted">
                     {approval.acted_at
                       ? formatDateTime(approval.acted_at)
                       : "Awaiting action"}
                   </p>
 
                   {approval.comment && (
-                    <p className="mt-2 text-xs leading-5 text-slate-600">
+                    <p className="mt-2 text-xs leading-5 text-ink-muted">
                       {approval.comment}
                     </p>
                   )}
@@ -646,15 +649,15 @@ export default function LeaveRequestDetailPage() {
 
               {request.cancelled_at && (
                 <div className="relative">
-                  <div className="absolute -left-8 flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 bg-white">
-                    <XCircle size={11} className="text-slate-400" />
+                  <div className="absolute -left-8 flex h-5 w-5 items-center justify-center rounded-full border border-line-strong bg-surface">
+                    <XCircle size={11} className="text-ink-subtle" />
                   </div>
 
-                  <p className="text-sm font-medium text-slate-900">
+                  <p className="text-sm font-medium text-ink-strong">
                     Request cancelled
                   </p>
 
-                  <p className="mt-1 text-xs text-slate-500">
+                  <p className="mt-1 text-xs text-ink-muted">
                     {formatDateTime(request.cancelled_at)}
                   </p>
                 </div>
@@ -662,15 +665,15 @@ export default function LeaveRequestDetailPage() {
 
               {approvals.length === 0 && !request.cancelled_at && (
                 <div className="relative">
-                  <div className="absolute -left-8 flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 bg-white">
-                    <Clock3 size={11} className="text-slate-400" />
+                  <div className="absolute -left-8 flex h-5 w-5 items-center justify-center rounded-full border border-line-strong bg-surface">
+                    <Clock3 size={11} className="text-ink-subtle" />
                   </div>
 
-                  <p className="text-sm font-medium text-slate-500">
+                  <p className="text-sm font-medium text-ink-muted">
                     {isPending ? "Awaiting approval" : "No approval steps"}
                   </p>
 
-                  <p className="mt-1 text-xs text-slate-400">
+                  <p className="mt-1 text-xs text-ink-subtle">
                     Current workflow state
                   </p>
                 </div>
@@ -680,52 +683,52 @@ export default function LeaveRequestDetailPage() {
         </section>
 
         {/* Attachments */}
-        <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 px-5 py-4">
-            <h2 className="text-sm font-semibold text-slate-900">
+        <section className="rounded-xl border border-line bg-surface shadow-sm">
+          <div className="border-b border-line px-5 py-4">
+            <h2 className="text-sm font-semibold text-ink-strong">
               Attachments
             </h2>
 
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-ink-muted">
               Supporting documents submitted with the request.
             </p>
           </div>
 
           <div className="p-5">
-            <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 p-4">
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-line p-4">
               <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100">
-                <FileText size={17} className="text-slate-500" />
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-surface-sunken">
+                <FileText size={17} className="text-ink-muted" />
               </div>
 
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-slate-700">
+                <p className="truncate text-sm font-medium text-ink">
                   {request.attachment
                     ? attachment?.original_filename ?? "Supporting document attached"
                     : "No attachments"}
                 </p>
 
-                <p className="mt-0.5 text-xs text-slate-400">
+                <p className="mt-0.5 text-xs text-ink-subtle">
                   {request.attachment
                     ? "Linked through the shared documents module."
                     : "No supporting documents were submitted."}
                 </p>
               </div>
               </div>
-              {attachment && <button type="button" onClick={() => void downloadAttachment()} className="shrink-0 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Download</button>}
+              {attachment && <button type="button" onClick={() => void downloadAttachment()} className={buttonClasses({ variant: "secondary", size: "sm", className: "shrink-0" })}>Download</button>}
             </div>
           </div>
         </section>
 
         {/* Decline form */}
         {showDeclineForm && (
-          <section className="rounded-xl border border-red-200 bg-white shadow-sm">
-            <div className="border-b border-red-100 px-5 py-4">
-              <h2 className="text-sm font-semibold text-red-900">
+          <section className="rounded-xl border border-danger/25 bg-surface shadow-sm">
+            <div className="border-b border-danger/25 px-5 py-4">
+              <h2 className="text-sm font-semibold text-danger-ink">
                 Decline Leave Request
               </h2>
 
-              <p className="mt-1 text-xs text-red-700">
+              <p className="mt-1 text-xs text-danger-ink">
                 Provide a reason that will be recorded with the workflow
                 decision.
               </p>
@@ -737,14 +740,14 @@ export default function LeaveRequestDetailPage() {
                 onChange={(event) => setDeclineReason(event.target.value)}
                 rows={4}
                 placeholder="Enter reason for declining this request..."
-                className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-red-300 focus:ring-2 focus:ring-red-50"
+                className="w-full resize-none rounded-lg border border-line px-3 py-2.5 text-sm outline-none focus:border-danger focus:ring-2 focus:ring-danger/15"
               />
 
               <div className="mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                 <button
                   type="button"
                   onClick={() => setShowDeclineForm(false)}
-                  className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  className={buttonClasses({ variant: "secondary" })}
                 >
                   Cancel
                 </button>
@@ -752,7 +755,7 @@ export default function LeaveRequestDetailPage() {
                 <button
                   type="button"
                   onClick={confirmDecline}
-                  className="rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-700"
+                  className={buttonClasses({ variant: "danger" })}
                 >
                   Confirm Decline
                 </button>
@@ -796,6 +799,7 @@ export default function LeaveRequestDetailPage() {
         onConfirm={runAction}
         onCancel={() => setPendingAction(null)}
       />
+      <PrintFooter />
     </>
   );
 }

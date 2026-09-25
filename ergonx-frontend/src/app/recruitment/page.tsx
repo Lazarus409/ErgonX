@@ -1,7 +1,8 @@
-import Link from "next/link";
+"use client";
+
 import { BriefcaseBusiness, CalendarDays, ClipboardCheck, FileText, Handshake, UsersRound, Workflow } from "lucide-react";
 
-import PageHeader from "@/components/ui/PageHeader";
+import ModuleLanding from "@/components/home/ModuleLanding";
 
 const areas = [
   { title: "Recruitment Dashboard", description: "Review open jobs, applications, interviews, offers, and pipeline distribution.", href: "/recruitment/dashboard", icon: BriefcaseBusiness },
@@ -16,5 +17,5 @@ const areas = [
 ];
 
 export default function RecruitmentHomePage() {
-  return <div className="space-y-6"><PageHeader title="Recruitment" description="Manage job postings, candidates, and the hiring pipeline." /><div className="grid gap-4 md:grid-cols-3">{areas.map((area) => { const Icon = area.icon; return <Link key={area.href} href={area.href} className="rounded-2xl border border-slate-200 bg-white p-5 transition hover:border-slate-300 hover:shadow-sm"><Icon className="h-6 w-6 text-slate-700" /><h2 className="mt-5 font-semibold text-slate-950">{area.title}</h2><p className="mt-1 text-sm leading-6 text-slate-500">{area.description}</p></Link>; })}</div></div>;
+  return <ModuleLanding title="Recruitment" eyebrow="Talent acquisition" description="Manage job postings, candidates, and the hiring pipeline." module="RECRUITMENT" accent="recruitment" icon={UsersRound} areas={areas} />;
 }

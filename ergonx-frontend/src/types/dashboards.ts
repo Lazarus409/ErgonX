@@ -119,6 +119,10 @@ export interface LeaveDashboard {
     available_days: string | number;
     utilisation_percent: string | number | null;
   };
+  /** Current-year approved leave days by current department (top 8). */
+  approved_days_by_department?: Array<{ department: string; requested_days: string | number; request_count: number }>;
+  /** 28 consecutive days from today: approved requests covering each day. */
+  leave_calendar?: Array<{ date: string; on_leave: number }>;
 }
 
 export interface AttendanceDashboard {
@@ -171,6 +175,8 @@ export interface PayrollDashboard {
     net_pay: string | number;
     total_deductions: string | number;
   }>;
+  /** Gross pay by current department for the latest finalized run. */
+  cost_by_department?: { period: string | null; departments: Array<{ department: string; gross_pay: string | number }> };
 }
 
 export interface FinanceDashboard {
@@ -186,6 +192,27 @@ export interface FinanceDashboard {
   journals_by_status: StatusCount[];
   profit_and_loss_trend: ProfitAndLossPoint[];
   cash_flow_trend: CashFlowPoint[];
+  /** Posted expenses by expense account: top five plus "Other". */
+  expenses_by_account?: Array<{ label: string; value: string | number }>;
+  unreconciled_bank_lines?: {
+    count: number;
+    latest: Array<{ id: string; statement_date: string; bank_account: string; reference: string; description: string; amount: string | number; currency: string; status: string }>;
+  };
 }
 
-export interface RecruitmentDashboard { open_jobs: number; active_candidates: number; applications: number; scheduled_interviews: number; offers_extended: number; pipeline: Array<{ name: string; count: number }>; }
+export interface RecruitmentDashboard {
+  open_jobs: number;
+  active_candidates: number;
+  applications: number;
+  scheduled_interviews: number;
+  offers_extended: number;
+  pipeline: Array<{ name: string; count: number }>;
+  applications_by_status?: Array<{ status: string; count: number }>;
+  /** Six calendar months ending with the current month, by application date. */
+  applications_trend?: Array<{ month: string; applications: number }>;
+  top_open_jobs?: Array<{ title: string; application_count: number }>;
+  applications_by_source?: Array<{ source: string; count: number }>;
+  interviews_by_status?: Array<{ status: string; count: number }>;
+  /** Accepted offers bucketed by days from application to acceptance. */
+  time_to_hire?: Array<{ bucket: string; hires: number }>;
+}

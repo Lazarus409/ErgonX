@@ -20,6 +20,7 @@ import type { PaginatedData } from "@/types/api";
 import type { Employee } from "@/types/hr";
 import type { LeaveRequest, LeaveType } from "@/types/leave";
 import { EM_DASH, formatDate, formatNumber } from "@/lib/format";
+import { buttonClasses } from "@/components/ui/Button";
 
 const ALL = "ALL";
 const SEARCH_DEBOUNCE_MS = 350;
@@ -213,50 +214,50 @@ export default function LeaveRequestsPage() {
       <div className="mt-6 space-y-6">
         {/* Management summary */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+          <div className="rounded-xl border border-line bg-surface p-5 shadow-sm">
+            <p className="text-xs font-medium uppercase tracking-wide text-ink-subtle">
               Total Requests
             </p>
-            <p className="mt-2 text-2xl font-semibold text-slate-950">
+            <p className="mt-2 text-2xl font-semibold text-ink-strong">
               {summaryPlaceholder ?? formatNumber(totals?.total)}
             </p>
           </div>
 
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-5">
-            <p className="text-xs font-medium uppercase tracking-wide text-amber-600">
+          <div className="rounded-xl border border-warning/30 bg-warning-soft p-5">
+            <p className="text-xs font-medium uppercase tracking-wide text-warning-ink">
               Pending
             </p>
-            <p className="mt-2 text-2xl font-semibold text-amber-900">
+            <p className="mt-2 text-2xl font-semibold text-warning-ink">
               {summaryPlaceholder ?? formatNumber(totals?.pending)}
             </p>
           </div>
 
-          <div className="rounded-xl border border-green-200 bg-green-50 p-5">
-            <p className="text-xs font-medium uppercase tracking-wide text-green-600">
+          <div className="rounded-xl border border-success/25 bg-success-soft p-5">
+            <p className="text-xs font-medium uppercase tracking-wide text-success-ink">
               Approved
             </p>
-            <p className="mt-2 text-2xl font-semibold text-green-900">
+            <p className="mt-2 text-2xl font-semibold text-success-ink">
               {summaryPlaceholder ?? formatNumber(totals?.approved)}
             </p>
           </div>
 
-          <div className="rounded-xl border border-red-200 bg-red-50 p-5">
-            <p className="text-xs font-medium uppercase tracking-wide text-red-600">
+          <div className="rounded-xl border border-danger/25 bg-danger-soft p-5">
+            <p className="text-xs font-medium uppercase tracking-wide text-danger-ink">
               Rejected
             </p>
-            <p className="mt-2 text-2xl font-semibold text-red-900">
+            <p className="mt-2 text-2xl font-semibold text-danger-ink">
               {summaryPlaceholder ?? formatNumber(totals?.rejected)}
             </p>
           </div>
         </div>
 
         {/* Filters */}
-        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <section className="rounded-xl border border-line bg-surface p-4 shadow-sm">
           <div className="grid gap-3 lg:grid-cols-6">
             <div className="relative lg:col-span-2">
               <Search
                 size={17}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-subtle"
               />
 
               <input
@@ -264,7 +265,7 @@ export default function LeaveRequestsPage() {
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search employee name or number..."
-                className="w-full rounded-lg border border-slate-200 py-2.5 pl-10 pr-3 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                className="w-full h-9 rounded-lg border border-line-strong pl-10 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/15"
               />
             </div>
 
@@ -274,7 +275,7 @@ export default function LeaveRequestsPage() {
                 setStatus(event.target.value);
                 setPage(1);
               }}
-              className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+              className="h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
             >
               <option value={ALL}>All statuses</option>
               <option value="DRAFT">Draft</option>
@@ -290,7 +291,7 @@ export default function LeaveRequestsPage() {
                 setLeaveType(event.target.value);
                 setPage(1);
               }}
-              className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+              className="h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
             >
               <option value={ALL}>All leave types</option>
 
@@ -307,7 +308,7 @@ export default function LeaveRequestsPage() {
                 setEmployee(event.target.value);
                 setPage(1);
               }}
-              className="rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+              className="h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
             >
               <option value={ALL}>All employees</option>
 
@@ -321,7 +322,7 @@ export default function LeaveRequestsPage() {
             <button
               type="button"
               onClick={resetFilters}
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+              className={buttonClasses({ variant: "secondary" })}
             >
               <X size={16} />
               Clear
@@ -337,7 +338,7 @@ export default function LeaveRequestsPage() {
             <div>
               <label
                 htmlFor="filter-start-date"
-                className="mb-1.5 block text-xs font-medium text-slate-500"
+                className="mb-1.5 block text-xs font-medium text-ink-muted"
               >
                 Start date
               </label>
@@ -350,14 +351,14 @@ export default function LeaveRequestsPage() {
                   setStartDate(event.target.value);
                   setPage(1);
                 }}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
               />
             </div>
 
             <div>
               <label
                 htmlFor="filter-end-date"
-                className="mb-1.5 block text-xs font-medium text-slate-500"
+                className="mb-1.5 block text-xs font-medium text-ink-muted"
               >
                 End date
               </label>
@@ -370,20 +371,20 @@ export default function LeaveRequestsPage() {
                   setEndDate(event.target.value);
                   setPage(1);
                 }}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400"
+                className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
               />
             </div>
           </div>
         </section>
 
         {/* Requests */}
-        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 px-5 py-4">
-            <h2 className="text-sm font-semibold text-slate-900">
+        <section className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
+          <div className="border-b border-line px-5 py-4">
+            <h2 className="text-sm font-semibold text-ink-strong">
               Employee Leave Requests
             </h2>
 
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-ink-muted">
               Review submitted requests and take authorised workflow actions.
             </p>
           </div>
@@ -394,9 +395,9 @@ export default function LeaveRequestsPage() {
             </div>
           ) : loading ? (
             <div className="flex min-h-56 flex-col items-center justify-center p-8 text-center">
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-slate-900" />
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-line-strong border-t-primary" />
 
-              <p className="mt-4 text-sm text-slate-500">
+              <p className="mt-4 text-sm text-ink-muted">
                 Loading leave requests...
               </p>
             </div>
@@ -412,28 +413,28 @@ export default function LeaveRequestsPage() {
               <div className="hidden overflow-x-auto md:block">
                 <table className="w-full text-left">
                   <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50">
-                      <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <tr className="border-b border-line bg-surface-muted">
+                      <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                         Employee
                       </th>
 
-                      <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                         Leave Type
                       </th>
 
-                      <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                         Period
                       </th>
 
-                      <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                         Days
                       </th>
 
-                      <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">
                         Status
                       </th>
 
-                      <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-ink-muted">
                         Action
                       </th>
                     </tr>
@@ -443,31 +444,31 @@ export default function LeaveRequestsPage() {
                     {requests.map((request) => (
                       <tr
                         key={request.id}
-                        className="border-b border-slate-100 last:border-0"
+                        className="border-b border-line-soft last:border-0"
                       >
                         <td className="px-5 py-4">
                           <Link
                             href={`/leave/requests/${request.id}`}
-                            className="font-medium text-slate-900 hover:underline"
+                            className="font-medium text-ink-strong hover:underline"
                           >
                             {employeeNames.get(request.employee) ?? EM_DASH}
                           </Link>
 
-                          <p className="mt-0.5 text-xs text-slate-400">
+                          <p className="mt-0.5 text-xs text-ink-subtle">
                             {employeeNumbers.get(request.employee) ?? EM_DASH}
                           </p>
                         </td>
 
-                        <td className="px-5 py-4 text-sm text-slate-600">
+                        <td className="px-5 py-4 text-sm text-ink-muted">
                           {leaveTypeNames.get(request.leave_type) ?? EM_DASH}
                         </td>
 
-                        <td className="px-5 py-4 text-sm text-slate-600">
+                        <td className="px-5 py-4 text-sm text-ink-muted">
                           {formatDate(request.start_date)} -{" "}
                           {formatDate(request.end_date)}
                         </td>
 
-                        <td className="px-5 py-4 text-sm font-medium text-slate-800">
+                        <td className="px-5 py-4 text-sm font-medium text-ink">
                           {formatNumber(request.requested_days)}
                         </td>
 
@@ -478,7 +479,7 @@ export default function LeaveRequestsPage() {
                         <td className="px-5 py-4 text-right">
                           <Link
                             href={`/leave/requests/${request.id}`}
-                            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                            className={buttonClasses({ variant: "secondary", size: "sm" })}
                           >
                             <Eye size={14} />
                             Review
@@ -491,19 +492,19 @@ export default function LeaveRequestsPage() {
               </div>
 
               {/* Mobile */}
-              <div className="divide-y divide-slate-100 md:hidden">
+              <div className="divide-y divide-line-soft md:hidden">
                 {requests.map((request) => (
                   <div key={request.id} className="p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <Link
                           href={`/leave/requests/${request.id}`}
-                          className="font-medium text-slate-900"
+                          className="font-medium text-ink-strong"
                         >
                           {employeeNames.get(request.employee) ?? EM_DASH}
                         </Link>
 
-                        <p className="mt-0.5 text-xs text-slate-400">
+                        <p className="mt-0.5 text-xs text-ink-subtle">
                           {employeeNumbers.get(request.employee) ?? EM_DASH}
                         </p>
                       </div>
@@ -513,22 +514,22 @@ export default function LeaveRequestsPage() {
 
                     <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
                       <div>
-                        <p className="text-xs text-slate-400">Leave Type</p>
-                        <p className="mt-1 text-slate-700">
+                        <p className="text-xs text-ink-subtle">Leave Type</p>
+                        <p className="mt-1 text-ink">
                           {leaveTypeNames.get(request.leave_type) ?? EM_DASH}
                         </p>
                       </div>
 
                       <div>
-                        <p className="text-xs text-slate-400">Days</p>
-                        <p className="mt-1 text-slate-700">
+                        <p className="text-xs text-ink-subtle">Days</p>
+                        <p className="mt-1 text-ink">
                           {formatNumber(request.requested_days)}
                         </p>
                       </div>
 
                       <div className="col-span-2">
-                        <p className="text-xs text-slate-400">Period</p>
-                        <p className="mt-1 text-slate-700">
+                        <p className="text-xs text-ink-subtle">Period</p>
+                        <p className="mt-1 text-ink">
                           {formatDate(request.start_date)} -{" "}
                           {formatDate(request.end_date)}
                         </p>
@@ -537,7 +538,7 @@ export default function LeaveRequestsPage() {
 
                     <Link
                       href={`/leave/requests/${request.id}`}
-                      className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-slate-800"
+                      className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-ink"
                     >
                       <Eye size={15} />
                       Review request
@@ -546,8 +547,8 @@ export default function LeaveRequestsPage() {
                 ))}
               </div>
 
-              <div className="flex items-center justify-between border-t border-slate-200 px-5 py-3">
-                <p className="text-xs text-slate-500">
+              <div className="flex items-center justify-between border-t border-line px-5 py-3">
+                <p className="text-xs text-ink-muted">
                   Showing {requests.length} of {data.count}
                 </p>
 
@@ -557,12 +558,12 @@ export default function LeaveRequestsPage() {
                     onClick={() => setPage((current) => Math.max(1, current - 1))}
                     disabled={loading || !data.previous}
                     aria-label="Previous page"
-                    className="rounded-md border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent"
+                    className="rounded-md border border-line p-1.5 text-ink-muted hover:bg-surface-hover disabled:cursor-not-allowed disabled:text-ink-subtle disabled:hover:bg-transparent"
                   >
                     <ChevronLeft size={16} />
                   </button>
 
-                  <span className="px-2 text-xs font-medium text-slate-600">
+                  <span className="px-2 text-xs font-medium text-ink-muted">
                     {page}
                   </span>
 
@@ -571,7 +572,7 @@ export default function LeaveRequestsPage() {
                     onClick={() => setPage((current) => current + 1)}
                     disabled={loading || !data.next}
                     aria-label="Next page"
-                    className="rounded-md border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent"
+                    className="rounded-md border border-line p-1.5 text-ink-muted hover:bg-surface-hover disabled:cursor-not-allowed disabled:text-ink-subtle disabled:hover:bg-transparent"
                   >
                     <ChevronRight size={16} />
                   </button>

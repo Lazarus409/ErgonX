@@ -4,15 +4,24 @@ import Link from "next/link";
 import { useCallback } from "react";
 import {
   CalendarDays,
+  CalendarRange,
   CheckCircle2,
   Clock3,
-  Users,
-  ArrowRight,
   ClipboardList,
+  Building2,
+  Grid3X3,
+  FileSliders,
+  PieChart as PieChartIcon,
+  Users,
 } from "lucide-react";
 
+import ChartCard from "@/components/charts/ChartCard";
+import { DonutChart, TrendChart, donutLegend } from "@/components/charts/Charts";
+import { HeatmapGrid, ProgressMeter, RankingBars } from "@/components/charts/Visuals";
+import { ButtonLink } from "@/components/ui/Button";
+import { ActionCard, Avatar, Card, MetricCard, SummaryList } from "@/components/ui/Card";
+import { DataTable } from "@/components/ui/DataTable";
 import PageHeader from "@/components/ui/PageHeader";
-import KPIStatCard from "@/components/ui/KPIStatCard";
 import StatusBadge from "@/components/ui/StatusBadge";
 import ErrorState from "@/components/ui/ErrorState";
 import { useAuth } from "@/components/guards/AuthProvider";
@@ -85,171 +94,173 @@ export default function LeaveDashboardPage() {
   }, [userId]);
 
   const { data, loading, error, reload } = useApiResource(load);
-
-  const placeholder = loading ? "…" : EM_DASH;
+  const initial = loading && !data;
 
   const value = (count: number | null | undefined): string =>
-    count === null || count === undefined ? placeholder : formatNumber(count);
+    count === null || count === undefined ? EM_DASH : formatNumber(count);
+
+  const monthly = data?.rollup.monthly_approved_leave ?? [];
+  const byDepartment = (data?.rollup.approved_days_by_department ?? []).map((item) => ({ label: item.department, value: Number(item.requested_days) }));
+  const calendarWeeks = leaveCalendarWeeks(data?.rollup.leave_calendar ?? []);
+  const byType = (data?.rollup.by_leave_type ?? []).map((item) => ({ label: item.leave_type__name, value: Number(item.requested_days) }));
+  const utilisation = data?.rollup.balance_utilisation;
+  const hasEntitlement = Boolean(utilisation && Number(utilisation.entitlement_days) > 0);
 
   return (
-    <main className="space-y-6">
+    <div className="space-y-6">
       <PageHeader
+        eyebrow="Leave"
         title="Leave Dashboard"
         description="Monitor leave requests, approvals, balances and upcoming leave."
+        icon={CalendarDays}
+        accent="leave"
         actions={
-          <Link
-            href="/leave/requests"
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <ClipboardList className="h-4 w-4" />
-            View Requests
-          </Link>
+          <>
+            <ButtonLink href="/leave/calendar" variant="secondary" leadingIcon={<CalendarRange className="h-4 w-4" />}>Calendar</ButtonLink>
+            <ButtonLink href="/leave/requests" leadingIcon={<ClipboardList className="h-4 w-4" />}>View requests</ButtonLink>
+          </>
         }
       />
 
-      {error && <ErrorState message={error} onRetry={reload} />}
+      {error && <ErrorState variant="inline" title="Unable to load leave dashboard" message={error} onRetry={reload} />}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KPIStatCard
-          title="Pending Requests"
-          value={value(data?.rollup.pending)}
-          icon={<Clock3 className="h-5 w-5" />}
-        />
-
-        <KPIStatCard
-          title="Awaiting My Approval"
-          value={value(data?.awaitingMyApproval)}
-          icon={<CheckCircle2 className="h-5 w-5" />}
-        />
-
-        <KPIStatCard
-          title="Currently on Leave"
-          value={value(data?.rollup.currently_on_leave)}
-          icon={<Users className="h-5 w-5" />}
-        />
-
-        <KPIStatCard
-          title="Upcoming Leave"
-          value={value(data?.rollup.upcoming)}
-          icon={<CalendarDays className="h-5 w-5" />}
-        />
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section className="rounded-xl border border-slate-200 bg-white p-5">
-          <h2 className="font-semibold text-slate-900">Monthly leave activity</h2>
-          <p className="mt-1 text-sm text-slate-500">Approved leave starting in each of the last six calendar months.</p>
-          <MonthlyLeaveTrend points={data?.rollup.monthly_approved_leave ?? []} loading={loading} />
-        </section>
-
-        <section className="rounded-xl border border-slate-200 bg-white p-5">
-          <h2 className="font-semibold text-slate-900">Approved leave by type</h2>
-          <p className="mt-1 text-sm text-slate-500">Approved request volume and requested days by leave type.</p>
-          <LeaveTypeDistribution items={data?.rollup.by_leave_type ?? []} loading={loading} />
-        </section>
-
-      </div>
-
-      <LeaveBalanceUtilisation summary={data?.rollup.balance_utilisation} loading={loading} />
-
-      <section className="rounded-xl border border-slate-200 bg-white">
-        <div className="flex flex-col gap-3 border-b border-slate-200 p-5 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="font-semibold text-slate-900">Upcoming Leave</h2>
-
-            <p className="mt-1 text-sm text-slate-500">
-              Recent and upcoming employee leave activity.
-            </p>
-          </div>
-
-          <Link
-            href="/leave/calendar"
-            className="inline-flex items-center gap-1 text-sm font-medium text-slate-700 hover:text-slate-900"
-          >
-            View Calendar
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-        </div>
-
-        {loading ? (
-          <div className="p-5 text-sm text-slate-500">
-            Loading upcoming leave...
-          </div>
-        ) : !data || data.upcoming.length === 0 ? (
-          <div className="p-5 text-sm text-slate-500">
-            No pending or approved leave is scheduled from today onwards.
-          </div>
-        ) : (
-          <div className="divide-y divide-slate-100">
-            {data.upcoming.map((request) => {
-              const employee = data.employees.get(request.employee);
-
-              return (
-                <div
-                  key={request.id}
-                  className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div>
-                    <p className="font-medium text-slate-900">
-                      {employee
-                        ? employeesApi.employeeDisplayName(employee)
-                        : EM_DASH}
-                    </p>
-
-                    <p className="mt-1 text-sm text-slate-500">
-                      {data.leaveTypes.get(request.leave_type)?.name ?? EM_DASH}{" "}
-                      · {formatDate(request.start_date)} –{" "}
-                      {formatDate(request.end_date)}
-                    </p>
-                  </div>
-
-                  <StatusBadge status={request.status} />
-                </div>
-              );
-            })}
-          </div>
-        )}
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Leave indicators">
+        <MetricCard label="Pending requests" value={value(data?.rollup.pending)} description="Across the institution" icon={Clock3} accent="payroll" loading={initial} href="/leave/requests?status=PENDING" />
+        <MetricCard label="Awaiting my approval" value={value(data?.awaitingMyApproval)} description="In your approval queue" icon={CheckCircle2} accent="leave" loading={initial} />
+        <MetricCard label="Currently on leave" value={value(data?.rollup.currently_on_leave)} description="Employees away today" icon={Users} accent="hr" loading={initial} />
+        <MetricCard label="Upcoming leave" value={value(data?.rollup.upcoming)} description="Approved, starting soon" icon={CalendarDays} accent="attendance" loading={initial} />
       </section>
 
-      <section className="rounded-xl border border-slate-200 bg-slate-50 p-5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="font-semibold text-slate-900">Leave Management</h2>
+      <div className="grid gap-5 xl:grid-cols-5">
+        <ChartCard
+          className="xl:col-span-3"
+          title="Monthly leave activity"
+          description="Approved leave days starting in each of the last six calendar months."
+          accent="leave"
+          loading={initial}
+          error={!data && error ? "This data is unavailable right now." : null}
+          empty={!monthly.length}
+          emptyDescription="Approved leave will appear here."
+          data={{ columns: ["Month", "Approved requests", "Requested days"], rows: monthly.map((point) => [point.month, point.request_count, Number(point.requested_days)]) }}
+        >
+          <TrendChart variant="area" data={monthly} xKey="month" format="days" series={[{ key: "requested_days", label: "Leave days", color: "var(--mod-leave)" }]} height={250} />
+        </ChartCard>
+        <ChartCard
+          className="xl:col-span-2"
+          title="Approved leave by type"
+          description="Share of approved leave days by leave type."
+          accent="leave"
+          icon={PieChartIcon}
+          loading={initial}
+          error={!data && error ? "This data is unavailable right now." : null}
+          empty={!byType.length}
+          emptyDescription="No approved leave is available yet."
+          data={{ columns: ["Leave type", "Requested days"], rows: byType.map((item) => [item.label, item.value]) }}
+        >
+          <DonutChart data={byType} height={180} format="days" centerValue={formatNumber(byType.reduce((sum, item) => sum + item.value, 0))} centerLabel="days" />
+          <SummaryList className="mt-4" items={donutLegend(byType, "days").map((item) => ({ label: <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ background: item.color }} />{item.label}</span>, value: item.value }))} />
+        </ChartCard>
+      </div>
 
-            <p className="mt-1 text-sm text-slate-500">
-              Manage requests, policies and leave calendar from the Leave
-              module.
-            </p>
+      <Card title="Leave balance utilisation" description={utilisation ? `Current-year granted balance used across employee leave balances (${utilisation.year}).` : "Current-year granted balance used across employee leave balances."} icon={FileSliders} accent="leave">
+        {initial ? <div className="skeleton h-24 rounded-xl" /> : hasEntitlement && utilisation ? (
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] lg:items-center">
+            <dl className="grid grid-cols-3 gap-3">
+              <div className="rounded-xl bg-surface-muted/70 p-3"><dt className="text-caption text-ink-muted">Entitlement</dt><dd className="mt-1 text-kpi-sm font-semibold text-ink-strong tabular-nums">{formatNumber(Number(utilisation.entitlement_days))}</dd></div>
+              <div className="rounded-xl bg-mod-leave-soft p-3"><dt className="text-caption text-ink-muted">Used</dt><dd className="mt-1 text-kpi-sm font-semibold text-mod-leave tabular-nums">{formatNumber(Number(utilisation.used_days))}</dd></div>
+              <div className="rounded-xl bg-surface-muted/70 p-3"><dt className="text-caption text-ink-muted">Available</dt><dd className="mt-1 text-kpi-sm font-semibold text-ink-strong tabular-nums">{formatNumber(Number(utilisation.available_days))}</dd></div>
+            </dl>
+            <ProgressMeter label="Utilisation of granted leave" value={Number(utilisation.utilisation_percent ?? 0)} color="var(--mod-leave)" detail="All figures are in days; utilisation is calculated by the server." />
           </div>
+        ) : <p className="text-support text-ink-muted">No positive current-year leave entitlement is available to calculate utilisation.</p>}
+      </Card>
 
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href="/leave/requests"
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Requests
-            </Link>
+      <div className="grid gap-5 xl:grid-cols-5">
+        <ChartCard
+          className="xl:col-span-2"
+          title="Leave by department"
+          description={`Approved leave days this year, by current department.`}
+          accent="leave"
+          icon={Building2}
+          loading={initial}
+          error={!data && error ? "This data is unavailable right now." : null}
+          empty={!byDepartment.length}
+          emptyDescription="Approved leave for employees with a department will appear here."
+          data={{ columns: ["Department", "Approved days"], rows: byDepartment.map((item) => [item.label, item.value]) }}
+        >
+          <RankingBars items={byDepartment} format="days" color="var(--mod-leave)" limit={8} />
+        </ChartCard>
+        <Card className="xl:col-span-3" title="Next four weeks" description="Employees on approved leave each day. Darker cells mean more people away." icon={Grid3X3} accent="leave">
+          {initial ? <div className="skeleton h-48 rounded-xl" /> : calendarWeeks.rows.length ? (
+            <HeatmapGrid rows={calendarWeeks.rows} columns={WEEKDAYS} cells={calendarWeeks.cells} color="var(--mod-leave)" />
+          ) : <p className="text-support text-ink-muted">The leave calendar is unavailable right now.</p>}
+        </Card>
+      </div>
 
-            <Link
-              href="/leave/policies"
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Policies
-            </Link>
-
-            <Link
-              href="/leave/calendar"
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              Calendar
-            </Link>
+      <DataTable
+        caption="Upcoming leave"
+        rows={data?.upcoming}
+        rowKey={(request) => request.id}
+        loading={initial}
+        error={!data && error ? "This data is unavailable right now." : null}
+        minWidth={620}
+        toolbar={
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-card-title font-semibold text-ink-strong">Upcoming leave</h2>
+              <p className="text-support text-ink-muted">Pending and approved leave from today onwards.</p>
+            </div>
+            <Link href="/leave/calendar" className="shrink-0 text-support font-semibold text-primary-ink hover:underline">View calendar</Link>
           </div>
-        </div>
+        }
+        empty={{ title: "Nothing scheduled", description: "No pending or approved leave is scheduled from today onwards.", icon: CalendarDays }}
+        columns={[
+          {
+            key: "employee",
+            header: "Employee",
+            cell: (request) => {
+              const employee = data?.employees.get(request.employee);
+              const name = employee ? employeesApi.employeeDisplayName(employee) : EM_DASH;
+              return <span className="flex items-center gap-3"><Avatar name={name} size="sm" /><span className="font-semibold text-ink-strong">{name}</span></span>;
+            },
+          },
+          { key: "type", header: "Leave type", cell: (request) => data?.leaveTypes.get(request.leave_type)?.name ?? EM_DASH },
+          { key: "dates", header: "Dates", cell: (request) => `${formatDate(request.start_date)} – ${formatDate(request.end_date)}`, sortValue: (request) => request.start_date },
+          { key: "status", header: "Status", cell: (request) => <StatusBadge status={request.status} size="sm" /> },
+        ]}
+      />
+
+      <section className="grid gap-4 sm:grid-cols-3" aria-label="Leave areas">
+        <ActionCard href="/leave/requests" title="Requests" description="Review, approve and track requests" icon={ClipboardList} accent="leave" />
+        <ActionCard href="/leave/policies" title="Policies" description="Leave types and eligibility rules" icon={FileSliders} accent="leave" />
+        <ActionCard href="/leave/calendar" title="Calendar" description="Who is away, and when" icon={CalendarRange} accent="leave" />
       </section>
-    </main>
+    </div>
   );
 }
 
-function MonthlyLeaveTrend({ points, loading }: { points: LeaveDashboard["monthly_approved_leave"]; loading: boolean }) { if (loading) return <p className="flex h-48 items-center justify-center text-sm text-slate-500">Loading leave activity…</p>; const maximum = Math.max(...points.map((point) => Number(point.requested_days)), 1); return <div className="mt-6 flex h-48 items-end gap-3" aria-label="Approved leave days by month">{points.map((point) => <div key={point.month} className="flex min-w-0 flex-1 flex-col justify-end gap-2"><span className="text-center text-xs font-medium text-slate-600">{formatNumber(Number(point.requested_days))}</span><div className="rounded-t-lg bg-gradient-to-t from-teal-600 to-cyan-300" style={{ height: `${Math.max((Number(point.requested_days) / maximum) * 100, Number(point.requested_days) ? 4 : 2)}%` }} title={`${point.request_count} approved requests, ${point.requested_days} requested days`} /><span className="text-center text-[10px] text-slate-500">{new Intl.DateTimeFormat(undefined, { month: "short" }).format(new Date(`${point.month}T00:00:00`))}</span></div>)}</div>; }
-function LeaveTypeDistribution({ items, loading }: { items: LeaveDashboard["by_leave_type"]; loading: boolean }) { if (loading) return <p className="flex h-48 items-center justify-center text-sm text-slate-500">Loading leave distribution…</p>; if (!items.length) return <p className="flex h-48 items-center justify-center text-center text-sm text-slate-500">No approved leave is available yet.</p>; const maximum = Math.max(...items.map((item) => Number(item.requested_days)), 1); return <div className="mt-6 space-y-4">{items.map((item) => <div key={item.leave_type__name}><div className="mb-1.5 flex justify-between gap-3 text-sm"><span className="truncate text-slate-600">{item.leave_type__name}</span><span className="font-semibold text-slate-950">{formatNumber(Number(item.requested_days))} days</span></div><div className="h-2.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-teal-500" style={{ width: `${Math.max((Number(item.requested_days) / maximum) * 100, 3)}%` }} /></div><p className="mt-1 text-xs text-slate-500">{formatNumber(item.request_count)} approved requests</p></div>)}</div>; }
-function LeaveBalanceUtilisation({ summary, loading }: { summary: LeaveDashboard["balance_utilisation"] | undefined; loading: boolean }) { if (loading) return <section className="rounded-xl border border-slate-200 bg-white p-5"><h2 className="font-semibold text-slate-900">Leave balance utilisation</h2><p className="mt-5 text-sm text-slate-500">Loading current-year balances…</p></section>; if (!summary || Number(summary.entitlement_days) <= 0) return <section className="rounded-xl border border-slate-200 bg-white p-5"><h2 className="font-semibold text-slate-900">Leave balance utilisation</h2><p className="mt-1 text-sm text-slate-500">Current-year granted balance used across employee leave balances.</p><p className="mt-5 text-sm text-slate-500">No positive current-year leave entitlement is available to calculate utilisation.</p></section>; const percentage = Number(summary.utilisation_percent); return <section className="rounded-xl border border-slate-200 bg-white p-5"><div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-end"><div><h2 className="font-semibold text-slate-900">Leave balance utilisation</h2><p className="mt-1 text-sm text-slate-500">Current-year granted balance used across employee leave balances.</p></div><span className="text-xs text-slate-500">{summary.year}</span></div><div className="mt-6 grid gap-4 sm:grid-cols-3"><div><p className="text-xs uppercase tracking-wide text-slate-500">Entitlement</p><p className="mt-1 text-2xl font-semibold text-slate-950">{formatNumber(Number(summary.entitlement_days))} days</p></div><div><p className="text-xs uppercase tracking-wide text-slate-500">Used</p><p className="mt-1 text-2xl font-semibold text-teal-700">{formatNumber(Number(summary.used_days))} days</p></div><div><p className="text-xs uppercase tracking-wide text-slate-500">Available</p><p className="mt-1 text-2xl font-semibold text-slate-950">{formatNumber(Number(summary.available_days))} days</p></div></div><div className="mt-5"><div className="mb-2 flex justify-between gap-3 text-sm"><span className="text-slate-600">Utilisation</span><span className="font-semibold text-slate-950">{formatNumber(percentage)}%</span></div><div className="h-3 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-gradient-to-r from-teal-600 to-cyan-400" style={{ width: `${Math.min(Math.max(percentage, 0), 100)}%` }} /></div></div></section>; }
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+/** Lay the server's 28-day series out as Monday-start week rows; days outside it stay blank. */
+function leaveCalendarWeeks(days: Array<{ date: string; on_leave: number }>) {
+  if (!days.length) return { rows: [] as string[], cells: [] as Array<Array<{ value: number; label?: string }>> };
+  const byDate = new Map(days.map((day) => [day.date, day.on_leave]));
+  const first = new Date(`${days[0].date}T00:00:00`);
+  const last = new Date(`${days[days.length - 1].date}T00:00:00`);
+  const cursor = new Date(first);
+  cursor.setDate(cursor.getDate() - ((cursor.getDay() + 6) % 7));
+  const rows: string[] = [];
+  const cells: Array<Array<{ value: number; label?: string }>> = [];
+  while (cursor <= last) {
+    rows.push(`w/c ${cursor.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`);
+    const week: Array<{ value: number; label?: string }> = [];
+    for (let offset = 0; offset < 7; offset += 1) {
+      const iso = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(cursor.getDate()).padStart(2, "0")}`;
+      const label = cursor.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+      week.push(byDate.has(iso) ? { value: byDate.get(iso) ?? 0, label: `${label}: ${byDate.get(iso)} on leave` } : { value: 0, label: `${label}: outside the four-week window` });
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    cells.push(week);
+  }
+  return { rows, cells };
+}

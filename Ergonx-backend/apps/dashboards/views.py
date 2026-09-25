@@ -8,7 +8,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
-from apps.accounting.models import Account, BankAccount, Expense, Invoice, JournalEntry, JournalLine, VendorBill
+from apps.accounting.models import Account, BankAccount, BankStatementLine, Expense, Invoice, JournalEntry, JournalLine, VendorBill
 from apps.attendance.models import AttendanceRecord
 from apps.employees.models import Employee, Employment
 from apps.leave.models import LeaveBalance, LeaveRequest
@@ -340,6 +340,19 @@ class DashboardViewSet(ViewSet):
                 "requested_days": item.get("requested_days", 0) or 0,
             })
             month = (month + timedelta(days=32)).replace(day=1)
+        by_department = [
+            {"department": row["employee__employments__department__name"] or "Unassigned", "requested_days": row["requested_days"] or 0, "request_count": row["request_count"]}
+            for row in approved.filter(start_date__year=today.year, employee__employments__is_current=True)
+            .values("employee__employments__department__name")
+            .annotate(requested_days=Sum("requested_days"), request_count=Count("id"))
+            .order_by("-requested_days")[:8]
+        ]
+        horizon = today + timedelta(days=27)
+        upcoming_spans = list(approved.filter(end_date__gte=today, start_date__lte=horizon).values_list("start_date", "end_date"))
+        leave_calendar = []
+        for offset in range(28):
+            day = today + timedelta(days=offset)
+            leave_calendar.append({"date": day.isoformat(), "on_leave": sum(1 for start, end in upcoming_spans if start <= day <= end)})
         return Response({
             "currency": institution.default_currency,
             "pending": records.filter(status=LeaveRequest.Status.PENDING).count(),
@@ -351,6 +364,8 @@ class DashboardViewSet(ViewSet):
                 .order_by("leave_type__name")
             ),
             "monthly_approved_leave": months,
+            "approved_days_by_department": by_department,
+            "leave_calendar": leave_calendar,
             "balance_utilisation": {
                 "year": today.year,
                 "entitlement_days": entitlement,
@@ -479,6 +494,21 @@ class DashboardViewSet(ViewSet):
             )
             .order_by("-payroll_run__payroll_period__end_date")[:6]
         )
+        latest_finalized = (
+            runs.filter(status=PayrollRun.Status.FINALIZED)
+            .select_related("payroll_period")
+            .order_by("-payroll_period__end_date", "-started_at")
+            .first()
+        )
+        cost_by_department = []
+        if latest_finalized:
+            cost_by_department = [
+                {"department": row["employee__employments__department__name"] or "Unassigned", "gross_pay": row["gross_pay"] or 0}
+                for row in PayrollRecord.objects.filter(payroll_run=latest_finalized, employee__employments__is_current=True)
+                .values("employee__employments__department__name")
+                .annotate(gross_pay=Sum("gross_pay"))
+                .order_by("-gross_pay")[:8]
+            ]
         return Response({
             "latest_run_id": str(latest.id) if latest else None,
             "latest_run_status": latest.status if latest else None,
@@ -498,6 +528,10 @@ class DashboardViewSet(ViewSet):
                 }
                 for item in reversed(period_rollups)
             ],
+            "cost_by_department": {
+                "period": latest_finalized.payroll_period.name if latest_finalized else None,
+                "departments": cost_by_department,
+            },
         })
 
     @extend_schema(responses={200: OpenApiTypes.OBJECT}, description="Return tenant-scoped recruitment dashboard rollups.")
@@ -505,6 +539,22 @@ class DashboardViewSet(ViewSet):
     def recruitment(self, request):
         institution = request.institution
         applications = Application.objects.filter(institution=institution)
+        today = date.today()
+        first_month = today.replace(day=1)
+        for _ in range(5):
+            first_month = (first_month - timedelta(days=1)).replace(day=1)
+        monthly_counts = {
+            item["month"].date() if hasattr(item["month"], "date") else item["month"]: item["count"]
+            for item in applications.filter(applied_at__date__gte=first_month, applied_at__date__lte=today)
+            .annotate(month=TruncMonth("applied_at"))
+            .values("month")
+            .annotate(count=Count("id"))
+        }
+        applications_trend = []
+        month = first_month
+        for _ in range(6):
+            applications_trend.append({"month": month.isoformat(), "applications": monthly_counts.get(month, 0)})
+            month = (month + timedelta(days=32)).replace(day=1)
         return Response({
             "open_jobs": JobPosting.objects.filter(institution=institution, status=JobPosting.Status.OPEN).count(),
             "active_candidates": Candidate.objects.filter(institution=institution, status=Candidate.Status.ACTIVE).count(),
@@ -512,6 +562,22 @@ class DashboardViewSet(ViewSet):
             "scheduled_interviews": Interview.objects.filter(institution=institution, status=Interview.Status.SCHEDULED).count(),
             "offers_extended": Offer.objects.filter(institution=institution, status=Offer.Status.EXTENDED).count(),
             "pipeline": list(RecruitmentStage.objects.filter(institution=institution, is_active=True).values("name").annotate(count=Count("applications")).order_by("sequence")),
+            "applications_by_status": list(applications.values("status").annotate(count=Count("id")).order_by("status")),
+            "applications_trend": applications_trend,
+            "applications_by_source": [
+                {"source": row["candidate__source"] or "Not recorded", "count": row["count"]}
+                for row in applications.values("candidate__source").annotate(count=Count("id")).order_by("-count", "candidate__source")[:6]
+            ],
+            "interviews_by_status": list(
+                Interview.objects.filter(institution=institution).values("status").annotate(count=Count("id")).order_by("status")
+            ),
+            "time_to_hire": _time_to_hire_distribution(institution),
+            "top_open_jobs": list(
+                JobPosting.objects.filter(institution=institution, status=JobPosting.Status.OPEN)
+                .annotate(application_count=Count("applications"))
+                .order_by("-application_count", "title")
+                .values("title", "application_count")[:5]
+            ),
         })
 
     @extend_schema(
@@ -534,6 +600,16 @@ class DashboardViewSet(ViewSet):
             status__in=(Invoice.Status.ISSUED, Invoice.Status.PART_PAID),
         )
         journals = JournalEntry.objects.filter(institution=institution)
+        expense_rows = list(
+            Expense.objects.filter(institution=institution, status=Expense.Status.POSTED)
+            .values("account__name")
+            .annotate(total=Sum("amount"))
+            .order_by("-total", "account__name")
+        )
+        unreconciled = BankStatementLine.objects.filter(
+            institution=institution,
+            status__in=(BankStatementLine.Status.UNMATCHED, BankStatementLine.Status.EXCEPTION),
+        )
         return Response({
             "pending_journals": journals.filter(status=JournalEntry.Status.PENDING_APPROVAL).count(),
             "accounts_payable": open_bills.aggregate(total=Sum("amount_payable"))["total"] or 0,
@@ -546,7 +622,56 @@ class DashboardViewSet(ViewSet):
             "journals_by_status": list(journals.values("status").annotate(count=Count("id")).order_by("status")),
             "profit_and_loss_trend": _profit_and_loss_trend(institution),
             "cash_flow_trend": bank_cash_position["cash_flow_trend"],
+            "expenses_by_account": _top_with_other(expense_rows, "account__name", "total"),
+            "unreconciled_bank_lines": {
+                "count": unreconciled.count(),
+                "latest": [
+                    {
+                        "id": str(line["id"]),
+                        "statement_date": line["statement_date"],
+                        "bank_account": line["bank_account__name"],
+                        "reference": line["reference"],
+                        "description": line["description"],
+                        "amount": line["amount"],
+                        "currency": line["currency"],
+                        "status": line["status"],
+                    }
+                    for line in unreconciled.order_by("-statement_date", "-created_at").values(
+                        "id", "statement_date", "bank_account__name", "reference", "description", "amount", "currency", "status"
+                    )[:5]
+                ],
+            },
         })
+
+
+TIME_TO_HIRE_BUCKETS = (("0–14 days", 0, 14), ("15–30 days", 15, 30), ("31–60 days", 31, 60), ("61+ days", 61, None))
+
+
+def _time_to_hire_distribution(institution):
+    """Days from application to accepted offer, bucketed for a distribution chart."""
+    pairs = Offer.objects.filter(
+        institution=institution,
+        accepted_at__isnull=False,
+        application__applied_at__isnull=False,
+    ).values_list("application__applied_at", "accepted_at")
+    counts = {label: 0 for label, _, _ in TIME_TO_HIRE_BUCKETS}
+    for applied_at, accepted_at in pairs:
+        days = max((accepted_at - applied_at).days, 0)
+        for label, low, high in TIME_TO_HIRE_BUCKETS:
+            if days >= low and (high is None or days <= high):
+                counts[label] += 1
+                break
+    return [{"bucket": label, "hires": counts[label]} for label, _, _ in TIME_TO_HIRE_BUCKETS]
+
+
+def _top_with_other(rows, label_key, value_key, limit=5):
+    """Keep the largest `limit` rows and fold the remainder into "Other"."""
+    top = rows[:limit]
+    rest = sum((row[value_key] or 0) for row in rows[limit:])
+    result = [{"label": row[label_key] or "Unassigned", "value": row[value_key] or 0} for row in top]
+    if rest:
+        result.append({"label": "Other", "value": rest})
+    return result
 
 
 class HomeViewSet(ViewSet):

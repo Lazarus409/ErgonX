@@ -17,6 +17,6 @@ export default function AuthenticationGate({ children }: { children: React.React
     }
   }, [bootstrap, isAuthenticated, loading, pathname, router]);
 
-  if (loading || !isAuthenticated) return <LoadingState />;
+  if (loading || !isAuthenticated) return <LoadingState variant="splash" />;
   return <>{children}</>;
 }

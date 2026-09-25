@@ -83,6 +83,8 @@ export interface Institution {
   country: string;
   currency: string;
   timezone: string;
+  institution_type: string;
+  executive_title?: string;
   logo: string | null;
   is_active: boolean;
 }
@@ -128,6 +130,18 @@ export interface InstitutionMembership {
   is_primary: boolean;
   joined_at: string | null;
   ended_at: string | null;
+}
+
+export interface InstitutionInvitation {
+  id: string;
+  email: string;
+  role: RoleSummary | null;
+  status: "PENDING" | "ACCEPTED" | "EXPIRED" | "REVOKED" | string;
+  expires_at: string;
+  accepted_at: string | null;
+  invited_by_email: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface UserPreference {

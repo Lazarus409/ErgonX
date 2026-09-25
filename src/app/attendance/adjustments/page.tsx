@@ -321,7 +321,7 @@ export default function AttendanceAdjustmentsPage() {
   const totalPages = Math.max(1, Math.ceil(data.count / DEFAULT_PAGE_SIZE));
 
   return (
-    <main className="space-y-6">
+    <div className="space-y-6">
       <PageHeader
         title="Attendance Adjustments"
         description="Review requested corrections to attendance records."
@@ -733,7 +733,7 @@ export default function AttendanceAdjustmentsPage() {
           </div>
         </div>
       </section>
-    </main>
+    </div>
   );
 }
 

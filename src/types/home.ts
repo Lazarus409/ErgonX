@@ -28,6 +28,7 @@ export interface HomeRecentWork {
   title: string;
   status: string;
   resume_action: string;
+  resume_route: string;
   updated_at: string;
   can_resume: boolean;
 }

@@ -1,0 +1,206 @@
+# ErgonX Design System v2
+
+Status: adopted 2026-09-24 · Scope: `ergonx-frontend/` · Companion docs: [branding.md](./branding.md), [visualization-guidelines.md](./visualization-guidelines.md)
+
+Visual direction: **modern enterprise blue + multi-accent signature X + module-coloured intelligence.** The interface should feel energetic yet calm enough for daily use: navy structure, blue actions, soft neutral canvas, and module colour used sparingly as information.
+
+This document describes the system as implemented. When code and this document disagree, the code in `src/app/globals.css` and `src/components/ui/` wins; update this file.
+
+---
+
+## 1. Architecture
+
+| Layer | Location | Purpose |
+|---|---|---|
+| Tokens | `src/app/globals.css` (`:root`, `.dark`) | Raw brand palette and semantic role variables for light and dark. |
+| Theme registration | `globals.css` `@theme inline` / `@theme` | Exposes roles as Tailwind v4 utilities (`bg-surface`, `text-ink-muted`, `border-line`, `bg-mod-payroll-soft`, `shadow-elevation-2`, `text-title` …). |
+| Legacy bridge | `globals.css` §3 | Re-tunes the default `slate` scale, radii and shadows, and maps legacy utilities onto roles in dark mode, so routes not yet migrated inherit v2. Temporary — delete rules as routes migrate. |
+| Primitives | `src/components/ui/*` | Button, Field/Input/Select/Textarea/Checkbox/Radio/Switch/FileInput, Card family, Badge/StatusBadge, Alert, DataTable/DataToolbar/Pagination, Dialog/Drawer/Popover/Menu/Tooltip, Tabs, Skeleton family, Empty/Error/Loading states, PageHeader, BackButton, ActionBar. |
+| Charts | `src/components/charts/*` | ChartCard frame, formatters, Recharts wrappers and custom visuals. |
+| Brand | `src/components/brand/*` | Logo, SidebarLogo transition, SplashScreen, AuthShell, DocumentFrame. |
+| Shell | `src/components/layout/*` | AppShell, Sidebar, TopBar. |
+| Theme runtime | `src/components/context/ThemeProvider.tsx` | Single canonical light/dark/system theme. |
+| Module accents | `src/lib/moduleTheme.ts` | Accent class map, route→accent and route→module label. |
+
+**Rule:** new code uses semantic roles and primitives. Do not introduce new `slate-*`, `sky-*`, `blue-*` or hex values in components. Arbitrary values are acceptable only for one-off geometry (e.g. chart heights).
+
+---
+
+## 2. Tokens
+
+### 2.1 Brand palette
+
+| Token | Value | Use |
+|---|---|---|
+| `--brand-navy` | `#0F2345` | Sidebar, hero surfaces, primary ink |
+| `--brand-navy-deep` | `#08172F` | Dark-mode sidebar, tooltips |
+| `--brand-ink` | `#23324D` | Body ink |
+| `--brand-primary` / `--accent-blue` | `#2F6BFF` | Primary action |
+| `--accent-teal` | `#14D2B8` | Signature gradient stop |
+| `--accent-aqua` | `#22D3EE` | Signature gradient stop, hero eyebrows |
+| `--accent-sky` | `#38BDF8` | Signature gradient stop |
+| `--accent-violet` | `#7C5CFF` | Signature gradient stop |
+| `--gradient-signature` | teal → aqua → blue → violet | Brand expression only (see §9) |
+
+### 2.2 Semantic roles (light · dark)
+
+| Role | Utility | Light | Dark |
+|---|---|---|---|
+| Canvas | `bg-canvas` | `#F5F7FB` | `#07132A` |
+| Surface | `bg-surface` | `#FFFFFF` | `#0D1C37` |
+| Surface muted | `bg-surface-muted` | `#EEF3FA` | `#122647` |
+| Surface sunken | `bg-surface-sunken` | `#E7EDF6` | `#0A1831` |
+| Surface hover | `bg-surface-hover` | `#F3F6FB` | `#15294C` |
+| Ink strong | `text-ink-strong` | `#0F2345` | `#F2F5FB` |
+| Ink | `text-ink` | `#23324D` | `#D3DCEC` |
+| Ink muted | `text-ink-muted` | `#56657F` | `#9AA9C3` |
+| Ink subtle | `text-ink-subtle` | `#8290A8` | `#6F82A3` |
+| Line | `border-line` | `#D9E2EF` | `#20365C` |
+| Line soft / strong | `border-line-soft` / `border-line-strong` | `#E6ECF5` / `#C2CEDF` | `#192D4F` / `#2D4773` |
+| Primary | `bg-primary`, `text-primary` | `#2F6BFF` | `#5687FF` |
+| Primary soft / ink | `bg-primary-soft`, `text-primary-ink` | `#E9F0FF` / `#1D4ED8` | 16% tint / `#A9C2FF` |
+| Focus ring | `--focus-ring` | blue 45% | light blue 55% |
+
+Feedback roles each have a solid, a `-soft` background and an `-ink` text colour: `success` (emerald), `warning` (amber), `danger` (rose), `info` (cyan), plus `neutral-soft` / `neutral-ink`.
+
+### 2.3 Module accents
+
+| Module | Accent | Utility family |
+|---|---|---|
+| Core HR | Indigo / blue | `mod-hr` |
+| Recruitment | Violet | `mod-recruitment` |
+| Leave | Teal | `mod-leave` |
+| Attendance | Cyan / sky | `mod-attendance` |
+| Payroll | Amber / gold | `mod-payroll` |
+| Accounting | Emerald | `mod-accounting` |
+| Reports & Analytics | Blue-violet | `mod-reports` |
+| Audit | Restrained rose | `mod-audit` |
+| Settings | Navy / slate | `mod-settings` |
+
+Each has a solid (`text-mod-x`, `bg-mod-x`) and a soft tint (`bg-mod-x-soft`). Use them through `moduleAccents[accent]` (`tile`, `soft`, `solid`, `text`, `border`, `cssVar`). Module colour appears in icon tiles, accent lines, chart series, active nav dots, selected states and badges. **Never paint a whole page in a module colour.**
+
+`accentForPath(pathname)` resolves a route's module; `PageHeader` uses it automatically when a page does not pass `accent`, so every page shows its module eyebrow.
+
+### 2.4 Typography
+
+Font: **Plus Jakarta Sans** via `next/font/google` (self-hosted at build time) exposed as `--font-brand`, with a system fallback stack.
+
+| Utility | Size / line | Use |
+|---|---|---|
+| `text-display` | 32 / 40 | Hero titles (desktop) |
+| `text-title` | 28 / 36 | Page titles (`PageHeader`) |
+| `text-heading` | 19 / 26 | Section headings, dialog titles |
+| `text-card-title` | 15 / 22 | Card and table titles |
+| `text-body` | 15 / 24 | Descriptions, long copy |
+| `text-sm` | 14 / 20 | Default UI text, tables |
+| `text-support` | 13 / 20 | Secondary copy, labels |
+| `text-caption` | 12 / 16 | Metadata, table headers, legends |
+| `text-kpi` | 30 / 36 | Primary KPI values |
+| `text-kpi-sm` | 22 / 28 | Secondary KPI values |
+
+Rules: use weight and spacing for hierarchy rather than borders; avoid all-caps micro-labels (the bridge de-capitalises legacy `text-xs uppercase` inside `main`); numbers use `tabular-nums`.
+
+### 2.5 Spacing grammar
+
+Scale: 4 · 8 · 12 · 16 · 20 · 24 · 32 · 40 · 48 px.
+
+| Context | Convention |
+|---|---|
+| Page padding | 16 (mobile) · 24 (sm) · 40 (xl) horizontal; 24–32 top |
+| Section spacing | `space-y-6` (24) between page sections, `space-y-8` on Home |
+| Card padding | 20 (`p-5`) default, 24–28 for hero/feature cards |
+| Dashboard gaps | `gap-4` (KPI rows), `gap-5` (chart grids) |
+| Field spacing | `gap-4` in grids, `space-y-4` stacked, 6 px label→control |
+| Toolbar spacing | `gap-3` between controls, `p-4` toolbar padding |
+| Table density | comfortable: 20×14 px cells; compact: 16×10 px |
+
+### 2.6 Radius & elevation
+
+| Name | Value | Utility |
+|---|---|---|
+| Small | ~10 px | `rounded-lg` |
+| Medium | ~14 px | `rounded-xl` (controls, buttons) |
+| Large | ~18 px | `rounded-2xl` (cards, tables) |
+| Hero | ~22 px | `rounded-3xl` (heroes, dialogs) |
+| Pill | full | `rounded-full` |
+
+Elevation (navy-tinted, never pure black): `shadow-elevation-1` (resting cards), `shadow-elevation-2` (hover, raised), `shadow-elevation-3` (heroes, splash), `shadow-overlay` (menus, dialogs, toasts). Legacy `shadow-sm/md/lg/xl` are re-tuned onto the same curve.
+
+### 2.7 Motion
+
+| Token | Value | Use |
+|---|---|---|
+| `--duration-quick` | 140 ms | Hover, press, colour |
+| `--duration-standard` | 200 ms | Popovers, tabs, sidebar collapse (220 ms) |
+| `--duration-emphasis` | 300 ms | Drawers, dialogs, chart entrance |
+| `ease-standard` | `cubic-bezier(.2,0,0,1)` | Default |
+| `ease-emphasis` | `cubic-bezier(.3,0,0,1.15)` | Emphasised entrances |
+
+Named animations: `animate-fade-in`, `animate-pop-in`, `animate-slide-up`, `animate-shimmer` (skeletons and splash only), `animate-splash-pulse`. No perpetual decorative animation. `prefers-reduced-motion` collapses all transitions/animations globally and disables chart entrance (`useChartAnimation`).
+
+---
+
+## 3. Surfaces & cards
+
+- **Surface** — base container (`tone`, `elevation`, `padding`, `radius`).
+- **Card** — Surface + header (`title`, `description`, `icon`, `accent`, `actions`) and optional 3 px module `accentLine`.
+- **MetricCard** — KPI: label, `text-kpi` value, description, icon tile, soft accent glow, optional trend chip (direction + whether up is good), skeleton while loading, optional link.
+- **InsightCard** — module-tinted interpretation of data ("Offer rate …").
+- **ActionCard** — navigation card with icon tile, animated accent line and CTA.
+- **AttentionItem** — severity bar + chip (label, not colour alone) + description + link.
+- **SummaryCard / SummaryList** — label/value lists with tabular numerals.
+- **ProfileCard / Avatar** — deterministic, name-derived avatar tints.
+- **HomeHero** (`components/home`) — expressive navy greeting surface with the abstract X art; one per page.
+
+Avoid the "white rectangle + grey border" monotony: vary with accent lines, soft tints, icon tiles and hierarchy — not with extra borders.
+
+## 4. Buttons
+
+`Button` variants: `primary`, `secondary`, `ghost`, `danger`, `link`, `inverse` (on navy). Sizes `sm` (32), `md` (40), `lg` (48). States: hover, active (1 px press), focus-visible ring, disabled (50% + no pointer events), `loading` (spinner, optional `loadingLabel`, `aria-busy`). `ButtonLink` renders a Next `Link` with button styling. `IconButton` requires `label` (accessible name + tooltip). Legacy `button.bg-slate-900/950` CTAs are bridged to the primary colour.
+
+## 5. Forms
+
+`Field` wires label, required marker, optional marker, helper text and error message (`role="alert"`, `aria-invalid`, `aria-describedby`) around any control. Controls: `Input` (sizes, leading icon, trailing slot), `Select` (native, custom chevron), `Textarea`, `Checkbox`, `Radio`, `Switch` (`role="switch"`), `FileInput` (accessible drop-zone over a native input), `FormSection` (labelled group with side heading). Heights: 32/40/48. Focus: primary border + 4 px 15% ring. Disabled/read-only use `surface-muted`. `ActionBar` holds form actions (optionally sticky).
+
+## 6. Tables
+
+`DataTable<Row>`: column model (`header`, `cell`, `numeric`, `sortValue`, `hideBelow`, `width`), caption (screen-reader), toolbar slot, sticky header, calm row hover, right-aligned tabular numerals, client-side sort on the current page, built-in skeleton / empty / error states, footer slot (`Pagination`). Horizontal overflow is contained inside the card (`minWidth`), never the page. `DataToolbar` provides search (with clear), filters and actions. Long values truncate with a native tooltip (`title`) or wrap. Status uses `StatusBadge`.
+
+## 7. Navigation & shell
+
+- **Sidebar** (desktop): navy structural anchor with a static signature glow, expanded 272 px / collapsed 80 px (persisted per browser), logo transition (see branding.md), groups with animated disclosure, only the most specific destination active, signature-gradient active bar, module-coloured active icon tile, tooltips when collapsed, institution monogram footer with subtle "on ErgonX" attribution. **Mobile**: the same panel as a modal drawer (Escape, scrim, scroll lock).
+- **Visibility** is computed exclusively from `navigation.ts` + enabled modules + effective permissions + self-service eligibility. Visibility is never authorization.
+- **TopBar**: light translucent surface; route context (`Section / Page`) with module dot and institution name; search trigger (`Ctrl/Cmd+K`) opening a command-palette dialog; help; theme toggle; notifications popover with unread count; profile menu (profile, preferences, security, appearance: light/dark/system, institution switching, sign out).
+- **Skip link** to `#main-content`; single `<main>` landmark per page.
+
+## 8. States
+
+- **Empty**: icon tile, title, explanation, optional action (`EmptyState`, `size="compact"` inside cards/tables).
+- **Loading**: skeletons shaped like the content — `LoadingState variant` = `page | dashboard | table | detail | form | inline | splash`. Splash is only for session start.
+- **Error**: `ErrorState` block or `variant="inline"` banner, always with retry when possible. Error must never be presented as "empty".
+- **Access**: `AccessDenied`, `ModuleDisabled`, `ConfigurationIncomplete`.
+- **Status**: `StatusBadge` — tone + icon + label (ACTIVE, PENDING, DRAFT, APPROVED, REJECTED, FINALIZED, PAID, OVERDUE, SCHEDULED, …); meaning never relies on colour alone.
+- **Toasts**: token-styled, severity bar + icon, `role="alert"` for errors.
+
+## 9. Dark mode
+
+One theme architecture: `ThemeProvider` stores `ergonx-theme` (`light | dark | system`), toggles `.dark` on `<html>`, and an inline `THEME_INIT_SCRIPT` applies it before first paint. The former Platform-only colour mode (`ergonx-platform-color-mode`) is adopted once and removed.
+
+Dark uses a deep-navy canvas, elevated navy surfaces, readable neutral ink, subtle borders and preserved (lightened) module accents. It is not an inversion. The legacy bridge maps `bg-white`, `bg-slate-*`, `text-slate-*`, `border-slate-*`, and semantic hue tints/borders/text onto roles under `html.dark`. Printing always uses light tokens.
+
+## 10. Accessibility
+
+- Visible focus ring on every interactive element; skip link; one `main` landmark.
+- Dialog/Drawer: `role="dialog"`, `aria-modal`, labelled, focus trap, Escape, focus restore, body scroll lock.
+- Menus: `role="menu"`, arrow-key/Home/End navigation, Escape returns focus to trigger.
+- Tabs: roving `tabIndex`, arrow keys.
+- Charts: `figure` + caption, plain-language `summary`, and a visually hidden data table (`ChartCard data`).
+- Status, severity and calendar cells carry text/icons, not just colour.
+- Controls ≥ 32 px (40 px default); touch targets in the mobile shell are 40 px.
+- `prefers-reduced-motion` respected globally.
+
+## 11. Migration status and legacy bridge
+
+Fully migrated to primitives: shell, Home, Employee Home, Executive and all module dashboards, Reports, auth/public pages, onboarding hub, Platform, HR org resources, Employees list, Recruitment lists, Payroll lists (runs, periods, payslips, components, structures, adjustments), payslip document, Financial Reports, Audit, Approvals, Notifications, self-service profile/leave/payslips/documents/contacts, Settings landing/modules.
+
+Remaining routes (large attendance, leave management, accounting operational, employee detail/create, several settings and recruitment forms) render through the legacy bridge and inherit v2 tokens, radii, elevation, focus, buttons, tables, inputs and dark mode, but still carry page-local utility markup. Migrate them to primitives page by page, then delete the corresponding bridge rules. See the completion report for the exact list.

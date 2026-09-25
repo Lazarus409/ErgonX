@@ -1,11 +1,398 @@
 @import "tailwindcss";
 
+/*
+ * ErgonX Design System v2 — global theme.
+ *
+ * Layers, in order:
+ *   1. Raw brand palette and semantic role variables (light + dark).
+ *   2. Tailwind v4 theme registration so roles become utilities
+ *      (bg-surface, text-ink-muted, border-line, bg-mod-payroll-soft, ...).
+ *   3. Legacy bridge: re-tunes the default slate scale, radii and shadows so
+ *      not-yet-migrated routes inherit the v2 palette, plus the dark-mode
+ *      compatibility patch for legacy utilities. New code must use the
+ *      semantic roles; see docs/frontend/design-system-v2.md.
+ */
+
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* -------------------------------------------------------------------------- */
+/* 1. Brand palette and semantic roles                                         */
+/* -------------------------------------------------------------------------- */
+
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  /* Brand */
+  --brand-navy: #0f2345;
+  --brand-navy-deep: #08172f;
+  --brand-ink: #23324d;
+  --brand-primary: #2f6bff;
+  --accent-teal: #14d2b8;
+  --accent-aqua: #22d3ee;
+  --accent-sky: #38bdf8;
+  --accent-blue: #2f6bff;
+  --accent-violet: #7c5cff;
+  --gradient-signature: linear-gradient(120deg, var(--accent-teal) 0%, var(--accent-aqua) 30%, var(--accent-blue) 68%, var(--accent-violet) 100%);
+
+  /* Surfaces */
+  --canvas: #f5f7fb;
+  --surface: #ffffff;
+  --surface-muted: #eef3fa;
+  --surface-sunken: #e7edf6;
+  --surface-hover: #f3f6fb;
+  --surface-inverse: #0f2345;
+  --overlay: rgb(8 23 47 / 0.48);
+
+  /* Text */
+  --ink-strong: #0f2345;
+  --ink: #23324d;
+  --ink-muted: #56657f;
+  --ink-subtle: #8290a8;
+  --ink-inverse: #ffffff;
+
+  /* Lines */
+  --line: #d9e2ef;
+  --line-soft: #e6ecf5;
+  --line-strong: #c2cedf;
+
+  /* Interactive */
+  --primary: #2f6bff;
+  --primary-hover: #1f58e6;
+  --primary-active: #1a4bc4;
+  --primary-soft: #e9f0ff;
+  --primary-ink: #1d4ed8;
+  --focus-ring: rgb(47 107 255 / 0.45);
+
+  /* Feedback */
+  --success: #0e9f6e;
+  --success-soft: #e6f7ef;
+  --success-ink: #067a53;
+  --warning: #d97706;
+  --warning-soft: #fdf3e2;
+  --warning-ink: #9a5200;
+  --danger: #e11d48;
+  --danger-soft: #fdecef;
+  --danger-ink: #b0123a;
+  --info: #0891b2;
+  --info-soft: #e5f6fa;
+  --info-ink: #0b6d88;
+  --neutral-soft: #eef2f7;
+  --neutral-ink: #4a5a76;
+
+  /* Module accents */
+  --mod-hr: #4f5bf0;
+  --mod-hr-soft: #eceefe;
+  --mod-recruitment: #7c5cff;
+  --mod-recruitment-soft: #f1edff;
+  --mod-leave: #0d9f8f;
+  --mod-leave-soft: #e3f7f4;
+  --mod-attendance: #0891b2;
+  --mod-attendance-soft: #e3f5fa;
+  --mod-payroll: #d68a00;
+  --mod-payroll-soft: #fdf4e1;
+  --mod-accounting: #059669;
+  --mod-accounting-soft: #e3f6ee;
+  --mod-reports: #5b5bf0;
+  --mod-reports-soft: #eeeefe;
+  --mod-audit: #be3455;
+  --mod-audit-soft: #fbeef1;
+  --mod-settings: #23324d;
+  --mod-settings-soft: #edf1f7;
+
+  /* Chart series (validated against both canvases) */
+  --chart-1: #2f6bff;
+  --chart-2: #14b8a6;
+  --chart-3: #7c5cff;
+  --chart-4: #f59e0b;
+  --chart-5: #0ea5e9;
+  --chart-6: #e11d48;
+  --chart-grid: #e6ecf5;
+  --chart-axis: #8290a8;
+
+  /* Elevation (navy-tinted, never pure black) */
+  --elevation-1: 0 1px 2px rgb(15 35 69 / 0.05), 0 1px 3px rgb(15 35 69 / 0.04);
+  --elevation-2: 0 2px 4px rgb(15 35 69 / 0.04), 0 6px 16px -4px rgb(15 35 69 / 0.08);
+  --elevation-3: 0 4px 8px rgb(15 35 69 / 0.05), 0 16px 32px -8px rgb(15 35 69 / 0.14);
+  --elevation-overlay: 0 24px 64px -16px rgb(8 23 47 / 0.32), 0 4px 12px rgb(8 23 47 / 0.08);
+
+  /* Motion */
+  --duration-quick: 140ms;
+  --duration-standard: 200ms;
+  --duration-emphasis: 300ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasis: cubic-bezier(0.3, 0, 0, 1.15);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  /* Shell */
+  --shell-sidebar-expanded: 17rem;
+  --shell-sidebar-collapsed: 5rem;
+  --shell-topbar: 4rem;
+
+  color-scheme: light;
 }
+
+.dark {
+  --canvas: #07132a;
+  --surface: #0d1c37;
+  --surface-muted: #122647;
+  --surface-sunken: #0a1831;
+  --surface-hover: #15294c;
+  --surface-inverse: #e9eef7;
+  --overlay: rgb(2 8 20 / 0.66);
+
+  --ink-strong: #f2f5fb;
+  --ink: #d3dcec;
+  --ink-muted: #9aa9c3;
+  --ink-subtle: #6f82a3;
+  --ink-inverse: #0f2345;
+
+  --line: #20365c;
+  --line-soft: #192d4f;
+  --line-strong: #2d4773;
+
+  --primary: #5687ff;
+  --primary-hover: #7aa1ff;
+  --primary-active: #3f74f5;
+  --primary-soft: rgb(86 135 255 / 0.16);
+  --primary-ink: #a9c2ff;
+  --focus-ring: rgb(122 161 255 / 0.55);
+
+  --success: #2cc98e;
+  --success-soft: rgb(44 201 142 / 0.14);
+  --success-ink: #6fe0b4;
+  --warning: #f5a524;
+  --warning-soft: rgb(245 165 36 / 0.14);
+  --warning-ink: #fcc96d;
+  --danger: #fb5b7e;
+  --danger-soft: rgb(251 91 126 / 0.14);
+  --danger-ink: #ff9bb1;
+  --info: #22c3e6;
+  --info-soft: rgb(34 195 230 / 0.14);
+  --info-ink: #7ddcf0;
+  --neutral-soft: rgb(154 169 195 / 0.14);
+  --neutral-ink: #b8c4d8;
+
+  --mod-hr: #8189ff;
+  --mod-hr-soft: rgb(129 137 255 / 0.15);
+  --mod-recruitment: #a28bff;
+  --mod-recruitment-soft: rgb(162 139 255 / 0.15);
+  --mod-leave: #2dd4bf;
+  --mod-leave-soft: rgb(45 212 191 / 0.13);
+  --mod-attendance: #38bdf8;
+  --mod-attendance-soft: rgb(56 189 248 / 0.13);
+  --mod-payroll: #fbbf24;
+  --mod-payroll-soft: rgb(251 191 36 / 0.13);
+  --mod-accounting: #34d399;
+  --mod-accounting-soft: rgb(52 211 153 / 0.13);
+  --mod-reports: #8b8bff;
+  --mod-reports-soft: rgb(139 139 255 / 0.15);
+  --mod-audit: #f47a98;
+  --mod-audit-soft: rgb(244 122 152 / 0.14);
+  --mod-settings: #b8c4d8;
+  --mod-settings-soft: rgb(184 196 216 / 0.12);
+
+  --chart-1: #5f8fff;
+  --chart-2: #2dd4bf;
+  --chart-3: #a28bff;
+  --chart-4: #fbbf24;
+  --chart-5: #38bdf8;
+  --chart-6: #fb7191;
+  --chart-grid: #1c3155;
+  --chart-axis: #7d8fae;
+
+  --elevation-1: 0 1px 2px rgb(0 0 0 / 0.3);
+  --elevation-2: 0 2px 6px rgb(0 0 0 / 0.28), 0 8px 20px -6px rgb(0 0 0 / 0.36);
+  --elevation-3: 0 6px 14px rgb(0 0 0 / 0.3), 0 20px 40px -10px rgb(0 0 0 / 0.5);
+  --elevation-overlay: 0 28px 72px -16px rgb(0 0 0 / 0.66), 0 4px 12px rgb(0 0 0 / 0.3);
+
+  color-scheme: dark;
+}
+
+/* -------------------------------------------------------------------------- */
+/* 2. Tailwind theme registration                                              */
+/* -------------------------------------------------------------------------- */
+
+@theme inline {
+  --font-sans: var(--font-brand), ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  --color-brand-navy: var(--brand-navy);
+  --color-brand-navy-deep: var(--brand-navy-deep);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-primary: var(--brand-primary);
+  --color-accent-teal: var(--accent-teal);
+  --color-accent-aqua: var(--accent-aqua);
+  --color-accent-sky: var(--accent-sky);
+  --color-accent-blue: var(--accent-blue);
+  --color-accent-violet: var(--accent-violet);
+
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-inverse: var(--surface-inverse);
+  --color-overlay: var(--overlay);
+
+  --color-ink-strong: var(--ink-strong);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-subtle: var(--ink-subtle);
+  --color-ink-inverse: var(--ink-inverse);
+
+  --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
+  --color-line-strong: var(--line-strong);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-active: var(--primary-active);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-ink: var(--primary-ink);
+
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-success-ink: var(--success-ink);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-ink: var(--warning-ink);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-ink: var(--danger-ink);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-info-ink: var(--info-ink);
+  --color-neutral-soft: var(--neutral-soft);
+  --color-neutral-ink: var(--neutral-ink);
+
+  --color-mod-hr: var(--mod-hr);
+  --color-mod-hr-soft: var(--mod-hr-soft);
+  --color-mod-recruitment: var(--mod-recruitment);
+  --color-mod-recruitment-soft: var(--mod-recruitment-soft);
+  --color-mod-leave: var(--mod-leave);
+  --color-mod-leave-soft: var(--mod-leave-soft);
+  --color-mod-attendance: var(--mod-attendance);
+  --color-mod-attendance-soft: var(--mod-attendance-soft);
+  --color-mod-payroll: var(--mod-payroll);
+  --color-mod-payroll-soft: var(--mod-payroll-soft);
+  --color-mod-accounting: var(--mod-accounting);
+  --color-mod-accounting-soft: var(--mod-accounting-soft);
+  --color-mod-reports: var(--mod-reports);
+  --color-mod-reports-soft: var(--mod-reports-soft);
+  --color-mod-audit: var(--mod-audit);
+  --color-mod-audit-soft: var(--mod-audit-soft);
+  --color-mod-settings: var(--mod-settings);
+  --color-mod-settings-soft: var(--mod-settings-soft);
+
+  --shadow-elevation-1: var(--elevation-1);
+  --shadow-elevation-2: var(--elevation-2);
+  --shadow-elevation-3: var(--elevation-3);
+  --shadow-overlay: var(--elevation-overlay);
+}
+
+@theme {
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasis: cubic-bezier(0.3, 0, 0, 1.15);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  /* Type scale: size / line-height / weight intent */
+  --text-display: 2rem;
+  --text-display--line-height: 2.5rem;
+  --text-title: 1.75rem;
+  --text-title--line-height: 2.25rem;
+  --text-heading: 1.1875rem;
+  --text-heading--line-height: 1.625rem;
+  --text-card-title: 0.9375rem;
+  --text-card-title--line-height: 1.375rem;
+  --text-body: 0.9375rem;
+  --text-body--line-height: 1.5rem;
+  --text-support: 0.8125rem;
+  --text-support--line-height: 1.25rem;
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1rem;
+  --text-kpi: 1.875rem;
+  --text-kpi--line-height: 2.25rem;
+  --text-kpi-sm: 1.375rem;
+  --text-kpi-sm--line-height: 1.75rem;
+
+  /* Radius scale. The legacy lg/xl/2xl/3xl names are re-tuned onto v2 steps. */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.625rem;   /* v2 small  ~10px */
+  --radius-xl: 0.875rem;   /* v2 medium ~14px */
+  --radius-2xl: 1.125rem;  /* v2 large  ~18px */
+  --radius-3xl: 1.375rem;  /* v2 hero   ~22px */
+
+  /* Legacy shadow names re-tuned onto navy-tinted elevation. */
+  --shadow-sm: 0 1px 2px rgb(15 35 69 / 0.05), 0 1px 3px rgb(15 35 69 / 0.04);
+  --shadow-md: 0 2px 4px rgb(15 35 69 / 0.04), 0 6px 16px -4px rgb(15 35 69 / 0.08);
+  --shadow-lg: 0 4px 8px rgb(15 35 69 / 0.05), 0 16px 32px -8px rgb(15 35 69 / 0.14);
+  --shadow-xl: 0 24px 56px -16px rgb(8 23 47 / 0.28), 0 4px 12px rgb(8 23 47 / 0.06);
+  --shadow-2xl: 0 32px 72px -18px rgb(8 23 47 / 0.36);
+
+  /* Legacy neutral scale re-tuned to navy-tinted brand neutrals. */
+  --color-slate-50: #f5f7fb;
+  --color-slate-100: #eef3fa;
+  --color-slate-200: #d9e2ef;
+  --color-slate-300: #c2cedf;
+  --color-slate-400: #8e9bb3;
+  --color-slate-500: #5f6e89;
+  --color-slate-600: #4a5a76;
+  --color-slate-700: #34445f;
+  --color-slate-800: #23324d;
+  --color-slate-900: #172a4b;
+  --color-slate-950: #0f2345;
+
+  --animate-fade-in: fade-in var(--duration-standard) var(--ease-standard) both;
+  --animate-pop-in: pop-in var(--duration-standard) var(--ease-standard) both;
+  --animate-slide-up: slide-up var(--duration-emphasis) var(--ease-standard) both;
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-splash-pulse: splash-pulse 1.8s var(--ease-standard) infinite;
+}
+
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pop-in { from { opacity: 0; transform: translateY(-4px) scale(0.98); } to { opacity: 1; transform: none; } }
+@keyframes slide-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@keyframes splash-pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(0.94); opacity: 0.82; } }
+@keyframes drawer-in-right { from { transform: translateX(100%); } to { transform: none; } }
+@keyframes drawer-in-left { from { transform: translateX(-100%); } to { transform: none; } }
+
+/*
+ * Tailwind v4 defaults bare `border`/`divide` to currentColor. ErgonX uses the
+ * soft semantic line instead so unqualified borders read as calm dividers.
+ */
+@layer base {
+  *, ::after, ::before, ::backdrop, ::file-selector-button {
+    border-color: var(--line);
+  }
+
+  /*
+   * Table baseline for routes not yet on <DataTable>. Utilities on the page
+   * still win; these rules only supply calm defaults the markup omits.
+   */
+  table { font-variant-numeric: tabular-nums; }
+  thead th { color: var(--ink-muted); font-weight: 600; }
+  tbody tr { transition: background-color var(--duration-quick) var(--ease-standard); }
+  main tbody tr:hover { background-color: var(--surface-hover); }
+  td { color: var(--ink); }
+
+  /* Native form-control baseline for routes not yet on <Field>/<Input>. */
+  :where(input:not([type="checkbox"], [type="radio"], [type="file"], [type="range"], [type="color"]), select, textarea) {
+    background-color: var(--surface);
+    color: var(--ink-strong);
+    transition: border-color var(--duration-quick) var(--ease-standard), box-shadow var(--duration-quick) var(--ease-standard);
+  }
+  :where(input, textarea)::placeholder { color: var(--ink-subtle); }
+  :where(input:not([type="checkbox"], [type="radio"], [type="file"]), select, textarea):focus-visible {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 4px rgb(47 107 255 / 0.15);
+  }
+  :where(input[type="checkbox"], input[type="radio"]) { accent-color: var(--primary); }
+  label { color: inherit; }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Base                                                                        */
+/* -------------------------------------------------------------------------- */
 
 html,
 body {
@@ -14,6 +401,156 @@ body {
 
 body {
   margin: 0;
-  background: #f8fafc;
-  color: #0f172a;
+  background: var(--canvas);
+  color: var(--ink);
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+:root { --scrollbar-thumb: #9aa7bd; --scrollbar-thumb-hover: #6f7f9b; }
+.dark { --scrollbar-thumb: #34507c; --scrollbar-thumb-hover: #4a6a9c; }
+
+* { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border: 3px solid transparent; border-radius: 999px; background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+
+/* Controls advertise whether they act. */
+button:not(:disabled),
+a[href],
+select:not(:disabled),
+summary,
+[role="button"]:not([aria-disabled="true"]),
+input[type="checkbox"]:not(:disabled),
+input[type="radio"]:not(:disabled),
+input[type="file"]:not(:disabled),
+label:has(input[type="checkbox"]),
+label:has(input[type="radio"]) {
+  cursor: pointer;
+}
+
+button:disabled,
+select:disabled,
+input:disabled,
+textarea:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+:where(a[href], button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+::selection { background: rgb(47 107 255 / 0.2); }
+
+.bg-signature { background-image: var(--gradient-signature); }
+.text-signature {
+  background-image: var(--gradient-signature);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-muted) 0%, var(--surface-hover) 40%, var(--surface-muted) 80%);
+  background-size: 200% 100%;
+  animation: var(--animate-shimmer);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media print {
+  /* Official documents always print on light, neutral tokens. */
+  html.dark {
+    --canvas: #ffffff; --surface: #ffffff; --surface-muted: #f5f7fb; --surface-sunken: #eef3fa; --surface-hover: #ffffff;
+    --ink-strong: #0f2345; --ink: #23324d; --ink-muted: #56657f; --ink-subtle: #8290a8;
+    --line: #d9e2ef; --line-soft: #e6ecf5; --line-strong: #c2cedf;
+    color-scheme: light;
+  }
+  body { background: #fff; color: #000; }
+  [data-shell-chrome] { display: none !important; }
+  [data-shell-main] { padding: 0 !important; }
+}
+
+/* -------------------------------------------------------------------------- */
+/* 3. Legacy bridge (temporary; remove as routes migrate to primitives)        */
+/* -------------------------------------------------------------------------- */
+
+/* Legacy dark-navy primary CTAs adopt the v2 primary action colour. */
+:is(button, a).bg-slate-900:not(:disabled),
+:is(button, a).bg-slate-950:not(:disabled) {
+  background-color: var(--primary);
+}
+:is(button, a).bg-slate-900:not(:disabled):hover,
+:is(button, a).bg-slate-950:not(:disabled):hover {
+  background-color: var(--primary-hover);
+}
+
+/* v2 avoids small all-caps labels; legacy micro-labels become sentence case. */
+main :is(.text-xs, .text-\[10px\], .text-\[11px\]).uppercase {
+  text-transform: none;
+  letter-spacing: 0.005em;
+}
+
+/* Legacy modal scrims adopt the overlay token. */
+.fixed.inset-0:is(.bg-black\/30, .bg-black\/40, .bg-slate-950\/40, .bg-slate-950\/45) {
+  background-color: var(--overlay);
+  backdrop-filter: blur(2px);
+}
+
+/* Legacy utilities in dark mode map onto semantic roles. */
+html.dark .bg-white,
+html.dark .bg-white\/95,
+html.dark .bg-white\/60 { background-color: var(--surface); }
+html.dark .bg-slate-50,
+html.dark .bg-slate-50\/70,
+html.dark .bg-slate-50\/90 { background-color: var(--surface-muted); }
+html.dark .bg-slate-100 { background-color: var(--surface-sunken); }
+html.dark .bg-slate-200 { background-color: var(--line); }
+html.dark .hover\:bg-slate-50:hover,
+html.dark .hover\:bg-slate-100:hover { background-color: var(--surface-hover); }
+html.dark .text-slate-950,
+html.dark .text-slate-900 { color: var(--ink-strong); }
+html.dark .text-slate-800,
+html.dark .text-slate-700 { color: var(--ink); }
+html.dark .text-slate-600,
+html.dark .text-slate-500 { color: var(--ink-muted); }
+html.dark .text-slate-400 { color: var(--ink-subtle); }
+html.dark .hover\:text-slate-900:hover,
+html.dark .hover\:text-slate-950:hover { color: var(--ink-strong); }
+html.dark .border-slate-100,
+html.dark .border-slate-200,
+html.dark .border-slate-300,
+html.dark .border-slate-200\/90 { border-color: var(--line); }
+html.dark .border-slate-400 { border-color: var(--line-strong); }
+html.dark .divide-slate-100 > :not(:last-child),
+html.dark .divide-slate-200 > :not(:last-child) { border-color: var(--line-soft); }
+html.dark .ring-slate-100,
+html.dark .ring-slate-200 { --tw-ring-color: var(--line); }
+html.dark :is(.bg-emerald-50, .bg-emerald-100, .bg-green-50, .bg-green-100, .bg-teal-50, .bg-teal-100) { background-color: var(--success-soft); }
+html.dark :is(.bg-amber-50, .bg-amber-100, .bg-yellow-50, .bg-yellow-100, .bg-orange-50, .bg-orange-100) { background-color: var(--warning-soft); }
+html.dark :is(.bg-red-50, .bg-red-100, .bg-rose-50, .bg-rose-100) { background-color: var(--danger-soft); }
+html.dark :is(.bg-sky-50, .bg-sky-100, .bg-blue-50, .bg-blue-100, .bg-cyan-50, .bg-cyan-100, .bg-indigo-50, .bg-indigo-100, .bg-violet-50, .bg-violet-100, .bg-purple-50, .bg-purple-100) { background-color: var(--primary-soft); }
+html.dark :is(.border-emerald-100, .border-emerald-200, .border-emerald-300, .border-green-200, .border-teal-200) { border-color: color-mix(in srgb, var(--success) 35%, var(--line)); }
+html.dark :is(.border-amber-100, .border-amber-200, .border-amber-300, .border-yellow-200, .border-orange-200) { border-color: color-mix(in srgb, var(--warning) 35%, var(--line)); }
+html.dark :is(.border-red-100, .border-red-200, .border-red-300, .border-rose-100, .border-rose-200, .border-rose-300) { border-color: color-mix(in srgb, var(--danger) 35%, var(--line)); }
+html.dark :is(.border-sky-100, .border-sky-200, .border-sky-300, .border-sky-400, .border-blue-200, .border-cyan-200, .border-indigo-200, .border-violet-100, .border-violet-200) { border-color: color-mix(in srgb, var(--primary) 40%, var(--line)); }
+html.dark :is(.text-emerald-600, .text-emerald-700, .text-emerald-800, .text-emerald-900, .text-emerald-950, .text-green-600, .text-green-700, .text-teal-700) { color: var(--success-ink); }
+html.dark :is(.text-amber-600, .text-amber-700, .text-amber-800, .text-amber-900, .text-amber-950, .text-orange-700, .text-yellow-800) { color: var(--warning-ink); }
+html.dark :is(.text-red-600, .text-red-700, .text-red-800, .text-red-900, .text-rose-600, .text-rose-700, .text-rose-800, .text-rose-900) { color: var(--danger-ink); }
+html.dark :is(.text-sky-600, .text-sky-700, .text-sky-800, .text-sky-900, .text-blue-600, .text-blue-700, .text-indigo-600, .text-indigo-700, .text-indigo-950, .text-cyan-700, .text-violet-700, .text-emerald-950) { color: var(--primary-ink); }
+html.dark :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]):not([data-ui]) {
+  background-color: var(--surface-sunken);
+  color: var(--ink-strong);
+  border-color: var(--line-strong);
 }

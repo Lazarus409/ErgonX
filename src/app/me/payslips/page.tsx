@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { FileText } from "lucide-react";
+import { ArrowRight, CircleDollarSign, FileText } from "lucide-react";
 import { useCallback } from "react";
-import ErrorState from "@/components/ui/ErrorState";
+
+import { DataTable } from "@/components/ui/DataTable";
 import PageHeader from "@/components/ui/PageHeader";
 import { payrollApi } from "@/lib/api";
 import { formatAmount, formatDate } from "@/lib/format";
@@ -14,5 +15,25 @@ export default function MyPayslipsPage() {
   const load = useCallback(() => payrollApi.listPayslips({ page_size: MAX_PAGE_SIZE, ordering: "-generated_at" }), []);
   const { data, loading, error, reload } = useApiResource(load);
   const payslips = data?.results ?? [];
-  return <main className="space-y-6 p-4 md:p-6"><PageHeader title="My Payslips" description="View your available payroll statements." />{error && <ErrorState message={error} onRetry={reload} />}<section className="rounded-xl border bg-white"><div className="divide-y">{payslips.map((item) => <div key={item.id} className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"><div className="flex items-center gap-3"><div className="rounded-lg bg-slate-100 p-3"><FileText size={20} /></div><div><p className="font-semibold">{item.payroll_period.name}</p><p className="text-sm text-slate-500">Pay date: {formatDate(item.payroll_period.pay_date)} · Net: {formatAmount(item.payload.net_pay, item.payload.currency)}</p></div></div><Link href={`/payroll/payslips/${item.id}`} className="rounded-lg border px-4 py-2 text-center text-sm font-medium">View</Link></div>)}{loading && <p className="p-10 text-center text-sm text-slate-500">Loading payslips...</p>}{!loading && !payslips.length && <p className="p-10 text-center text-sm text-slate-500">No payslips are available yet.</p>}</div></section></main>;
+  return (
+    <div className="mx-auto max-w-5xl space-y-6">
+      <PageHeader title="My payslips" description="View your available payroll statements." icon={CircleDollarSign} accent="payroll" />
+      <DataTable
+        caption="My payslips"
+        rows={payslips}
+        rowKey={(item) => item.id}
+        loading={loading && !data}
+        error={error}
+        onRetry={reload}
+        minWidth={560}
+        empty={{ title: "No payslips yet", description: "Your payslips appear here after your first finalized payroll.", icon: FileText }}
+        columns={[
+          { key: "period", header: "Period", sortValue: (item) => item.payroll_period.pay_date, cell: (item) => <span className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-lg bg-mod-payroll-soft text-mod-payroll" aria-hidden="true"><FileText className="h-4 w-4" /></span><span className="font-semibold text-ink-strong">{item.payroll_period.name}</span></span> },
+          { key: "paydate", header: "Pay date", sortValue: (item) => item.payroll_period.pay_date, cell: (item) => formatDate(item.payroll_period.pay_date) },
+          { key: "net", header: "Net pay", numeric: true, sortValue: (item) => Number(item.payload.net_pay), cell: (item) => <span className="font-semibold text-ink-strong">{formatAmount(item.payload.net_pay, item.payload.currency)}</span> },
+          { key: "view", header: <span className="sr-only">View</span>, cell: (item) => <div className="flex justify-end"><Link href={`/payroll/payslips/${item.id}`} className="inline-flex h-8 items-center gap-1 rounded-lg px-2.5 text-support font-semibold text-primary-ink hover:bg-primary-soft">View<ArrowRight className="h-3.5 w-3.5" aria-hidden="true" /></Link></div> },
+        ]}
+      />
+    </div>
+  );
 }

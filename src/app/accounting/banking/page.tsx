@@ -126,7 +126,7 @@ export default function BankingPage() {
     }
   };
   return (
-    <main className="space-y-6">
+    <div className="space-y-6">
       <PageHeader
         title="Banking & Cash"
         description="Manage bank accounts and payment or receipt references."
@@ -289,7 +289,7 @@ export default function BankingPage() {
           onConfirm={() => void voidTransaction()}
         />
       )}
-    </main>
+    </div>
   );
 }
 type CashForm = {

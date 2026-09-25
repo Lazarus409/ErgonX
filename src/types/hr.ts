@@ -50,6 +50,7 @@ export interface Employee {
   personal_email: string;
   work_email: string;
   phone: string;
+  avatar_key: string;
   date_of_birth: string | null;
   gender: Gender | string;
   hire_date: string;
@@ -67,6 +68,7 @@ export interface EmployeePayload {
   personal_email?: string;
   work_email?: string;
   phone?: string;
+  avatar_key?: string;
   date_of_birth?: string | null;
   gender?: Gender | string;
   hire_date: string;

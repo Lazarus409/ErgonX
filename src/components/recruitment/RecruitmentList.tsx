@@ -1,11 +1,10 @@
 "use client";
 
-import Link from "next/link";
-import { Search } from "lucide-react";
+import { Plus, UsersRound } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
-import ErrorState from "@/components/ui/ErrorState";
-import LoadingState from "@/components/ui/LoadingState";
+import { ButtonLink } from "@/components/ui/Button";
+import { DataTable, DataToolbar } from "@/components/ui/DataTable";
 import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { getApiErrorMessage } from "@/lib/api";
@@ -49,15 +48,28 @@ export default function RecruitmentList<T extends { id: string; status: string }
 
   return (
     <div className="space-y-6">
-      <PageHeader title={title} description={description} actions={createHref && createLabel ? <Link href={createHref} className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white">{createLabel}</Link> : undefined} />
-      <div className="flex gap-3 rounded-xl border border-slate-200 bg-white p-3">
-        <Search className="mt-2 h-4 w-4 text-slate-400" />
-        <input value={search} onChange={(event) => setSearch(event.target.value)} onKeyDown={(event) => event.key === "Enter" && void refresh()} placeholder={`Search ${title.toLowerCase()}…`} className="min-w-0 flex-1 bg-transparent py-1 text-sm outline-none" />
-        <button type="button" onClick={() => void refresh()} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700">Search</button>
-      </div>
-      {error && <ErrorState message={error} onRetry={() => void refresh()} />}
-      {!data && !error && <LoadingState />}
-      {data && <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white"><table className="w-full min-w-[700px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-slate-500">{columns.map((column) => <th key={column.label} className="px-5 py-3 font-medium">{column.label}</th>)}<th className="px-5 py-3 font-medium">Status</th></tr></thead><tbody>{data.results.length === 0 ? <tr><td colSpan={columns.length + 1} className="px-5 py-10 text-center text-slate-500">No records found.</td></tr> : data.results.map((item) => <tr key={item.id} className="border-b border-slate-100 last:border-0">{columns.map((column) => <td key={column.label} className="px-5 py-4 text-slate-700">{column.render(item)}</td>)}<td className="px-5 py-4"><StatusBadge status={item.status} /></td></tr>)}</tbody></table></div>}
+      <PageHeader
+        eyebrow="Recruitment"
+        title={title}
+        description={description}
+        icon={UsersRound}
+        accent="recruitment"
+        actions={createHref && createLabel ? <ButtonLink href={createHref} leadingIcon={<Plus className="h-4 w-4" />}>{createLabel}</ButtonLink> : undefined}
+      />
+      <DataTable<T>
+        caption={title}
+        rows={data?.results}
+        rowKey={(item) => item.id}
+        loading={!data && !error}
+        error={error}
+        onRetry={() => void refresh()}
+        toolbar={<DataToolbar search={search} onSearchChange={setSearch} searchPlaceholder={`Search ${title.toLowerCase()}…`} />}
+        empty={{ title: "No records found", description: search ? "Try a different search term." : undefined }}
+        columns={[
+          ...columns.map((column) => ({ key: column.label, header: column.label, cell: column.render })),
+          { key: "status", header: "Status", cell: (item: T) => <StatusBadge status={item.status} size="sm" /> },
+        ]}
+      />
     </div>
   );
 }

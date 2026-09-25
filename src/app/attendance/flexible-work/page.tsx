@@ -197,7 +197,7 @@ export default function FlexibleWorkPage() {
   };
 
   return (
-    <main className="space-y-6">
+    <div className="space-y-6">
       <section className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <p className="text-sm font-medium text-slate-500">
@@ -486,7 +486,7 @@ export default function FlexibleWorkPage() {
           </div>
         </div>
       )}
-    </main>
+    </div>
   );
 }
 

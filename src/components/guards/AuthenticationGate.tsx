@@ -7,7 +7,7 @@ import LoadingState from "@/components/ui/LoadingState";
 
 /** Keeps authenticated application shells out of anonymous sessions. */
 export default function AuthenticationGate({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, loading } = useAuth();
+  const { bootstrap, isAuthenticated, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -15,8 +15,8 @@ export default function AuthenticationGate({ children }: { children: React.React
     if (!loading && !isAuthenticated) {
       router.replace(`/login?next=${encodeURIComponent(pathname || "/")}`);
     }
-  }, [isAuthenticated, loading, pathname, router]);
+  }, [bootstrap, isAuthenticated, loading, pathname, router]);
 
-  if (loading || !isAuthenticated) return <LoadingState />;
+  if (loading || !isAuthenticated) return <LoadingState variant="splash" />;
   return <>{children}</>;
 }

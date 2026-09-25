@@ -1,29 +1,19 @@
-"use client";
-
 import { LockKeyhole } from "lucide-react";
 
-interface ModuleDisabledProps {
-  moduleName: string;
-}
+import { ButtonLink } from "@/components/ui/Button";
 
-export default function ModuleDisabled({
-  moduleName,
-}: ModuleDisabledProps) {
+export default function ModuleDisabled({ moduleName }: { moduleName: string }) {
   return (
-    <div className="flex min-h-[360px] items-center justify-center rounded-2xl border bg-white p-6">
+    <div className="flex min-h-[420px] items-center justify-center rounded-3xl border border-line bg-surface p-6 shadow-elevation-1">
       <div className="max-w-md text-center">
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-          <LockKeyhole className="h-5 w-5 text-slate-600" />
-        </div>
-
-        <h2 className="mt-4 text-lg font-semibold text-slate-900">
-          Module not enabled
-        </h2>
-
-        <p className="mt-2 text-sm leading-6 text-slate-500">
-          The {moduleName} module is not enabled for the active institution.
-          Contact an institution administrator if this module is required.
+        <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-neutral-soft text-neutral-ink" aria-hidden="true">
+          <LockKeyhole className="h-6 w-6" />
+        </span>
+        <h2 className="mt-5 text-heading font-semibold text-ink-strong">{moduleName} isn&apos;t enabled</h2>
+        <p className="mt-2 text-support text-ink-muted">
+          The {moduleName} module is not enabled for the active institution. Contact an institution administrator if this module is required.
         </p>
+        <ButtonLink href="/" variant="secondary" className="mt-6">Return home</ButtonLink>
       </div>
     </div>
   );

@@ -1,5 +1,9 @@
 import Link from "next/link";
-import { ArrowRight, Mail, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, ShieldCheck } from "lucide-react";
+
+import AuthShell, { AuthHeading } from "@/components/brand/AuthShell";
+import Alert from "@/components/ui/Alert";
+import { ButtonLink } from "@/components/ui/Button";
 
 const steps = [
   ["Receive an invitation", "Your Super Admin, Institution Admin, or HR team sends an invitation to your work email."],
@@ -8,5 +12,28 @@ const steps = [
 ];
 
 export default function GetStartedPage() {
-  return <main className="min-h-screen bg-slate-50 px-5 py-8 text-slate-950 sm:px-8 sm:py-12"><div className="mx-auto max-w-3xl"><Link href="/login" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 transition hover:text-slate-950">← Back to sign in</Link><section className="mt-6 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-xl shadow-slate-200/60"><div className="bg-slate-950 px-7 py-8 text-white sm:px-10"><p className="text-sm font-semibold tracking-[0.17em] text-sky-300">GET STARTED</p><h1 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">Get your ErgonX account.</h1><p className="mt-3 max-w-xl text-slate-300">ErgonX accounts are created through a secure invitation. It takes just a few steps.</p></div><div className="p-7 sm:p-10"><div className="space-y-6">{steps.map(([title, description], index) => <div key={title} className="flex gap-4"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-50 text-sm font-bold text-sky-700">{index + 1}</span><div><h2 className="font-semibold text-slate-950">{title}</h2><p className="mt-1 text-sm leading-6 text-slate-600">{description}</p></div></div>)}</div><div className="mt-8 rounded-2xl border border-sky-100 bg-sky-50 p-5"><div className="flex gap-3"><Mail className="mt-0.5 h-5 w-5 shrink-0 text-sky-700" /><div><p className="font-semibold text-slate-950">Need an invitation?</p><p className="mt-1 text-sm leading-6 text-slate-600">Contact your organization&apos;s administrator. New organizations must be invited by an ErgonX Super Admin.</p></div></div></div><div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><p className="flex items-center gap-2 text-sm text-slate-500"><ShieldCheck className="h-4 w-4 text-emerald-600" />Invitation links are secure and single-use.</p><Link href="/login" className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800">Go to sign in <ArrowRight className="h-4 w-4" /></Link></div></div></section></div></main>;
+  return (
+    <AuthShell>
+      <Link href="/login" className="mb-8 inline-flex items-center gap-2 text-support font-semibold text-ink-muted hover:text-ink-strong"><ArrowLeft className="h-4 w-4" aria-hidden="true" />Back to sign in</Link>
+      <AuthHeading eyebrow="Get started" title="Get your ErgonX account." description="ErgonX accounts are created through a secure invitation. It takes just a few steps." />
+      <ol className="space-y-5">
+        {steps.map(([title, description], index) => (
+          <li key={title} className="flex gap-4">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-sm font-bold text-primary-ink">{index + 1}</span>
+            <div>
+              <h2 className="font-semibold text-ink-strong">{title}</h2>
+              <p className="mt-0.5 text-support text-ink-muted">{description}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+      <Alert tone="info" title="Need an invitation?" className="mt-8">
+        Contact your organization&apos;s administrator. New organizations must be invited by an ErgonX Super Admin.
+      </Alert>
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="flex items-center gap-2 text-support text-ink-muted"><ShieldCheck className="h-4 w-4 text-success" aria-hidden="true" />Invitation links are secure and single-use.</p>
+        <ButtonLink href="/login" trailingIcon={<ArrowRight className="h-4 w-4" />}>Go to sign in</ButtonLink>
+      </div>
+    </AuthShell>
+  );
 }

@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
-  ArrowLeft,
   BriefcaseBusiness,
   CalendarDays,
   FileText,
@@ -18,12 +17,17 @@ import {
   Plus,
   Trash2,
   X,
+  Download,
+  Upload,
 } from "lucide-react";
 
 import StatusBadge from "@/components/ui/StatusBadge";
 import ErrorState from "@/components/ui/ErrorState";
 import LoadingState from "@/components/ui/LoadingState";
+import BackNavigation from "@/components/ui/BackNavigation";
 import { employeesApi, getApiErrorMessage, organizationApi } from "@/lib/api";
+import { operationsApi } from "@/lib/api";
+import type { DocumentRecord } from "@/types/operations";
 import type { OrganizationLookups } from "@/lib/api/organization";
 import type {
   EmergencyContact as ApiEmergencyContact,
@@ -342,6 +346,11 @@ export default function EmployeeDetailPage() {
   });
   const [lifecycle, setLifecycle] = useState<EmployeeLifecycle | null>(null);
   const [lifecycleSaving, setLifecycleSaving] = useState(false);
+  const [documents, setDocuments] = useState<DocumentRecord[]>([]);
+  const [documentsError, setDocumentsError] = useState<string | null>(null);
+  const [documentUploading, setDocumentUploading] = useState(false);
+  const [documentProgress, setDocumentProgress] = useState(0);
+  const [documentActionId, setDocumentActionId] = useState<string | null>(null);
 
   const updateField = (field: keyof EmployeeView, value: string) => {
     setFormData((current) => ({
@@ -358,12 +367,13 @@ export default function EmployeeDetailPage() {
       setLoadError(null);
 
       try {
-        const [record, history, referenceData, contacts, lifecycleData] = await Promise.all([
+        const [record, history, referenceData, contacts, lifecycleData, documentData] = await Promise.all([
           employeesApi.getEmployee(params.id),
           employeesApi.listEmploymentHistory(params.id),
           organizationApi.loadOrganizationLookups(),
           employeesApi.listEmergencyContacts(params.id),
           employeesApi.getEmployeeLifecycle(params.id),
+          operationsApi.listDocuments({ entity_type: "employees.Employee", entity_id: params.id, is_active: true, page_size: 100 }),
         ]);
         const currentEmployment = history.results.find(
           (employment) => employment.is_current,
@@ -380,9 +390,12 @@ export default function EmployeeDetailPage() {
         setLookups(referenceData);
         setEmergencyContacts(contacts.results.map(toEmergencyContactView));
         setLifecycle(lifecycleData);
+        setDocuments(documentData.results);
+        setDocumentsError(null);
       } catch (caught) {
         if (active) {
           setLoadError(getApiErrorMessage(caught));
+          setDocumentsError(getApiErrorMessage(caught));
         }
       } finally {
         if (active) {
@@ -397,6 +410,61 @@ export default function EmployeeDetailPage() {
       active = false;
     };
   }, [params.id]);
+
+  const uploadEmployeeDocument = async (file: File | undefined) => {
+    if (!file) return;
+    if (!["application/pdf", "image/jpeg", "image/png"].includes(file.type)) {
+      setDocumentsError("Employee documents must be PDF, JPEG, or PNG files.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setDocumentsError("Employee documents must be 10 MB or smaller.");
+      return;
+    }
+    setDocumentUploading(true);
+    setDocumentProgress(0);
+    setDocumentsError(null);
+    try {
+      const uploaded = await operationsApi.uploadDocument(
+        file,
+        { category: "EMPLOYEE_DOCUMENT", classification: "CONFIDENTIAL", entity_type: "employees.Employee", entity_id: params.id },
+        setDocumentProgress,
+      );
+      setDocuments((current) => [uploaded, ...current]);
+    } catch (caught) {
+      setDocumentsError(getApiErrorMessage(caught));
+    } finally {
+      setDocumentUploading(false);
+    }
+  };
+
+  const downloadEmployeeDocument = async (document: DocumentRecord) => {
+    try {
+      const blob = await operationsApi.downloadDocument(document.id);
+      const url = URL.createObjectURL(blob);
+      const anchor = window.document.createElement("a");
+      anchor.href = url;
+      anchor.download = document.original_filename;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (caught) {
+      setDocumentsError(getApiErrorMessage(caught));
+    }
+  };
+
+  const deactivateEmployeeDocument = async (document: DocumentRecord) => {
+    if (!window.confirm(`Deactivate ${document.original_filename}? It will remain in history but no longer be active.`)) return;
+    setDocumentActionId(document.id);
+    setDocumentsError(null);
+    try {
+      await operationsApi.deactivateDocument(document.id);
+      setDocuments((current) => current.filter((item) => item.id !== document.id));
+    } catch (caught) {
+      setDocumentsError(getApiErrorMessage(caught));
+    } finally {
+      setDocumentActionId(null);
+    }
+  };
 
   const startEditing = () => {
     if (!employee) return;
@@ -695,13 +763,7 @@ export default function EmployeeDetailPage() {
 
   return (
     <div className="space-y-6">
-      <Link
-        href="/hr/employees"
-        className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Back to Employees
-      </Link>
+      <BackNavigation fallback="/hr/employees" label="Back to Employees" />
 
       {savedMessage && (
         <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
@@ -1060,19 +1122,52 @@ export default function EmployeeDetailPage() {
           <SectionCard
             id="documents"
             title="Documents"
-            description="Employee documents will appear here when available."
+            description="Upload and review protected documents associated with this employee."
+            action={
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60">
+                <Upload className="h-4 w-4" />
+                {documentUploading ? `Uploading… ${documentProgress}%` : "Add Document"}
+                <input
+                  type="file"
+                  accept="application/pdf,image/jpeg,image/png"
+                  className="sr-only"
+                  disabled={documentUploading}
+                  onChange={(event) => {
+                    void uploadEmployeeDocument(event.target.files?.[0]);
+                    event.currentTarget.value = "";
+                  }}
+                />
+              </label>
+            }
           >
-            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 py-10 text-center">
-              <FileText className="h-10 w-10 text-slate-400" />
-
-              <h3 className="mt-3 font-medium text-slate-900">
-                No documents available
-              </h3>
-
-              <p className="mt-1 text-sm text-slate-500">
-                Employee documents will be displayed here.
-              </p>
-            </div>
+            {documentsError && <p className="mb-4 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{documentsError}</p>}
+            {documents.length === 0 ? (
+              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 py-10 text-center">
+                <FileText className="h-10 w-10 text-slate-400" />
+                <h3 className="mt-3 font-medium text-slate-900">No documents available</h3>
+                <p className="mt-1 text-sm text-slate-500">Add an employee document to make it available to authorized users.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100 rounded-xl border border-slate-200">
+                {documents.map((document) => (
+                  <div key={document.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-slate-900">{document.original_filename}</p>
+                      <p className="mt-1 text-xs text-slate-500">{document.category || "Employee document"} · {(document.size_bytes / 1024).toFixed(0)} KB · {new Date(document.created_at).toLocaleDateString("en-GB")}</p>
+                    </div>
+                    <div className="flex shrink-0 gap-2 self-start sm:self-auto">
+                      <button type="button" onClick={() => void downloadEmployeeDocument(document)} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" title="Download document">
+                        <Download className="h-4 w-4" />
+                        Download
+                      </button>
+                      <button type="button" onClick={() => void deactivateEmployeeDocument(document)} disabled={documentActionId === document.id} className="rounded-lg border border-rose-200 px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60">
+                        {documentActionId === document.id ? "Deactivating…" : "Deactivate"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </SectionCard>
 
           <SectionCard

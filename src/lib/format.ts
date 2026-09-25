@@ -79,12 +79,30 @@ export function formatAmount(
     return String(value);
   }
 
-  const formatted = numeric.toLocaleString("en-GB", {
+  const formatted = Math.abs(numeric).toLocaleString("en-GB", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
 
-  return currency ? `${currency} ${formatted}` : formatted;
+  if (!currency) {
+    return numeric < 0 ? `-${formatted}` : formatted;
+  }
+
+  // Keep one presentation contract for all monetary UI. The backend remains
+  // authoritative for the currency code; this map only controls its display
+  // symbol and falls back to the ISO code for an unknown currency.
+  const normalized = currency.toUpperCase();
+  const symbols: Record<string, string> = {
+    GHS: "GH₵",
+    USD: "$",
+    EUR: "€",
+    GBP: "£",
+    NGN: "₦",
+    KES: "KSh",
+  };
+  const symbol = symbols[normalized] ?? normalized;
+  const separator = symbol.length > 2 || normalized === "GHS" ? " " : "";
+  return `${numeric < 0 ? "-" : ""}${symbol}${separator}${formatted}`;
 }
 
 export function formatNumber(
@@ -110,4 +128,10 @@ export function humanizeEnum(value: string | null | undefined): string {
     .filter(Boolean)
     .map((word) => word[0].toUpperCase() + word.slice(1).toLowerCase())
     .join(" ");
+}
+
+/** "1 record" / "3 records"; an unknown count renders as an em dash with the plural noun. */
+export function formatCount(value: number | string | null | undefined, singular: string, plural = `${singular}s`): string {
+  if (value === null || value === undefined || value === "") return `${EM_DASH} ${plural}`;
+  return `${formatNumber(value)} ${Number(value) === 1 ? singular : plural}`;
 }

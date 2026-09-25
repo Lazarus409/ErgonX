@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Calculator, CheckCircle2, Lock, Send, XCircle } from "lucide-react";
+import { Calculator, CheckCircle2, Lock, Send, XCircle } from "lucide-react";
 
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import BackNavigation from "@/components/ui/BackNavigation";
 import ErrorState from "@/components/ui/ErrorState";
 import LoadingState from "@/components/ui/LoadingState";
 import PageHeader from "@/components/ui/PageHeader";
@@ -116,8 +117,9 @@ export default function PayrollRunDetailPage() {
   });
 
   return (
-    <main className="space-y-6">
-      <PageHeader title={`Payroll Run #${run.run_number}`} description={period ? `${period.name} · Started ${formatDateTime(run.started_at)}` : "Review payroll results and workflow status."} actions={<Link href="/payroll/runs" className="inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold"><ArrowLeft className="h-4 w-4" />Back</Link>} />
+    <div className="space-y-6">
+      <BackNavigation fallback="/payroll/runs" label="Back to payroll runs" />
+      <PageHeader title={`Payroll Run #${run.run_number}`} description={period ? `${period.name} · Started ${formatDateTime(run.started_at)}` : "Review payroll results and workflow status."} />
       {error && <ErrorState title="Payroll action failed" message={error} onRetry={() => void load()} />}
 
       <div className="grid gap-4 md:grid-cols-5">
@@ -145,7 +147,7 @@ export default function PayrollRunDetailPage() {
       <section className="rounded-2xl border bg-white p-5"><h2 className="font-semibold">Payroll to Accounting</h2><p className="mt-1 text-sm text-slate-500">{run.accounting_journal_entry ? "An accounting journal is linked to this payroll run." : run.status === "FINALIZED" && canGenerateJournal ? "Generate the idempotent draft journal, then submit, approve, and post it through Accounting." : "A draft accounting journal can only be generated from a finalized run by a user with Accounting journal-create access."}</p>{run.accounting_journal_entry && <Link href={`/accounting/journals/${run.accounting_journal_entry}`} className="mt-4 inline-flex text-sm font-semibold text-slate-900 hover:underline">Open accounting journal</Link>}{run.status === "FINALIZED" && !run.accounting_journal_entry && canGenerateJournal && <button type="button" onClick={() => setPendingAction("generateJournal")} className="mt-4 inline-flex rounded-xl border px-4 py-2.5 text-sm font-semibold hover:bg-slate-50">Generate Accounting Journal</button>}</section>
 
       {pendingAction && <ConfirmDialog open title={actionCopy[pendingAction].title} description={actionCopy[pendingAction].description} confirmLabel={actionCopy[pendingAction].label} destructive={actionCopy[pendingAction].destructive} loading={acting} onCancel={() => setPendingAction(null)} onConfirm={() => void executeAction()} />}
-    </main>
+    </div>
   );
 }
 

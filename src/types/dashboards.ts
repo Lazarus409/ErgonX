@@ -16,6 +16,24 @@ export interface HireYearCount {
   count: number;
 }
 
+export interface NamedCount {
+  count: number;
+  department__name?: string;
+  grade__name?: string;
+  location__name?: string;
+  employment_type?: string;
+}
+
+export interface RecentHire {
+  id: string;
+  first_name: string;
+  last_name: string;
+  employee_number: string;
+  hire_date: string;
+  employments__department__name: string;
+  employments__position__title: string;
+}
+
 export interface EmployeeMetrics {
   total_employees: number;
   active_employees: number;
@@ -23,19 +41,84 @@ export interface EmployeeMetrics {
 }
 
 export interface ExecutiveDashboard extends EmployeeMetrics {
-  pending_leave_requests: number;
-  pending_journals: number;
-  payroll_cost: string | number;
+  executive_title?: string;
+  currency: string;
+  pending_leave_requests?: number;
+  pending_journals?: number;
+  payroll_cost?: string | number;
+  attendance_today?: {
+    present: number;
+    late: number;
+    absent: number;
+    on_leave: number;
+  };
+  financial_position?: {
+    bank_balance: string | number;
+    registered_bank_accounts: number;
+    accounts_payable: string | number;
+    accounts_receivable: string | number;
+    posted_expenses: string | number;
+  };
+  recruitment_summary?: {
+    open_jobs: number;
+    active_candidates: number;
+    applications: number;
+    scheduled_interviews: number;
+    offers_extended: number;
+  };
+  payroll_by_period?: Array<{
+    label: string;
+    period_end: string;
+    gross_pay: string | number;
+  }>;
+  profit_and_loss_trend?: ProfitAndLossPoint[];
+  cash_flow_trend?: CashFlowPoint[];
+}
+
+export interface ProfitAndLossPoint {
+  month: string;
+  income: string | number;
+  expenses: string | number;
+  net_income: string | number;
+}
+
+export interface CashFlowPoint {
+  month: string;
+  inflow: string | number;
+  outflow: string | number;
+  net_movement: string | number;
 }
 
 export interface HrDashboard extends EmployeeMetrics {
   by_hire_year: HireYearCount[];
+  by_department: NamedCount[];
+  by_grade: NamedCount[];
+  by_location: NamedCount[];
+  by_employment_type: NamedCount[];
+  recent_hires: RecentHire[];
 }
 
 export interface LeaveDashboard {
   pending: number;
   currently_on_leave: number;
   upcoming: number;
+  by_leave_type: Array<{
+    leave_type__name: string;
+    request_count: number;
+    requested_days: string | number;
+  }>;
+  monthly_approved_leave: Array<{
+    month: string;
+    request_count: number;
+    requested_days: string | number;
+  }>;
+  balance_utilisation: {
+    year: number;
+    entitlement_days: string | number;
+    used_days: string | number;
+    available_days: string | number;
+    utilisation_percent: string | number | null;
+  };
 }
 
 export interface AttendanceDashboard {
@@ -43,6 +126,33 @@ export interface AttendanceDashboard {
   late: number;
   absent: number;
   overtime_minutes: number;
+  weekly_attendance: Array<{
+    date: string;
+    present: number;
+    late: number;
+    absent: number;
+    on_leave: number;
+    overtime_minutes: number;
+  }>;
+  by_department: Array<{
+    employee__employments__department__name: string;
+    present: number;
+    late: number;
+    absent: number;
+    on_leave: number;
+    total: number;
+  }>;
+  repeated_lateness: Array<{
+    employee_id: string;
+    employee__first_name: string;
+    employee__last_name: string;
+    employee__employee_number: string;
+    employee__employments__department__name: string;
+    late_occurrences: number;
+    total_minutes_late: number;
+  }>;
+  lateness_trend: Array<{ month: string; late_occurrences: number; total_minutes_late: number }>;
+  lateness_by_department: Array<{ employee__employments__department__name: string; late_occurrences: number; total_minutes_late: number }>;
 }
 
 export interface PayrollDashboard {
@@ -50,11 +160,32 @@ export interface PayrollDashboard {
   latest_run_status: string | null;
   pending_runs: number;
   finalized_gross_pay: string | number;
+  finalized_net_pay: string | number;
+  finalized_deductions: string | number;
+  employer_contributions: string | number;
+  runs_by_status: StatusCount[];
+  payroll_by_period: Array<{
+    label: string;
+    period_end: string;
+    gross_pay: string | number;
+    net_pay: string | number;
+    total_deductions: string | number;
+  }>;
 }
 
 export interface FinanceDashboard {
+  currency: string;
   pending_journals: number;
   accounts_payable: string | number;
   accounts_receivable: string | number;
   expenses: string | number;
+  bank_balance: string | number;
+  registered_bank_accounts: number;
+  accounts_payable_aging: Array<{ bucket: string; amount: string | number }>;
+  accounts_receivable_aging: Array<{ bucket: string; amount: string | number }>;
+  journals_by_status: StatusCount[];
+  profit_and_loss_trend: ProfitAndLossPoint[];
+  cash_flow_trend: CashFlowPoint[];
 }
+
+export interface RecruitmentDashboard { open_jobs: number; active_candidates: number; applications: number; scheduled_interviews: number; offers_extended: number; pipeline: Array<{ name: string; count: number }>; }

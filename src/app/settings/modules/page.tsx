@@ -1,24 +1,78 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import type { LucideIcon } from "lucide-react";
-import { BarChart3, Banknote, CalendarDays, Calculator, CheckCircle2, Plane, ShieldCheck, Sparkles, UserRoundPlus, UsersRound } from "lucide-react";
+import { BarChart3, Banknote, CalendarDays, Calculator, CheckCircle2, Layers3, Plane, UserRoundPlus, UsersRound, type LucideIcon } from "lucide-react";
+
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { IconTile } from "@/components/ui/Card";
 import ErrorState from "@/components/ui/ErrorState";
 import LoadingState from "@/components/ui/LoadingState";
+import PageHeader from "@/components/ui/PageHeader";
+import StatusBadge from "@/components/ui/StatusBadge";
 import { getApiErrorMessage, institutionsApi } from "@/lib/api";
+import { cx } from "@/lib/cx";
+import { moduleAccents, type ModuleAccent } from "@/lib/moduleTheme";
 import { useApiResource } from "@/lib/useApiResource";
 
-const moduleDetails: Record<string, { description: string; icon: LucideIcon; tone: string }> = {
-  ACCOUNTING: { description: "Financial records, journals, payables and receivables.", icon: Calculator, tone: "bg-violet-50 text-violet-700" }, ATTENDANCE: { description: "Schedules, shifts, time capture and work patterns.", icon: CalendarDays, tone: "bg-sky-50 text-sky-700" }, CORE_HR: { description: "Employee records, organization structure and people data.", icon: UsersRound, tone: "bg-emerald-50 text-emerald-700" }, LEAVE: { description: "Leave policies, balances, requests and approvals.", icon: Plane, tone: "bg-amber-50 text-amber-700" }, PAYROLL: { description: "Pay runs, payslips, components and statutory setup.", icon: Banknote, tone: "bg-rose-50 text-rose-700" }, RECRUITMENT: { description: "Open roles, candidates, interviews and offers.", icon: UserRoundPlus, tone: "bg-indigo-50 text-indigo-700" }, REPORTS: { description: "Operational reports and organization insights.", icon: BarChart3, tone: "bg-cyan-50 text-cyan-700" },
+const moduleDetails: Record<string, { name: string; description: string; icon: LucideIcon; accent: ModuleAccent }> = {
+  CORE_HR: { name: "Core HR", description: "Employee records, organization structure and people data.", icon: UsersRound, accent: "hr" },
+  RECRUITMENT: { name: "Recruitment", description: "Open roles, candidates, interviews and offers.", icon: UserRoundPlus, accent: "recruitment" },
+  LEAVE: { name: "Leave", description: "Leave policies, balances, requests and approvals.", icon: Plane, accent: "leave" },
+  ATTENDANCE: { name: "Attendance", description: "Schedules, shifts, time capture and work patterns.", icon: CalendarDays, accent: "attendance" },
+  PAYROLL: { name: "Payroll", description: "Pay runs, payslips, components and statutory setup.", icon: Banknote, accent: "payroll" },
+  ACCOUNTING: { name: "Accounting", description: "Financial records, journals, payables and receivables.", icon: Calculator, accent: "accounting" },
+  REPORTS: { name: "Reports & Analytics", description: "Operational reports and organization insights.", icon: BarChart3, accent: "reports" },
 };
 
-function configurationLabel(status: string) { return status.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase()); }
-function configurationTone(status: string) { if (status === "READY") return "border-emerald-100 bg-emerald-50 text-emerald-700"; if (status === "IN_PROGRESS") return "border-amber-100 bg-amber-50 text-amber-700"; return "border-slate-200 bg-slate-50 text-slate-600"; }
+function configurationLabel(status: string) { return status.replaceAll("_", " ").toLowerCase().replace(/^\w/, (letter) => letter.toUpperCase()); }
 
 export default function ModuleSettingsPage() {
-  const load = useCallback(() => institutionsApi.listInstitutionModules(), []); const { data, loading, error, reload } = useApiResource(load); const [updating, setUpdating] = useState<string | null>(null); const [actionError, setActionError] = useState<string | null>(null);
+  const load = useCallback(() => institutionsApi.listInstitutionModules(), []);
+  const { data, loading, error, reload } = useApiResource(load);
+  const [updating, setUpdating] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const toggle = async (id: string, enabled: boolean) => { setUpdating(id); setActionError(null); try { await institutionsApi.updateInstitutionModule(id, !enabled); reload(); } catch (caught) { setActionError(getApiErrorMessage(caught)); } finally { setUpdating(null); } };
-  if (loading) return <LoadingState />; if (error || !data) return <ErrorState message={error ?? "You may not have permission to manage modules."} onRetry={reload} />;
+  if (loading) return <LoadingState variant="dashboard" />;
+  if (error || !data) return <ErrorState message={error ?? "You may not have permission to manage modules."} onRetry={reload} />;
   const enabledCount = data.results.filter((module) => module.is_enabled).length;
-  return <main className="space-y-6">{actionError && <ErrorState message={actionError} />}<section className="relative overflow-hidden rounded-3xl bg-slate-950 px-6 py-7 text-white shadow-[0_20px_45px_rgba(15,23,42,0.16)] sm:px-8"><div className="absolute -right-12 -top-16 h-48 w-48 rounded-full border border-sky-300/20" /><div className="absolute right-20 top-8 h-24 w-24 rounded-full bg-sky-400/10 blur-2xl" /><div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between"><div><div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold text-sky-100"><Sparkles className="h-3.5 w-3.5" />Organization workspace</div><h2 className="text-2xl font-semibold tracking-tight">Module configuration</h2><p className="mt-2 text-sm leading-6 text-slate-300">Enable the modules your organization needs.</p></div><div className="rounded-2xl border border-white/10 bg-white/10 px-4 py-3 backdrop-blur-sm"><p className="text-xs font-medium text-slate-300">Active modules</p><p className="mt-1 text-2xl font-semibold">{enabledCount}<span className="ml-1 text-sm font-medium text-slate-300">of {data.results.length}</span></p></div></div></section><section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.06)]"><div className="flex items-center justify-between border-b border-slate-100 px-6 py-5 sm:px-7"><div><h2 className="text-base font-semibold text-slate-950">Available modules</h2><p className="mt-1 text-sm text-slate-500">Your selections can be changed as your organization grows.</p></div><ShieldCheck className="h-5 w-5 text-sky-700" /></div><div className="grid gap-px bg-slate-100 md:grid-cols-2">{data.results.map((module) => { const detail = moduleDetails[module.module_code] ?? { description: "ErgonX workspace capability.", icon: CheckCircle2, tone: "bg-slate-100 text-slate-700" }; const Icon = detail.icon; return <article key={module.id} className="bg-white p-5 transition hover:bg-slate-50/70 sm:p-6"><div className="flex gap-4"><div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${detail.tone}`}><Icon className="h-5 w-5" /></div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-semibold text-slate-950">{module.module_code.replaceAll("_", " ")}</h3><p className="mt-1 text-sm leading-5 text-slate-500">{detail.description}</p></div><span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${module.is_enabled ? "border-emerald-100 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-50 text-slate-500"}`}><span className={`h-1.5 w-1.5 rounded-full ${module.is_enabled ? "bg-emerald-500" : "bg-slate-400"}`} />{module.is_enabled ? "Active" : "Inactive"}</span></div><div className="mt-5 flex items-center justify-between gap-3"><span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${configurationTone(module.configuration_status)}`}>Setup: {configurationLabel(module.configuration_status)}</span><button type="button" disabled={updating === module.id} onClick={() => void toggle(module.id, module.is_enabled)} className={`rounded-xl border px-3.5 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${module.is_enabled ? "border-slate-200 bg-white text-slate-700 hover:border-red-200 hover:bg-red-50 hover:text-red-700" : "border-slate-950 bg-slate-950 text-white hover:bg-slate-800"}`}>{updating === module.id ? "Updating..." : module.is_enabled ? "Disable" : "Enable"}</button></div></div></div></article>; })}</div></section></main>;
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Module configuration"
+        description="Enable the modules your organization needs. Your selections can be changed as your organization grows."
+        icon={Layers3}
+        accent="settings"
+        meta={<Badge tone="brand">{enabledCount} of {data.results.length} active</Badge>}
+      />
+      {actionError && <ErrorState variant="inline" title="Module could not be updated" message={actionError} />}
+      <section className="grid gap-4 md:grid-cols-2" aria-label="Available modules">
+        {data.results.map((module) => {
+          const detail = moduleDetails[module.module_code] ?? { name: module.module_code.replaceAll("_", " "), description: "ErgonX workspace capability.", icon: CheckCircle2, accent: "settings" as ModuleAccent };
+          return (
+            <article key={module.id} className={cx("relative flex gap-4 overflow-hidden rounded-2xl border bg-surface p-5 shadow-elevation-1 transition-shadow hover:shadow-elevation-2", module.is_enabled ? "border-line" : "border-dashed border-line-strong")}>
+              {module.is_enabled && <span aria-hidden="true" className={cx("absolute inset-y-0 left-0 w-1", moduleAccents[detail.accent].solid)} />}
+              <IconTile icon={detail.icon} accent={detail.accent} className={module.is_enabled ? undefined : "opacity-60"} />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-card-title font-semibold text-ink-strong">{detail.name}</h2>
+                    <p className="mt-0.5 text-support text-ink-muted">{detail.description}</p>
+                  </div>
+                  <StatusBadge status={module.is_enabled ? "ACTIVE" : "INACTIVE"} size="sm" />
+                </div>
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                  <Badge size="sm" tone={module.configuration_status === "READY" ? "success" : module.configuration_status === "IN_PROGRESS" ? "warning" : "neutral"}>Setup: {configurationLabel(module.configuration_status)}</Badge>
+                  <Button size="sm" variant={module.is_enabled ? "secondary" : "primary"} loading={updating === module.id} loadingLabel="Updating…" onClick={() => void toggle(module.id, module.is_enabled)}>
+                    {module.is_enabled ? "Disable" : "Enable"}
+                  </Button>
+                </div>
+              </div>
+            </article>
+          );
+        })}
+      </section>
+    </div>
+  );
 }

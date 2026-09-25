@@ -1,29 +1,109 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, Plus, Search, X, XCircle } from "lucide-react";
+import { Check, FileCog, Plus, XCircle } from "lucide-react";
+
+import Alert from "@/components/ui/Alert";
+import { Button, IconButton } from "@/components/ui/Button";
+import { Avatar } from "@/components/ui/Card";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
-import ErrorState from "@/components/ui/ErrorState";
+import { DataTable, DataToolbar } from "@/components/ui/DataTable";
+import { Field, Input, Select, Textarea } from "@/components/ui/Field";
+import { Dialog } from "@/components/ui/Overlay";
 import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { employeesApi, getApiErrorMessage, payrollApi } from "@/lib/api";
 import { EM_DASH, formatAmount, formatDateTime } from "@/lib/format";
 import { useApiResource } from "@/lib/useApiResource";
 import { MAX_PAGE_SIZE } from "@/types/api";
-import type { PayComponent, PayrollPeriod } from "@/types/payroll";
+import type { PayComponent, PayrollAdjustment, PayrollPeriod } from "@/types/payroll";
 
 const ALL = "ALL";
 const emptyForm = { employee: "", payroll_period: "", pay_component: "", amount: "", reason: "" };
 
 export default function PayrollAdjustmentsPage() {
-  const [status, setStatus] = useState(ALL); const [search, setSearch] = useState(""); const [modal, setModal] = useState(false); const [form, setForm] = useState(emptyForm); const [periods, setPeriods] = useState<PayrollPeriod[]>([]); const [components, setComponents] = useState<PayComponent[]>([]); const [names, setNames] = useState<Map<string, string>>(new Map()); const [formError, setFormError] = useState(""); const [saving, setSaving] = useState(false); const [pending, setPending] = useState<{ id: string; action: "approve" | "reject" } | null>(null);
+  const [status, setStatus] = useState(ALL);
+  const [search, setSearch] = useState("");
+  const [modal, setModal] = useState(false);
+  const [form, setForm] = useState(emptyForm);
+  const [periods, setPeriods] = useState<PayrollPeriod[]>([]);
+  const [components, setComponents] = useState<PayComponent[]>([]);
+  const [names, setNames] = useState<Map<string, string>>(new Map());
+  const [formError, setFormError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [pending, setPending] = useState<{ id: string; action: "approve" | "reject" } | null>(null);
   const load = useCallback(() => payrollApi.listPayrollAdjustments({ page_size: MAX_PAGE_SIZE, status: status === ALL ? undefined : status, ordering: "-created_at" }), [status]);
   const { data, loading, error, reload } = useApiResource(load);
   useEffect(() => { let active = true; Promise.all([payrollApi.listPayrollPeriods({ page_size: MAX_PAGE_SIZE }), payrollApi.listPayComponents({ page_size: MAX_PAGE_SIZE }), employeesApi.loadEmployeeIndex()]).then(([p, c, e]) => { if (active) { setPeriods(p.results); setComponents(c.results.filter((item) => item.is_active)); setNames(new Map([...e.byId].map(([id, employee]) => [id, employeesApi.employeeDisplayName(employee)]))); } }).catch(() => {}); return () => { active = false; }; }, []);
   const items = useMemo(() => { const q = search.toLowerCase().trim(); return (data?.results ?? []).filter((item) => !q || (names.get(item.employee) ?? item.employee).toLowerCase().includes(q) || item.reason.toLowerCase().includes(q)); }, [data, names, search]);
-  const periodNames = useMemo(() => new Map(periods.map((item) => [item.id, item.name])), [periods]); const componentNames = useMemo(() => new Map(components.map((item) => [item.id, item.name])), [components]);
+  const periodNames = useMemo(() => new Map(periods.map((item) => [item.id, item.name])), [periods]);
+  const componentNames = useMemo(() => new Map(components.map((item) => [item.id, item.name])), [components]);
   const create = async () => { setFormError(""); if (!form.employee || !form.payroll_period || !form.pay_component || !form.amount || !form.reason.trim()) { setFormError("Complete every adjustment field."); return; } setSaving(true); try { const created = await payrollApi.createPayrollAdjustment({ ...form, amount: form.amount, reason: form.reason.trim() }); await payrollApi.submitPayrollAdjustment(created.id); setModal(false); setForm(emptyForm); reload(); } catch (caught) { setFormError(getApiErrorMessage(caught)); } finally { setSaving(false); } };
   const review = async () => { if (!pending) return; setSaving(true); try { await (pending.action === "approve" ? payrollApi.approvePayrollAdjustment(pending.id) : payrollApi.rejectPayrollAdjustment(pending.id)); setPending(null); reload(); } catch (caught) { setFormError(getApiErrorMessage(caught)); setPending(null); } finally { setSaving(false); } };
-  return <main className="space-y-6 p-4 md:p-6"><PageHeader title="Payroll Adjustments" description="Create and approve adjustments before payroll calculation." actions={<button type="button" onClick={() => { setFormError(""); setModal(true); }} className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white"><Plus size={17} />New Adjustment</button>} />{error && <ErrorState message={error} onRetry={reload} />}<section className="rounded-xl border bg-white"><div className="flex flex-col gap-3 border-b p-4 lg:flex-row"><div className="relative flex-1"><Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search employee or reason..." className="w-full rounded-lg border px-10 py-2.5 text-sm" /></div><select value={status} onChange={(event) => setStatus(event.target.value)} className="rounded-lg border px-3 py-2.5 text-sm"><option value={ALL}>All Statuses</option><option value="DRAFT">Draft</option><option value="PENDING">Pending</option><option value="APPROVED">Approved</option><option value="REJECTED">Rejected</option></select></div><div className="overflow-x-auto"><table className="w-full min-w-[850px] text-left text-sm"><thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-4 py-3">Employee</th><th className="px-4 py-3">Component</th><th className="px-4 py-3">Amount</th><th className="px-4 py-3">Period</th><th className="px-4 py-3">Created</th><th className="px-4 py-3">Status</th><th className="px-4 py-3" /></tr></thead><tbody className="divide-y">{items.map((item) => <tr key={item.id}><td className="px-4 py-4 font-medium">{names.get(item.employee) ?? item.employee}</td><td className="px-4 py-4">{componentNames.get(item.pay_component) ?? item.pay_component}</td><td className="px-4 py-4">{formatAmount(item.amount)}</td><td className="px-4 py-4">{periodNames.get(item.payroll_period) ?? EM_DASH}</td><td className="px-4 py-4">{formatDateTime(item.created_at)}</td><td className="px-4 py-4"><StatusBadge status={item.status} /></td><td className="px-4 py-4 text-right">{item.status === "PENDING" && <span className="flex justify-end gap-2"><button onClick={() => setPending({ id: item.id, action: "reject" })} className="rounded border px-2 py-1 text-red-600"><XCircle size={15} /></button><button onClick={() => setPending({ id: item.id, action: "approve" })} className="rounded border px-2 py-1"><Check size={15} /></button></span>}</td></tr>)}</tbody></table>{loading && <p className="p-8 text-center text-sm text-slate-500">Loading adjustments...</p>}{!loading && !items.length && <p className="p-8 text-center text-sm text-slate-500">No payroll adjustments found.</p>}</div></section>{modal && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-xl"><div className="flex justify-between"><div><h2 className="font-bold">New Payroll Adjustment</h2><p className="text-sm text-slate-500">The new draft is submitted to the backend approval workflow.</p></div><button onClick={() => setModal(false)}><X size={19} /></button></div>{formError && <p className="mt-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{formError}</p>}<div className="mt-5 grid gap-4 sm:grid-cols-2"><Select label="Employee" value={form.employee} options={[...names].map(([value, label]) => ({ value, label }))} onChange={(value) => setForm({ ...form, employee: value })} /><Select label="Payroll Period" value={form.payroll_period} options={periods.map((item) => ({ value: item.id, label: item.name }))} onChange={(value) => setForm({ ...form, payroll_period: value })} /><Select label="Pay Component" value={form.pay_component} options={components.map((item) => ({ value: item.id, label: item.name }))} onChange={(value) => setForm({ ...form, pay_component: value })} /><Input label="Amount" value={form.amount} type="number" onChange={(value) => setForm({ ...form, amount: value })} /><label className="sm:col-span-2"><span className="text-sm font-medium">Reason</span><textarea value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} className="mt-1 w-full rounded border p-2" /></label></div><div className="mt-6 flex justify-end gap-3"><button onClick={() => setModal(false)} className="rounded border px-4 py-2">Cancel</button><button onClick={() => void create()} disabled={saving} className="rounded bg-slate-900 px-4 py-2 text-white">{saving ? "Submitting..." : "Submit Adjustment"}</button></div></div></div>}{pending && <ConfirmDialog open title={`${pending.action === "approve" ? "Approve" : "Reject"} adjustment`} description="This workflow action is recorded by the backend." confirmLabel={pending.action === "approve" ? "Approve" : "Reject"} destructive={pending.action === "reject"} loading={saving} onCancel={() => setPending(null)} onConfirm={() => void review()} />}</main>;
+
+  return (
+    <div className="space-y-6">
+      <PageHeader eyebrow="Payroll" title="Payroll adjustments" description="Create and approve adjustments before payroll calculation." icon={FileCog} accent="payroll" actions={<Button leadingIcon={<Plus className="h-4 w-4" />} onClick={() => { setFormError(""); setModal(true); }}>New adjustment</Button>} />
+      {formError && !modal && <Alert tone="danger" onDismiss={() => setFormError("")}>{formError}</Alert>}
+      <DataTable<PayrollAdjustment>
+        caption="Payroll adjustments"
+        rows={items}
+        rowKey={(item) => item.id}
+        loading={loading && !data}
+        error={error}
+        onRetry={reload}
+        minWidth={880}
+        toolbar={
+          <DataToolbar
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search employee or reason…"
+            filters={<Select size="sm" aria-label="Status" value={status} onChange={(event) => setStatus(event.target.value)}><option value={ALL}>All statuses</option><option value="DRAFT">Draft</option><option value="PENDING">Pending</option><option value="APPROVED">Approved</option><option value="REJECTED">Rejected</option></Select>}
+            onClear={search || status !== ALL ? () => { setSearch(""); setStatus(ALL); } : undefined}
+          />
+        }
+        empty={{ title: "No payroll adjustments found", description: "Adjustments submitted for review will appear here.", icon: FileCog }}
+        columns={[
+          { key: "employee", header: "Employee", sortValue: (item) => names.get(item.employee) ?? item.employee, cell: (item) => { const name = names.get(item.employee) ?? item.employee; return <span className="flex items-center gap-3"><Avatar name={name} size="sm" /><span className="font-semibold text-ink-strong">{name}</span></span>; } },
+          { key: "component", header: "Component", cell: (item) => componentNames.get(item.pay_component) ?? item.pay_component },
+          { key: "amount", header: "Amount", numeric: true, sortValue: (item) => Number(item.amount), cell: (item) => <span className="font-semibold">{formatAmount(item.amount)}</span> },
+          { key: "period", header: "Period", hideBelow: "lg", cell: (item) => periodNames.get(item.payroll_period) ?? EM_DASH },
+          { key: "created", header: "Created", hideBelow: "xl", sortValue: (item) => item.created_at, cell: (item) => formatDateTime(item.created_at) },
+          { key: "status", header: "Status", cell: (item) => <StatusBadge status={item.status} size="sm" /> },
+          {
+            key: "review",
+            header: <span className="sr-only">Review</span>,
+            cell: (item) => item.status === "PENDING" ? (
+              <div className="flex justify-end gap-1">
+                <IconButton size="sm" label="Reject adjustment" className="text-danger-ink hover:bg-danger-soft" onClick={() => setPending({ id: item.id, action: "reject" })}><XCircle className="h-4 w-4" /></IconButton>
+                <IconButton size="sm" label="Approve adjustment" className="text-success-ink hover:bg-success-soft" onClick={() => setPending({ id: item.id, action: "approve" })}><Check className="h-4 w-4" /></IconButton>
+              </div>
+            ) : null,
+          },
+        ]}
+      />
+
+      <Dialog
+        open={modal}
+        onClose={() => setModal(false)}
+        dismissible={!saving}
+        size="lg"
+        title="New payroll adjustment"
+        description="The new draft is submitted to the backend approval workflow."
+        footer={<><Button variant="secondary" onClick={() => setModal(false)} disabled={saving}>Cancel</Button><Button onClick={() => void create()} loading={saving} loadingLabel="Submitting…">Submit adjustment</Button></>}
+      >
+        <div className="space-y-4">
+          {formError && <Alert tone="danger">{formError}</Alert>}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Employee" required><Select value={form.employee} onChange={(event) => setForm({ ...form, employee: event.target.value })}><option value="">Select employee</option>{[...names].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select></Field>
+            <Field label="Payroll period" required><Select value={form.payroll_period} onChange={(event) => setForm({ ...form, payroll_period: event.target.value })}><option value="">Select payroll period</option>{periods.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></Field>
+            <Field label="Pay component" required><Select value={form.pay_component} onChange={(event) => setForm({ ...form, pay_component: event.target.value })}><option value="">Select pay component</option>{components.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></Field>
+            <Field label="Amount" required><Input type="number" inputMode="decimal" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} className="tabular-nums" /></Field>
+          </div>
+          <Field label="Reason" required><Textarea value={form.reason} onChange={(event) => setForm({ ...form, reason: event.target.value })} rows={3} /></Field>
+        </div>
+      </Dialog>
+
+      <ConfirmDialog open={pending !== null} title={`${pending?.action === "approve" ? "Approve" : "Reject"} adjustment`} description="This workflow action is recorded by the backend." confirmLabel={pending?.action === "approve" ? "Approve" : "Reject"} destructive={pending?.action === "reject"} loading={saving} onCancel={() => setPending(null)} onConfirm={() => void review()} />
+    </div>
+  );
 }
-function Select({ label, value, options, onChange }: { label: string; value: string; options: Array<{ value: string; label: string }>; onChange: (value: string) => void }) { return <label><span className="text-sm font-medium">{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full rounded border p-2"><option value="">Select {label.toLowerCase()}</option>{options.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>; }
-function Input({ label, value, type = "text", onChange }: { label: string; value: string; type?: string; onChange: (value: string) => void }) { return <label><span className="text-sm font-medium">{label}</span><input type={type} value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full rounded border p-2" /></label>; }

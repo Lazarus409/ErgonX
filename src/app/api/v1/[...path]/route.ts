@@ -1,0 +1,143 @@
+import { NextRequest, NextResponse } from "next/server";
+
+export const runtime = "nodejs";
+
+const ACCESS_COOKIE = "ergonx_access";
+const REFRESH_COOKIE = "ergonx_refresh";
+const SESSION_COOKIE = "ergonx_session";
+const API_PREFIX = "/api/v1/";
+const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+type RouteContext = { params: Promise<{ path: string[] }> };
+
+function backendOrigin(): string {
+  return (process.env.ERGONX_API_PROXY_URL || "http://127.0.0.1:8000").replace(/\/+$/, "");
+}
+
+function jsonResponse(body: object, status: number): NextResponse {
+  return NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
+}
+
+function cookieIsSecure(request: NextRequest): boolean {
+  return request.nextUrl.protocol === "https:" || request.headers.get("x-forwarded-proto") === "https";
+}
+
+function clearSession(request: NextRequest, response: NextResponse): NextResponse {
+  for (const name of [ACCESS_COOKIE, REFRESH_COOKIE, SESSION_COOKIE]) {
+    response.cookies.set({ name, value: "", httpOnly: name !== SESSION_COOKIE, sameSite: "lax", secure: cookieIsSecure(request), path: "/", maxAge: 0 });
+  }
+  return response;
+}
+
+function establishSession(request: NextRequest, response: NextResponse, access: string, refresh?: string): NextResponse {
+  const cookieOptions = {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: cookieIsSecure(request),
+    path: "/",
+  };
+  response.cookies.set({ name: ACCESS_COOKIE, value: access, ...cookieOptions, maxAge: 60 * 15 });
+  if (refresh) response.cookies.set({ name: REFRESH_COOKIE, value: refresh, ...cookieOptions, maxAge: 60 * 60 * 24 * 7 });
+  // This non-sensitive hint lets client route guards decide whether to hydrate.
+  response.cookies.set({ name: SESSION_COOKIE, value: "1", httpOnly: false, sameSite: "lax", secure: cookieIsSecure(request), path: "/", maxAge: 60 * 60 * 24 * 7 });
+  return response;
+}
+
+function safeAuthPayload(payload: unknown): { body: unknown; access?: string; refresh?: string } {
+  if (!payload || typeof payload !== "object") return { body: payload };
+  const outer = payload as Record<string, unknown>;
+  const data = outer.data;
+  if (!data || typeof data !== "object") return { body: payload };
+  const tokenData = data as Record<string, unknown>;
+  const access = typeof tokenData.access === "string" ? tokenData.access : undefined;
+  const refresh = typeof tokenData.refresh === "string" ? tokenData.refresh : undefined;
+  if (!access) return { body: payload };
+  const safeData = { ...tokenData };
+  delete safeData.access;
+  delete safeData.refresh;
+  return { body: { ...outer, data: safeData }, access, refresh };
+}
+
+export async function handler(request: NextRequest, context: RouteContext): Promise<NextResponse> {
+  const { path } = await context.params;
+  const route = path.join("/");
+
+  if (UNSAFE_METHODS.has(request.method)) {
+    const origin = request.headers.get("origin");
+    if (origin) {
+      try {
+        const originUrl = new URL(origin);
+        // Standalone Next may use an internal localhost origin while retaining
+        // the browser's Host header. Compare the externally requested host,
+        // including a reverse proxy's forwarded host, rather than that
+        // internal origin string.
+        const expectedHost = request.headers.get("x-forwarded-host") || request.headers.get("host");
+        if (!expectedHost || originUrl.host !== expectedHost) {
+          return jsonResponse({ success: false, message: "Cross-origin requests are not accepted.", code: "csrf_failed" }, 403);
+        }
+      } catch {
+        return jsonResponse({ success: false, message: "Cross-origin requests are not accepted.", code: "csrf_failed" }, 403);
+      }
+    }
+  }
+
+  if (route === "auth/logout" && request.method === "POST") {
+    return clearSession(request, jsonResponse({ success: true, data: { logged_out: true } }, 200));
+  }
+
+  const headers = new Headers();
+  const acceptedHeaders = ["accept", "content-type", "x-institution-id"];
+  for (const name of acceptedHeaders) {
+    const value = request.headers.get(name);
+    if (value) headers.set(name, value);
+  }
+  headers.set("accept", headers.get("accept") || "application/json");
+
+  const access = request.cookies.get(ACCESS_COOKIE)?.value;
+  if (access) headers.set("authorization", `Bearer ${access}`);
+
+  let body: BodyInit | undefined;
+  if (!["GET", "HEAD"].includes(request.method)) {
+    if (route === "auth/refresh") {
+      const refresh = request.cookies.get(REFRESH_COOKIE)?.value;
+      body = JSON.stringify(refresh ? { refresh } : {});
+      headers.set("content-type", "application/json");
+    } else {
+      body = await request.arrayBuffer();
+    }
+  }
+
+  let upstream: Response;
+  try {
+    upstream = await fetch(`${backendOrigin()}${API_PREFIX}${route}/${request.nextUrl.search}`, {
+      method: request.method,
+      headers,
+      body,
+      cache: "no-store",
+    });
+  } catch {
+    return jsonResponse({ success: false, message: "The server could not be reached.", code: "network_error" }, 503);
+  }
+
+  const responseHeaders = new Headers();
+  for (const name of ["content-type", "content-disposition"]) {
+    const value = upstream.headers.get(name);
+    if (value) responseHeaders.set(name, value);
+  }
+  responseHeaders.set("Cache-Control", "no-store");
+
+  const isTokenRoute = route === "auth/login" || route === "auth/refresh";
+  if (isTokenRoute && upstream.headers.get("content-type")?.includes("application/json")) {
+    const tokenResult = safeAuthPayload(await upstream.json());
+    const response = NextResponse.json(tokenResult.body, { status: upstream.status, headers: responseHeaders });
+    return tokenResult.access ? establishSession(request, response, tokenResult.access, tokenResult.refresh) : response;
+  }
+
+  return new NextResponse(upstream.body, { status: upstream.status, headers: responseHeaders });
+}
+
+export const GET = handler;
+export const POST = handler;
+export const PUT = handler;
+export const PATCH = handler;
+export const DELETE = handler;

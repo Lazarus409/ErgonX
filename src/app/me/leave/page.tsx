@@ -2,8 +2,11 @@
 
 import Link from "next/link";
 import { useCallback } from "react";
-import { CalendarDays, Clock3, Plus } from "lucide-react";
+import { CalendarCheck, CalendarClock, CalendarDays, Clock3, Plus } from "lucide-react";
 
+import { ButtonLink } from "@/components/ui/Button";
+import { MetricCard } from "@/components/ui/Card";
+import { DataTable } from "@/components/ui/DataTable";
 import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
 import EmptyState from "@/components/ui/EmptyState";
@@ -61,8 +64,6 @@ export default function MyLeavePage() {
 
   const { data, loading, error, reload } = useApiResource(load);
 
-  const placeholder = loading ? "…" : EM_DASH;
-
   // Totals below sum values the backend already computed per row; no
   // entitlement or accrual logic is re-derived here.
   const available = data?.balances.reduce(
@@ -90,204 +91,52 @@ export default function MyLeavePage() {
     .sort((a, b) => a.start_date.localeCompare(b.start_date))[0];
 
   const requests = data?.requests ?? [];
+  const initial = loading && !data;
 
   return (
-    <>
+    <div className="mx-auto max-w-6xl space-y-6">
       <PageHeader
-        title="My Leave"
+        title="My leave"
         description="View your leave balance and manage your leave requests."
-        actions={
-          <Link
-            href="/me/leave/request"
-            className="inline-flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
-          >
-            <Plus size={17} />
-            Request Leave
-          </Link>
-        }
+        icon={CalendarDays}
+        accent="leave"
+        actions={<ButtonLink href="/me/leave/request" leadingIcon={<Plus className="h-4 w-4" />}>Request leave</ButtonLink>}
       />
 
-      <div className="mt-6 space-y-6">
-        {error && <ErrorState message={error} onRetry={reload} />}
+      {error && <ErrorState variant="inline" message={error} onRetry={reload} />}
 
-        {!loading && !error && data && !data.employee && (
-          <EmptyState
-            title="No employee record linked"
-            description="Your account is not linked to an employee record in this institution, so personal leave balances and requests are unavailable."
-          />
-        )}
+      {!loading && !error && data && !data.employee && (
+        <EmptyState
+          icon={CalendarDays}
+          accent="leave"
+          title="No employee record linked"
+          description="Your account is not linked to an employee record in this institution, so personal leave balances and requests are unavailable."
+        />
+      )}
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <CalendarDays size={20} className="text-slate-500" />
-            <p className="mt-4 text-xs font-medium uppercase tracking-wide text-slate-400">
-              Leave Balance
-            </p>
-            <p className="mt-1 text-2xl font-semibold text-slate-950">
-              {available === undefined
-                ? placeholder
-                : `${formatNumber(available)} days`}
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              Available across all leave types
-            </p>
-          </div>
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Leave summary">
+        <MetricCard size="sm" label="Leave balance" value={available === undefined ? EM_DASH : `${formatNumber(available)} days`} description="Available across all leave types" icon={CalendarDays} accent="leave" loading={initial} />
+        <MetricCard size="sm" label="Pending" value={pendingDays === undefined ? EM_DASH : `${formatNumber(pendingDays)} days`} description="Awaiting approval" icon={Clock3} accent="payroll" loading={initial} />
+        <MetricCard size="sm" label="Used" value={used === undefined ? EM_DASH : `${formatNumber(used)} days`} description="This leave year" icon={CalendarCheck} accent="hr" loading={initial} />
+        <MetricCard size="sm" label="Upcoming" value={nextLeave ? formatDate(nextLeave.start_date) : EM_DASH} description="Next approved/requested leave" icon={CalendarClock} accent="attendance" loading={initial} />
+      </section>
 
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <Clock3 size={20} className="text-slate-500" />
-            <p className="mt-4 text-xs font-medium uppercase tracking-wide text-slate-400">
-              Pending
-            </p>
-            <p className="mt-1 text-2xl font-semibold text-slate-950">
-              {pendingDays === undefined
-                ? placeholder
-                : `${formatNumber(pendingDays)} days`}
-            </p>
-            <p className="mt-1 text-xs text-slate-500">Awaiting approval</p>
-          </div>
-
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <CalendarDays size={20} className="text-slate-500" />
-            <p className="mt-4 text-xs font-medium uppercase tracking-wide text-slate-400">
-              Used
-            </p>
-            <p className="mt-1 text-2xl font-semibold text-slate-950">
-              {used === undefined ? placeholder : `${formatNumber(used)} days`}
-            </p>
-            <p className="mt-1 text-xs text-slate-500">This leave year</p>
-          </div>
-
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <CalendarDays size={20} className="text-slate-500" />
-            <p className="mt-4 text-xs font-medium uppercase tracking-wide text-slate-400">
-              Upcoming
-            </p>
-            <p className="mt-1 text-2xl font-semibold text-slate-950">
-              {loading
-                ? placeholder
-                : nextLeave
-                  ? formatDate(nextLeave.start_date)
-                  : EM_DASH}
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              Next approved/requested leave
-            </p>
-          </div>
-        </div>
-
-        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 px-5 py-4">
-            <h2 className="text-sm font-semibold text-slate-900">
-              My Leave Requests
-            </h2>
-
-            <p className="mt-1 text-xs text-slate-500">
-              Your submitted leave requests and their current status.
-            </p>
-          </div>
-
-          {loading ? (
-            <div className="p-5 text-sm text-slate-500">
-              Loading your leave requests...
-            </div>
-          ) : requests.length === 0 ? (
-            <div className="p-5 text-sm text-slate-500">
-              You have no leave requests.
-            </div>
-          ) : (
-            <>
-              <div className="hidden overflow-x-auto md:block">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="border-b border-slate-200 bg-slate-50">
-                      <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Request
-                      </th>
-                      <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Leave Type
-                      </th>
-                      <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Period
-                      </th>
-                      <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Days
-                      </th>
-                      <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Status
-                      </th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    {requests.map((request) => (
-                      <tr
-                        key={request.id}
-                        className="border-b border-slate-100 last:border-0"
-                      >
-                        <td className="px-5 py-4 text-sm font-medium text-slate-900">
-                          <Link
-                            href={`/leave/requests/${request.id}`}
-                            className="hover:underline"
-                          >
-                            {formatDate(request.created_at)}
-                          </Link>
-                        </td>
-
-                        <td className="px-5 py-4 text-sm text-slate-600">
-                          {data?.leaveTypes.get(request.leave_type)?.name ??
-                            EM_DASH}
-                        </td>
-
-                        <td className="px-5 py-4 text-sm text-slate-600">
-                          {formatDate(request.start_date)} -{" "}
-                          {formatDate(request.end_date)}
-                        </td>
-
-                        <td className="px-5 py-4 text-sm text-slate-700">
-                          {formatNumber(request.requested_days)}
-                        </td>
-
-                        <td className="px-5 py-4">
-                          <StatusBadge status={request.status} />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="divide-y divide-slate-100 md:hidden">
-                {requests.map((request) => (
-                  <div key={request.id} className="p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-medium text-slate-900">
-                          {data?.leaveTypes.get(request.leave_type)?.name ??
-                            EM_DASH}
-                        </p>
-                        <p className="mt-1 text-xs text-slate-400">
-                          {formatDate(request.created_at)}
-                        </p>
-                      </div>
-
-                      <StatusBadge status={request.status} />
-                    </div>
-
-                    <p className="mt-4 text-sm text-slate-600">
-                      {formatDate(request.start_date)} -{" "}
-                      {formatDate(request.end_date)}
-                    </p>
-
-                    <p className="mt-1 text-xs text-slate-500">
-                      {formatNumber(request.requested_days)} days
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </section>
-      </div>
-    </>
+      <DataTable
+        caption="My leave requests"
+        rows={requests}
+        rowKey={(request) => request.id}
+        loading={initial}
+        minWidth={620}
+        toolbar={<div><h2 className="text-card-title font-semibold text-ink-strong">My leave requests</h2><p className="text-support text-ink-muted">Your submitted leave requests and their current status.</p></div>}
+        empty={{ title: "No leave requests yet", description: "Requests you submit will appear here with their approval status.", icon: CalendarDays, action: <ButtonLink href="/me/leave/request" size="sm" leadingIcon={<Plus className="h-4 w-4" />}>Request leave</ButtonLink> }}
+        columns={[
+          { key: "requested", header: "Requested", sortValue: (request) => request.created_at, cell: (request) => <Link href={`/leave/requests/${request.id}`} className="font-semibold text-ink-strong hover:text-primary-ink">{formatDate(request.created_at)}</Link> },
+          { key: "type", header: "Leave type", cell: (request) => data?.leaveTypes.get(request.leave_type)?.name ?? EM_DASH },
+          { key: "period", header: "Period", sortValue: (request) => request.start_date, cell: (request) => `${formatDate(request.start_date)} – ${formatDate(request.end_date)}` },
+          { key: "days", header: "Days", numeric: true, sortValue: (request) => Number(request.requested_days), cell: (request) => formatNumber(request.requested_days) },
+          { key: "status", header: "Status", cell: (request) => <StatusBadge status={request.status} size="sm" /> },
+        ]}
+      />
+    </div>
   );
 }

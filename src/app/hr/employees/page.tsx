@@ -1,20 +1,26 @@
 "use client";
 
 import {
+  Copy,
   Eye,
   MoreHorizontal,
   Mail,
   Pencil,
   Plus,
-  Search,
-  SlidersHorizontal,
+  Users,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import Alert from "@/components/ui/Alert";
+import { Button, ButtonLink, IconButton } from "@/components/ui/Button";
+import { Avatar } from "@/components/ui/Card";
+import { DataTable, DataToolbar, Pagination } from "@/components/ui/DataTable";
+import { Field, Input, Select } from "@/components/ui/Field";
+import { Dialog, Menu, MenuItem } from "@/components/ui/Overlay";
 import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
-import ErrorState from "@/components/ui/ErrorState";
 import { employeesApi, getApiErrorMessage, organizationApi } from "@/lib/api";
 import type { CurrentEmploymentIndex } from "@/lib/api/employees";
 import type { OrganizationLookups } from "@/lib/api/organization";
@@ -45,7 +51,7 @@ export default function EmployeesPage() {
   const [department, setDepartment] = useState(ALL);
   const [location, setLocation] = useState(ALL);
   const [page, setPage] = useState(1);
-  const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const router = useRouter();
 
   const [data, setData] = useState<PaginatedData<Employee>>(() =>
     emptyPage<Employee>(),
@@ -258,313 +264,164 @@ export default function EmployeesPage() {
     [employments, departmentNames, positionTitles, locationNames],
   );
 
+  const inviteEmployee = async () => {
+    setInviting(true);
+    setInviteError(null);
+    try {
+      const invitation = await employeesApi.inviteNewEmployeeToSelfService(inviteEmail.trim());
+      setInvitationLink(`${window.location.origin}/accept-invitation/${invitation.acceptance_token}`);
+    } catch (caught) {
+      setInviteError(getApiErrorMessage(caught));
+    } finally {
+      setInviting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
+        eyebrow="Core HR"
         title="Employees"
         description="Manage employee records, employment details and workforce information."
-        actions={<div className="flex items-center gap-3"><button type="button" onClick={() => { setInviteOpen(true); setInviteError(null); setInvitationLink(null); }} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 transition hover:bg-slate-50"><Mail className="h-4 w-4" />Invite Employee</button><Link href="/hr/employees/new" className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"><Plus className="h-4 w-4" />Add Employee</Link></div>}
+        icon={Users}
+        accent="hr"
+        actions={
+          <>
+            <Button variant="secondary" leadingIcon={<Mail className="h-4 w-4" />} onClick={() => { setInviteOpen(true); setInviteError(null); setInvitationLink(null); }}>Invite employee</Button>
+            <ButtonLink href="/hr/employees/new" leadingIcon={<Plus className="h-4 w-4" />}>Add employee</ButtonLink>
+          </>
+        }
       />
 
-      {inviteOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4"><div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-semibold tracking-[0.16em] text-sky-700">EMPLOYEE INVITATION</p><h2 className="mt-1 text-xl font-bold text-slate-950">Invite to Self-Service</h2><p className="mt-2 text-sm text-slate-500">Invite a new employee by email. They will create their account and complete their Self-Service profile.</p></div><button onClick={() => setInviteOpen(false)} className="text-slate-400 hover:text-slate-800" aria-label="Close">×</button></div>{invitationLink ? <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4"><p className="font-semibold text-emerald-900">Invitation created</p><p className="mt-1 text-sm text-emerald-800">The email will be delivered when email delivery is enabled. You may also copy the secure link below.</p><div className="mt-3 flex gap-2"><input readOnly value={invitationLink} className="min-w-0 flex-1 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs text-slate-600" /><button onClick={() => void navigator.clipboard.writeText(invitationLink)} className="rounded-lg bg-slate-950 px-3 py-2 text-sm font-semibold text-white">Copy</button></div></div> : <><label className="mt-6 grid gap-2 text-sm font-medium text-slate-700">Employee email<input type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder="employee@example.com" className="h-11 rounded-xl border border-slate-200 px-3 text-slate-900" /></label><p className="mt-2 text-xs text-slate-500">The recipient uses this email to create their Employee Self-Service account.</p>{inviteError && <p className="mt-4 rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{inviteError}</p>}<div className="mt-6 flex justify-end gap-3"><button onClick={() => setInviteOpen(false)} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-600">Cancel</button><button disabled={!inviteEmail.trim() || inviting} onClick={async () => { setInviting(true); setInviteError(null); try { const invitation = await employeesApi.inviteNewEmployeeToSelfService(inviteEmail.trim()); setInvitationLink(`${window.location.origin}/accept-invitation/${invitation.acceptance_token}`); } catch (caught) { setInviteError(getApiErrorMessage(caught)); } finally { setInviting(false); } }} className="rounded-lg bg-slate-950 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{inviting ? "Creating…" : "Create invitation"}</button></div></>}</div></div>}
-
-      <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-200 p-4">
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
-            <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-
-              <input
-                type="search"
-                value={search}
-                onChange={(event) => changeSearch(event.target.value)}
-                placeholder="Search by employee name, ID or work email..."
-                className="h-10 w-full rounded-lg border border-slate-300 bg-white pl-10 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
-              />
+      <Dialog
+        open={inviteOpen}
+        onClose={() => setInviteOpen(false)}
+        dismissible={!inviting}
+        title="Invite to Self-Service"
+        description="Invite a new employee by email. They will create their account and complete their Self-Service profile."
+        footer={invitationLink ? <Button onClick={() => setInviteOpen(false)}>Done</Button> : (
+          <>
+            <Button variant="secondary" onClick={() => setInviteOpen(false)} disabled={inviting}>Cancel</Button>
+            <Button disabled={!inviteEmail.trim()} loading={inviting} loadingLabel="Creating…" onClick={() => void inviteEmployee()}>Create invitation</Button>
+          </>
+        )}
+      >
+        {invitationLink ? (
+          <Alert tone="success" title="Invitation created">
+            <p>The email will be delivered when email delivery is enabled. You may also copy the secure link below.</p>
+            <div className="mt-3 flex gap-2">
+              <Input readOnly value={invitationLink} size="sm" aria-label="Invitation link" className="font-mono text-caption" />
+              <Button size="sm" variant="secondary" leadingIcon={<Copy className="h-3.5 w-3.5" />} onClick={() => void navigator.clipboard.writeText(invitationLink)}>Copy</Button>
             </div>
-
-            <div className="flex items-center gap-2">
-              <SlidersHorizontal className="h-4 w-4 text-slate-500" />
-
-              <select
-                value={status}
-                onChange={(event) => changeStatus(event.target.value)}
-                className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none focus:border-slate-500"
-              >
-                <option value={ALL}>Status: All</option>
-
-                {EMPLOYEE_STATUSES.map((option) => (
-                  <option key={option} value={option}>
-                    Status: {humanizeEnum(option)}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={employmentType}
-                onChange={(event) => changeEmploymentType(event.target.value)}
-                className="hidden h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none focus:border-slate-500 md:block"
-              >
-                <option value={ALL}>Type: All</option>
-
-                {EMPLOYMENT_TYPES.map((option) => (
-                  <option key={option} value={option}>
-                    Type: {humanizeEnum(option)}
-                  </option>
-                ))}
-              </select>
-
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="h-10 rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
-              >
-                Clear
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <select
-              value={department}
-              onChange={(event) => changeDepartment(event.target.value)}
-              className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none focus:border-slate-500"
-            >
-              <option value={ALL}>Department: All</option>
-
-              {lookups.departments.map((option) => (
-                <option key={option.id} value={option.id}>
-                  Department: {option.name}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={location}
-              onChange={(event) => changeLocation(event.target.value)}
-              className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none focus:border-slate-500"
-            >
-              <option value={ALL}>Location: All</option>
-
-              {lookups.locations.map((option) => (
-                <option key={option.id} value={option.id}>
-                  Location: {option.name}
-                </option>
-              ))}
-            </select>
-
-            <div className="flex items-center rounded-lg bg-slate-50 px-3 text-sm text-slate-600">
-              Showing{" "}
-              <span className="mx-1 font-semibold text-slate-900">
-                {employees.length}
-              </span>
-              of{" "}
-              <span className="ml-1 font-semibold text-slate-900">
-                {data.count}
-              </span>{" "}
-              employees
-            </div>
-          </div>
-        </div>
-
-        {error ? (
-          <div className="p-4">
-            <ErrorState message={error} onRetry={retry} />
-          </div>
-        ) : loading ? (
-          <div className="flex min-h-64 flex-col items-center justify-center px-6 text-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-slate-900" />
-
-            <p className="mt-4 text-sm text-slate-500">Loading employees...</p>
-          </div>
-        ) : employees.length === 0 ? (
-          <div className="flex min-h-64 flex-col items-center justify-center px-6 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-              <Search className="h-5 w-5 text-slate-400" />
-            </div>
-
-            <h2 className="mt-4 text-sm font-semibold text-slate-900">
-              No employees found
-            </h2>
-
-            <p className="mt-1 max-w-sm text-sm text-slate-500">
-              {hasFilters
-                ? "Try changing your search or filters to find employee records."
-                : "No employee records exist for this institution yet."}
-            </p>
-
-            {hasFilters && (
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="mt-4 text-sm font-medium text-slate-900 underline underline-offset-4"
-              >
-                Clear filters
-              </button>
-            )}
-          </div>
+          </Alert>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-[1100px] w-full">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-left">
-                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Employee
-                  </th>
-                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Department
-                  </th>
-                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Position
-                  </th>
-                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Employment
-                  </th>
-                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Location
-                  </th>
-                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Date Joined
-                  </th>
-                  <th className="px-5 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Status
-                  </th>
-                  <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {employees.map((employee) => {
-                  const name = employeesApi.employeeDisplayName(employee);
-                  const assignment = assignmentFor(employee.id);
-
-                  return (
-                    <tr
-                      key={employee.id}
-                      className="border-b border-slate-100 transition hover:bg-slate-50"
-                    >
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white">
-                            {employeesApi.employeeInitials(employee)}
-                          </div>
-
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-slate-900">
-                              {name}
-                            </p>
-                            <p className="truncate text-xs text-slate-500">
-                              {employee.employee_number}
-                              {employee.work_email
-                                ? ` · ${employee.work_email}`
-                                : ""}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-
-                      <td className="px-5 py-4 text-sm text-slate-600">
-                        {assignment.department}
-                      </td>
-
-                      <td className="px-5 py-4 text-sm text-slate-600">
-                        {assignment.position}
-                      </td>
-
-                      <td className="px-5 py-4 text-sm text-slate-600">
-                        {assignment.employmentType}
-                      </td>
-
-                      <td className="px-5 py-4 text-sm text-slate-600">
-                        {assignment.location}
-                      </td>
-
-                      <td className="px-5 py-4 text-sm text-slate-600">
-                        {formatDate(employee.hire_date)}
-                      </td>
-
-                      <td className="px-5 py-4">
-                        <StatusBadge status={employee.status} />
-                      </td>
-
-                      <td className="relative px-5 py-4 text-right">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setOpenMenu(
-                              openMenu === employee.id ? null : employee.id,
-                            )
-                          }
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
-                          aria-label={`Actions for ${name}`}
-                        >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </button>
-
-                        {openMenu === employee.id && (
-                          <div className="absolute right-5 top-12 z-20 w-40 rounded-lg border border-slate-200 bg-white p-1 text-left shadow-lg">
-                            <Link
-                              href={`/hr/employees/${employee.id}`}
-                              className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                              onClick={() => setOpenMenu(null)}
-                            >
-                              <Eye className="h-4 w-4" />
-                              View
-                            </Link>
-
-                            <Link
-                              href={`/hr/employees/${employee.id}?edit=true`}
-                              className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                              onClick={() => setOpenMenu(null)}
-                            >
-                              <Pencil className="h-4 w-4" />
-                              Edit
-                            </Link>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className="space-y-4">
+            <Field label="Employee email" helper="The recipient uses this email to create their Employee Self-Service account." required>
+              <Input type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} placeholder="employee@example.com" data-autofocus />
+            </Field>
+            {inviteError && <Alert tone="danger">{inviteError}</Alert>}
           </div>
         )}
+      </Dialog>
 
-        <div className="flex flex-col gap-3 border-t border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-slate-500">
-            {employments?.truncated
-              ? "Assignment columns are resolved for the most recent employment records only."
-              : `Page ${page} of ${totalPages}`}
-          </p>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setPage((current) => Math.max(1, current - 1))}
-              disabled={loading || !data.previous}
-              className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400 disabled:hover:bg-transparent"
-            >
-              Previous
-            </button>
-
-            <span className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-medium text-white">
-              {page}
-            </span>
-
-            <button
-              type="button"
-              onClick={() => setPage((current) => current + 1)}
-              disabled={loading || !data.next}
-              className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400 disabled:hover:bg-transparent"
-            >
-              Next
-            </button>
+      <DataTable<Employee>
+        caption="Employees"
+        rows={employees}
+        rowKey={(employee) => employee.id}
+        loading={loading}
+        error={error}
+        onRetry={retry}
+        minWidth={1040}
+        toolbar={
+          <div className="space-y-3">
+            <DataToolbar
+              search={search}
+              onSearchChange={changeSearch}
+              searchPlaceholder="Search by employee name, ID or work email…"
+              filters={
+                <>
+                  <Select size="sm" aria-label="Status" value={status} onChange={(event) => changeStatus(event.target.value)}>
+                    <option value={ALL}>Status: All</option>
+                    {EMPLOYEE_STATUSES.map((option) => <option key={option} value={option}>Status: {humanizeEnum(option)}</option>)}
+                  </Select>
+                  <Select size="sm" aria-label="Employment type" value={employmentType} onChange={(event) => changeEmploymentType(event.target.value)}>
+                    <option value={ALL}>Type: All</option>
+                    {EMPLOYMENT_TYPES.map((option) => <option key={option} value={option}>Type: {humanizeEnum(option)}</option>)}
+                  </Select>
+                  <Select size="sm" aria-label="Department" value={department} onChange={(event) => changeDepartment(event.target.value)}>
+                    <option value={ALL}>Department: All</option>
+                    {lookups.departments.map((option) => <option key={option.id} value={option.id}>Department: {option.name}</option>)}
+                  </Select>
+                  <Select size="sm" aria-label="Location" value={location} onChange={(event) => changeLocation(event.target.value)}>
+                    <option value={ALL}>Location: All</option>
+                    {lookups.locations.map((option) => <option key={option.id} value={option.id}>Location: {option.name}</option>)}
+                  </Select>
+                </>
+              }
+              onClear={hasFilters ? clearFilters : undefined}
+            />
+            <p className="text-caption text-ink-muted">Showing <span className="font-semibold text-ink-strong tabular-nums">{employees.length}</span> of <span className="font-semibold text-ink-strong tabular-nums">{data.count}</span> employees</p>
           </div>
-        </div>
-      </section>
+        }
+        empty={{
+          title: "No employees found",
+          description: hasFilters ? "Try changing your search or filters to find employee records." : "No employee records exist for this institution yet.",
+          icon: Users,
+          action: hasFilters ? <Button size="sm" variant="secondary" onClick={clearFilters}>Clear filters</Button> : <ButtonLink href="/hr/employees/new" size="sm" leadingIcon={<Plus className="h-4 w-4" />}>Add employee</ButtonLink>,
+        }}
+        footer={
+          <div className="space-y-2">
+            <Pagination page={page} pageSize={pageSize} total={data.count} onPageChange={(next) => setPage(Math.min(Math.max(1, next), totalPages))} />
+            {employments?.truncated && <p className="text-caption text-ink-muted">Assignment columns are resolved for the most recent employment records only.</p>}
+          </div>
+        }
+        columns={[
+          {
+            key: "employee",
+            header: "Employee",
+            cell: (employee) => {
+              const name = employeesApi.employeeDisplayName(employee);
+              return (
+                <Link href={`/hr/employees/${employee.id}`} className="group flex min-w-0 items-center gap-3">
+                  <Avatar name={name} size="sm" />
+                  <span className="min-w-0">
+                    <span className="block truncate font-semibold text-ink-strong group-hover:text-primary-ink">{name}</span>
+                    <span className="block truncate text-caption text-ink-muted">{employee.employee_number}{employee.work_email ? ` · ${employee.work_email}` : ""}</span>
+                  </span>
+                </Link>
+              );
+            },
+          },
+          { key: "department", header: "Department", cell: (employee) => assignmentFor(employee.id).department },
+          { key: "position", header: "Position", cell: (employee) => assignmentFor(employee.id).position },
+          { key: "employment", header: "Employment", hideBelow: "lg", cell: (employee) => assignmentFor(employee.id).employmentType },
+          { key: "location", header: "Location", hideBelow: "xl", cell: (employee) => assignmentFor(employee.id).location },
+          { key: "joined", header: "Date joined", sortValue: (employee) => employee.hire_date, cell: (employee) => formatDate(employee.hire_date) },
+          { key: "status", header: "Status", cell: (employee) => <StatusBadge status={employee.status} size="sm" /> },
+          {
+            key: "actions",
+            header: <span className="sr-only">Actions</span>,
+            cell: (employee) => {
+              const name = employeesApi.employeeDisplayName(employee);
+              return (
+                <div className="flex justify-end">
+                  <Menu
+                    label={`Actions for ${name}`}
+                    trigger={(props) => <IconButton {...props} label={`Actions for ${name}`} size="sm"><MoreHorizontal className="h-4 w-4" /></IconButton>}
+                  >
+                    {(close) => (
+                      <div className="p-1.5">
+                        <MenuItem icon={<Eye />} onSelect={() => { close(); router.push(`/hr/employees/${employee.id}`); }}>View</MenuItem>
+                        <MenuItem icon={<Pencil />} onSelect={() => { close(); router.push(`/hr/employees/${employee.id}?edit=true`); }}>Edit</MenuItem>
+                      </div>
+                    )}
+                  </Menu>
+                </div>
+              );
+            },
+          },
+        ]}
+      />
     </div>
   );
 }

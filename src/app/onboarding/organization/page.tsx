@@ -81,7 +81,7 @@ export default function OrganizationStarterPage() {
   };
 
   return (
-    <main className="mx-auto max-w-4xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-4xl space-y-6">
       <PageHeader title="Create starter organization structure" description="These four records are the minimum Core HR structure required before institution setup can be validated." actions={<Link href="/onboarding" className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold">Back to setup</Link>} />
       {error && <ErrorState title="Could not create starter structure" message={error} />}
       <section className="rounded-2xl border border-slate-200 bg-white p-6">
@@ -94,7 +94,7 @@ export default function OrganizationStarterPage() {
         </div>
         <div className="mt-7 flex justify-end"><button type="button" disabled={saving} onClick={() => void save()} className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white disabled:opacity-50">{saving ? "Creating structure..." : "Create starter structure"}</button></div>
       </section>
-    </main>
+    </div>
   );
 }
 

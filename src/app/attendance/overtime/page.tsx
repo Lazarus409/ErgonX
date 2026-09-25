@@ -308,7 +308,7 @@ export default function OvertimePage() {
   const totalPages = Math.max(1, Math.ceil(data.count / DEFAULT_PAGE_SIZE));
 
   return (
-    <main className="space-y-6">
+    <div className="space-y-6">
       <PageHeader
         title="Overtime"
         description="Review overtime generated from attendance. Only approved overtime is consumed by Payroll."
@@ -731,7 +731,7 @@ export default function OvertimePage() {
           </div>
         </div>
       )}
-    </main>
+    </div>
   );
 }
 

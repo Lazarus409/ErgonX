@@ -5,6 +5,11 @@ import { FormEvent, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { KeyRound } from "lucide-react";
 
+import AuthShell, { AuthHeading } from "@/components/brand/AuthShell";
+import Alert from "@/components/ui/Alert";
+import { Button } from "@/components/ui/Button";
+import { Field, Input } from "@/components/ui/Field";
+import PasswordStrength from "@/components/ui/PasswordStrength";
 import { authApi, getApiErrorMessage } from "@/lib/api";
 
 export default function ResetPasswordPage() {
@@ -35,7 +40,26 @@ export default function ResetPasswordPage() {
     }
   };
 
-  return <main className="flex min-h-screen items-center justify-center bg-slate-50 px-5 py-10"><section className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-7 shadow-[0_18px_45px_rgba(15,23,42,0.08)] sm:p-9"><div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-sky-300"><KeyRound className="h-6 w-6" /></div><h1 className="mt-5 text-2xl font-semibold tracking-tight">Choose a new password</h1><p className="mt-2 text-sm leading-6 text-slate-500">Use a strong password you have not used elsewhere.</p>{success ? <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">Password updated. Redirecting you to sign in…</div> : <form onSubmit={submit} className="mt-7 space-y-5">{error && <p className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}<Field label="New password" value={password} onChange={setPassword} /><Field label="Confirm new password" value={confirmation} onChange={setConfirmation} /><button disabled={saving} className="h-11 w-full rounded-xl bg-slate-950 text-sm font-semibold text-white disabled:opacity-50">{saving ? "Updating..." : "Set new password"}</button></form>}<Link href="/login" className="mt-6 block text-center text-sm font-semibold text-slate-600 hover:text-slate-950">Return to sign in</Link></section></main>;
+  return (
+    <AuthShell>
+      <span className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-soft text-primary" aria-hidden="true"><KeyRound className="h-6 w-6" /></span>
+      <AuthHeading title="Choose a new password" description="Use a strong password you have not used elsewhere." />
+      {success ? (
+        <Alert tone="success" title="Password updated">Redirecting you to sign in…</Alert>
+      ) : (
+        <form onSubmit={submit} className="space-y-5">
+          {error && <Alert tone="danger">{error}</Alert>}
+          <Field label="New password">
+            <Input required minLength={8} type="password" size="lg" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} />
+          </Field>
+          <PasswordStrength value={password} />
+          <Field label="Confirm new password" error={confirmation && password !== confirmation ? "Passwords do not match yet." : null}>
+            <Input required minLength={8} type="password" size="lg" autoComplete="new-password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} />
+          </Field>
+          <Button type="submit" size="lg" block loading={saving} loadingLabel="Updating…">Set new password</Button>
+        </form>
+      )}
+      <Link href="/login" className="mt-6 block text-center text-support font-semibold text-ink-muted hover:text-ink-strong">Return to sign in</Link>
+    </AuthShell>
+  );
 }
-
-function Field({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { return <label className="block text-sm font-medium text-slate-700">{label}<input required minLength={8} type="password" autoComplete="new-password" value={value} onChange={(event) => onChange(event.target.value)} className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-sky-500 focus:bg-white focus:ring-4 focus:ring-sky-100" /></label>; }

@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useState } from "react";
 
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import BackNavigation from "@/components/ui/BackNavigation";
 import ErrorState from "@/components/ui/ErrorState";
 import LoadingState from "@/components/ui/LoadingState";
 import PageHeader from "@/components/ui/PageHeader";
@@ -134,7 +134,7 @@ export default function ApplicationDetailPage() {
         </div>
       </section>
 
-      <Link href="/recruitment/applications" className="text-sm font-medium text-slate-600 hover:text-slate-900">Back to Applications</Link>
+      <BackNavigation fallback="/recruitment/applications" label="Back to applications" />
 
       <ConfirmDialog open={confirmedAction !== null} title={confirmedAction === "submit" ? "Submit application?" : confirmedAction === "withdraw" ? "Withdraw application?" : "Move application stage?"} description={confirmedAction === "submit" ? "The backend will assign the first active stage and create the initial history entry." : confirmedAction === "withdraw" ? "This application will no longer progress through recruitment." : "This creates an immutable pipeline-history entry."} confirmLabel={confirmedAction === "submit" ? "Submit" : confirmedAction === "withdraw" ? "Withdraw" : "Move Stage"} destructive={confirmedAction === "withdraw"} loading={saving} onConfirm={() => void runConfirmedAction()} onCancel={() => setConfirmedAction(null)} />
       <ConfirmDialog open={confirmReject} title="Reject application?" description="The optional reason will be retained with this terminal workflow decision." confirmLabel="Reject Application" destructive loading={saving} onConfirm={() => void rejectApplication()} onCancel={() => setConfirmReject(false)} />

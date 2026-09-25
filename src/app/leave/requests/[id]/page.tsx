@@ -1,10 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import {
-  ArrowLeft,
   CalendarDays,
   CheckCircle2,
   Clock3,
@@ -18,11 +16,13 @@ import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
 import ErrorState from "@/components/ui/ErrorState";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import BackNavigation from "@/components/ui/BackNavigation";
 import {
   employeesApi,
   getApiErrorMessage,
   isApiRequestError,
   leaveApi,
+  operationsApi,
 } from "@/lib/api";
 import type { Employee } from "@/types/hr";
 import type {
@@ -31,6 +31,7 @@ import type {
   LeaveRequest,
   LeaveType,
 } from "@/types/leave";
+import type { DocumentRecord } from "@/types/operations";
 import { EM_DASH, formatDate, formatDateTime, formatNumber } from "@/lib/format";
 
 type PendingAction = "submit" | "approve" | "reject" | "cancel" | null;
@@ -41,6 +42,7 @@ interface RequestDetail {
   leaveType: LeaveType | null;
   balance: LeaveBalance | null;
   approvals: LeaveApproval[];
+  attachment: DocumentRecord | null;
 }
 
 /**
@@ -51,7 +53,7 @@ interface RequestDetail {
 async function loadDetail(id: string): Promise<RequestDetail> {
   const request = await leaveApi.getLeaveRequest(id);
 
-  const [employee, leaveType, balance, approvals] = await Promise.all([
+  const [employee, leaveType, balance, approvals, attachment] = await Promise.all([
     employeesApi.getEmployee(request.employee).catch(() => null),
     leaveApi.getLeaveType(request.leave_type).catch(() => null),
     leaveApi
@@ -71,9 +73,10 @@ async function loadDetail(id: string): Promise<RequestDetail> {
       })
       .then((page) => page.results)
       .catch(() => []),
+    request.attachment ? operationsApi.getDocument(request.attachment).catch(() => null) : Promise.resolve(null),
   ]);
 
-  return { request, employee, leaveType, balance, approvals };
+  return { request, employee, leaveType, balance, approvals, attachment };
 }
 
 export default function LeaveRequestDetailPage() {
@@ -214,15 +217,7 @@ export default function LeaveRequestDetailPage() {
         <PageHeader
           title="Leave Request"
           description="Review the employee leave request and take the appropriate authorised action."
-          actions={
-            <Link
-              href="/leave/requests"
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              <ArrowLeft size={16} />
-              Back to Requests
-            </Link>
-          }
+          actions={<BackNavigation fallback="/leave/requests" label="Back to Requests" />}
         />
 
         <div className="mt-6">
@@ -235,7 +230,18 @@ export default function LeaveRequestDetailPage() {
     );
   }
 
-  const { request, employee, leaveType, balance, approvals } = detail;
+  const { request, employee, leaveType, balance, approvals, attachment } = detail;
+
+  const downloadAttachment = async () => {
+    if (!attachment) return;
+    const blob = await operationsApi.downloadDocument(attachment.id);
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = attachment.original_filename;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   const status = request.status;
   const isDraft = status === "DRAFT";
@@ -264,15 +270,7 @@ export default function LeaveRequestDetailPage() {
       <PageHeader
         title="Leave Request"
         description="Review the employee leave request and take the appropriate authorised action."
-        actions={
-          <Link
-            href="/leave/requests"
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <ArrowLeft size={16} />
-            Back to Requests
-          </Link>
-        }
+        actions={<BackNavigation fallback="/leave/requests" label="Back to Requests" />}
       />
 
       <div className="mt-6 space-y-6">
@@ -694,15 +692,16 @@ export default function LeaveRequestDetailPage() {
           </div>
 
           <div className="p-5">
-            <div className="flex items-center gap-3 rounded-lg border border-slate-200 p-4">
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 p-4">
+              <div className="flex min-w-0 items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100">
                 <FileText size={17} className="text-slate-500" />
               </div>
 
-              <div>
-                <p className="text-sm font-medium text-slate-700">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-slate-700">
                   {request.attachment
-                    ? "Supporting document attached"
+                    ? attachment?.original_filename ?? "Supporting document attached"
                     : "No attachments"}
                 </p>
 
@@ -712,6 +711,8 @@ export default function LeaveRequestDetailPage() {
                     : "No supporting documents were submitted."}
                 </p>
               </div>
+              </div>
+              {attachment && <button type="button" onClick={() => void downloadAttachment()} className="shrink-0 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">Download</button>}
             </div>
           </div>
         </section>

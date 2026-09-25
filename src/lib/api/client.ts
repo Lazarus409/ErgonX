@@ -3,7 +3,7 @@
  *
  * This is the single Axios instance for the whole frontend. It owns:
  *   - base URL resolution;
- *   - the Authorization header;
+ *   - same-origin BFF session routing;
  *   - the X-Institution-ID tenant header;
  *   - unwrapping the shared response envelope;
  *   - normalising backend errors into `ApiRequestError`;
@@ -31,29 +31,14 @@ import type {
 /* Configuration                                                              */
 /* -------------------------------------------------------------------------- */
 
-function stripTrailingSlashes(value: string): string {
-  return value.replace(/\/+$/, "");
-}
-
 /**
  * Resolves the API root, always ending at `/api/v1`.
  *
- * `NEXT_PUBLIC_API_URL` is expected to already include the version prefix.
- * `NEXT_PUBLIC_API_BASE_URL` is expected to be the host origin only.
+ * The browser always uses the same-origin Next.js BFF. That proxy attaches
+ * the HttpOnly access cookie server-side, so bearer tokens never enter JS.
  */
 export function resolveApiBaseUrl(): string {
-  const explicit = process.env.NEXT_PUBLIC_API_URL;
-
-  if (explicit) {
-    return stripTrailingSlashes(explicit);
-  }
-
-  // Local builds use the same-origin Next.js proxy. This works whether the
-  // browser reaches the app by localhost or a LAN address, and avoids making
-  // the browser resolve its own localhost as the Django server.
-  const origin = process.env.NEXT_PUBLIC_API_BASE_URL || "";
-
-  return `${stripTrailingSlashes(origin)}/api/v1`;
+  return "/api/v1";
 }
 
 export const API_BASE_URL = resolveApiBaseUrl();
@@ -64,14 +49,12 @@ const REQUEST_TIMEOUT_MS = 30000;
 /* Token and tenant storage                                                   */
 /* -------------------------------------------------------------------------- */
 
-export const ACCESS_TOKEN_KEY = "ergonx_access_token";
-export const REFRESH_TOKEN_KEY = "ergonx_refresh_token";
+export const SESSION_HINT_KEY = "ergonx_session_hint";
 export const INSTITUTION_ID_KEY = "ergonx_institution_id";
 
 /**
- * Local storage is a known, documented limitation (PWA-002 in the backend
- * discrepancy register). It is intentionally kept in one place so a future
- * move to an HttpOnly-cookie/BFF design touches only this file.
+ * Access and refresh tokens are HttpOnly cookies owned by the same-origin BFF.
+ * The browser stores only a non-sensitive session hint and institution UUID.
  */
 function isBrowser(): boolean {
   return typeof window !== "undefined";
@@ -107,24 +90,25 @@ function writeStorage(key: string, value: string | null): void {
 }
 
 export function getAccessToken(): string | null {
-  return readStorage(ACCESS_TOKEN_KEY);
+  return null;
 }
 
 export function getRefreshToken(): string | null {
-  return readStorage(REFRESH_TOKEN_KEY);
+  return null;
 }
 
-export function setAuthTokens(access: string, refresh?: string | null): void {
-  writeStorage(ACCESS_TOKEN_KEY, access);
+export function hasSessionHint(): boolean {
+  return readStorage(SESSION_HINT_KEY) === "1";
+}
 
-  if (refresh) {
-    writeStorage(REFRESH_TOKEN_KEY, refresh);
-  }
+export function setAuthTokens(...tokens: Array<string | null | undefined>): void {
+  // Session credentials are deliberately owned by the HttpOnly BFF cookies.
+  void tokens;
+  writeStorage(SESSION_HINT_KEY, "1");
 }
 
 export function clearAuthTokens(): void {
-  writeStorage(ACCESS_TOKEN_KEY, null);
-  writeStorage(REFRESH_TOKEN_KEY, null);
+  writeStorage(SESSION_HINT_KEY, null);
 }
 
 const UUID_PATTERN =
@@ -302,12 +286,6 @@ const apiClient: AxiosInstance = axios.create({
 });
 
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const token = getAccessToken();
-
-  if (token) {
-    config.headers.set("Authorization", `Bearer ${token}`);
-  }
-
   const institutionId = getInstitutionId();
 
   if (isInstitutionSelector(institutionId)) {
@@ -320,42 +298,26 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 type RetriableConfig = InternalAxiosRequestConfig & { _retried?: boolean };
 
 /** In-flight refresh, shared so concurrent 401s trigger a single call. */
-let refreshInFlight: Promise<string | null> | null = null;
+let refreshInFlight: Promise<boolean> | null = null;
 
-async function refreshAccessToken(): Promise<string | null> {
-  const refresh = getRefreshToken();
-
-  if (!refresh) {
-    return null;
+async function refreshAccessToken(): Promise<boolean> {
+  if (!hasSessionHint()) {
+    return false;
   }
 
   try {
     // Deliberately a bare axios call: the instance interceptors must not
     // recurse into refresh handling.
-    const response = await axios.post<ApiResponse<{ access: string; refresh?: string }>>(
+    await axios.post(
       `${API_BASE_URL}/auth/refresh/`,
-      { refresh },
-      { headers: { "Content-Type": "application/json" }, timeout: REQUEST_TIMEOUT_MS },
+      {},
+      { headers: { "Content-Type": "application/json" }, timeout: REQUEST_TIMEOUT_MS, withCredentials: true },
     );
-
-    const data = response.data?.data ?? (response.data as unknown as {
-      access?: string;
-      refresh?: string;
-    });
-
-    const access = data?.access ?? null;
-
-    if (!access) {
-      clearAuthTokens();
-      return null;
-    }
-
-    // SIMPLE_JWT rotates refresh tokens, so persist the new one when present.
-    setAuthTokens(access, data?.refresh ?? null);
-    return access;
+    setAuthTokens();
+    return true;
   } catch {
     clearAuthTokens();
-    return null;
+    return false;
   }
 }
 
@@ -368,7 +330,7 @@ apiClient.interceptors.response.use(
       error.response?.status === 401 &&
       config !== undefined &&
       config._retried !== true &&
-      getRefreshToken() !== null;
+      hasSessionHint();
 
     if (!shouldAttemptRefresh || !config) {
       return Promise.reject(error);
@@ -378,22 +340,20 @@ apiClient.interceptors.response.use(
 
     refreshInFlight = refreshInFlight ?? refreshAccessToken();
 
-    let access: string | null = null;
+    let refreshed = false;
 
     try {
-      access = await refreshInFlight;
+      refreshed = await refreshInFlight;
     } finally {
       refreshInFlight = null;
     }
 
-    if (!access) {
+    if (!refreshed) {
       // Tokens are cleared, but no hard navigation happens here. Routing is
       // the auth provider's concern, which keeps the development auth bypass
       // working when no real session exists.
       return Promise.reject(error);
     }
-
-    config.headers.set("Authorization", `Bearer ${access}`);
 
     return apiClient(config);
   },
@@ -483,6 +443,23 @@ export async function apiPost<T, B = unknown>(
 ): Promise<T> {
   try {
     const response = await apiClient.post<ApiResponse<T>>(url, body, config);
+    return unwrap<T>(response.data);
+  } catch (error) {
+    throw normalizeError(error);
+  }
+}
+
+export async function apiPostMultipart<T>(
+  url: string,
+  body: FormData,
+  onUploadProgress?: (progress: number) => void,
+): Promise<T> {
+  try {
+    const response = await apiClient.post<ApiResponse<T>>(url, body, {
+      onUploadProgress: (event) => {
+        if (event.total) onUploadProgress?.(Math.round((event.loaded / event.total) * 100));
+      },
+    });
     return unwrap<T>(response.data);
   } catch (error) {
     throw normalizeError(error);

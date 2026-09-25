@@ -21,6 +21,7 @@ export interface PayrollPeriod {
 }
 
 export interface PayrollConfiguration { id: string; country_code: string; currency: string; payroll_frequency: string; payroll_setup_mode: string; selected_payroll_preset_version: string | null; pay_day_rule: Record<string, unknown>; rounding_rule: Record<string, unknown>; is_configured: boolean; configured_at: string | null; }
+export interface EmployeePayrollProfile { id: string; employee: string; tax_residency: "RESIDENT" | "NON_RESIDENT" | string; tax_identification_number: string; created_at: string; updated_at: string; }
 export interface PayrollSetupChoice { mode: string; preset_version_id: string | null; preset_code: string | null; version_code: string | null; name: string; recommended: boolean; compliance_warning: string | null; }
 export interface PayrollSetupChoices { country_code: string; currency: string; choices: PayrollSetupChoice[]; }
 export interface ContributionRule { id: string; preset_version: string; code: string; name: string; basis: string; employee_rate: string; employer_rate: string; minimum_basis: string | null; maximum_basis: string | null; effective_from: string; effective_to: string | null; }

@@ -3,6 +3,8 @@
 .env
 .coverage
 *.sqlite3
+*.dump
+*.backup
 *.log
 __pycache__/
 *.py[cod]

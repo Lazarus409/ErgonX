@@ -2,14 +2,47 @@ from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
+from rest_framework.exceptions import AuthenticationFailed
+from django.conf import settings
+from django.utils import timezone
+from datetime import timedelta
+import secrets
+import base64
+import hashlib
+import hmac
+import struct
+import time
+from apps.accounts.models import EmailOTPChallenge, InstitutionAdminInvitation, User, UserMFA
+from apps.accounts.emails import send_email_mfa_code
+from django.utils.crypto import salted_hmac
 
-from apps.accounts.models import InstitutionAdminInvitation, User
+
+def _totp(secret: str, timestamp: int | None = None) -> str:
+    counter = int((timestamp or time.time()) // 30)
+    key = base64.b32decode(secret, casefold=True)
+    digest = hmac.new(key, struct.pack(">Q", counter), hashlib.sha1).digest()
+    offset = digest[-1] & 0x0F
+    value = struct.unpack(">I", digest[offset:offset + 4])[0] & 0x7FFFFFFF
+    return f"{value % 1_000_000:06d}"
+
+
+def verify_totp(secret: str, code: str) -> bool:
+    normalized = str(code).strip()
+    return bool(normalized) and any(hmac.compare_digest(_totp(secret, int(time.time()) + drift * 30), normalized) for drift in (-1, 0, 1))
+
+
+class MFARequired(AuthenticationFailed):
+    api_code = "mfa_required"
+
+
+class EmailOTPRequired(AuthenticationFailed):
+    api_code = "email_otp_required"
 
 
 class UserSerializer(serializers.ModelSerializer):
     is_platform_admin = serializers.SerializerMethodField()
 
-    def get_is_platform_admin(self, user):
+    def get_is_platform_admin(self, user) -> bool:
         return bool(user.is_platform_admin or user.is_superuser)
 
     class Meta:
@@ -38,6 +71,7 @@ class AuthBootstrapSerializer(serializers.Serializer):
 
 
 class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
+    mfa_code = serializers.CharField(required=False, write_only=True, allow_blank=True)
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
@@ -46,8 +80,50 @@ class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
 
     def validate(self, attrs):
         data = super().validate(attrs)
+        mfa = UserMFA.objects.filter(user=self.user, is_enabled=True).first()
+        if mfa and mfa.method == UserMFA.Method.EMAIL_OTP:
+            code = str(attrs.get("mfa_code", "")).strip()
+            if not code:
+                if not settings.EMAIL_DELIVERY_ENABLED:
+                    raise AuthenticationFailed("Email MFA delivery is not configured.", code="email_otp_unavailable")
+                EmailOTPChallenge.objects.filter(user=self.user, consumed_at__isnull=True).update(consumed_at=timezone.now())
+                plain_code = f"{secrets.randbelow(1_000_000):06d}"
+                expires_at = timezone.now() + timedelta(minutes=5)
+                challenge = EmailOTPChallenge.objects.create(
+                    user=self.user,
+                    code_digest=salted_hmac("ergonx-email-mfa", plain_code).hexdigest(),
+                    expires_at=expires_at,
+                    sent_at=timezone.now(),
+                )
+                try:
+                    send_email_mfa_code(recipient_email=self.user.email, code=plain_code, expires_at=expires_at)
+                except Exception:
+                    challenge.delete()
+                    raise AuthenticationFailed("Email MFA delivery failed.", code="email_otp_unavailable")
+                raise EmailOTPRequired("Enter the verification code sent to your email.")
+            challenge = EmailOTPChallenge.objects.filter(user=self.user, consumed_at__isnull=True).order_by("-created_at").first()
+            if not challenge or challenge.expires_at <= timezone.now() or challenge.attempts >= 5:
+                raise AuthenticationFailed("The email verification code is invalid or expired.", code="email_otp_invalid")
+            challenge.attempts += 1
+            challenge.save(update_fields=("attempts", "updated_at"))
+            if not hmac.compare_digest(challenge.code_digest, salted_hmac("ergonx-email-mfa", code).hexdigest()):
+                raise AuthenticationFailed("The email verification code is invalid or expired.", code="email_otp_invalid")
+            challenge.consumed_at = timezone.now()
+            challenge.save(update_fields=("consumed_at", "updated_at"))
+        elif mfa and not verify_totp(mfa.secret, attrs.get("mfa_code", "")):
+            raise MFARequired("Enter the six-digit authenticator code to continue.")
         data["user"] = UserSerializer(self.user).data
         return data
+
+
+class MFASetupSerializer(serializers.Serializer):
+    code = serializers.RegexField(regex=r"^\d{6}$", required=False)
+
+    def validate_code(self, value):
+        mfa = UserMFA.objects.filter(user=self.context["request"].user).first()
+        if not mfa or not verify_totp(mfa.secret, value):
+            raise serializers.ValidationError("The authenticator code is invalid or expired.")
+        return value
 
 
 class SelfServiceRegistrationSerializer(serializers.Serializer):

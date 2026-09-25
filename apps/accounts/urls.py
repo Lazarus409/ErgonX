@@ -1,9 +1,10 @@
 from django.urls import path
 
-from apps.accounts.views import AccountProfileView, AuthBootstrapView, InstitutionAdminInvitationAcceptanceView, InstitutionAdminInvitationView, InvitationAcceptanceView, LoginView, MeView, PasswordChangeView, PasswordResetConfirmView, PasswordResetRequestView, RefreshView, SelfServiceRegistrationView
+from apps.accounts.views import AccountProfileView, AuthBootstrapView, InstitutionAdminInvitationAcceptanceView, InstitutionAdminInvitationView, InvitationAcceptanceView, LoginView, MFASettingsView, MeView, PasswordChangeView, PasswordResetConfirmView, PasswordResetRequestView, RefreshView, SelfServiceRegistrationView
 
 urlpatterns = [
     path("login/", LoginView.as_view(), name="login"),
+    path("security/mfa/", MFASettingsView.as_view(), name="mfa-settings"),
     path("register/", SelfServiceRegistrationView.as_view(), name="register"),
     path("institution-admin-invitations/", InstitutionAdminInvitationView.as_view(), name="institution-admin-invitation"),
     path("institution-admin-invitations/<str:token>/", InstitutionAdminInvitationAcceptanceView.as_view(), name="institution-admin-invitation-acceptance"),

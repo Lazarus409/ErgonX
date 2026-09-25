@@ -99,6 +99,7 @@ class EmployeeCompensationSerializer(TenantRelationSerializer):
             "employee",
             "salary_structure",
             "base_salary",
+            "pay_basis",
             "currency",
             "effective_from",
             "effective_to",

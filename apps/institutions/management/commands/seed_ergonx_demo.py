@@ -16,12 +16,13 @@ from django.utils import timezone
 from apps.accounts.models import User
 from apps.employees.models import Employee, Employment
 from apps.employees.services import create_employment
-from apps.institutions.models import Institution, InstitutionMembership, InstitutionModule, Role
+from apps.institutions.models import Institution, InstitutionMembership, InstitutionModule, Role, UserActivityEvent
 from apps.institutions.services import (
     bootstrap_institution,
     create_custom_role,
     create_membership,
     effective_permission_codes,
+    record_user_activity,
     update_custom_role,
 )
 from apps.organization.models import Department, Grade, Location, Position
@@ -53,7 +54,11 @@ from apps.accounting.services import apply_accounting_preset, approve_journal, a
 
 DEMO_INSTITUTION_CODE = "APEX-DEMO"
 DEMO_ADMIN_EMAIL = "kwame.mensah@apexdemo.example"
-DEFAULT_DEMO_PASSWORD = "Demo@ErgonX2026!"
+DEMO_DIRECTOR_EMAIL = "evelyn.darko@apexdemo.example"
+# Keep the APEX-DEMO credential aligned with the development credential used by
+# the onboarding/demo documentation and local UI smoke tests. This is only for
+# synthetic development accounts; production seeding is explicitly blocked.
+DEFAULT_DEMO_PASSWORD = "ErgonxDemo!2026"
 
 MODULE_CODES = (
     InstitutionModule.ModuleCode.CORE_HR,
@@ -245,6 +250,8 @@ class Command(BaseCommand):
             raise CommandError("APEX-DEMO module baseline is incomplete.")
         if not InstitutionMembership.objects.filter(institution=institution, user__email=DEMO_ADMIN_EMAIL, role__code="INSTITUTION_ADMIN", status=InstitutionMembership.Status.ACTIVE).exists():
             raise CommandError("APEX-DEMO requires its active institution-admin seed membership.")
+        if not InstitutionMembership.objects.filter(institution=institution, user__email=DEMO_DIRECTOR_EMAIL, role__code="DIRECTOR", status=InstitutionMembership.Status.ACTIVE).exists():
+            raise CommandError("APEX-DEMO requires its active Director setup-owner membership.")
         self._validate_organization(institution)
         if institution.employees.count() != len(EMPLOYEES):
             raise CommandError("APEX-DEMO employee baseline is incomplete.")
@@ -273,6 +280,7 @@ class Command(BaseCommand):
             raise CommandError("APEX-DEMO invoice receipt scenario is incomplete.")
         if institution.expenses.filter(description="EXP-2026-000112 Travel expense", status=Expense.Status.PENDING).count() != 1:
             raise CommandError("APEX-DEMO pending expense scenario is incomplete.")
+        self._validate_home_activity(institution)
         self._validate_role_access(institution)
 
     def _validate_role_access(self, institution):
@@ -302,10 +310,14 @@ class Command(BaseCommand):
                     "account.view",
                     "journal.view",
                     "payroll.view",
+                    "payroll.prepare",
+                },
+                "forbidden": {
+                    "employee.view",
+                    "candidate.view",
                     "payroll.approve",
                     "payroll.finalize",
                 },
-                "forbidden": {"employee.view", "candidate.view"},
             },
             "INSTITUTION_ADMIN": {
                 "required": {
@@ -365,6 +377,9 @@ class Command(BaseCommand):
         self._ensure_employees(
             institution, password, reset_passwords=reset_passwords
         )
+        self._ensure_director(
+            institution, password, reset_passwords=reset_passwords
+        )
         self._ensure_compensation_and_payroll_profiles(institution, admin)
         self._ensure_recruitment(institution, admin)
         self._ensure_leave(institution, admin)
@@ -372,6 +387,7 @@ class Command(BaseCommand):
         self._ensure_payroll_run(institution, admin)
         self._ensure_accounting_foundation(institution, admin)
         self._ensure_accounting_operations(institution, admin)
+        self._ensure_home_activity(institution, admin)
         self._validate_existing()
         return {
             "institution": institution,
@@ -379,6 +395,83 @@ class Command(BaseCommand):
             "department_count": len(ORGANIZATION["departments"]),
             "position_count": len(ORGANIZATION["positions"]),
         }
+
+    def _ensure_home_activity(self, institution, admin):
+        """Give the authorized demo personas real, resumable Home activity.
+
+        These records point at data created by the deterministic seed; they do
+        not introduce separate dashboard data or additional financial effects.
+        The existence check makes reruns idempotent while retaining the first
+        recorded timestamp for a stable demonstration history.
+        """
+        employee = institution.employees.get(employee_number="EMP-000102")
+        candidate = institution.candidates.order_by("created_at").first()
+        leave_request = institution.leave_requests.order_by("created_at").first()
+        payroll_run = institution.payroll_runs.filter(
+            status=PayrollRun.Status.FINALIZED
+        ).select_related("accounting_journal_entry").first()
+        journal = payroll_run.accounting_journal_entry if payroll_run else None
+        recruiter = institution.employees.get(employee_number="EMP-000104").user
+        requester = leave_request.employee.user if leave_request else None
+
+        # Earlier seed revisions labelled the posted payroll journal as a
+        # manual journal creation. Remove only that known synthetic event;
+        # APEX-DEMO has no manual journal scenario using this entity.
+        if journal is not None:
+            UserActivityEvent.objects.filter(
+                institution=institution,
+                user=admin,
+                activity_code="journal.create",
+                entity_id=journal.id,
+            ).delete()
+
+        activities = (
+            (admin, "employee.create", employee),
+            (recruiter, "candidate.create", candidate),
+            (requester, "leave.request", leave_request),
+            (admin, "journal.approve", journal),
+        )
+        for actor, activity_code, entity in activities:
+            if actor is None or entity is None:
+                raise CommandError(
+                    f"APEX-DEMO cannot seed Home activity {activity_code}; its source record is missing."
+                )
+            if UserActivityEvent.objects.filter(
+                institution=institution,
+                user=actor,
+                activity_code=activity_code,
+                entity_id=entity.id,
+            ).exists():
+                continue
+            record_user_activity(
+                actor=actor,
+                institution=institution,
+                activity_code=activity_code,
+                entity=entity,
+            )
+
+    def _validate_home_activity(self, institution):
+        """Verify that seeded Home records retain both tenant and entity scope."""
+        candidate = institution.candidates.order_by("created_at").first()
+        leave_request = institution.leave_requests.order_by("created_at").first()
+        payroll_run = institution.payroll_runs.filter(
+            status=PayrollRun.Status.FINALIZED
+        ).select_related("accounting_journal_entry").first()
+        required = {
+            "employee.create": institution.employees.get(employee_number="EMP-000102").id,
+            "candidate.create": candidate.id if candidate else None,
+            "leave.request": leave_request.id if leave_request else None,
+            "journal.approve": payroll_run.accounting_journal_entry_id if payroll_run else None,
+        }
+        for activity_code, entity_id in required.items():
+            if not entity_id or not UserActivityEvent.objects.filter(
+                institution=institution,
+                activity_code=activity_code,
+                entity_id=entity_id,
+            ).exists():
+                raise CommandError(
+                    f"APEX-DEMO Home activity baseline is missing {activity_code}."
+                )
 
     def _ensure_compensation_and_payroll_profiles(self, institution, admin):
         preset = PayrollPresetVersion.objects.select_related("payroll_preset").get(
@@ -500,7 +593,7 @@ class Command(BaseCommand):
             candidate, _ = Candidate.objects.get_or_create(institution=institution, email=email, defaults={"first_name": first_name, "last_name": last_name, "source": "APEX-DEMO"})
             application, _ = Application.objects.get_or_create(institution=institution, job_posting=postings[job_code], candidate=candidate, defaults={"notes": reference})
             if application.status == Application.Status.DRAFT:
-                submit_application(application=application, actor=admin)
+                application = submit_application(application=application, actor=admin)
             if application.status == Application.Status.ACTIVE and application.current_stage_id != stages[stage_name].id:
                 move_application_stage(application=application, stage=stages[stage_name], actor=admin, comment=reference)
             if target_status == "REJECTED" and application.status != Application.Status.REJECTED:
@@ -580,7 +673,16 @@ class Command(BaseCommand):
                 for approval in request.approvals.filter(status="PENDING").order_by("sequence"):
                     request = approve_leave_request(leave_request=request, actor=approval.approver, comment="APEX-DEMO approval")
             if request.status != target_status:
-                raise CommandError(f"Leave scenario {reference} is {request.status}; expected {target_status}.")
+                # Leave requests are operational workflow records. A user may
+                # have legitimately progressed a seeded scenario after the
+                # initial demo load; preserve that history instead of making
+                # an idempotent rerun fail or silently resetting it.
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Preserving progressed leave scenario {reference}: "
+                        f"{request.status} (fixture baseline: {target_status})."
+                    )
+                )
 
     def _ensure_attendance(self, institution, admin):
         def shift(code, name, start, end, overnight=False):
@@ -859,6 +961,28 @@ class Command(BaseCommand):
             changes.append("password")
         if changes:
             user.save(update_fields=tuple(dict.fromkeys((*changes, "updated_at"))))
+        return user
+
+    def _ensure_director(self, institution, password, *, reset_passwords=False):
+        user, created = User.objects.get_or_create(
+            email=DEMO_DIRECTOR_EMAIL,
+            defaults={"first_name": "Evelyn", "last_name": "Darko", "is_active": True},
+        )
+        changes = []
+        for field, value in {"first_name": "Evelyn", "last_name": "Darko", "is_active": True}.items():
+            if getattr(user, field) != value:
+                setattr(user, field, value)
+                changes.append(field)
+        if created or reset_passwords:
+            user.set_password(password)
+            changes.append("password")
+        if changes:
+            user.save(update_fields=tuple(dict.fromkeys((*changes, "updated_at"))))
+        self._ensure_active_membership(
+            user=user,
+            institution=institution,
+            role=institution.roles.get(code="DIRECTOR"),
+        )
         return user
 
     def _ensure_active_membership(self, *, user, institution, role, is_primary=False):

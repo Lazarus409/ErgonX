@@ -14,6 +14,7 @@ from apps.accounting.models import (
     AccountingPreset,
     AccountingPresetVersion,
     AccountTemplate,
+    BankAccount,
     ChartOfAccountsTemplate,
     FiscalYear,
     JournalEntry,
@@ -155,6 +156,7 @@ class Command(BaseCommand):
         account_specs = (
             ("1000", "Cash at bank", Account.AccountType.ASSET, Account.NormalBalance.DEBIT, "CASH"),
             ("3000", "Owner's equity", Account.AccountType.EQUITY, Account.NormalBalance.CREDIT, "EQUITY"),
+            ("4000", "Service income", Account.AccountType.INCOME, Account.NormalBalance.CREDIT, "SERVICE_INCOME"),
             ("5000", "Rent expense", Account.AccountType.EXPENSE, Account.NormalBalance.DEBIT, "RENT_EXPENSE"),
         )
         for code, name, account_type, normal_balance, mapping_code in account_specs:
@@ -247,18 +249,17 @@ class Command(BaseCommand):
                 start_date=date(2026, 1, 1),
                 end_date=date(2026, 12, 31),
             )
-        period = AccountingPeriod.objects.filter(
-            institution=institution, name="September 2026"
-        ).first()
-        if period is None:
-            period = create_accounting_period(
+        periods = []
+        for month in range(1, 10):
+            start = date(2026, month, 1)
+            end = date(2026, month + 1, 1) - date.resolution if month < 12 else date(2026, 12, 31)
+            period, _ = AccountingPeriod.objects.get_or_create(
                 institution=institution,
-                actor=actor,
-                fiscal_year=fiscal_year,
-                name="September 2026",
-                start_date=date(2026, 9, 1),
-                end_date=date(2026, 9, 30),
+                name=start.strftime("%B 2026"),
+                defaults={"fiscal_year": fiscal_year, "start_date": start, "end_date": end},
             )
+            periods.append(period)
+        period = periods[-1]
 
         cash = self._ensure_account(
             institution,
@@ -284,32 +285,17 @@ class Command(BaseCommand):
             account_type=Account.AccountType.EXPENSE,
             normal_balance=Account.NormalBalance.DEBIT,
         )
-        journals = (
-            self._ensure_posted_journal(
-                institution,
-                actor,
-                period,
-                "DEMO-OPENING-2026",
-                entry_date=date(2026, 9, 1),
-                description="Opening capital",
-                lines=[
-                    {"account": cash, "debit": Decimal("25000.00"), "credit": Decimal("0.00")},
-                    {"account": equity, "debit": Decimal("0.00"), "credit": Decimal("25000.00")},
-                ],
-            ),
-            self._ensure_posted_journal(
-                institution,
-                actor,
-                period,
-                "DEMO-RENT-2026-09",
-                entry_date=date(2026, 9, 5),
-                description="September office rent",
-                lines=[
-                    {"account": rent, "debit": Decimal("2500.00"), "credit": Decimal("0.00")},
-                    {"account": cash, "debit": Decimal("0.00"), "credit": Decimal("2500.00")},
-                ],
-            ),
-        )
+        income = self._ensure_account(institution, actor, code="4000", name="Service income", account_type=Account.AccountType.INCOME, normal_balance=Account.NormalBalance.CREDIT)
+        BankAccount.objects.get_or_create(institution=institution, name="Demo Operating Account", defaults={"bank_name": "ErgonX Demo Bank", "masked_account_number": "•••• 2026", "currency": "GHS", "ledger_account": cash, "is_active": True})
+        journals = []
+        for index, month_period in enumerate(periods):
+            month = index + 1
+            income_amount = Decimal(12000 + (month * 850) + ((month % 3) * 500))
+            expense_amount = Decimal(5200 + (month * 275) + ((month % 2) * 350))
+            if month == 1:
+                journals.append(self._ensure_posted_journal(institution, actor, month_period, "DEMO-OPENING-2026", entry_date=date(2026, 1, 2), description="Opening capital", lines=[{"account": cash, "debit": Decimal("25000.00"), "credit": Decimal("0.00")}, {"account": equity, "debit": Decimal("0.00"), "credit": Decimal("25000.00")}]))
+            journals.append(self._ensure_posted_journal(institution, actor, month_period, f"DEMO-INCOME-2026-{month:02d}", entry_date=date(2026, month, 10), description=f"Monthly service income {month:02d}", lines=[{"account": cash, "debit": income_amount, "credit": Decimal("0.00")}, {"account": income, "debit": Decimal("0.00"), "credit": income_amount}]))
+            journals.append(self._ensure_posted_journal(institution, actor, month_period, f"DEMO-RENT-2026-{month:02d}", entry_date=date(2026, month, 20), description=f"Monthly operating expense {month:02d}", lines=[{"account": rent, "debit": expense_amount, "credit": Decimal("0.00")}, {"account": cash, "debit": Decimal("0.00"), "credit": expense_amount}]))
         return {
             "institution": institution,
             "fiscal_year": fiscal_year,

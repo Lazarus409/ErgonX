@@ -4,6 +4,7 @@ from smtplib import SMTPException
 from django.conf import settings
 from django.core.mail import BadHeaderError
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -14,10 +15,10 @@ from apps.employees.filters import EmergencyContactFilter, EmployeeFilter
 from apps.employees.models import EmergencyContact, Employee, EmployeeOffboarding, EmployeeOnboarding, Employment
 from apps.employees.selectors import employment_history_for_employee
 from apps.employees.serializers import EmergencyContactSerializer, EmployeeOffboardingSerializer, EmployeeOffboardingStartSerializer, EmployeeOnboardingSerializer, EmployeeRehireSerializer, EmployeeSelfServiceInvitationSerializer, NewEmployeeSelfServiceInvitationSerializer, EmployeeSerializer, EmploymentSerializer, SelfServiceProfileSerializer
-from apps.employees.services import complete_employee_offboarding, complete_employee_onboarding, initiate_employee_offboarding, rehire_employee, start_employee_onboarding
+from apps.employees.services import complete_employee_offboarding, complete_employee_onboarding, ensure_not_self_hr_mutation, initiate_employee_offboarding, rehire_employee, start_employee_onboarding
 from apps.accounts.emails import send_employee_self_service_invitation
 from apps.institutions.models import Role
-from apps.institutions.services import create_invitation
+from apps.institutions.services import create_invitation, record_user_activity
 from apps.organization.models import Department, Grade, Location, Position
 from apps.documents.models import Document
 from apps.documents.serializers import DocumentSerializer
@@ -36,7 +37,9 @@ class SelfServiceBaseView(APIView):
         return get_object_or_404(Employee.objects.for_institution(request.institution), user=request.user)
 
 
+@extend_schema(responses=SelfServiceProfileSerializer)
 class SelfServiceProfileView(SelfServiceBaseView):
+    serializer_class = SelfServiceProfileSerializer
     def get(self, request):
         return Response(SelfServiceProfileSerializer(self.employee(request)).data)
 
@@ -47,7 +50,9 @@ class SelfServiceProfileView(SelfServiceBaseView):
         return Response(serializer.data)
 
 
+@extend_schema(responses=EmergencyContactSerializer(many=True))
 class SelfServiceEmergencyContactsView(SelfServiceBaseView):
+    serializer_class = EmergencyContactSerializer
     def get(self, request):
         contacts = EmergencyContact.objects.for_institution(request.institution).filter(employee=self.employee(request))
         return Response(EmergencyContactSerializer(contacts, many=True, context={"request": request}).data)
@@ -60,7 +65,9 @@ class SelfServiceEmergencyContactsView(SelfServiceBaseView):
         return Response(EmergencyContactSerializer(contact, context={"request": request}).data, status=status.HTTP_201_CREATED)
 
 
+@extend_schema(responses=EmergencyContactSerializer)
 class SelfServiceEmergencyContactDetailView(SelfServiceBaseView):
+    serializer_class = EmergencyContactSerializer
     def _contact(self, request, pk):
         return get_object_or_404(EmergencyContact.objects.for_institution(request.institution), pk=pk, employee=self.employee(request))
 
@@ -83,7 +90,9 @@ class SelfServiceEmergencyContactDetailView(SelfServiceBaseView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+@extend_schema(responses=DocumentSerializer(many=True))
 class SelfServiceDocumentsView(SelfServiceBaseView):
+    serializer_class = DocumentSerializer
     def get(self, request):
         documents = Document.objects.for_institution(request.institution).filter(
             entity_type="EMPLOYEE", entity_id=self.employee(request).id, is_active=True
@@ -115,6 +124,19 @@ class EmployeeViewSet(TenantModelViewSet):
     def get_queryset(self):
         return super().get_queryset().select_related("user")
 
+    def perform_create(self, serializer):
+        employee = serializer.save(institution=self.request.institution)
+        record_user_activity(
+            actor=self.request.user,
+            institution=self.request.institution,
+            activity_code="employee.create",
+            entity=employee,
+        )
+
+    def perform_update(self, serializer):
+        ensure_not_self_hr_mutation(actor=self.request.user, employee=self.get_object())
+        serializer.save()
+
     def get_required_permission(self):
         if self.action == "me":
             return "home.view"
@@ -125,6 +147,7 @@ class EmployeeViewSet(TenantModelViewSet):
         return super().get_required_permission()
 
     def perform_destroy(self, instance):
+        ensure_not_self_hr_mutation(actor=self.request.user, employee=instance)
         instance.status = Employee.Status.INACTIVE
         instance.save(update_fields=("status", "updated_at"))
 
@@ -136,6 +159,7 @@ class EmployeeViewSet(TenantModelViewSet):
             return Response({"detail": "No employee record is linked to this account."}, status=404)
         return Response(self.get_serializer(employee).data)
 
+    @extend_schema(operation_id="employees_invite_new_self_service")
     @action(detail=False, methods=("post",), url_path="invite-self-service")
     def invite_new_self_service(self, request):
         """Invite a new employee before an HR employee record exists."""
@@ -159,6 +183,7 @@ class EmployeeViewSet(TenantModelViewSet):
                 delivery_status = "failed"
         return Response({"id": str(invitation.id), "email": email, "expires_at": expires_at, "acceptance_token": token, "email_delivery_status": delivery_status}, status=201)
 
+    @extend_schema(operation_id="employees_invite_existing_self_service")
     @action(detail=True, methods=("post",), url_path="invite-self-service")
     def invite_self_service(self, request, pk=None):
         """Issue a one-time account activation link for this employee."""
@@ -223,24 +248,28 @@ class EmployeeViewSet(TenantModelViewSet):
 
     @action(detail=True, methods=("post",), url_path="onboarding/start")
     def onboarding_start(self, request, pk=None):
-        record = call_validated_service(start_employee_onboarding, institution=request.institution, employee=self.get_object(), actor=request.user)
+        employee = self.get_object(); ensure_not_self_hr_mutation(actor=request.user, employee=employee)
+        record = call_validated_service(start_employee_onboarding, institution=request.institution, employee=employee, actor=request.user)
         return Response(EmployeeOnboardingSerializer(record).data)
 
     @action(detail=True, methods=("post",), url_path="onboarding/complete")
     def onboarding_complete(self, request, pk=None):
-        record = call_validated_service(complete_employee_onboarding, institution=request.institution, employee=self.get_object(), actor=request.user)
+        employee = self.get_object(); ensure_not_self_hr_mutation(actor=request.user, employee=employee)
+        record = call_validated_service(complete_employee_onboarding, institution=request.institution, employee=employee, actor=request.user)
         return Response(EmployeeOnboardingSerializer(record).data)
 
     @action(detail=True, methods=("post",), url_path="offboarding/start")
     def offboarding_start(self, request, pk=None):
         payload = EmployeeOffboardingStartSerializer(data=request.data)
         payload.is_valid(raise_exception=True)
-        record = call_validated_service(initiate_employee_offboarding, institution=request.institution, employee=self.get_object(), actor=request.user, **payload.validated_data)
+        employee = self.get_object(); ensure_not_self_hr_mutation(actor=request.user, employee=employee)
+        record = call_validated_service(initiate_employee_offboarding, institution=request.institution, employee=employee, actor=request.user, **payload.validated_data)
         return Response(EmployeeOffboardingSerializer(record).data)
 
     @action(detail=True, methods=("post",), url_path="offboarding/complete")
     def offboarding_complete(self, request, pk=None):
-        record = call_validated_service(complete_employee_offboarding, institution=request.institution, employee=self.get_object(), actor=request.user)
+        employee = self.get_object(); ensure_not_self_hr_mutation(actor=request.user, employee=employee)
+        record = call_validated_service(complete_employee_offboarding, institution=request.institution, employee=employee, actor=request.user)
         return Response(EmployeeOffboardingSerializer(record).data)
 
     @action(detail=True, methods=("post",))
@@ -249,8 +278,9 @@ class EmployeeViewSet(TenantModelViewSet):
         payload.is_valid(raise_exception=True)
         values = payload.validated_data
         institution = request.institution
+        employee = self.get_object(); ensure_not_self_hr_mutation(actor=request.user, employee=employee)
         employment, onboarding = call_validated_service(
-            rehire_employee, institution=institution, employee=self.get_object(), actor=request.user,
+            rehire_employee, institution=institution, employee=employee, actor=request.user,
             department=Department.objects.for_institution(institution).get(pk=values["department_id"]),
             position=Position.objects.for_institution(institution).get(pk=values["position_id"]),
             grade=Grade.objects.for_institution(institution).get(pk=values["grade_id"]),
@@ -278,6 +308,16 @@ class EmploymentViewSet(TenantModelViewSet):
         return super().get_queryset().select_related(
             "employee", "department", "position", "grade", "location", "reports_to"
         )
+
+    def perform_create(self, serializer):
+        employee = serializer.validated_data.get("employee")
+        if employee:
+            ensure_not_self_hr_mutation(actor=self.request.user, employee=employee)
+        serializer.save(institution=self.request.institution)
+
+    def perform_update(self, serializer):
+        ensure_not_self_hr_mutation(actor=self.request.user, employee=self.get_object().employee)
+        serializer.save()
 
 
 class EmergencyContactViewSet(TenantModelViewSet):

@@ -9,6 +9,7 @@ from django.utils import timezone
 from apps.employees.models import Employment
 from apps.audit.services import record_audit_event
 from apps.institutions.models import InstitutionMembership
+from apps.institutions.services import record_user_activity
 from apps.leave.models import (
     LeaveApproval,
     LeaveBalance,
@@ -273,6 +274,12 @@ def create_leave_request(*, institution, actor, **values):
         institution=institution,
         entity=leave_request,
         action="leave.request.created",
+    )
+    record_user_activity(
+        actor=actor,
+        institution=institution,
+        activity_code="leave.request",
+        entity=leave_request,
     )
     return leave_request
 

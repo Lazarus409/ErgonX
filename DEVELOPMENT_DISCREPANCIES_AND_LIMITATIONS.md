@@ -1,6 +1,6 @@
 # ErgonX Development Discrepancies and Limitations Register
 
-Last updated: 2026-09-16
+Last updated: 2026-09-24
 
 ## Purpose
 
@@ -56,7 +56,7 @@ Under the Module Delivery and Frontend Integration Contract v1.0, the current de
 | Cash / Bank and Settlement | `COMPLETE WITH DOCUMENTED LIMITATIONS` | ERD BankAccount, Payment, and Receipt, tenant-safe APIs, one-document settlement, balanced CASH journals, reversal-on-void, and auditable bank statement-line reconciliation are implemented. Allocation, file ingest, and bank feeds remain explicitly deferred under `CASH-001` and `CASH-002`. |
 | Expenses | `COMPLETE WITH DOCUMENTED LIMITATIONS` | ERD Expense schema, tenant-safe APIs, Document attachment safeguard, draft/approval workflow, balanced EXPENSE journal posting, RBAC, audit events, focused test, and frontend/completion records are complete. Settlement/reimbursement, allocation, and expense-specific correction remain deferred under `EXP-001`. |
 | Payroll-to-Accounting Integration | `COMPLETE WITH DOCUMENTED LIMITATIONS` | ERD mapping-template and institution mapping entities, tenant-safe APIs, governed Ghana starter templates, idempotent finalized-run draft PAYROLL journals, protected run link, and the standard accounting submit/approve/post flow are implemented. Unmapped special/custom payroll effects fail closed under `PAY-ACC-001`. |
-| Shared Frontend Platform Contracts | `COMPLETE WITH DOCUMENTED LIMITATIONS` | A consolidated frontend platform contract now documents shared auth/tenant/envelope rules, PWA boundaries, dashboard/report endpoints, shared documents, generalized approvals, import/export foundations, background jobs, and links to module-specific contracts. Product limitations remain explicit under `PWA-001`, `PWA-002`, `PWA-003`, `REPORT-001`, and `OPS-001`. |
+| Shared Frontend Platform Contracts | `COMPLETE WITH DOCUMENTED LIMITATIONS` | A consolidated frontend platform contract now documents shared auth/tenant/envelope rules, the static-only PWA and HttpOnly-session boundaries, dashboard/report endpoints, shared documents, generalized approvals, import/export foundations, background jobs, and links to module-specific contracts. Remaining product limitations are explicit under `PWA-003`, `REPORT-001`, and `OPS-001`; `PWA-001` and `PWA-002` are retained as resolved historical records. |
 | Recruitment / ATS | `COMPLETE WITH DOCUMENTED LIMITATIONS` | ERD-required Recruitment entities, tenant/RBAC APIs, explicit workflow services, shared document linkage, audit/notifications, deterministic demo data, and atomic/idempotent Employee conversion are complete. PostgreSQL focused tests and full regression are green; only `RECRUIT-001` and `RECRUIT-002` remain as documented scope/ERD decisions. |
 
 ## Open discrepancies and decisions
@@ -69,23 +69,10 @@ Under the Module Delivery and Frontend Integration Contract v1.0, the current de
 - Priority: `P1`
 - Governing references: `ERGONX_CODEX_HOME_SEARCH_SETTINGS_REFERENCE_IDS_INSTRUCTIONS_v1.0.md` sections 4-50.
 - Historical finding (2026-09-16): Before this increment there was no Home endpoint, search registry, preference/activity storage, reusable reference-sequence service, or settings API hierarchy.
-- Current implementation and limitation: `/api/v1/home/`, `/api/v1/search/`, personal preferences, institution/module settings, permission-aware action catalogue, tenant-scoped PostgreSQL provider registry, and locked `ReferenceSequence` issuance are now implemented. Existing business entities still retain their historical code fields, and not every create workflow has been migrated to request a generated reference. Activity events are available for Home ranking, but not every user action emits one yet.
+- Current implementation and limitation: `/api/v1/home/`, `/api/v1/search/`, personal preferences, institution/module settings, permission-aware action catalogue, tenant-scoped PostgreSQL provider registry, and locked `ReferenceSequence` issuance are now implemented. Employee, candidate, leave-request, attendance-adjustment, recruitment application submission, interview updates, offers, compensation changes, payroll adjustments, manual-journal, and payroll-run creation append tenant-scoped `UserActivityEvent` records only after their authoritative write succeeds; Home resolves those events to their actual detail route rather than a generic action route. Existing business entities still retain their historical code fields, and not every create workflow has been migrated to request a generated reference or emit an activity event.
 - Impact: The platform contract is available now; generated-reference coverage and Home recency will grow per domain without invalidating legacy references.
 - Decision or work needed: Integrate `next_reference` and `UserActivityEvent` into each relevant write service only when its existing identifier compatibility is reviewed.
-- Evidence: `apps/dashboards/home.py`, `apps/institutions/search.py`, `apps/institutions/models.py`, `apps/institutions/services.py`, `apps/institutions/views.py`, `docs/integration/home_frontend_contract.md`, and `docs/integration/reference_codes_frontend_contract.md`.
-
-### ACCESS-001 - Access and lifecycle foundations are delivered; invitation and rehire flows remain outstanding
-
-- Area: Access, RBAC, institution onboarding, employee lifecycle
-- Type: Governing-instruction delivery gap
-- Status: `OPEN`
-- Priority: `P1`
-- Governing references: `ERGONX_CODEX_ACCESS_RBAC_ONBOARDING_LIFECYCLE_INSTRUCTIONS_v1.0.md` sections 3-41.
-- Historical finding (2026-09-16): Before this increment bootstrap metadata, protected custom-role APIs, server-derived onboarding steps, lifecycle actions, last-admin safeguards, and recruitment-to-onboarding handoff were absent.
-- Current implementation and limitation: Tenant bootstrap, reserved/custom role controls, membership reassignment/status updates, platform-only permission protection, institution onboarding validation, employee onboarding/offboarding actions, institution-only access deactivation, and recruitment handoff are implemented. One-time invitation-token delivery/acceptance and a rehire action that creates a new employment/onboarding cycle are not yet implemented.
-- Impact: Administrators can manage the active lifecycle safely, but invitation and rehire must remain manual operational workflows until their dedicated contracts are delivered.
-- Decision or work needed: Add expiring single-use invitation tokens and a service-backed rehire endpoint without mutating historical employment/offboarding records.
-- Evidence: `apps/accounts/views.py`, `apps/institutions/services.py`, `apps/institutions/views.py`, `apps/employees/services.py`, `apps/recruitment/services.py`, and `docs/integration/access_rbac_frontend_contract.md`.
+- Evidence: `apps/attendance/services.py`, `apps/compensation/services.py`, `apps/dashboards/home.py`, `apps/institutions/search.py`, `apps/institutions/models.py`, `apps/institutions/services.py`, `apps/institutions/views.py`, `apps/payroll/services.py`, `apps/recruitment/services.py`, `ergonx-frontend/src/components/layout/TopBar.tsx`, `tests/test_scheduling_attendance.py`, `tests/test_payroll.py`, `tests/test_recruitment.py`, `docs/integration/home_frontend_contract.md`, and `docs/integration/reference_codes_frontend_contract.md`. Validation on 2026-09-24 covered the seeded Institution Admin Home and Executive Dashboard in a production browser, visible Search-button and Ctrl/Cmd+K opening, an `EMP-000109` cross-module query returning controlled employee/leave results, controlled employee-result navigation, a 16-route authenticated operational sweep, six 390px routes with no horizontal overflow, payroll-run and payroll-adjustment activity/idempotency regression coverage, attendance-adjustment activity regression, and recruitment activity assertions; the remaining limitation is incremental domain-wide activity/reference adoption, not a broken Home route.
 
 ### RECRUIT-001 - Recruitment ERD names entities but leaves field-level and workflow details unspecified
 
@@ -112,6 +99,31 @@ Under the Module Delivery and Frontend Integration Contract v1.0, the current de
 - Decision or work needed: Treat additions as Phase 2 unless explicitly reprioritized after release-candidate freeze.
 - Evidence: `apps/recruitment/`, `docs/integration/recruitment_frontend_contract.md`.
 
+### DASH-001 — Cash dashboard is a registered-bank movement view, not a full cash-flow statement
+
+- Area: Finance and Executive dashboards
+- Type: Delivery limitation
+- Status: `REVIEW`
+- Priority: `P2`
+- Governing references: UI/UX release-candidate brief §§14–15 and Accounting/Cash-Bank ERD scope.
+- Observed behavior or limitation: `/api/v1/dashboards/finance/` and `/api/v1/dashboards/executive/` now return current bank balance and up to twelve monthly inflow/outflow/net-movement points from posted `JournalLine` records belonging to active `BankAccount.ledger_account` records. This is intentionally not an indirect cash-flow statement and does not infer cash from arbitrary asset accounts.
+- Impact: The dashboard accurately shows configured bank-ledger movement, but does not classify cash movement into operating, investing, and financing activities or represent unregistered cash accounts.
+- Current safeguard or workaround: Zero active bank accounts returns an explicit zero balance and empty trend. Only posted journals and explicitly registered bank ledger accounts contribute, preventing receivables or unrelated assets from being displayed as cash.
+- Decision or work needed: Add governed cash-account classification and statement presentation only when accounting policy and account-mapping requirements are approved.
+- Evidence: `apps/dashboards/views.py`, `tests/test_dashboards_reports.py`, `docs/integration/frontend_platform_contract.md`, and the Finance/Executive dashboard pages.
+
+### OPENAPI-001 — Generated schema serializer-discovery and operation-ID issues
+
+- Area: OpenAPI contract publishing
+- Type: Documentation/runtime-contract limitation
+- Status: `RESOLVED`
+- Priority: `P2`
+- Governing references: UI/UX release-candidate brief §27 and Module Delivery Contract API/OpenAPI requirements.
+- Historical finding (2026-09-22): `manage.py spectacular --file openapi-schema.yml --validate` generated a schema but reported 122 discovery errors (19 unique) and eight warnings. The errors were concentrated in APIViews whose request/response shape was already implemented but undisclosed to the schema generator; three operation IDs also collided.
+- Resolution (2026-09-22): Existing concrete serializers or object responses were declared on authentication, self-service, preference/settings, onboarding/search, notification, reports, Home, and dashboard actions. Schema-only fake-queryset guards prevent tenant-context access during inspection; serializer method return annotations remove ambiguous fields; and explicit unique operation IDs resolve the three collisions.
+- Validation: `manage.py spectacular --file openapi-schema.yml --validate` now exits zero with no errors or warnings. Runtime endpoint behavior is unchanged; regression tests remain the source of behavioral proof.
+- Evidence: `openapi-schema.yml`, `common/schema.py`, `apps/accounts/views.py`, `apps/employees/views.py`, `apps/institutions/views.py`, `apps/notifications/views.py`, `apps/audit/views.py`, `apps/reports/views.py`, `apps/dashboards/views.py`, and the 2026-09-22 schema-generation command output.
+
 ### OPS-001 — Shared import/export infrastructure needs type-specific handlers
 
 - Area: Platform operations / import-export
@@ -119,11 +131,11 @@ Under the Module Delivery and Frontend Integration Contract v1.0, the current de
 - Status: `REVIEW`
 - Priority: `P1`
 - Governing references: Product Roadmap Shared Infrastructure and Context v1.6 §91.
-- Observed behavior or limitation: Shared tenant-safe ImportJob, ImportRowResult, ExportJob, and BackgroundJob APIs and queue records now exist. A validated `EMPLOYEE` import handler is registered; no generic handler can infer a domain's column mapping, validation, idempotency contract, or output layout for arbitrary remaining types.
-- Impact: Employee imports and notification delivery can execute through the worker. Other domain imports and all generated export artifacts remain safely queued until their explicit handlers are registered.
+- Observed behavior or limitation: Shared tenant-safe ImportJob, ImportRowResult, ExportJob, and BackgroundJob APIs and queue records now exist. Validated `EMPLOYEE` and `ATTENDANCE` import handlers and a normalized report CSV export handler are registered; no generic handler can infer a domain's column mapping, validation, idempotency contract, or output layout for arbitrary remaining types.
+- Impact: Employee/attendance imports, notification delivery, and report CSV export jobs can execute through the worker. Other domain imports/exports remain safely queued until their explicit handlers are registered.
 - Current safeguard or workaround: Import confirmation is permitted only from the validated READY state, and the worker fails unregistered job types visibly rather than silently committing data.
-- Decision or work needed: Register attendance import and report-export handlers with documented schema/version/idempotency rules.
-- Evidence: `apps/operations/models.py`, `apps/operations/services.py`, `apps/operations/views.py`, `apps/operations/management/commands/run_background_jobs.py`, and `tests/test_operations_platform.py`.
+- Decision or work needed: Register any further import/export type only with documented schema/version/idempotency rules; report artifacts are currently bounded to 10 MB inline storage.
+- Evidence: `apps/reports/services.py`, `apps/operations/models.py`, `apps/operations/views.py`, `apps/operations/management/commands/run_background_jobs.py`, `docs/integration/frontend_platform_contract.md`, and `tests/test_operations_platform.py`.
 
 ### REPORT-001 — MVP exports are CSV only
 
@@ -132,37 +144,38 @@ Under the Module Delivery and Frontend Integration Contract v1.0, the current de
 - Status: `ACCEPTED_MVP`
 - Priority: `P2`
 - Governing references: Product Roadmap Reports & Analytics requests Excel/PDF export where practical; Context v1.6 §§25 and 80 list PDF and Excel outputs.
-- Observed behavior or limitation: The seven tenant-scoped report endpoints provide a practical spreadsheet-ready CSV download. Native XLSX and PDF rendering, scheduled/background exports, and saved export artifacts are not implemented.
+- Observed behavior or limitation: The eight tenant-scoped report endpoints provide a practical spreadsheet-ready CSV download. Native XLSX and PDF rendering remain unavailable; queued CSV exports now generate bounded saved artifacts and expose a download endpoint.
 - Impact: Users can open exports in Excel-compatible tools, but cannot receive formatted workbook or printable PDF output from ErgonX.
 - Current safeguard or workaround: Exports derive directly from authoritative tenant-scoped operational data and require `report.view`; CSV is deliberately not cached by the PWA worker.
-- Decision or work needed: Add a reusable export-job/rendering framework before formatted or large asynchronous exports are required.
+- Decision or work needed: Add XLSX/PDF renderers and external/object storage before formatted or large asynchronous exports are required.
 - Evidence: `apps/reports/views.py`, `frontend/app/workspace/[name]/page.tsx`, and `tests/test_dashboards_reports.py`.
 
-### PWA-001 — Offline support is application-shell only
+### PWA-001 — PWA delivery was deferred because the current checkout lacked verifiable assets
 
 - Area: Next.js PWA delivery
-- Type: Intentional MVP boundary
-- Status: `ACCEPTED_MVP`
-- Priority: `P2`
+- Type: Implementation/documentation discrepancy
+- Status: `RESOLVED`
+- Priority: `P1`
 - Governing references: Context v1.6 §§5 and 159–184; Product Roadmap PWA / Frontend section.
-- Observed behavior or limitation: The manifest, service worker, static-asset cache, standalone display, and offline fallback are delivered. Authenticated API responses, HR/payroll records, transactions, and report exports are never cached or queued offline.
-- Impact: The application remains installable and provides a safe offline page, but users cannot perform operational work without network connectivity.
-- Current safeguard or workaround: The service worker caches only the app shell/static frontend assets and uses network-only requests for operational data, avoiding sensitive-record persistence in browser caches.
-- Decision or work needed: Do not add offline transactions or background synchronization without explicit security, conflict-resolution, and product approval.
-- Evidence: `frontend/public/manifest.webmanifest`, `frontend/public/sw.js`, `frontend/app/offline/page.tsx`, and `frontend/app/register-sw.tsx`.
+- Historical claim: The prior platform contract and this register stated that a manifest, service worker, static-asset cache, standalone display, and offline fallback had been delivered, with operational data deliberately network-only.
+- Historical finding (2026-09-20): The active `ergonx-frontend/` checkout contains no manifest, service worker, offline route, or service-worker registration source, so the prior delivery claim was not verifiable from the code being run.
+- Impact at discovery: The app could not be described as installable or offline-capable; its claimed application-shell safety boundary did not exist.
+- Resolution (2026-09-22): Added `public/manifest.webmanifest`, a production-only `ServiceWorkerRegistration`, a static `/offline` route, and `public/sw.js`. The worker caches only static same-origin assets plus the generic fallback; it never caches navigation pages, `/api/` requests, exports, JWTs, selected-institution values, or tenant data, and it does not queue writes.
+- Validation: `npx tsc --noEmit`, `npm run lint`, and `npm run build` completed after the PWA files were added. A production-mode standalone smoke test returned HTTP 200 for the manifest, worker, and offline route; a real browser confirmed the manifest link and an active worker at the application scope. The manifest is valid JSON and the worker is source-reviewed for the stated cache exclusions.
+- Evidence: `ergonx-frontend/public/manifest.webmanifest`, `ergonx-frontend/public/sw.js`, `ergonx-frontend/src/components/pwa/ServiceWorkerRegistration.tsx`, `ergonx-frontend/src/app/offline/page.tsx`, and `Ergonx-backend/docs/integration/frontend_platform_contract.md`.
 
-### PWA-002 — Browser session tokens are stored in local storage
+### PWA-002 — Browser session tokens were stored in local storage
 
 - Area: Frontend authentication
 - Type: Security architecture limitation
-- Status: `REVIEW`
+- Status: `RESOLVED`
 - Priority: `P1`
 - Governing references: Context v1.6 tenant/RBAC requirements and PWA frontend baseline.
-- Observed behavior or limitation: The first functional frontend stores short-lived JWT access/refresh tokens and the selected institution UUID in browser local storage to attach the existing API's required bearer and `X-Institution-ID` headers.
-- Impact: A future XSS defect could expose the tokens. The current API token endpoint does not provide an HttpOnly-cookie browser-session flow.
-- Current safeguard or workaround: The PWA does not cache API responses; token access is limited to the browser origin and the backend access-token lifetime is configured separately.
-- Decision or work needed: Before production launch, adopt a same-site HttpOnly refresh-token/BFF session design or explicitly accept and harden the local-storage JWT model with CSP/XSS controls.
-- Evidence: `frontend/app/login/page.tsx`, `frontend/app/workspace/[name]/page.tsx`, `apps/accounts/views.py`, and `config/settings/base.py`.
+- Historical finding: The frontend stored short-lived JWT access/refresh tokens and the selected institution UUID in browser local storage to attach the existing API's required bearer and `X-Institution-ID` headers.
+- Impact at discovery: A future XSS defect could expose bearer credentials. CSP mitigated but could not eliminate that session-boundary risk.
+- Resolution (2026-09-22): Added the same-origin `src/app/api/v1/[...path]/route.ts` BFF proxy. It strips tokens from login/refresh JSON, stores them in HttpOnly SameSite cookies, attaches bearer credentials server-side to Django, refreshes with the HttpOnly refresh cookie, applies an unsafe-method origin check, and clears cookies on proxy logout. The client stores only a non-sensitive session hint and institution UUID; it no longer emits an Authorization header.
+- Validation: Production-mode login returned no `access` field to JavaScript while `ergonx_access` and `ergonx_refresh` were HttpOnly; authenticated `/auth/me/`, cookie refresh, and logout-through-proxy passed, post-logout `/auth/me/` correctly returned 401, and a hostile `Origin` on an unsafe proxy request returned 403.
+- Evidence: `ergonx-frontend/src/app/api/v1/[...path]/route.ts`, `ergonx-frontend/src/lib/api/client.ts`, `ergonx-frontend/src/lib/api/auth.ts`, `ergonx-frontend/src/components/guards/AuthProvider.tsx`, and the 2026-09-22 production smoke output.
 
 ### PWA-003 — Initial frontend operational screens are read-oriented
 
@@ -421,17 +434,6 @@ Under the Module Delivery and Frontend Integration Contract v1.0, the current de
 - Impact: Automated preset upgrades and chart migrations are unavailable.
 - Decision needed: Specify review, diff, account-remapping, rollback, and historical-version rules before enabling preset-version migration.
 
-### ERD-007 — Institution type is not retained for accounting-preset recommendation
-
-- Area: Accounting preset onboarding
-- Type: ERD onboarding gap
-- Status: `OPEN`
-- Priority: `P2`
-- Governing references: Context §64 requires onboarding to ask for Commercial/SME/Public/Nonprofit/Other and recommend a preset; ERD §4.2 Institution and §14.1 InstitutionAccountingConfiguration contain no institution-type field, while §23.1 categorizes AccountingPreset by `institution_type`.
-- Observed limitation: The backend can filter and display each same-country preset's institution type but cannot persist the onboarding answer or automatically rank one as the institution's recommendation.
-- Current safeguard: Country-matching choices remain explicit and no preset is silently selected.
-- Decision needed: Add an accounting-specific institution classification field/entity or designate an existing governed source for the recommendation input.
-
 ### GHA-001 — Daily and casual minimum-wage compliance cannot be calculated
 
 - Area: Compensation / Ghana payroll
@@ -468,11 +470,12 @@ Under the Module Delivery and Frontend Integration Contract v1.0, the current de
 
 - Area: Compensation / Payroll
 - Type: Data-model ambiguity
-- Status: `OPEN`
+- Status: `SAFEGUARDED`
 - Priority: `P1`
-- Limitation: Payroll currently interprets `EmployeeCompensation.base_salary` as the amount for one configured payroll period. The schema does not say whether it is annual, monthly, weekly, daily, or hourly.
-- Impact: Weekly, biweekly, semimonthly, daily, and hourly payroll can be materially incorrect if callers use a different interpretation.
-- Decision needed: Add a compensation pay-basis/frequency contract and conversion rules before enabling those frequencies for localized production payroll.
+- Current implementation: `EmployeeCompensation.pay_basis` now explicitly records `PAYROLL_PERIOD` for the supported engine behavior. Existing rows are backfilled to that value by migration; the API exposes it to configuration clients.
+- Current safeguard: Payroll calculation fails closed for any unsupported future basis instead of treating annual, daily, or hourly amounts as a configured-period amount.
+- Decision needed: Add conversion rules and additional approved basis values before enabling annual, weekly, daily, or hourly compensation in localized production payroll.
+- Evidence: `apps/compensation/models.py`, `apps/compensation/serializers.py`, `apps/compensation/migrations/0002_employeecompensation_pay_basis.py`, and `apps/payroll/calculation.py`.
 
 ### PAY-002 — Mid-period compensation changes have no proration rule
 
@@ -564,6 +567,109 @@ The entries below are retained for traceability only. They no longer carry curre
 
 ## Resolved items
 
+### RES-029 - Integrated demo seeding applied recruitment stages only on rerun
+
+- Resolved: 2026-09-24
+- Original issue: The integrated demo command submitted newly-created recruitment applications but retained the stale pre-submit object in memory, so target pipeline stages were not applied until a second run; that second run also emitted duplicate stage-moved audit events.
+- Resolution: The seed now uses the submitted application returned by the authoritative service before applying its target stage. Progressed leave workflows are preserved and reported rather than reset.
+- Validation: `tests/test_integrated_demo_seed.py` runs the command twice and proves stable institution, employee, leave, audit, and notification counts; the current PostgreSQL APEX-DEMO rerun completes while preserving its progressed leave request.
+- Evidence: `apps/institutions/management/commands/seed_ergonx_demo.py`, `tests/test_integrated_demo_seed.py`, and the 2026-09-24 seed command output.
+
+### RES-030 - Employee Details had no document action or document list
+
+- Resolved: 2026-09-24
+- Original issue: The Employee Details screen rendered an empty Documents panel without a way to upload, inspect, or download employee-associated documents, despite the shared backend document contract already supporting those records.
+- Resolution: Employee Details now loads active tenant-scoped documents for the employee, validates supported uploads in the browser, exposes upload progress and errors, lists document metadata, and downloads through the protected operations endpoint.
+- Validation: Frontend lint and production build pass; a live browser smoke against the backend returned the scoped document list successfully and rendered the `Documents` section with its `Add Document` action and empty state.
+- Evidence: `ergonx-frontend/src/app/hr/employees/[id]/page.tsx`, `ergonx-frontend/src/lib/api/operations.ts`, `apps/documents/views.py`, and the 2026-09-24 Playwright smoke output.
+
+### RES-031 - Financial report filters were only visible for Trial Balance
+
+- Resolved: 2026-09-24
+- Original issue: Income Statement and Balance Sheet requests accepted date parameters, but the frontend rendered the date controls only inside the Trial Balance panel, leaving the other report actions effectively unfilterable and displaying amounts without the active institution currency.
+- Resolution: Financial Reports now uses one shared filter surface for Trial Balance, Income Statement, and Balance Sheet; the Balance Sheet end date is labelled as its as-of date. Report metrics and trial-balance rows use the institution currency and the canonical currency-symbol formatter, with loading, empty, error, and retry states retained.
+- Validation: `npm run lint` and `npm run build` pass after the change; the production build includes `/accounting/reports` and TypeScript validation succeeds. The focused accounting/report regression run passed `17` tests with one explicit PostgreSQL-only skip. A live APEX-DEMO browser smoke switched to Income Statement and Balance Sheet and confirmed the shared filters remained visible with `GH₵`-formatted values.
+- Evidence: `ergonx-frontend/src/app/accounting/reports/page.tsx`, `ergonx-frontend/src/lib/format.ts`, and the 2026-09-24 frontend command output.
+
+### RES-032 - Country changes silently overwrote explicit currency choices
+
+- Resolved: 2026-09-24
+- Original issue: Institution Settings replaced the saved/default currency whenever the country field changed, which violated the requirement that country-to-currency be a convenience proposal and not a silent override. Onboarding had no visible proposal action.
+- Resolution: Settings and onboarding now preserve the current currency while showing the authoritative catalogue suggestion and an explicit `Use suggestion` action. The backend-owned country catalogue remains the source of default mappings.
+- Validation: Frontend lint and production build pass after the change; the implementation uses the shared locale catalogue rather than a duplicated country list.
+- Evidence: `ergonx-frontend/src/app/settings/institution/page.tsx`, `ergonx-frontend/src/app/onboarding/profile/page.tsx`, `ergonx-frontend/src/lib/api/institutions.ts`, and the 2026-09-24 frontend command output.
+
+### RES-033 - Disabled-module propagation lacked a centralized Leave regression
+
+- Resolved: 2026-09-24
+- Original issue: Executive aggregation and endpoint gating had coverage, but no single regression proved that a disabled Leave module was removed consistently from Home actions, Home attention items, Universal Search, and Reports.
+- Resolution: Added a tenant-scoped test that disables Leave while preserving a historical leave request, then verifies all four active surfaces are gated without deleting the record.
+- Validation: Full SQLite suite passes `148 passed, 6 skipped`; the six skips are explicitly PostgreSQL-only.
+- Evidence: `tests/test_access_experience_foundation.py::test_disabled_leave_is_removed_from_home_search_and_reports`, `apps/dashboards/home.py`, `apps/institutions/search.py`, and `apps/reports/views.py`.
+
+### RES-034 - Employee Documents lacked a governed deactivate/replace action
+
+- Resolved: 2026-09-24
+- Original issue: Employee Details could upload, list, and download documents but did not expose the shared document layer's safe deactivation capability, leaving replacement/deactivation dependent on an unrelated API client.
+- Resolution: Added a protected `deactivateDocument` adapter and Employee Details Deactivate action. The backend's existing tenant-scoped soft-delete behavior marks the document inactive and preserves its historical record; a new upload can be used as the replacement.
+- Validation: Frontend lint and production build pass after the change; the Employee Details document list continues to request active records only.
+- Evidence: `ergonx-frontend/src/lib/api/operations.ts`, `ergonx-frontend/src/app/hr/employees/[id]/page.tsx`, `Ergonx-backend/common/viewsets.py`, and `Ergonx-backend/apps/institutions/migrations/0019_seed_document_access.py`.
+
+### RES-028 - Universal Search pointer trigger was closed by the global menu handler
+
+- Resolved: 2026-09-24
+- Original issue: The visible Search button set the search state, but the document-level outside-click handler immediately closed it before a pointer user could type. Keyboard `Ctrl/Cmd+K` remained functional, masking the integration defect.
+- Resolution: The Search trigger now stops propagation and is explicitly treated as an in-scope search surface by the shared TopBar menu boundary. The existing single search API, permission/module filtering, controlled route hints, and debounce behavior remain unchanged.
+- Validation: Browser smoke opened Search by pointer and `Ctrl/Cmd+K`, queried `EMP-000109`, displayed employee and leave results, and navigated the employee result to its controlled detail route.
+- Evidence: `ergonx-frontend/src/components/layout/TopBar.tsx`, `apps/institutions/search.py`, and the 2026-09-24 Playwright smoke output.
+
+### RES-027 - Settings institution classification values diverged from the backend enum
+
+- Resolved: 2026-09-22
+- Original issue: The Settings institution editor offered `COMMERCIAL`, `PUBLIC_SECTOR`, `NONPROFIT`, and `EDUCATIONAL`, while the persisted backend choices are `PRIVATE`, `GOVERNMENT`, `NGO`, and `EDUCATION`. A Settings edit could therefore submit a value rejected by the serializer even though onboarding used the correct choices.
+- Resolution: Settings now uses the same server-owned enum values and human labels as onboarding, while preserving an unknown stored legacy value as a visible option instead of silently replacing it.
+- Validation: Frontend lint, TypeScript, production build, and a live APEX-DEMO browser pass confirmed the corrected values in read-only and edit states.
+- Evidence: `ergonx-frontend/src/app/settings/institution/page.tsx`, `ergonx-frontend/src/app/onboarding/profile/page.tsx`, `Ergonx-backend/apps/institutions/models.py`, and `Ergonx-backend/apps/institutions/serializers.py`.
+
+### RES-026 - ERD-007 institution type could not be retained for onboarding and preset recommendation
+
+- Resolved: 2026-09-21
+- Superseded item: `ERD-007`.
+- Original issue: The ERD did not retain the Commercial/SME/Public/Nonprofit/Other onboarding answer needed to contextualize an accounting-preset recommendation.
+- Resolution: `Institution.institution_type` now persists the governed classification. The authenticated locale catalogue and onboarding profile contract expose the controlled choices independently of country, currency, and timezone. Preset selection remains explicit: this field is context for a recommendation, not permission to silently apply a preset.
+- Evidence: `apps/institutions/models.py`, `apps/institutions/migrations/0032_institution_institution_type.py`, `apps/institutions/catalogues.py`, `apps/institutions/serializers.py`, and `ergonx-frontend/src/app/onboarding/profile/page.tsx`.
+
+### RES-025 - Payslip detail API omitted the payroll-period summary required by the frontend
+
+- Resolved: 2026-09-21
+- Original issue: The typed frontend payslip detail screen rendered `payslip.payroll_period.name`, but `PayslipSerializer` supplied only the immutable calculation payload. Viewing a payslip therefore raised a browser runtime error instead of rendering its period information.
+- Resolution: `PayslipSerializer` now returns the server-owned payroll-period summary from the linked run. The frontend retains an explicit incomplete-response state so a malformed or stale API response cannot crash the route.
+- Validation: Focused payroll regression now asserts the summary; a live APEX-DEMO payslip response includes `payroll_period.name`.
+- Evidence: `apps/payroll/serializers.py`, `tests/test_payroll.py`, `ergonx-frontend/src/app/payroll/payslips/[id]/page.tsx`, and `docs/integration/payroll_frontend_contract.md`.
+
+### RES-023 - Tracked local environment example exposed non-placeholder credentials
+
+- Resolved: 2026-09-19
+- Original issue: The repository-root `.env.example` contained a database password, pgAdmin password, and personal pgAdmin email.
+- Resolution: Replaced committed values with non-sensitive placeholders. Local credentials remain untracked and must be supplied through `.env` or `.env.production`.
+- Evidence: repository-root `.env.example` and `.gitignore`.
+
+### RES-024 - Post-sync frontend lockfile and invitation tests were not reproducible
+
+- Resolved: 2026-09-19
+- Original issue: `ergonx-frontend` could not run `npm ci` because its lockfile omitted required `@emnapi` package entries. The invitation tests also recreated the bootstrap-provided Employee role and omitted the required invitation issuer.
+- Resolution: Regenerated the frontend lockfile from the declared dependency graph and corrected invitation fixtures to use the seeded role and an active HR-admin issuer. The full frontend lint/build path and invitation coverage now execute from a clean install.
+- Validation: `npm ci`, `npm run lint`, `npm run build`, and focused backend invitation/lifecycle tests.
+- Evidence: `ergonx-frontend/package-lock.json` and `apps/accounts/tests.py`.
+
+### RES-022 - ACCESS-001 invitation and rehire lifecycle gap was superseded
+
+- Resolved: 2026-09-19
+- Superseded item: `ACCESS-001`.
+- Original issue: Institution invitation acceptance and a service-backed rehire flow were absent from the access/onboarding lifecycle foundation.
+- Resolution: Expiring invitation acceptance, role/membership activation, HR-prepared employee linking, new employee-profile creation, and rehire actions now exist. Employee-to-user linkage was changed from globally one-to-one to institution-compatible foreign-key profiles, preserving a single login across institutions while retaining tenant ownership validation.
+- Evidence: `apps/accounts/views.py`, `apps/employees/services.py`, `apps/employees/views.py`, `apps/employees/migrations/0006_allow_multi_institution_employee_profiles.py`, and `apps/accounts/tests.py`.
+
 ### RES-021 - Historical ROADMAP-001 pending-domain snapshot was superseded
 
 - Resolved: 2026-09-13
@@ -583,10 +689,12 @@ The entries below are retained for traceability only. They no longer carry curre
 ### RES-019 - Historical PWA-001 no-frontend limitation was superseded
 
 - Resolved: 2026-09-13
+- Superseded: 2026-09-20 by the reopened current `PWA-001` checkout audit.
 - Superseded item: `PWA-001`
 - Original historical note: Backend provisions existed, but installable frontend, service worker, offline synchronization, offline payroll/payslip persistence, and web push were deferred.
-- Current state: An installable Next.js frontend now exists with manifest, service worker, offline fallback, and app-shell caching. The current `PWA-001` entry remains active only for the deliberate application-shell-only offline boundary.
-- Evidence: `frontend/public/manifest.webmanifest`, `frontend/public/sw.js`, `frontend/app/offline/page.tsx`, `frontend/app/register-sw.tsx`, `frontend/app/workspace/[name]/page.tsx`, and `docs/integration/frontend_platform_contract.md`.
+- Historical resolution record: A prior review reported that an installable Next.js frontend, manifest, service worker, offline fallback, and app-shell cache existed.
+- Current status: That claimed asset set is absent from the current `ergonx-frontend/` checkout. `PWA-001` is the sole current implementation status and is `ACCEPTED_MVP`; this item is retained only as historical evidence of the prior report.
+- Evidence: `ergonx-frontend/public/` current file inventory and `docs/ai_context/ERGONX_UI_AND_FRONTEND_BACKEND_CONTEXT.md`.
 
 ### RES-018 - Ghana localization sequencing note was superseded by delivered dependent workflows
 
@@ -745,6 +853,24 @@ The entries below are retained for traceability only. They no longer carry curre
 - Original issue: Custom mode correctly avoided Ghana defaults, but the setup-choice response did not communicate the institution's compliance responsibility.
 - Resolution: The Custom choice now includes an explicit `compliance_warning` in the API and OpenAPI schema.
 - Evidence: `apps/payroll/services.py`, `apps/payroll/serializers.py`, and `openapi-schema.yml`.
+
+## Current release-candidate reconciliation notes (2026-09-23)
+
+- `UI-001` — **RESOLVED**: Payslip detail now guards missing payroll-period relations and renders the active institution name. Evidence: `ergonx-frontend/src/app/payroll/payslips/[id]/page.tsx`.
+- `UI-002` — **RESOLVED**: Audit history is rendered as a structured table with actor, action, object, timestamp, IP address, and expandable metadata rather than raw JSON-only records. Evidence: `ergonx-frontend/src/app/settings/audit/page.tsx`, `apps/audit/serializers.py`.
+- `UI-003` — **RESOLVED**: Optional TOTP MFA setup/confirmation/disable and login challenge flow are implemented; password-strength guidance is shown at login and password change. Evidence: `apps/accounts/models.py`, migration `apps/accounts/migrations/0003_usermfa.py`, and the security/login screens.
+- `UI-004` — **RESOLVED**: Module-aware dashboards, collapsible module navigation, notification route hints, dark/light theme, responsive report cards, and global top-right status toasts are implemented. Evidence: frontend dashboard, navigation, `ToastProvider`, and theme files.
+- `UI-005` — **OPEN / ACCEPTED_MVP**: Employment type remains a governed backend enum (`PERMANENT`, `CONTRACT`, `TEMPORARY`, `INTERN`, `CASUAL`) rather than an institution-defined catalogue. This is safe and validated by serializers and leave eligibility, but custom institution-defined types require an ERD/product decision and a future migration.
+- `DASH-003` — **RESOLVED (2026-09-24)**: Finance and executive dashboards now share posted-ledger monthly rollups, carry institution currency, and use distinct detailed versus summarized visualizations. Evidence: `apps/dashboards/views.py`, the dashboard seed command, and the two dashboard pages.
+- `ATT-001` — **RESOLVED (2026-09-24)**: Attendance reporting now includes tenant-scoped employee identity, employee number, department, late-occurrence totals, minutes late, a 90-day lateness trend, and department rollups. The UI uses neutral “Repeated Lateness” language and remains behind attendance/report permissions. Evidence: `apps/dashboards/views.py`, `src/app/attendance/dashboard/page.tsx`, and `src/types/dashboards.ts`.
+- `ACCESS-001` — **RESOLVED (2026-09-24)**: HR administration could previously mutate the signed-in user's own Employee record through generic update, delete, lifecycle, or employment endpoints. The backend now rejects those mutations with `self_hr_record_edit_not_allowed`; self-service profile, preferences, security, and emergency-contact routes remain available. Evidence: `apps/employees/services.py`, `apps/employees/views.py`, and `tests/test_access_experience_foundation.py`.
+- `DASH-002` — **RESOLVED (2026-09-24)**: The executive dashboard endpoint calculated optional-module metrics regardless of the institution's enabled modules, creating a backend data-leakage risk even when the frontend hid those cards. The endpoint now omits Leave, Attendance, Payroll, Accounting, and Recruitment rollups unless the corresponding module is enabled; the frontend treats those fields as optional. Evidence: `apps/dashboards/views.py`, `src/app/dashboard/page.tsx`, and `src/types/dashboards.ts`.
+- `SETTINGS-001` — **RESOLVED (2026-09-24)**: Users & Access was duplicated as a Settings card while also being an administration route. It is now standalone in navigation at `/settings/users`; the Settings landing page no longer advertises it. Evidence: `src/app/settings/page.tsx` and `src/components/navigation/navigation.ts`.
+- `UI-006` — **RESOLVED (2026-09-24)**: The top-right profile popover could be closed by the document-level click handler before its menu actions were usable. The popover now has explicit menu semantics, a stable stacking layer, deterministic close-before-navigation behavior, and a guarded Sign out action that clears auth state and routes to `/login`; interaction remains protected from the document-level close handler. Evidence (2026-09-24): `ergonx-frontend/src/components/layout/TopBar.tsx`, frontend lint, and production build.
+- `DOCS-001` — **SAFEGUARDED / ACCEPTED_MVP**: Tenant-scoped multipart document upload now supports PDF/JPEG/PNG files up to 10 MB with MIME/signature validation, managed storage, protected download, leave-request upload progress/removal, and Employee Details upload/list/download actions. Production object-storage offload, malware scanning, and resumable uploads remain deployment decisions. Evidence: `apps/documents/models.py`, `apps/documents/serializers.py`, `apps/documents/views.py`, `ergonx-frontend/src/app/hr/employees/[id]/page.tsx`, `ergonx-frontend/src/lib/api/operations.ts`, `src/app/me/leave/request/page.tsx`, and migration `apps/documents/migrations/0002_document_stored_file_alter_document_file_reference.py`.
+- `MFA-001` — **SAFEGUARDED / ACCEPTED_MVP**: TOTP enrollment, QR rendering, and challenge remain implemented. Optional email OTP is now implemented with a dedicated hashed challenge model, five-minute expiry, one-time consumption, five-attempt limit, resend invalidation, Security settings selection, login challenge handling, and audit events for meaningful MFA changes. Production email delivery remains a deployment prerequisite and is rejected when `EMAIL_DELIVERY_ENABLED` is false. Evidence (2026-09-24): `apps/accounts/models.py`, migration `apps/accounts/migrations/0004_usermfa_method_emailotpchallenge.py`, `apps/accounts/serializers.py`, `apps/accounts/views.py`, `apps/accounts/emails.py`, `src/app/settings/security/page.tsx`, and `src/app/login/page.tsx`.
+- `IMG-001` — **SAFEGUARDED / ACCEPTED_MVP**: Private tenant-scoped binary image upload and protected delivery are now exposed for USER, EMPLOYEE, and INSTITUTION owners, with JPEG/PNG/GIF signature and 5 MB validation, active-owner replacement, permission checks, and profile/institution UI previews. Production image processing, object storage, malware scanning, and persisted current-image references remain follow-up hardening. Evidence (2026-09-24): `apps/documents/models.py`, `apps/documents/serializers.py`, `apps/documents/views.py`, migration `apps/documents/migrations/0003_imageasset.py`, `src/lib/api/images.ts`, `src/app/me/profile/page.tsx`, and `src/app/settings/institution/page.tsx`.
+- `UI-007` — **RESOLVED (2026-09-24)**: Several recruitment create flows and Payroll Configuration lacked the shared back-navigation pattern required for detail/create/configuration subpages. They now use `BackNavigation` with logical parent fallbacks while retaining history-based navigation for same-origin in-app entry; Settings subpages were verified to inherit the control from the shared Settings layout. Evidence (2026-09-24): `ergonx-frontend/src/app/recruitment/*/new/page.tsx`, `ergonx-frontend/src/app/payroll/configuration/page.tsx`, `ergonx-frontend/src/app/settings/layout.tsx`, `ergonx-frontend/src/components/ui/BackNavigation.tsx`, frontend lint, and production build.
 
 ## Review template for new entries
 

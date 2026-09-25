@@ -192,6 +192,9 @@ class SalaryStructureComponent(TenantOwnedModel):
 
 
 class EmployeeCompensation(TenantOwnedModel):
+    class PayBasis(models.TextChoices):
+        PAYROLL_PERIOD = "PAYROLL_PERIOD", "Configured payroll period"
+
     institution = models.ForeignKey(
         Institution, on_delete=models.CASCADE, related_name="employee_compensations"
     )
@@ -202,6 +205,11 @@ class EmployeeCompensation(TenantOwnedModel):
         SalaryStructure, on_delete=models.PROTECT, related_name="employee_compensations"
     )
     base_salary = models.DecimalField(max_digits=18, decimal_places=2)
+    pay_basis = models.CharField(
+        max_length=32,
+        choices=PayBasis.choices,
+        default=PayBasis.PAYROLL_PERIOD,
+    )
     currency = models.CharField(max_length=3)
     effective_from = models.DateField()
     effective_to = models.DateField(null=True, blank=True)

@@ -157,6 +157,7 @@ class ExportJob(TenantOwnedModel):
     )
     status = models.CharField(max_length=12, choices=Status.choices, default=Status.QUEUED)
     result_reference = models.CharField(max_length=500, blank=True)
+    result_content = models.TextField(blank=True)
     error_summary = models.TextField(blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     metadata = models.JSONField(default=dict, blank=True)

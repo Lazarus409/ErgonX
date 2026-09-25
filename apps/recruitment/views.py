@@ -6,6 +6,7 @@ from apps.recruitment.models import Application, ApplicationStageHistory, Candid
 from apps.recruitment.selectors import applications_for_institution, candidate_scorecard, recruitment_pipeline
 from apps.recruitment.serializers import (ApplicationSerializer, ApplicationStageHistorySerializer, CandidateEvaluationSerializer, CandidateSerializer, CommentSerializer, HireCandidateSerializer, InterviewSerializer, InterviewStatusSerializer, JobPostingSerializer, OfferSerializer, RecruitmentStageSerializer, RejectionSerializer, StageMoveSerializer)
 from apps.recruitment.services import (close_job_posting, decide_offer, extend_offer, hire_candidate, move_application_stage, publish_job_posting, reject_application, submit_application, update_interview_status, withdraw_application, withdraw_offer)
+from apps.institutions.services import record_user_activity
 from apps.documents.models import Document
 from apps.documents.serializers import DocumentSerializer
 from common.serializers import call_validated_service
@@ -50,6 +51,15 @@ class CandidateViewSet(RecruitmentViewSet):
     filterset_fields = ("status", "source")
     search_fields = ("first_name", "middle_name", "last_name", "email", "phone")
     ordering_fields = ("first_name", "last_name", "email", "created_at", "updated_at")
+
+    def perform_create(self, serializer):
+        candidate = serializer.save(institution=self.request.institution)
+        record_user_activity(
+            actor=self.request.user,
+            institution=self.request.institution,
+            activity_code="candidate.create",
+            entity=candidate,
+        )
 
     @action(detail=True, methods=("get",), url_path="scorecard")
     def scorecard(self, request, pk=None):

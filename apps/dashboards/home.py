@@ -5,19 +5,48 @@ from zoneinfo import ZoneInfo
 from django.utils import timezone
 
 from apps.institutions.models import UserActivityEvent, UserPreference
+from apps.employees.models import Employee
 from apps.notifications.models import Notification
 
 
 ACTION_CATALOG = {
     "employee.create": {"permission": "employee.create", "module": "CORE_HR", "label": "Add employee", "route_hint": "/hr/employees/new"},
-    "leave.request": {"permission": "leave.request", "module": "LEAVE", "label": "Request leave", "route_hint": "/leave/requests/new"},
+    # A personal leave request must use the self-service flow. The managed
+    # requests route is not a create screen and can legitimately be hidden.
+    "leave.request": {"permission": "leave.request", "module": "LEAVE", "label": "Request leave", "route_hint": "/me/leave/request"},
     "leave.approve": {"permission": "leave.approve", "module": "LEAVE", "label": "Review leave requests", "route_hint": "/leave/requests?status=PENDING"},
-    "attendance.adjust": {"permission": "attendance.adjust", "module": "ATTENDANCE", "label": "Request attendance adjustment", "route_hint": "/attendance/adjustments/new"},
+    "attendance.adjust": {"permission": "attendance.adjust", "module": "ATTENDANCE", "label": "Attendance adjustments", "route_hint": "/attendance/adjustments"},
+    "payroll.prepare": {"permission": "payroll.prepare", "module": "PAYROLL", "label": "Prepare payroll run", "route_hint": "/payroll/runs"},
     "payroll.approve": {"permission": "payroll.approve", "module": "PAYROLL", "label": "Review payroll runs", "route_hint": "/payroll/runs?status=UNDER_REVIEW"},
+    "payroll.adjustment": {"permission": "payroll.prepare", "module": "PAYROLL", "label": "Prepare payroll adjustment", "route_hint": "/payroll/adjustments"},
+    "payroll.adjustment.review": {"permission": "payroll.approve", "module": "PAYROLL", "label": "Review payroll adjustment", "route_hint": "/payroll/adjustments?status=PENDING"},
+    "compensation.change": {"permission": "payroll.configure", "module": "PAYROLL", "label": "Review compensation change", "route_hint": "/payroll/employee-profiles"},
     "journal.create": {"permission": "journal.create", "module": "ACCOUNTING", "label": "Create journal", "route_hint": "/accounting/journals/new"},
     "journal.approve": {"permission": "journal.approve", "module": "ACCOUNTING", "label": "Approve journals", "route_hint": "/accounting/journals?status=PENDING_APPROVAL"},
     "candidate.create": {"permission": "candidate.create", "module": "RECRUITMENT", "label": "Manage candidates", "route_hint": "/recruitment/candidates"},
+    "application.submit": {"permission": "candidate.create", "module": "RECRUITMENT", "label": "Review application", "route_hint": "/recruitment/applications"},
+    "interview.update": {"permission": "interview.manage", "module": "RECRUITMENT", "label": "Update interview", "route_hint": "/recruitment/interviews"},
     "offer.manage": {"permission": "offer.manage", "module": "RECRUITMENT", "label": "Recruitment workspace", "route_hint": "/recruitment"},
+}
+
+
+RESUME_ROUTE_BUILDERS = {
+    "employee.create": lambda entity_id: f"/hr/employees/{entity_id}",
+    "leave.request": lambda entity_id: f"/leave/requests/{entity_id}",
+    "journal.create": lambda entity_id: f"/accounting/journals/{entity_id}",
+    "journal.approve": lambda entity_id: f"/accounting/journals/{entity_id}",
+    "candidate.create": lambda entity_id: f"/recruitment/candidates/{entity_id}",
+    "application.submit": lambda entity_id: f"/recruitment/applications/{entity_id}",
+    "interview.update": lambda entity_id: "/recruitment/interviews",
+    "offer.manage": lambda entity_id: f"/recruitment/offers/{entity_id}",
+    "payroll.prepare": lambda entity_id: f"/payroll/runs/{entity_id}",
+    "payroll.adjustment": lambda entity_id: "/payroll/adjustments",
+    "payroll.adjustment.review": lambda entity_id: "/payroll/adjustments?status=PENDING",
+    "compensation.change": lambda entity_id: "/payroll/employee-profiles",
+    # The frontend currently exposes the review modal from the adjustments
+    # list rather than a dedicated detail route. Keep the resume target real;
+    # the list remains filterable and avoids manufacturing a dead URL.
+    "attendance.adjust": lambda entity_id: "/attendance/adjustments",
 }
 
 
@@ -53,6 +82,10 @@ def _greeting_context(user, institution):
 
 def _quick_actions(*, user, institution, permission_codes):
     available = permitted_actions(institution=institution, permission_codes=permission_codes)
+    # Requesting leave is self-service. A role permission alone must not put a
+    # broken action in Home for a user who has no employee record here.
+    if "leave.request" in available and not Employee.objects.for_institution(institution).filter(user=user).exists():
+        available.pop("leave.request")
     preference = UserPreference.objects.for_institution(institution).filter(
         user=user, preference_key="quick_actions"
     ).first()
@@ -84,11 +117,14 @@ def _recent_work(*, user, institution, permission_codes):
         seen.add(event.entity_id)
         rows.append({
             "type": event.entity_type or "WORK_ITEM",
-            "id": event.entity_id,
+            # Keep the JSON contract stable for UUID-backed domain entities;
+            # frontend route builders and typed adapters consume string IDs.
+            "id": str(event.entity_id),
             "reference": "",
             "title": available[event.activity_code]["label"],
             "status": "IN_PROGRESS",
             "resume_action": event.activity_code,
+            "resume_route": RESUME_ROUTE_BUILDERS.get(event.activity_code, lambda _entity_id: "")(event.entity_id),
             "updated_at": event.occurred_at,
             "can_resume": True,
         })

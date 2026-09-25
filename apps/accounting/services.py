@@ -38,6 +38,7 @@ from apps.accounting.selectors import account_templates_for_application
 from apps.audit.models import AuditLog
 from apps.audit.services import record_audit_event
 from apps.institutions.models import Institution, InstitutionModule
+from apps.institutions.services import record_user_activity
 from apps.notifications.models import Notification
 from common.exceptions import CodedValidationError
 
@@ -480,13 +481,21 @@ def _create_journal_record(
 @transaction.atomic
 def create_journal(*, institution, actor, lines, source=JournalEntry.Source.MANUAL, **values):
     _require(actor, institution, "journal.create")
-    return _create_journal_record(
+    journal = _create_journal_record(
         institution=institution,
         actor=actor,
         lines=lines,
         source=source,
         **values,
     )
+    if source == JournalEntry.Source.MANUAL:
+        record_user_activity(
+            actor=actor,
+            institution=institution,
+            activity_code="journal.create",
+            entity=journal,
+        )
+    return journal
 
 
 @transaction.atomic

@@ -22,7 +22,8 @@ class Document(TenantOwnedModel):
         blank=True,
         related_name="uploaded_documents",
     )
-    file_reference = models.CharField(max_length=500)
+    file_reference = models.CharField(max_length=500, blank=True)
+    stored_file = models.FileField(upload_to="documents/%Y/%m/", blank=True, null=True)
     original_filename = models.CharField(max_length=255)
     content_type = models.CharField(max_length=150)
     size_bytes = models.PositiveBigIntegerField()
@@ -56,3 +57,28 @@ class Document(TenantOwnedModel):
 
     def __str__(self):
         return self.original_filename
+
+
+class ImageAsset(TenantOwnedModel):
+    """Private tenant-scoped profile/employee/institution image storage."""
+
+    class OwnerType(models.TextChoices):
+        USER = "USER", "User"
+        EMPLOYEE = "EMPLOYEE", "Employee"
+        INSTITUTION = "INSTITUTION", "Institution"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="image_assets")
+    owner_type = models.CharField(max_length=20, choices=OwnerType.choices)
+    owner_id = models.UUIDField()
+    stored_file = models.FileField(upload_to="images/%Y/%m/", max_length=500)
+    original_filename = models.CharField(max_length=255)
+    content_type = models.CharField(max_length=100)
+    size_bytes = models.PositiveBigIntegerField()
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=("institution", "owner_type", "owner_id"), condition=models.Q(is_active=True), name="uniq_active_image_owner")]
+        indexes = [models.Index(fields=("institution", "owner_type", "owner_id", "is_active"))]
+
+    def __str__(self):
+        return f"{self.owner_type} image {self.owner_id}"

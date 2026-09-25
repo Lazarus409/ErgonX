@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from apps.operations.models import BackgroundJob, ExportJob, ImportJob, ImportRowResult
+from apps.reports.services import normalize_report_type
 
 
 class BackgroundJobSerializer(serializers.ModelSerializer):
@@ -25,6 +26,10 @@ class ImportRowResultSerializer(serializers.ModelSerializer):
 
 
 class ExportJobSerializer(serializers.ModelSerializer):
+    def validate_export_type(self, value):
+        normalize_report_type(value)
+        return value
+
     class Meta:
         model = ExportJob
         fields = ("id", "institution", "export_type", "initiated_by", "status", "result_reference", "error_summary", "completed_at", "metadata", "created_at", "updated_at")

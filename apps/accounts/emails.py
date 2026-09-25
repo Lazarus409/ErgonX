@@ -65,6 +65,17 @@ def send_password_reset(*, recipient_email: str, uid: str, token: str) -> None:
     message.send(fail_silently=False)
 
 
+def send_email_mfa_code(*, recipient_email: str, code: str, expires_at) -> None:
+    """Send a short-lived MFA code without persisting the plaintext value."""
+    message = EmailMultiAlternatives(
+        subject="Your ErgonX verification code",
+        body=f"Your ErgonX verification code is {code}. It expires at {expires_at:%H:%M %Z}.",
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[recipient_email],
+    )
+    message.send(fail_silently=False)
+
+
 def send_employee_self_service_invitation(*, recipient_email: str, acceptance_token: str, institution_name: str, expires_at) -> None:
     """Deliver the single-use employee account activation link."""
     acceptance_url = f"{settings.FRONTEND_PUBLIC_URL}/accept-invitation/{acceptance_token}"

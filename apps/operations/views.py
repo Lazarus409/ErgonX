@@ -1,4 +1,5 @@
 from django.utils import timezone
+from django.http import HttpResponse
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
@@ -48,9 +49,23 @@ class ExportJobViewSet(TenantModelViewSet):
     serializer_class = ExportJobSerializer
     permission_resource = "export_job"
 
+    def get_required_permission(self):
+        if self.action == "download":
+            return "export_job.view"
+        return super().get_required_permission()
+
     def perform_create(self, serializer):
         item = serializer.save(institution=self.request.institution, initiated_by=self.request.user)
         enqueue_background_job(job_type="EXPORT_GENERATE", institution=self.request.institution, initiated_by=self.request.user, metadata={"export_job_id": str(item.id)})
+
+    @action(detail=True, methods=("get",), url_path="download")
+    def download(self, request, pk=None):
+        item = self.get_object()
+        if item.status != ExportJob.Status.COMPLETED or not item.result_content:
+            return Response({"detail": "This export is not ready for download."}, status=409)
+        response = HttpResponse(item.result_content, content_type="text/csv")
+        response["Content-Disposition"] = f'attachment; filename="{item.export_type}.csv"'
+        return response
 
 
 class BackgroundJobViewSet(TenantModelViewSet):

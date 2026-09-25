@@ -1,4 +1,4 @@
-# Emergency contacts — frontend contract
+# Emergency contacts ? frontend contract
 
 Emergency contacts are tenant-scoped Core HR records. Every request requires
 the normal bearer token and `X-Institution-ID` header, and uses the active

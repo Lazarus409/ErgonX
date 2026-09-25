@@ -471,6 +471,9 @@ class PayrollAdjustmentSerializer(TenantRelationSerializer):
 
 class PayslipSerializer(serializers.ModelSerializer):
     payload = serializers.SerializerMethodField()
+    payroll_period = PayrollPeriodSerializer(
+        source="payroll_record.payroll_run.payroll_period", read_only=True
+    )
 
     class Meta:
         model = Payslip
@@ -480,6 +483,7 @@ class PayslipSerializer(serializers.ModelSerializer):
             "generated_at",
             "document_reference",
             "checksum",
+            "payroll_period",
             "payload",
             "created_at",
             "updated_at",

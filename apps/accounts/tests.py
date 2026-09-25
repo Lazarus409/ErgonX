@@ -13,7 +13,16 @@ from apps.institutions.models import Institution, InstitutionInvitation, Institu
 class EmployeeInvitationAcceptanceTests(TestCase):
     def setUp(self):
         self.institution = Institution.objects.create(name="Invitation Test Institution", code="INVITE-TEST")
-        self.role = Role.objects.create(institution=self.institution, code="EMPLOYEE", name="Employee")
+        self.role = Role.objects.get(institution=self.institution, code="EMPLOYEE")
+        self.invited_by = User.objects.create_user(
+            email="hr.admin@example.com", password="StrongPass!123"
+        )
+        InstitutionMembership.objects.create(
+            institution=self.institution,
+            user=self.invited_by,
+            role=Role.objects.get(institution=self.institution, code="HR_ADMIN"),
+            status=InstitutionMembership.Status.ACTIVE,
+        )
 
     def invitation_url(self, token):
         return reverse("v1:invitation-acceptance", args=[token])
@@ -27,6 +36,7 @@ class EmployeeInvitationAcceptanceTests(TestCase):
             employee=employee,
             token_hash=salted_hmac("institution-invitation", token).hexdigest(),
             expires_at=timezone.now() + timedelta(days=1),
+            invited_by=self.invited_by,
         )
 
     def test_new_employee_acceptance_creates_linked_employee_profile(self):
@@ -46,6 +56,41 @@ class EmployeeInvitationAcceptanceTests(TestCase):
         self.assertTrue(InstitutionMembership.objects.filter(user=user, institution=self.institution, role=self.role, status="ACTIVE").exists())
         invitation.refresh_from_db()
         self.assertEqual(invitation.status, InstitutionInvitation.Status.ACCEPTED)
+
+    def test_one_user_can_have_employee_profiles_in_multiple_institutions(self):
+        user = User.objects.create_user(email="multi.institution@example.com", password="StrongPass!123")
+        InstitutionMembership.objects.create(
+            institution=self.institution,
+            user=user,
+            role=self.role,
+            status=InstitutionMembership.Status.ACTIVE,
+        )
+        Employee.objects.create(
+            institution=self.institution,
+            user=user,
+            employee_number="EMP-FIRST",
+            first_name="Multi",
+            last_name="Institution",
+            hire_date=date.today(),
+        )
+        second_institution = Institution.objects.create(name="Second Institution", code="INVITE-SECOND")
+        second_role = Role.objects.get(institution=second_institution, code="EMPLOYEE")
+        InstitutionMembership.objects.create(
+            institution=second_institution,
+            user=user,
+            role=second_role,
+            status=InstitutionMembership.Status.ACTIVE,
+        )
+        Employee.objects.create(
+            institution=second_institution,
+            user=user,
+            employee_number="EMP-SECOND",
+            first_name="Multi",
+            last_name="Institution",
+            hire_date=date.today(),
+        )
+
+        self.assertEqual(Employee.objects.filter(user=user).count(), 2)
 
     def test_acceptance_links_the_employee_record_prepared_by_hr(self):
         employee = Employee.objects.create(

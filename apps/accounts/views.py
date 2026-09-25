@@ -8,6 +8,8 @@ from django.core.mail import BadHeaderError
 from smtplib import SMTPException
 from django.utils import timezone
 from datetime import timedelta
+import base64
+import secrets
 from django.utils.crypto import salted_hmac
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
@@ -17,7 +19,7 @@ from django.utils.text import slugify
 from uuid import uuid4
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework_simplejwt.tokens import RefreshToken
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiTypes, extend_schema
 
 from apps.accounts.serializers import (
     AuthBootstrapSerializer,
@@ -31,17 +33,70 @@ from apps.accounts.serializers import (
     PasswordChangeSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
+    MFASetupSerializer,
 )
 from apps.institutions.services import create_membership, effective_permission_codes
 from apps.institutions.models import Institution, InstitutionInvitation, InstitutionMembership, InstitutionModule, Role
-from apps.accounts.models import InstitutionAdminInvitation, User
+from apps.accounts.models import InstitutionAdminInvitation, User, UserMFA
 from apps.employees.models import Employee
 from apps.accounts.emails import send_institution_admin_invitation, send_password_reset
+from apps.audit.services import record_audit_event
 from common.permissions import TenantContextPermission
 
 
 class LoginView(TokenObtainPairView):
     serializer_class = EmailTokenObtainPairSerializer
+
+
+class MFASettingsView(APIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = MFASetupSerializer
+
+    def get(self, request):
+        mfa = UserMFA.objects.filter(user=request.user).first()
+        return Response({"enabled": bool(mfa and mfa.is_enabled), "pending": bool(mfa and not mfa.is_enabled), "method": mfa.method if mfa else None})
+
+    def post(self, request):
+        mfa, _ = UserMFA.objects.get_or_create(user=request.user, defaults={"secret": base32_secret()})
+        if mfa.is_enabled:
+            return Response({"detail": "MFA is already enabled."}, status=409)
+        record_audit_event(actor=request.user, institution=getattr(request, "institution", None), entity=mfa, action="account.mfa.setup_started", metadata={"method": mfa.method})
+        return Response({"secret": mfa.secret, "otpauth_uri": f"otpauth://totp/ErgonX:{request.user.email}?secret={mfa.secret}&issuer=ErgonX"})
+
+    def put(self, request):
+        serializer = MFASetupSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        mfa = UserMFA.objects.get(user=request.user)
+        mfa.is_enabled = True
+        mfa.confirmed_at = timezone.now()
+        mfa.save(update_fields=("is_enabled", "confirmed_at", "updated_at"))
+        record_audit_event(actor=request.user, institution=getattr(request, "institution", None), entity=mfa, action="account.mfa.enabled", metadata={"method": mfa.method})
+        return Response({"enabled": True, "pending": False})
+
+    def patch(self, request):
+        method = request.data.get("method")
+        if method not in UserMFA.Method.values:
+            return Response({"detail": "Unsupported MFA method."}, status=400)
+        mfa, _ = UserMFA.objects.get_or_create(user=request.user, defaults={"secret": base32_secret()})
+        if method == UserMFA.Method.EMAIL_OTP and not settings.EMAIL_DELIVERY_ENABLED:
+            return Response({"detail": "Email MFA delivery is not configured."}, status=409)
+        mfa.method = method
+        mfa.is_enabled = True
+        mfa.confirmed_at = timezone.now()
+        mfa.save(update_fields=("method", "is_enabled", "confirmed_at", "updated_at"))
+        record_audit_event(actor=request.user, institution=getattr(request, "institution", None), entity=mfa, action="account.mfa.method_changed", metadata={"method": mfa.method})
+        return Response({"enabled": True, "pending": False, "method": mfa.method})
+
+    def delete(self, request):
+        mfa = UserMFA.objects.filter(user=request.user).first()
+        if mfa:
+            record_audit_event(actor=request.user, institution=getattr(request, "institution", None), entity=mfa, action="account.mfa.disabled", metadata={"method": mfa.method})
+            mfa.delete()
+        return Response({"enabled": False, "pending": False})
+
+
+def base32_secret():
+    return base64.b32encode(secrets.token_bytes(20)).decode("ascii").rstrip("=")
 
 
 class SelfServiceRegistrationView(APIView):
@@ -75,7 +130,7 @@ class InstitutionAdminInvitationView(APIView):
         invitations = InstitutionAdminInvitation.objects.select_related("invited_by").order_by("-created_at")
         return Response(InstitutionAdminInvitationSerializer(invitations, many=True).data)
 
-    @extend_schema(request=InstitutionAdminInvitationCreateSerializer)
+    @extend_schema(request=InstitutionAdminInvitationCreateSerializer, responses={201: OpenApiTypes.OBJECT})
     def post(self, request):
         self._assert_platform_admin(request)
         serializer = InstitutionAdminInvitationCreateSerializer(data=request.data)
@@ -101,8 +156,10 @@ class InstitutionAdminInvitationView(APIView):
         return Response({"id": str(invitation.id), "email": invitation.email, "expires_at": invitation.expires_at, "acceptance_token": token, "email_delivery_status": delivery_status}, status=201)
 
 
+@extend_schema(responses={200: OpenApiTypes.OBJECT, 201: OpenApiTypes.OBJECT})
 class InstitutionAdminInvitationAcceptanceView(APIView):
     permission_classes = [AllowAny]
+    serializer_class = InstitutionAdminInvitationAcceptanceSerializer
 
     @staticmethod
     def _institution_code(name):
@@ -125,6 +182,7 @@ class InstitutionAdminInvitationAcceptanceView(APIView):
             return Response({"detail": "Invitation is invalid or expired."}, status=404)
         return Response({"email": invitation.email, "expires_at": invitation.expires_at})
 
+    @extend_schema(operation_id="auth_institution_admin_invitation_accept")
     @transaction.atomic
     def post(self, request, token):
         invitation = self._invitation(token)
@@ -178,7 +236,7 @@ class AccountProfileView(APIView):
 class PasswordChangeView(APIView):
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(request=PasswordChangeSerializer)
+    @extend_schema(request=PasswordChangeSerializer, responses={200: OpenApiTypes.OBJECT})
     def post(self, request):
         serializer = PasswordChangeSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
@@ -192,7 +250,7 @@ class PasswordResetRequestView(APIView):
 
     permission_classes = [AllowAny]
 
-    @extend_schema(request=PasswordResetRequestSerializer)
+    @extend_schema(request=PasswordResetRequestSerializer, responses={202: OpenApiTypes.OBJECT})
     def post(self, request):
         serializer = PasswordResetRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -210,7 +268,7 @@ class PasswordResetRequestView(APIView):
 class PasswordResetConfirmView(APIView):
     permission_classes = [AllowAny]
 
-    @extend_schema(request=PasswordResetConfirmSerializer)
+    @extend_schema(request=PasswordResetConfirmSerializer, responses={200: OpenApiTypes.OBJECT})
     def post(self, request):
         serializer = PasswordResetConfirmSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -244,12 +302,10 @@ class AuthBootstrapView(APIView):
             for code in permission_codes
             if code.startswith("dashboard.") and code.endswith(".view")
         ]
-        if "employee.view" in permission_codes:
-            landing = "HOME"
-        elif dashboards:
-            landing = "DASHBOARD"
-        else:
-            landing = "HOME"
+        # Home is the canonical post-login workspace for every institutional
+        # membership. Dashboards stay discoverable analytical destinations;
+        # role titles must not choose a user's landing route.
+        landing = "HOME"
         payload = {
             "user": request.user,
             "active_institution": {
@@ -274,8 +330,10 @@ class AuthBootstrapView(APIView):
         return Response(AuthBootstrapSerializer(payload).data)
 
 
+@extend_schema(responses={200: OpenApiTypes.OBJECT, 201: OpenApiTypes.OBJECT})
 class InvitationAcceptanceView(APIView):
     permission_classes = [AllowAny]
+    serializer_class = InstitutionAdminInvitationAcceptanceSerializer
 
     @staticmethod
     def _access_preview(invitation):
@@ -320,6 +378,7 @@ class InvitationAcceptanceView(APIView):
             "access_preview": self._access_preview(invitation),
         })
 
+    @extend_schema(operation_id="auth_institution_invitation_accept")
     @transaction.atomic
     def post(self, request, token):
         invitation = self._invitation(token)

@@ -8,7 +8,7 @@ from django.core.exceptions import ValidationError
 from apps.compensation.models import EmployeeCompensation, SalaryStructure
 from apps.documents.models import Document
 from apps.employees.models import Employee, Employment
-from apps.institutions.models import InstitutionModule
+from apps.institutions.models import InstitutionModule, UserActivityEvent
 from apps.recruitment.models import Application, Candidate, JobPosting, Offer, RecruitmentStage
 from apps.recruitment.services import (
     decide_offer,
@@ -54,6 +54,8 @@ def test_recruitment_state_transitions_and_idempotent_hire(institution_factory, 
     assert offer.status == Offer.Status.HIRED
     assert application.status == Application.Status.HIRED
     assert candidate.status == Candidate.Status.HIRED
+    assert UserActivityEvent.objects.filter(institution=institution, activity_code="application.submit", entity_id=application.id).exists()
+    assert UserActivityEvent.objects.filter(institution=institution, activity_code="offer.manage", entity_id=offer.id).count() == 2
 
 
 @pytest.mark.django_db

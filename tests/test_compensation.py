@@ -176,6 +176,7 @@ def test_compensation_api_creates_and_resolves_current_record(
         format="json",
     )
     assert created.status_code == 201
+    assert created.data["pay_basis"] == "PAYROLL_PERIOD"
 
     resolved = api_client.get(
         reverse(

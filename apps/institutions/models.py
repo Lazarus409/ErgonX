@@ -6,6 +6,15 @@ from common.models import BaseModel, TenantOwnedModel
 
 
 class Institution(BaseModel):
+    class InstitutionType(models.TextChoices):
+        PRIVATE = "PRIVATE", "Private / Commercial"
+        SME = "SME", "SME"
+        GOVERNMENT = "GOVERNMENT", "Government / Public Sector"
+        NGO = "NGO", "NGO / Nonprofit"
+        EDUCATION = "EDUCATION", "Educational Institution"
+        HEALTHCARE = "HEALTHCARE", "Healthcare Institution"
+        OTHER = "OTHER", "Other"
+
     name = models.CharField(max_length=255)
     code = models.CharField(max_length=50, unique=True)
     email = models.EmailField(blank=True)
@@ -14,6 +23,10 @@ class Institution(BaseModel):
     country_code = models.CharField(max_length=2, default="GH")
     default_currency = models.CharField(max_length=3, default="GHS")
     timezone = models.CharField(max_length=64, default="Africa/Accra")
+    institution_type = models.CharField(
+        max_length=20, choices=InstitutionType.choices, default=InstitutionType.PRIVATE
+    )
+    executive_title = models.CharField(max_length=80, default="Executive", blank=True)
     logo = models.CharField(max_length=500, blank=True)
     is_active = models.BooleanField(default=True)
 

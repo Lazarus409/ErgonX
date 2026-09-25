@@ -7,6 +7,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from apps.audit.services import record_audit_event
+from apps.institutions.services import record_user_activity
 from apps.compensation.models import (
     EmployeeCompensation,
     EmployeePayComponent,
@@ -34,6 +35,7 @@ def change_current_compensation(
     currency,
     effective_from,
     actor,
+    pay_basis=EmployeeCompensation.PayBasis.PAYROLL_PERIOD,
 ):
     _assert_active_member(actor, institution)
     if employee.institution_id != institution.id:
@@ -75,6 +77,7 @@ def change_current_compensation(
         employee=employee,
         salary_structure=salary_structure,
         base_salary=base_salary,
+        pay_basis=pay_basis,
         currency=currency,
         effective_from=effective_from,
         is_current=True,
@@ -86,6 +89,12 @@ def change_current_compensation(
         entity=compensation,
         action="compensation.employee.changed",
         metadata={"replaced_compensation_id": str(current.id) if current else None},
+    )
+    record_user_activity(
+        actor=actor,
+        institution=institution,
+        activity_code="compensation.change",
+        entity=compensation,
     )
     return compensation
 

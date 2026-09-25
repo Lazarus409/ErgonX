@@ -9,7 +9,7 @@ import { cx } from "@/lib/cx";
  */
 export default function HomeHero({ eyebrow, title, subtitle, children, aside, className }: { eyebrow?: ReactNode; title: ReactNode; subtitle?: ReactNode; children?: ReactNode; aside?: ReactNode; className?: string }) {
   return (
-    <section className={cx("relative isolate overflow-hidden rounded-3xl bg-brand-navy px-6 py-7 text-white shadow-elevation-3 sm:px-8 sm:py-9 dark:bg-[#0b1a36] dark:ring-1 dark:ring-white/5", className)}>
+    <section className={cx("relative isolate overflow-hidden rounded-3xl bg-brand-navy bg-hero px-6 py-7 text-white shadow-elevation-3 ring-1 ring-inset ring-white/[0.06] sm:px-8 sm:py-9", className)}>
       <HeroArt />
       <div className={cx("relative grid gap-6", aside && "lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] lg:items-end")}>
         <div className="min-w-0">

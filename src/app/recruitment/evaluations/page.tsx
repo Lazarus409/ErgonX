@@ -25,7 +25,7 @@ export default function EvaluationsPage() {
         error={error}
         onRetry={reload}
         minWidth={600}
-        empty={{ title: "No evaluations recorded", description: "Interviewer evaluations will appear here.", icon: ClipboardList }}
+        empty={{ title: "No evaluations recorded", description: "Interviewer evaluations will appear here.", icon: ClipboardList, action: <ButtonLink variant="secondary" href="/recruitment/evaluations/new" leadingIcon={<Plus className="h-4 w-4" />}>Add evaluation</ButtonLink> }}
         columns={[
           { key: "application", header: "Application", cell: (item) => <span className="font-mono text-support">{item.application.slice(0, 8)}</span> },
           { key: "score", header: "Score", numeric: true, sortValue: (item) => Number(item.score), cell: (item) => <span className="font-semibold text-ink-strong">{item.score}</span> },

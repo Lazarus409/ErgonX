@@ -80,7 +80,7 @@ export default function PayrollPeriodsPage() {
             onClear={search || status !== ALL ? () => { setSearch(""); setStatus(ALL); } : undefined}
           />
         }
-        empty={{ title: "No payroll periods found", description: "Open a period to begin processing payroll.", icon: CalendarDays }}
+        empty={{ title: "No payroll periods found", description: "Open a period to begin processing payroll.", icon: CalendarDays, action: <Button variant="secondary" leadingIcon={<Plus className="h-4 w-4" />} onClick={() => { setFormError(""); setFormOpen(true); }}>New period</Button> }}
         footer={<p className="flex items-center gap-2 text-caption text-ink-muted"><CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />Period dates and processing status are controlled by the payroll backend. Closed periods cannot be changed.</p>}
         columns={[
           { key: "name", header: "Period", sortValue: (period) => period.name, cell: (period) => <span className="font-semibold text-ink-strong">{period.name}</span> },

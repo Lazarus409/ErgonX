@@ -64,7 +64,7 @@ export default function RecruitmentList<T extends { id: string; status: string }
         error={error}
         onRetry={() => void refresh()}
         toolbar={<DataToolbar search={search} onSearchChange={setSearch} searchPlaceholder={`Search ${title.toLowerCase()}…`} />}
-        empty={{ title: "No records found", description: search ? "Try a different search term." : undefined }}
+        empty={{ title: "No records found", description: search ? "Try a different search term." : undefined, action: !search && createHref && createLabel ? <ButtonLink variant="secondary" href={createHref} leadingIcon={<Plus className="h-4 w-4" />}>{createLabel}</ButtonLink> : undefined }}
         columns={[
           ...columns.map((column) => ({ key: column.label, header: column.label, cell: column.render })),
           { key: "status", header: "Status", cell: (item: T) => <StatusBadge status={item.status} size="sm" /> },

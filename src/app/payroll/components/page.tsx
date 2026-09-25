@@ -75,7 +75,7 @@ export default function PayComponentsPage() {
             onClear={search || typeFilter !== ALL || statusFilter !== ALL ? () => { setSearch(""); setTypeFilter(ALL); setStatusFilter(ALL); } : undefined}
           />
         }
-        empty={{ title: "No pay components found", description: "Add earnings, deductions and employer contributions to build salary structures.", icon: Banknote }}
+        empty={{ title: "No pay components found", description: "Add earnings, deductions and employer contributions to build salary structures.", icon: Banknote, action: <Button variant="secondary" leadingIcon={<Plus className="h-4 w-4" />} onClick={openCreate}>Add component</Button> }}
         columns={[
           { key: "code", header: "Code", sortValue: (item) => item.code, cell: (item) => <span className="font-mono font-semibold text-ink-strong">{item.code}</span> },
           { key: "name", header: "Component", sortValue: (item) => item.name, cell: (item) => <span>{item.name}{!item.recurring && <Badge size="sm" className="ml-2">One-off</Badge>}</span> },

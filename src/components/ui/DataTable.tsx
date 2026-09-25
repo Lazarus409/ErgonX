@@ -71,11 +71,11 @@ export function DataTable<Row>({ columns, rows, rowKey, loading, error, onRetry,
     });
   }, [rows, sort, columns]);
 
-  const cellPad = density === "compact" ? "px-4 py-2" : "px-4 py-3";
+  const cellPad = density === "compact" ? "px-4 py-2.5" : "px-5 py-3.5";
 
   return (
     <section className={cx("min-w-0 overflow-hidden rounded-2xl border border-line bg-surface shadow-elevation-1", className)}>
-      {toolbar && <div className="border-b border-line-soft px-4 py-3">{toolbar}</div>}
+      {toolbar && <div className="border-b border-line-soft p-4">{toolbar}</div>}
       {error ? (
         <div className="p-5"><ErrorState message={error} onRetry={onRetry} variant="inline" /></div>
       ) : (
@@ -95,7 +95,7 @@ export function DataTable<Row>({ columns, rows, rowKey, loading, error, onRetry,
                       style={column.width ? { width: column.width } : undefined}
                       className={cx(
                         "sticky top-0 z-10 border-b border-line bg-surface-muted/90 text-left text-caption font-medium text-ink-muted backdrop-blur",
-                        density === "compact" ? "px-4 py-2" : "px-4 py-2.5",
+                        density === "compact" ? "px-4 py-2.5" : "px-5 py-3",
                         column.numeric && "text-right",
                         column.hideBelow && hideClasses[column.hideBelow],
                       )}
@@ -160,7 +160,7 @@ export function DataTable<Row>({ columns, rows, rowKey, loading, error, onRetry,
           </table>
         </div>
       )}
-      {footer && <div className="border-t border-line-soft px-4 py-2.5">{footer}</div>}
+      {footer && <div className="border-t border-line-soft px-5 py-3">{footer}</div>}
     </section>
   );
 }

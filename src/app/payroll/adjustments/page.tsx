@@ -61,7 +61,7 @@ export default function PayrollAdjustmentsPage() {
             onClear={search || status !== ALL ? () => { setSearch(""); setStatus(ALL); } : undefined}
           />
         }
-        empty={{ title: "No payroll adjustments found", description: "Adjustments submitted for review will appear here.", icon: FileCog }}
+        empty={{ title: "No payroll adjustments found", description: "Adjustments submitted for review will appear here.", icon: FileCog, action: <Button variant="secondary" leadingIcon={<Plus className="h-4 w-4" />} onClick={() => { setFormError(""); setModal(true); }}>New adjustment</Button> }}
         columns={[
           { key: "employee", header: "Employee", sortValue: (item) => names.get(item.employee) ?? item.employee, cell: (item) => { const name = names.get(item.employee) ?? item.employee; return <span className="flex items-center gap-3"><Avatar name={name} size="sm" /><span className="font-semibold text-ink-strong">{name}</span></span>; } },
           { key: "component", header: "Component", cell: (item) => componentNames.get(item.pay_component) ?? item.pay_component },

@@ -57,7 +57,7 @@ export default function InterviewsPage() {
         error={!rows ? error : null}
         onRetry={() => void load()}
         minWidth={700}
-        empty={{ title: "No interviews scheduled", description: "Scheduled interviews will appear here.", icon: CalendarClock }}
+        empty={{ title: "No interviews scheduled", description: "Scheduled interviews will appear here.", icon: CalendarClock, action: <ButtonLink variant="secondary" href="/recruitment/interviews/new" leadingIcon={<Plus className="h-4 w-4" />}>Schedule interview</ButtonLink> }}
         columns={[
           { key: "scheduled", header: "Scheduled", sortValue: (row) => row.scheduled_at, cell: (row) => <span className="font-semibold text-ink-strong">{formatDateTime(row.scheduled_at)}</span> },
           { key: "type", header: "Type", cell: (row) => row.interview_type || "Interview" },

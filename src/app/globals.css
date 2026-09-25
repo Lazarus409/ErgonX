@@ -31,6 +31,8 @@
   --accent-blue: #2f6bff;
   --accent-violet: #7c5cff;
   --gradient-signature: linear-gradient(120deg, var(--accent-teal) 0%, var(--accent-aqua) 30%, var(--accent-blue) 68%, var(--accent-violet) 100%);
+  /* Greeting hero: deep navy → navy → blue → violet tint. */
+  --gradient-hero: linear-gradient(125deg, #08172f 0%, #0f2345 42%, #183a86 78%, #2e2a78 100%);
 
   /* Surfaces */
   --canvas: #f5f7fb;
@@ -202,6 +204,7 @@
   --chart-axis: #7d8fae;
 
   --glow-primary: 0 6px 18px -6px rgb(86 135 255 / 0.6);
+  --gradient-hero: linear-gradient(125deg, #050e1d 0%, #0a1830 45%, #122a63 80%, #221e5a 100%);
 
   --elevation-1: 0 1px 2px rgb(0 0 0 / 0.3);
   --elevation-2: 0 2px 6px rgb(0 0 0 / 0.28), 0 8px 20px -6px rgb(0 0 0 / 0.36);
@@ -460,6 +463,7 @@ textarea:disabled,
 h1, h2 { letter-spacing: -0.012em; }
 
 .bg-signature { background-image: var(--gradient-signature); }
+.bg-hero { background-image: var(--gradient-hero); }
 .text-signature {
   background-image: var(--gradient-signature);
   -webkit-background-clip: text;
@@ -471,6 +475,12 @@ h1, h2 { letter-spacing: -0.012em; }
   background: linear-gradient(90deg, var(--surface-muted) 0%, var(--surface-hover) 40%, var(--surface-muted) 80%);
   background-size: 200% 100%;
   animation: var(--animate-shimmer);
+}
+
+/* Touch devices get comfortable 40 px targets; mouse layouts keep 36 px density. */
+@media (pointer: coarse) {
+  :is([data-ui="button"], [data-ui="icon-button"], [data-ui="input"], [data-ui="select"]) { min-height: 2.5rem; }
+  [data-ui="icon-button"] { min-width: 2.5rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {

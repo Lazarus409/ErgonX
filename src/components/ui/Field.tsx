@@ -5,6 +5,9 @@ import {
   forwardRef,
   isValidElement,
   useId,
+  useRef,
+  useState,
+  type DragEvent,
   type InputHTMLAttributes,
   type ReactElement,
   type ReactNode,
@@ -186,16 +189,59 @@ export interface FileInputProps extends Omit<InputHTMLAttributes<HTMLInputElemen
   fileName?: string | null;
 }
 
-/** A calm, accessible drop-zone styled file control (native input underneath). */
+/**
+ * A calm, accessible drop zone over a native file input. Click or keyboard
+ * opens the picker; dropping files fills the same input and fires its normal
+ * change event, so callers keep one onChange path and their own validation.
+ */
 export const FileInput = forwardRef<HTMLInputElement, FileInputProps>(function FileInput({ hint, fileName, className, id, ...rest }, ref) {
   const generated = useId();
   const controlId = id ?? generated;
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [dragging, setDragging] = useState(false);
+
+  const setRefs = (node: HTMLInputElement | null) => {
+    inputRef.current = node;
+    if (typeof ref === "function") ref(node);
+    else if (ref) ref.current = node;
+  };
+
+  const onDragOver = (event: DragEvent<HTMLLabelElement>) => {
+    if (rest.disabled || !event.dataTransfer.types.includes("Files")) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    setDragging(true);
+  };
+
+  const onDrop = (event: DragEvent<HTMLLabelElement>) => {
+    setDragging(false);
+    const input = inputRef.current;
+    if (rest.disabled || !input || !event.dataTransfer.files.length) return;
+    event.preventDefault();
+    const transfer = new DataTransfer();
+    const dropped = Array.from(event.dataTransfer.files);
+    (rest.multiple ? dropped : dropped.slice(0, 1)).forEach((file) => transfer.items.add(file));
+    input.files = transfer.files;
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  };
+
   return (
-    <label htmlFor={controlId} className={cx("flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-line-strong bg-surface-muted/60 px-4 py-6 text-center transition-colors hover:border-primary hover:bg-primary-soft/50 focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/15", rest.disabled && "pointer-events-none opacity-60", className)}>
+    <label
+      htmlFor={controlId}
+      onDragOver={onDragOver}
+      onDragLeave={() => setDragging(false)}
+      onDrop={onDrop}
+      className={cx(
+        "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-4 py-6 text-center transition-colors hover:border-primary hover:bg-primary-soft/50 focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/15",
+        dragging ? "border-primary bg-primary-soft/70" : "border-line-strong bg-surface-muted/60",
+        rest.disabled && "pointer-events-none opacity-60",
+        className,
+      )}
+    >
       <UploadCloud className="h-6 w-6 text-primary" aria-hidden="true" />
-      <span className="text-sm font-semibold text-ink-strong">{fileName || "Choose a file"}</span>
+      <span className="text-sm font-semibold text-ink-strong">{fileName || (dragging ? "Drop to upload" : "Choose a file or drag it here")}</span>
       {hint && <span className="text-caption text-ink-muted">{hint}</span>}
-      <input ref={ref} id={controlId} type="file" data-ui="file" className="sr-only" {...rest} />
+      <input ref={setRefs} id={controlId} type="file" data-ui="file" className="sr-only" {...rest} />
     </label>
   );
 });

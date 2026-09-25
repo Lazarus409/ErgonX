@@ -112,7 +112,7 @@ Scale: 4 · 8 · 12 · 16 · 20 · 24 · 32 · 40 · 48 px.
 | Dashboard gaps | `gap-4` (KPI rows), `gap-5` (chart grids) |
 | Field spacing | `gap-4` in grids, `space-y-4` stacked, 6 px label→control |
 | Toolbar spacing | `gap-3` between controls, `p-4` toolbar padding |
-| Table density | comfortable: 16×12 px cells; compact: 16×8 px |
+| Table density | comfortable: 20×14 px cells (default, per the spec's "more row height"); compact: 16×10 px |
 
 ### 2.6 Radius & elevation
 
@@ -196,7 +196,7 @@ Dark uses a deep-navy canvas, elevated navy surfaces, readable neutral ink, subt
 - Tabs: roving `tabIndex`, arrow keys.
 - Charts: `figure` + caption, plain-language `summary`, and a visually hidden data table (`ChartCard data`).
 - Status, severity and calendar cells carry text/icons, not just colour.
-- Controls ≥ 32 px (36 px default); touch targets in the mobile shell are ≥ 36 px.
+- Controls ≥ 32 px (36 px default with a mouse). On touch devices (`pointer: coarse`) buttons, icon buttons, inputs and selects grow to at least 40 px.
 - `prefers-reduced-motion` respected globally.
 
 ## 11. Migration status and legacy bridge

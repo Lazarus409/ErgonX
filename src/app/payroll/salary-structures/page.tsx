@@ -73,7 +73,7 @@ export default function SalaryStructuresPage() {
             onClear={search || status !== ALL ? () => { setSearch(""); setStatus(ALL); } : undefined}
           />
         }
-        empty={{ title: "No salary structures found", description: "Create a structure and attach the pay components it uses.", icon: WalletCards }}
+        empty={{ title: "No salary structures found", description: "Create a structure and attach the pay components it uses.", icon: WalletCards, action: <Button variant="secondary" leadingIcon={<Plus className="h-4 w-4" />} onClick={openCreate}>Add structure</Button> }}
         columns={[
           { key: "code", header: "Code", sortValue: (item) => item.code, cell: (item) => <span className="font-mono font-semibold text-ink-strong">{item.code}</span> },
           { key: "name", header: "Structure", sortValue: (item) => item.name, cell: (item) => <span><span className="block font-semibold text-ink-strong">{item.name}</span>{item.description && <span className="block max-w-sm truncate text-caption text-ink-muted" title={item.description}>{item.description}</span>}</span> },

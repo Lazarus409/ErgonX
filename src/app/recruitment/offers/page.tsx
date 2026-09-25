@@ -26,7 +26,7 @@ export default function OffersPage() {
         error={error}
         onRetry={reload}
         minWidth={700}
-        empty={{ title: "No offers found", description: "Offers you draft for candidates will appear here.", icon: FileSignature }}
+        empty={{ title: "No offers found", description: "Offers you draft for candidates will appear here.", icon: FileSignature, action: <ButtonLink variant="secondary" href="/recruitment/offers/new" leadingIcon={<Plus className="h-4 w-4" />}>New offer</ButtonLink> }}
         columns={[
           { key: "offer", header: "Offer", cell: (offer) => <Link href={`/recruitment/offers/${offer.id}`} className="font-semibold text-ink-strong hover:underline">Offer <span className="font-mono">{offer.id.slice(0, 8)}</span></Link> },
           { key: "start", header: "Start date", sortValue: (offer) => offer.proposed_start_date, cell: (offer) => formatDate(offer.proposed_start_date) },

@@ -1,5 +1,28 @@
 # ErgonX production deployment
 
+## Render
+
+This repository is a monorepo: the Django API and Next.js application are
+separate Render web services. Do not deploy the repository root as a single
+Docker service: there is intentionally no root `Dockerfile`.
+
+The included [`render.yaml`](render.yaml) creates the required API service,
+frontend service, and managed PostgreSQL database. In Render, choose **New +**
+then **Blueprint**, select this repository and branch, and provide these values
+when Render prompts for them:
+
+- `DJANGO_ALLOWED_HOSTS`: the API hostname only, for example
+  `ergonx-api.onrender.com` (no `https://`).
+- `CORS_ALLOWED_ORIGINS`: the frontend origin, for example
+  `https://ergonx-web.onrender.com`.
+- `FRONTEND_PUBLIC_URL`: the same frontend origin.
+- `NEXT_PUBLIC_API_BASE_URL`: the complete API URL, for example
+  `https://ergonx-api.onrender.com/api/v1`.
+
+After deployment, update the three URL values if you attach custom domains and
+redeploy both web services. Configure SMTP variables in the API service only;
+keep `EMAIL_DELIVERY_ENABLED=false` until those values are ready.
+
 The development Compose file and demo seed commands are not production deployment tools. Use `compose.production.yaml` together with a secret `.env.production` file.
 
 ## Before first deployment

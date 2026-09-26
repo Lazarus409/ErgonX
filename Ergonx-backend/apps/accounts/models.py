@@ -78,6 +78,14 @@ class InstitutionAdminInvitation(BaseModel):
         null=True,
         related_name="institution_admin_invitations",
     )
+    # The organization created by accepting this invitation.
+    institution = models.ForeignKey(
+        "institutions.Institution",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="admin_invitations",
+    )
 
     class Meta:
         indexes = [models.Index(fields=("email", "status"))]

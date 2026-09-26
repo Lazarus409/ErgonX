@@ -29,6 +29,9 @@ class Institution(BaseModel):
     executive_title = models.CharField(max_length=80, default="Executive", blank=True)
     logo = models.CharField(max_length=500, blank=True)
     is_active = models.BooleanField(default=True)
+    # Set by a platform administrator; an inactive institution refuses all tenant requests.
+    suspended_at = models.DateTimeField(null=True, blank=True)
+    suspension_reason = models.TextField(blank=True)
 
     class Meta:
         ordering = ("name",)

@@ -52,7 +52,10 @@ class TenantContextPermission(BasePermission):
                 membership = candidates[0]
 
         if not membership.institution.is_active:
-            raise PermissionDenied("The selected institution is inactive.")
+            raise PermissionDenied(
+                "This organization has been suspended. Contact ErgonX support to restore access.",
+                code="institution_suspended",
+            )
 
         request.membership = membership
         request.institution = membership.institution

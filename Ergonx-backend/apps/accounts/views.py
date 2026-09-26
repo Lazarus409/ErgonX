@@ -22,6 +22,7 @@ from uuid import uuid4
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework_simplejwt.tokens import RefreshToken
 from drf_spectacular.utils import OpenApiTypes, extend_schema
+from apps.accounts.platform import expire_stale_admin_invitations, record_platform_event
 
 from apps.accounts.serializers import (
     AuthBootstrapSerializer,
@@ -191,7 +192,8 @@ class InstitutionAdminInvitationView(APIView):
     @extend_schema(responses=InstitutionAdminInvitationSerializer(many=True))
     def get(self, request):
         _assert_platform_admin(request)
-        invitations = InstitutionAdminInvitation.objects.select_related("invited_by").order_by("-created_at")
+        expire_stale_admin_invitations()
+        invitations = InstitutionAdminInvitation.objects.select_related("invited_by", "institution").order_by("-created_at")
         return Response(InstitutionAdminInvitationSerializer(invitations, many=True).data)
 
     @extend_schema(request=InstitutionAdminInvitationCreateSerializer, responses={201: OpenApiTypes.OBJECT})
@@ -204,7 +206,55 @@ class InstitutionAdminInvitationView(APIView):
             expires_in_hours=serializer.validated_data["expires_in_hours"],
             invited_by=request.user,
         )
+        record_platform_event(actor=request.user, action="invitation.created", entity=invitation, metadata={"email": invitation.email, "delivery": delivery_status})
         return Response({"id": str(invitation.id), "email": invitation.email, "expires_at": invitation.expires_at, "acceptance_token": token, "email_delivery_status": delivery_status}, status=201)
+
+
+class InstitutionAdminInvitationActionView(APIView):
+    """Platform admins revoke a pending invitation or re-issue a fresh link."""
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(request=InstitutionAccessRequestApproveSerializer, responses={200: OpenApiTypes.OBJECT})
+    @transaction.atomic
+    def post(self, request, pk, action):
+        _assert_platform_admin(request)
+        if action not in ("revoke", "reissue"):
+            return Response({"detail": "Unknown action."}, status=404)
+        expire_stale_admin_invitations()
+        invitation = InstitutionAdminInvitation.objects.select_for_update().filter(pk=pk).first()
+        if invitation is None:
+            return Response({"detail": "Invitation not found."}, status=404)
+        Status = InstitutionAdminInvitation.Status
+        if action == "revoke":
+            if invitation.status != Status.PENDING:
+                return Response({"detail": f"Only a pending invitation can be revoked; this one is {invitation.get_status_display().lower()}."}, status=409)
+            invitation.status = Status.REVOKED
+            invitation.save(update_fields=("status", "updated_at"))
+            record_platform_event(actor=request.user, action="invitation.revoked", entity=invitation, metadata={"email": invitation.email})
+            return Response({"invitation": InstitutionAdminInvitationSerializer(invitation).data})
+        if invitation.status == Status.ACCEPTED:
+            return Response({"detail": "This invitation was already used to create an organization."}, status=409)
+        if User.objects.filter(email=invitation.email).exists():
+            return Response({"detail": "This email already has an ErgonX account, so it cannot receive an organization invitation."}, status=409)
+        serializer = InstitutionAccessRequestApproveSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        if invitation.status == Status.PENDING:
+            invitation.status = Status.REVOKED
+            invitation.save(update_fields=("status", "updated_at"))
+        replacement, token, delivery_status = issue_institution_admin_invitation(
+            email=invitation.email,
+            expires_in_hours=serializer.validated_data["expires_in_hours"],
+            invited_by=request.user,
+        )
+        access_request = InstitutionAccessRequest.objects.filter(invitation=invitation).first()
+        if access_request is not None:
+            access_request.invitation = replacement
+            access_request.save(update_fields=("invitation", "updated_at"))
+        record_platform_event(actor=request.user, action="invitation.reissued", entity=replacement, metadata={"email": invitation.email, "replaces": str(invitation.id), "delivery": delivery_status})
+        return Response({
+            "invitation": {"id": str(replacement.id), "email": replacement.email, "expires_at": replacement.expires_at, "acceptance_token": token, "email_delivery_status": delivery_status},
+        })
 
 
 class InstitutionAccessRequestThrottle(AnonRateThrottle):
@@ -281,6 +331,7 @@ class InstitutionAccessRequestDecisionView(APIView):
             access_request.reviewed_by = request.user
             access_request.reviewed_at = timezone.now()
             access_request.save(update_fields=("status", "decline_reason", "reviewed_by", "reviewed_at", "updated_at"))
+            record_platform_event(actor=request.user, action="access_request.declined", entity=access_request, metadata={"email": access_request.email, "institution_name": access_request.institution_name, "reason": access_request.decline_reason})
             return Response({"request": InstitutionAccessRequestSerializer(access_request).data})
         serializer = InstitutionAccessRequestApproveSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -296,6 +347,7 @@ class InstitutionAccessRequestDecisionView(APIView):
         access_request.reviewed_by = request.user
         access_request.reviewed_at = timezone.now()
         access_request.save(update_fields=("status", "invitation", "reviewed_by", "reviewed_at", "updated_at"))
+        record_platform_event(actor=request.user, action="access_request.approved", entity=access_request, metadata={"email": access_request.email, "institution_name": access_request.institution_name, "delivery": delivery_status})
         return Response({
             "request": InstitutionAccessRequestSerializer(access_request).data,
             "invitation": {"id": str(invitation.id), "email": invitation.email, "expires_at": invitation.expires_at, "acceptance_token": token, "email_delivery_status": delivery_status},
@@ -347,7 +399,9 @@ class InstitutionAdminInvitationAcceptanceView(APIView):
         create_membership(user=user, institution=institution, role=role, status=InstitutionMembership.Status.ACTIVE, is_primary=True, joined_at=timezone.now())
         invitation.status = InstitutionAdminInvitation.Status.ACCEPTED
         invitation.accepted_at = timezone.now()
-        invitation.save(update_fields=("status", "accepted_at", "updated_at"))
+        invitation.institution = institution
+        invitation.save(update_fields=("status", "accepted_at", "institution", "updated_at"))
+        record_platform_event(actor=user, action="institution.created", institution=institution, entity=institution, metadata={"name": institution.name, "invitation": str(invitation.id)})
         refresh = RefreshToken.for_user(user)
         return Response({"access": str(refresh.access_token), "refresh": str(refresh), "user": UserSerializer(user).data, "institution": {"id": str(institution.id), "name": institution.name, "code": institution.code}}, status=201)
 

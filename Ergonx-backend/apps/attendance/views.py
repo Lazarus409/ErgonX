@@ -20,15 +20,14 @@ from apps.attendance.services import (
     decide_adjustment,
     decide_overtime,
 )
+from common.scoping import ATTENDANCE_BROAD, scope_to_employees
 from common.serializers import call_validated_service
 from common.viewsets import TenantModelViewSet
 
 
 class EmployeeScopedQuerysetMixin:
-    def scope_to_employee(self, queryset, field="employee__user"):
-        if getattr(self.request, "membership", None) and self.request.membership.role.code == "EMPLOYEE":
-            return queryset.filter(**{field: self.request.user})
-        return queryset
+    def scope_to_employee(self, queryset, employee_field="employee"):
+        return scope_to_employees(queryset, self.request, employee_field, broad=ATTENDANCE_BROAD)
 
 
 class AttendanceRecordViewSet(EmployeeScopedQuerysetMixin, TenantModelViewSet):
@@ -129,7 +128,7 @@ class AttendanceAdjustmentViewSet(EmployeeScopedQuerysetMixin, TenantModelViewSe
         queryset = super().get_queryset().select_related(
             "attendance_record__employee", "requested_by", "approved_by"
         )
-        return self.scope_to_employee(queryset, "attendance_record__employee__user")
+        return self.scope_to_employee(queryset, "attendance_record__employee")
 
     @action(detail=True, methods=("post",))
     def approve(self, request, pk=None):

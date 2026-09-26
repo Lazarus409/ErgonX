@@ -7,6 +7,7 @@ from django.utils import timezone
 from apps.institutions.models import UserActivityEvent, UserPreference
 from apps.employees.models import Employee
 from apps.notifications.models import Notification
+from common.scoping import ATTENDANCE_BROAD, DEPARTMENT, INSTITUTION
 
 
 ACTION_CATALOG = {
@@ -50,13 +51,29 @@ RESUME_ROUTE_BUILDERS = {
 }
 
 
-def permitted_actions(*, institution, permission_codes):
+def _personal_routes(*, permissions, data_scope):
+    """Route overrides for members who act on their own or their team's records.
+
+    The module workspaces (/leave, /attendance, ...) are institution-wide; a
+    department head decides leave in /department and self-service users
+    correct attendance from /me.
+    """
+    routes = {}
+    if data_scope == DEPARTMENT:
+        routes["leave.approve"] = "/department/approvals"
+    if data_scope != INSTITUTION or not permissions & set(ATTENDANCE_BROAD):
+        routes["attendance.adjust"] = "/me/attendance"
+    return routes
+
+
+def permitted_actions(*, institution, permission_codes, data_scope=INSTITUTION):
     enabled_modules = set(
         institution.modules.filter(is_enabled=True).values_list("module_code", flat=True)
     )
     permissions = set(permission_codes)
+    overrides = _personal_routes(permissions=permissions, data_scope=data_scope)
     return {
-        code: {"code": code, **definition}
+        code: {"code": code, **definition, **({"route_hint": overrides[code]} if code in overrides else {})}
         for code, definition in ACTION_CATALOG.items()
         if definition["permission"] in permissions
         and (definition["module"] == "CORE_HR" or definition["module"] in enabled_modules)
@@ -80,8 +97,8 @@ def _greeting_context(user, institution):
     }
 
 
-def _quick_actions(*, user, institution, permission_codes):
-    available = permitted_actions(institution=institution, permission_codes=permission_codes)
+def _quick_actions(*, user, institution, permission_codes, data_scope):
+    available = permitted_actions(institution=institution, permission_codes=permission_codes, data_scope=data_scope)
     # Requesting leave is self-service. A role permission alone must not put a
     # broken action in Home for a user who has no employee record here.
     if "leave.request" in available and not Employee.objects.for_institution(institution).filter(user=user).exists():
@@ -103,8 +120,9 @@ def _quick_actions(*, user, institution, permission_codes):
     ]
 
 
-def _recent_work(*, user, institution, permission_codes):
-    available = permitted_actions(institution=institution, permission_codes=permission_codes)
+def _recent_work(*, user, institution, permission_codes, data_scope):
+    available = permitted_actions(institution=institution, permission_codes=permission_codes, data_scope=data_scope)
+    overrides = _personal_routes(permissions=set(permission_codes), data_scope=data_scope)
     events = (
         UserActivityEvent.objects.for_institution(institution)
         .filter(user=user, entity_id__isnull=False)
@@ -124,7 +142,7 @@ def _recent_work(*, user, institution, permission_codes):
             "title": available[event.activity_code]["label"],
             "status": "IN_PROGRESS",
             "resume_action": event.activity_code,
-            "resume_route": RESUME_ROUTE_BUILDERS.get(event.activity_code, lambda _entity_id: "")(event.entity_id),
+            "resume_route": overrides.get(event.activity_code) or RESUME_ROUTE_BUILDERS.get(event.activity_code, lambda _entity_id: "")(event.entity_id),
             "updated_at": event.occurred_at,
             "can_resume": True,
         })
@@ -133,7 +151,7 @@ def _recent_work(*, user, institution, permission_codes):
     return rows
 
 
-def _attention_items(*, institution, permission_codes):
+def _attention_items(*, user, institution, permission_codes):
     from apps.accounting.models import JournalEntry
     from apps.leave.models import LeaveRequest
     from apps.payroll.models import PayrollRun
@@ -148,6 +166,14 @@ def _attention_items(*, institution, permission_codes):
         ("ACCOUNTING", "journal.approve", JournalEntry.objects.for_institution(institution).filter(status=JournalEntry.Status.PENDING_APPROVAL), "JOURNAL_APPROVAL_REQUIRED", "Journals awaiting approval", "journal.approve"),
         ("RECRUITMENT", "interview.manage", Interview.objects.for_institution(institution).filter(status=Interview.Status.SCHEDULED, scheduled_at__date=timezone.localdate()), "INTERVIEWS_TODAY", "Interviews scheduled today", "interview.manage"),
     )
+    if "dashboard.department.view" in permissions and "leave.approve" in permissions and "dashboard.hr.view" not in permissions:
+        # Department heads act on their own approval queue, not every pending request.
+        from apps.dashboards.department import leave_awaiting_approval_by
+
+        definitions = (
+            ("LEAVE", "leave.approve", leave_awaiting_approval_by(user, institution), "LEAVE_APPROVAL_REQUIRED", "Team leave awaiting your approval", "leave.approve"),
+            *definitions[1:],
+        )
     for module, permission, queryset, code, title, action_code in definitions:
         if module not in enabled or permission not in permissions:
             continue
@@ -241,15 +267,24 @@ def _personal_snapshot(*, user, institution, permission_codes):
     return {"upcoming_shifts": upcoming_shifts, "attention": attention, "activity": activity}
 
 
-def home_payload(*, user, institution, permission_codes):
+def _team_snapshot(*, user, institution, permission_codes):
+    if "dashboard.department.view" not in set(permission_codes):
+        return None
+    from apps.dashboards.department import team_snapshot
+
+    return team_snapshot(user, institution)
+
+
+def home_payload(*, user, institution, permission_codes, data_scope=INSTITUTION):
     unread = Notification.objects.for_institution(institution).filter(
         user=user, status__in=(Notification.Status.PENDING, Notification.Status.SENT)
     )
     return {
         "greeting_context": _greeting_context(user, institution),
-        "quick_actions": _quick_actions(user=user, institution=institution, permission_codes=permission_codes),
-        "recent_work": _recent_work(user=user, institution=institution, permission_codes=permission_codes),
-        "attention_items": _attention_items(institution=institution, permission_codes=permission_codes),
+        "quick_actions": _quick_actions(user=user, institution=institution, permission_codes=permission_codes, data_scope=data_scope),
+        "recent_work": _recent_work(user=user, institution=institution, permission_codes=permission_codes, data_scope=data_scope),
+        "attention_items": _attention_items(user=user, institution=institution, permission_codes=permission_codes),
         "notifications_summary": {"unread_count": unread.count(), "latest": list(unread.values("id", "notification_type", "title", "message", "created_at")[:5])},
         "optional_personal_snapshot": _personal_snapshot(user=user, institution=institution, permission_codes=permission_codes),
+        "team_snapshot": _team_snapshot(user=user, institution=institution, permission_codes=permission_codes),
     }

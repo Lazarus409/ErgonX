@@ -1,7 +1,19 @@
 from uuid import UUID
 
 from rest_framework.exceptions import PermissionDenied
-from rest_framework.permissions import BasePermission
+from rest_framework.permissions import SAFE_METHODS, BasePermission
+
+# Roles that may read whatever they are granted but never change institution
+# data. Their only writes are self-service actions on their own records.
+READ_ONLY_ROLES = frozenset({"AUDITOR"})
+SELF_SERVICE_ACTIONS = frozenset({
+    "home.view",
+    "settings.profile.manage_self",
+    "leave.request",
+    "attendance.clock",
+    "attendance.adjust",
+    "tax_relief.claim",
+})
 
 
 class TenantContextPermission(BasePermission):
@@ -63,6 +75,12 @@ class TenantRBACPermission(BasePermission):
             )
 
         permission_code = view.get_required_permission()
+        if (
+            request.method not in SAFE_METHODS
+            and membership.role.code in READ_ONLY_ROLES
+            and permission_code not in SELF_SERVICE_ACTIONS
+        ):
+            raise PermissionDenied("Your role has read-only access.", code="read_only_role")
         if permission_code is None:
             return True
         if membership.role.permissions.filter(code=permission_code).exists():

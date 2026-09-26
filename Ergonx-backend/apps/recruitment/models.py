@@ -7,10 +7,15 @@ from apps.compensation.models import SalaryStructure
 from apps.employees.models import Employee, Employment
 from apps.institutions.models import Institution
 from apps.organization.models import Department, Grade, Location, Position
+from common.codes import AutoCodeMixin
 from common.models import TenantOwnedModel
 
 
-class JobPosting(TenantOwnedModel):
+class JobPosting(AutoCodeMixin, TenantOwnedModel):
+    auto_code_prefix = "JOB"
+    auto_code_width = 5
+    auto_code_year_from = "today"
+
     class Status(models.TextChoices):
         DRAFT = "DRAFT", "Draft"
         OPEN = "OPEN", "Open"
@@ -18,7 +23,7 @@ class JobPosting(TenantOwnedModel):
         CANCELLED = "CANCELLED", "Cancelled"
 
     institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="job_postings")
-    code = models.CharField(max_length=50)
+    code = models.CharField(max_length=50, blank=True)
     title = models.CharField(max_length=200)
     department = models.ForeignKey(Department, on_delete=models.PROTECT, related_name="job_postings")
     position = models.ForeignKey(Position, on_delete=models.PROTECT, related_name="job_postings")

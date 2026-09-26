@@ -2,15 +2,19 @@ from django.core.exceptions import ValidationError
 from django.db import models
 
 from apps.institutions.models import Institution
+from common.codes import AutoCodeMixin
 from common.models import TenantOwnedModel
 
 
-class Department(TenantOwnedModel):
+class Department(AutoCodeMixin, TenantOwnedModel):
+    auto_code_prefix = "DPT"
+    auto_code_width = 3
+
     institution = models.ForeignKey(
         Institution, on_delete=models.CASCADE, related_name="departments"
     )
     name = models.CharField(max_length=150)
-    code = models.CharField(max_length=50)
+    code = models.CharField(max_length=50, blank=True)
     description = models.TextField(blank=True)
     parent = models.ForeignKey(
         "self",
@@ -18,6 +22,14 @@ class Department(TenantOwnedModel):
         null=True,
         blank=True,
         related_name="children",
+    )
+    head = models.ForeignKey(
+        "employees.Employee",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="headed_departments",
+        help_text="Department Head: approves team leave and sees this department's people.",
     )
     is_active = models.BooleanField(default=True)
 
@@ -37,6 +49,8 @@ class Department(TenantOwnedModel):
             raise ValidationError({"parent": "Parent department must be in the same institution."})
         if self.parent_id and self.parent_id == self.id:
             raise ValidationError({"parent": "A department cannot be its own parent."})
+        if self.head_id and self.head.institution_id != self.institution_id:
+            raise ValidationError({"head": "Department head must be an employee of the same institution."})
 
     def save(self, *args, **kwargs):
         self.code = self.code.strip().upper()
@@ -46,7 +60,10 @@ class Department(TenantOwnedModel):
         return f"{self.institution.code}: {self.name}"
 
 
-class Position(TenantOwnedModel):
+class Position(AutoCodeMixin, TenantOwnedModel):
+    auto_code_prefix = "POS"
+    auto_code_width = 3
+
     institution = models.ForeignKey(
         Institution, on_delete=models.CASCADE, related_name="positions"
     )
@@ -54,7 +71,7 @@ class Position(TenantOwnedModel):
         Department, on_delete=models.PROTECT, related_name="positions"
     )
     title = models.CharField(max_length=150)
-    code = models.CharField(max_length=50)
+    code = models.CharField(max_length=50, blank=True)
     description = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
 
@@ -84,12 +101,15 @@ class Position(TenantOwnedModel):
         return f"{self.institution.code}: {self.title}"
 
 
-class Grade(TenantOwnedModel):
+class Grade(AutoCodeMixin, TenantOwnedModel):
+    auto_code_prefix = "GRD"
+    auto_code_width = 2
+
     institution = models.ForeignKey(
         Institution, on_delete=models.CASCADE, related_name="grades"
     )
     name = models.CharField(max_length=150)
-    code = models.CharField(max_length=50)
+    code = models.CharField(max_length=50, blank=True)
     level = models.PositiveIntegerField(null=True, blank=True)
     description = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
@@ -115,12 +135,15 @@ class Grade(TenantOwnedModel):
         return f"{self.institution.code}: {self.name}"
 
 
-class Location(TenantOwnedModel):
+class Location(AutoCodeMixin, TenantOwnedModel):
+    auto_code_prefix = "LOC"
+    auto_code_width = 3
+
     institution = models.ForeignKey(
         Institution, on_delete=models.CASCADE, related_name="locations"
     )
     name = models.CharField(max_length=150)
-    code = models.CharField(max_length=50)
+    code = models.CharField(max_length=50, blank=True)
     address = models.TextField(blank=True)
     city = models.CharField(max_length=100, blank=True)
     country = models.CharField(max_length=2, blank=True)

@@ -8,6 +8,7 @@ from apps.employees.models import Employee
 from apps.leave.models import LeaveRequest
 from apps.payroll.models import PayrollRun
 from apps.recruitment.models import Candidate, JobPosting, Offer
+from common.scoping import LEAVE_BROAD
 
 
 @dataclass(frozen=True)
@@ -17,10 +18,16 @@ class SearchProvider:
     permission: str
     route_hint: str
     query: callable
+    # Providers of employee-linked rows accept ``scope(queryset, employee_field, broad)``.
+    employee_scoped: bool = False
 
 
-def _employee_results(institution, query, limit):
-    rows = Employee.objects.for_institution(institution).filter(
+def _unscoped(queryset, employee_field, broad=None):
+    return queryset
+
+
+def _employee_results(institution, query, limit, scope=_unscoped):
+    rows = scope(Employee.objects.for_institution(institution), "").filter(
         Q(employee_number__iexact=query)
         | Q(employee_number__icontains=query)
         | Q(first_name__icontains=query)
@@ -81,7 +88,7 @@ def _payroll_results(institution, query, limit):
     ]
 
 
-def _leave_request_results(institution, query, limit):
+def _leave_request_results(institution, query, limit, scope=_unscoped):
     filters = (
         Q(employee__employee_number__icontains=query)
         | Q(employee__first_name__icontains=query)
@@ -89,7 +96,7 @@ def _leave_request_results(institution, query, limit):
         | Q(leave_type__code__icontains=query)
         | Q(status__iexact=query)
     )
-    queryset = LeaveRequest.objects.for_institution(institution)
+    queryset = scope(LeaveRequest.objects.for_institution(institution), "employee", LEAVE_BROAD)
     if query.upper().startswith("LR-"):
         queryset = queryset.annotate(search_id=Cast("id", output_field=CharField()))
         filters |= Q(search_id__istartswith=query[3:])
@@ -141,12 +148,12 @@ def _vendor_bill_results(institution, query, limit):
 
 
 SEARCH_PROVIDERS = (
-    SearchProvider("EMPLOYEE", "CORE_HR", "employee.view", "/hr/employees/{id}", _employee_results),
+    SearchProvider("EMPLOYEE", "CORE_HR", "employee.view", "/hr/employees/{id}", _employee_results, employee_scoped=True),
     SearchProvider("JOB_POSTING", "RECRUITMENT", "job_posting.view", "/recruitment/job-postings/{id}", _job_results),
     SearchProvider("CANDIDATE", "RECRUITMENT", "candidate.view", "/recruitment/candidates/{id}", _candidate_results),
     SearchProvider("OFFER", "RECRUITMENT", "offer.view", "/recruitment/offers/{id}", _offer_results),
     SearchProvider("PAYROLL_RUN", "PAYROLL", "payroll.view", "/payroll/runs/{id}", _payroll_results),
-    SearchProvider("LEAVE_REQUEST", "LEAVE", "leave.view", "/leave/requests/{id}", _leave_request_results),
+    SearchProvider("LEAVE_REQUEST", "LEAVE", "leave.view", "/leave/requests/{id}", _leave_request_results, employee_scoped=True),
     SearchProvider("ACCOUNT", "ACCOUNTING", "account.view", "/accounting/accounts/{id}", _account_results),
     SearchProvider("JOURNAL", "ACCOUNTING", "journal.view", "/accounting/journals/{id}", _journal_results),
     SearchProvider("INVOICE", "ACCOUNTING", "invoice.view", "/accounting/invoices/{id}", _invoice_results),
@@ -154,7 +161,7 @@ SEARCH_PROVIDERS = (
 )
 
 
-def universal_search(*, institution, permission_codes, query, result_types=(), module=None, limit=20):
+def universal_search(*, institution, permission_codes, query, result_types=(), module=None, limit=20, scope=_unscoped):
     enabled_modules = set(institution.modules.filter(is_enabled=True).values_list("module_code", flat=True)) | {"CORE_HR"}
     requested_types = set(result_types)
     results = []
@@ -165,6 +172,7 @@ def universal_search(*, institution, permission_codes, query, result_types=(), m
             continue
         if provider.module not in enabled_modules or provider.permission not in permission_codes:
             continue
-        for row in provider.query(institution, query, limit):
+        rows = provider.query(institution, query, limit, scope) if provider.employee_scoped else provider.query(institution, query, limit)
+        for row in rows:
             results.append({"type": provider.result_type, "module": provider.module, "route_hint": provider.route_hint.format(id=row["id"]), **row})
     return results[:limit]

@@ -6,10 +6,14 @@ from django.db.models import Q
 
 from apps.employees.models import Employee
 from apps.institutions.models import Institution
+from common.codes import AutoCodeMixin
 from common.models import TenantOwnedModel
 
 
-class PayComponent(TenantOwnedModel):
+class PayComponent(AutoCodeMixin, TenantOwnedModel):
+    auto_code_prefix = "PCM"
+    auto_code_width = 3
+
     class ComponentType(models.TextChoices):
         EARNING = "EARNING", "Earning"
         DEDUCTION = "DEDUCTION", "Deduction"
@@ -27,7 +31,7 @@ class PayComponent(TenantOwnedModel):
         Institution, on_delete=models.CASCADE, related_name="pay_components"
     )
     name = models.CharField(max_length=150)
-    code = models.CharField(max_length=50)
+    code = models.CharField(max_length=50, blank=True)
     component_type = models.CharField(max_length=24, choices=ComponentType.choices)
     calculation_type = models.CharField(max_length=12, choices=CalculationType.choices)
     taxable = models.BooleanField(default=False)
@@ -62,12 +66,15 @@ class PayComponent(TenantOwnedModel):
         return f"{self.institution.code}: {self.code}"
 
 
-class SalaryStructure(TenantOwnedModel):
+class SalaryStructure(AutoCodeMixin, TenantOwnedModel):
+    auto_code_prefix = "SAL"
+    auto_code_width = 3
+
     institution = models.ForeignKey(
         Institution, on_delete=models.CASCADE, related_name="salary_structures"
     )
     name = models.CharField(max_length=150)
-    code = models.CharField(max_length=50)
+    code = models.CharField(max_length=50, blank=True)
     description = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
 

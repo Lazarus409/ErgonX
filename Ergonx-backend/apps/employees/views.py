@@ -22,6 +22,7 @@ from apps.institutions.services import create_invitation, record_user_activity
 from apps.organization.models import Department, Grade, Location, Position
 from apps.documents.models import Document
 from apps.documents.serializers import DocumentSerializer
+from common.scoping import scope_to_employees
 from common.serializers import call_validated_service
 from common.viewsets import TenantModelViewSet
 from common.permissions import TenantContextPermission, TenantRBACPermission
@@ -122,7 +123,7 @@ class EmployeeViewSet(TenantModelViewSet):
     )
 
     def get_queryset(self):
-        return super().get_queryset().select_related("user")
+        return scope_to_employees(super().get_queryset().select_related("user"), self.request, "")
 
     def perform_create(self, serializer):
         employee = serializer.save(institution=self.request.institution)
@@ -305,9 +306,10 @@ class EmploymentViewSet(TenantModelViewSet):
     ordering_fields = ("start_date", "end_date", "created_at", "updated_at")
 
     def get_queryset(self):
-        return super().get_queryset().select_related(
+        queryset = super().get_queryset().select_related(
             "employee", "department", "position", "grade", "location", "reports_to"
         )
+        return scope_to_employees(queryset, self.request)
 
     def perform_create(self, serializer):
         employee = serializer.validated_data.get("employee")
@@ -329,4 +331,5 @@ class EmergencyContactViewSet(TenantModelViewSet):
     ordering_fields = ("full_name", "is_primary", "created_at", "updated_at")
 
     def get_queryset(self):
-        return super().get_queryset().select_related("employee")
+        # Emergency contacts are personal data: team leads see only their own.
+        return scope_to_employees(super().get_queryset().select_related("employee"), self.request, allow_team=False)

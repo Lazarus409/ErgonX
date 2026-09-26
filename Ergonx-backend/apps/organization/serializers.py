@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from apps.employees.models import Employee
 from apps.organization.models import Department, Grade, Location, Position
 from apps.organization.services import create_position, update_position
 from common.serializers import ValidatedModelSerializer, call_validated_service
@@ -21,6 +22,8 @@ class TenantValidationMixin:
 
 
 class DepartmentSerializer(TenantValidationMixin, ValidatedModelSerializer):
+    head_name = serializers.CharField(source="head.full_name", read_only=True, default=None)
+
     class Meta:
         model = Department
         fields = (
@@ -29,19 +32,26 @@ class DepartmentSerializer(TenantValidationMixin, ValidatedModelSerializer):
             "code",
             "description",
             "parent",
+            "head",
+            "head_name",
             "is_active",
             "created_at",
             "updated_at",
         )
-        read_only_fields = ("id", "created_at", "updated_at")
+        read_only_fields = ("id", "head_name", "created_at", "updated_at")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.scope_relation("parent", Department)
+        self.scope_relation("head", Employee)
 
     def validate(self, attrs):
         parent = attrs.get("parent", getattr(self.instance, "parent", None))
         self.validate_tenant_relation("parent", parent)
+        head = attrs.get("head", getattr(self.instance, "head", None))
+        self.validate_tenant_relation("head", head)
+        if "head" in attrs and head and head.status != Employee.Status.ACTIVE:
+            raise serializers.ValidationError({"head": "Department head must be an active employee."})
         if self.instance and parent and parent.id == self.instance.id:
             raise serializers.ValidationError({"parent": "A department cannot be its own parent."})
         return attrs

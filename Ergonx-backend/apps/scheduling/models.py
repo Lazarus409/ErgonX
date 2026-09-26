@@ -8,15 +8,19 @@ from django.utils import timezone
 
 from apps.employees.models import Employee
 from apps.institutions.models import Institution
+from common.codes import AutoCodeMixin
 from common.models import TenantOwnedModel
 
 
-class Shift(TenantOwnedModel):
+class Shift(AutoCodeMixin, TenantOwnedModel):
+    auto_code_prefix = "SHF"
+    auto_code_width = 3
+
     institution = models.ForeignKey(
         Institution, on_delete=models.CASCADE, related_name="shifts"
     )
     name = models.CharField(max_length=150)
-    code = models.CharField(max_length=50)
+    code = models.CharField(max_length=50, blank=True)
     start_time = models.TimeField()
     end_time = models.TimeField()
     crosses_midnight = models.BooleanField(default=False)
@@ -67,12 +71,15 @@ class Shift(TenantOwnedModel):
         return f"{self.institution.code}: {self.name}"
 
 
-class ShiftPattern(TenantOwnedModel):
+class ShiftPattern(AutoCodeMixin, TenantOwnedModel):
+    auto_code_prefix = "SPT"
+    auto_code_width = 3
+
     institution = models.ForeignKey(
         Institution, on_delete=models.CASCADE, related_name="shift_patterns"
     )
     name = models.CharField(max_length=150)
-    code = models.CharField(max_length=50)
+    code = models.CharField(max_length=50, blank=True)
     cycle_length_days = models.PositiveSmallIntegerField()
     is_active = models.BooleanField(default=True)
 
@@ -138,12 +145,15 @@ class ShiftPatternDay(TenantOwnedModel):
             raise ValidationError(errors)
 
 
-class RotationPattern(TenantOwnedModel):
+class RotationPattern(AutoCodeMixin, TenantOwnedModel):
+    auto_code_prefix = "ROT"
+    auto_code_width = 3
+
     institution = models.ForeignKey(
         Institution, on_delete=models.CASCADE, related_name="rotation_patterns"
     )
     name = models.CharField(max_length=150)
-    code = models.CharField(max_length=50)
+    code = models.CharField(max_length=50, blank=True)
     is_active = models.BooleanField(default=True)
 
     class Meta:
@@ -260,7 +270,10 @@ class FlexibleWorkRule(TenantOwnedModel):
             raise ValidationError(errors)
 
 
-class WorkSchedule(TenantOwnedModel):
+class WorkSchedule(AutoCodeMixin, TenantOwnedModel):
+    auto_code_prefix = "SCH"
+    auto_code_width = 3
+
     class ScheduleType(models.TextChoices):
         FIXED = "FIXED", "Fixed"
         SHIFT_PATTERN = "SHIFT_PATTERN", "Shift pattern"
@@ -271,7 +284,7 @@ class WorkSchedule(TenantOwnedModel):
         Institution, on_delete=models.CASCADE, related_name="work_schedules"
     )
     name = models.CharField(max_length=150)
-    code = models.CharField(max_length=50)
+    code = models.CharField(max_length=50, blank=True)
     schedule_type = models.CharField(max_length=16, choices=ScheduleType.choices)
     effective_from = models.DateField()
     effective_to = models.DateField(null=True, blank=True)

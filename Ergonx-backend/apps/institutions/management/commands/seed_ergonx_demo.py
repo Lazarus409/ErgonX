@@ -18,6 +18,7 @@ from apps.employees.models import Employee, Employment
 from apps.employees.services import create_employment
 from apps.institutions.models import Institution, InstitutionMembership, InstitutionModule, Role, UserActivityEvent
 from apps.institutions.services import (
+    SELF_SERVICE_PERMISSIONS,
     bootstrap_institution,
     create_custom_role,
     create_membership,
@@ -112,21 +113,17 @@ ORGANIZATION = {
 }
 
 CUSTOM_ROLES = {
-    "DEPARTMENT_HEAD": (
-        "Department Head",
-        ("home.view", "employee.view", "leave.view", "leave.approve", "attendance.view", "dashboard.hr.view"),
-    ),
     "PAYROLL_OFFICER": (
         "Payroll Officer",
-        ("home.view", "payroll.view", "payroll.prepare", "payslip.view"),
+        ("home.view", "payroll.view", "payroll.prepare", "payslip.view", *SELF_SERVICE_PERMISSIONS),
     ),
     "RECRUITMENT_OFFICER": (
         "Recruitment Officer",
-        ("home.view", "job_posting.view", "job_posting.create", "job_posting.update", "candidate.view", "candidate.create", "candidate.update", "interview.view", "interview.manage", "candidate_evaluation.create"),
+        ("home.view", "job_posting.view", "job_posting.create", "job_posting.update", "candidate.view", "candidate.create", "candidate.update", "interview.view", "interview.manage", "candidate_evaluation.create", *SELF_SERVICE_PERMISSIONS),
     ),
     "SHIFT_SUPERVISOR": (
         "Shift Supervisor",
-        ("home.view", "attendance.view", "attendance.approve", "schedule.view", "schedule.manage"),
+        ("home.view", "attendance.view", "attendance.approve", "schedule.view", "schedule.manage", *SELF_SERVICE_PERMISSIONS),
     ),
 }
 
@@ -166,6 +163,16 @@ EMPLOYEES = (
     ("EMP-000129", "Samuel", "Antwi", "+233201000028", 34821, "MALE", 44563, "EMPLOYEE"),
     ("EMP-000130", "Linda", "Bonsu", "+233201000029", 35219, "FEMALE", 45019, "EMPLOYEE"),
 )
+
+# Department code -> employee number of its head (Department.head).
+DEPARTMENT_HEADS = {
+    "DPT-001": "EMP-000101",
+    "DPT-002": "EMP-000102",
+    "DPT-003": "EMP-000105",
+    "DPT-004": "EMP-000108",
+    "DPT-005": "EMP-000112",
+    "DPT-006": "EMP-000118",
+}
 
 EMPLOYMENT_ASSIGNMENTS = (
     # employee, department, position, grade, location, manager, type, category, start serial
@@ -369,6 +376,10 @@ class Command(BaseCommand):
                     "candidate.view",
                 },
                 "forbidden": set(),
+            },
+            "DEPARTMENT_HEAD": {
+                "required": {"employee.view", "leave.approve", "attendance.view", "dashboard.department.view"},
+                "forbidden": {"dashboard.hr.view", "payroll.view", "compensation.manage", "employee.update", "account.view"},
             },
             "EMPLOYEE": {
                 "required": {"home.view", "leave.request", "attendance.view", "payslip.view"},
@@ -999,6 +1010,14 @@ class Command(BaseCommand):
                 employment.full_clean()
                 employment.save(update_fields=("reports_to", "updated_at"))
 
+        for department_code, head_number in DEPARTMENT_HEADS.items():
+            department = institution.departments.get(code=department_code)
+            head = current_employments[head_number].employee
+            if department.head_id != head.id:
+                department.head = head
+                department.full_clean()
+                department.save(update_fields=("head", "updated_at"))
+
     def _ensure_admin(self, password, *, reset_passwords=False):
         user, created = User.objects.get_or_create(
             email=DEMO_ADMIN_EMAIL,
@@ -1093,7 +1112,9 @@ class Command(BaseCommand):
                 continue
             actual = set(role.permissions.values_list("code", flat=True))
             expected = set(permission_codes)
-            if actual == expected - {"home.view"}:
+            # Older seeds created these roles with a subset of today's grants
+            # (no home.view / self-service); only ever add, never remove.
+            if role.is_custom and actual < expected:
                 update_custom_role(
                     role=role,
                     institution=institution,

@@ -25,6 +25,7 @@ from apps.compensation.services import (
     deactivate_employee_pay_component,
     resolve_compensation,
 )
+from common.scoping import scope_to_employees
 from common.serializers import call_validated_service
 from common.viewsets import TenantModelViewSet
 
@@ -113,12 +114,7 @@ class EmployeeCompensationViewSet(TenantModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset().select_related("employee", "salary_structure")
-        if (
-            getattr(self.request, "membership", None)
-            and self.request.membership.role.code == "EMPLOYEE"
-        ):
-            queryset = queryset.filter(employee__user=self.request.user)
-        return queryset
+        return scope_to_employees(queryset, self.request, allow_team=False)
 
     def perform_create(self, serializer):
         serializer.save(institution=self.request.institution, actor=self.request.user)
@@ -156,14 +152,9 @@ class EmployeePayComponentViewSet(TenantModelViewSet):
         queryset = super().get_queryset().select_related(
             "employee_compensation__employee", "pay_component"
         )
-        if (
-            getattr(self.request, "membership", None)
-            and self.request.membership.role.code == "EMPLOYEE"
-        ):
-            queryset = queryset.filter(
-                employee_compensation__employee__user=self.request.user
-            )
-        return queryset
+        return scope_to_employees(
+            queryset, self.request, "employee_compensation__employee", allow_team=False
+        )
 
     def perform_create(self, serializer):
         serializer.save(institution=self.request.institution, actor=self.request.user)

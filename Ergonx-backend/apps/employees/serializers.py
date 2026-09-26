@@ -4,6 +4,7 @@ from apps.accounts.models import User
 from apps.employees.models import EmergencyContact, Employee, EmployeeOffboarding, EmployeeOnboarding, Employment
 from apps.employees.services import change_current_employment, create_employment, save_emergency_contact
 from apps.organization.models import Department, Grade, Location, Position
+from common.scoping import is_team_scoped
 from common.serializers import ValidatedModelSerializer, call_validated_service
 
 
@@ -41,6 +42,17 @@ class EmployeeSerializer(ValidatedModelSerializer):
             self.fields["user"].queryset = User.objects.filter(
                 memberships__institution=institution
             ).distinct()
+
+    PERSONAL_FIELDS = ("personal_email", "date_of_birth")
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        request = self.context.get("request")
+        # Department heads see work details for their team, not personal data.
+        if request and is_team_scoped(request) and instance.user_id != request.user.id:
+            for field in self.PERSONAL_FIELDS:
+                data.pop(field, None)
+        return data
 
     def validate_user(self, user):
         institution = self.context["request"].institution

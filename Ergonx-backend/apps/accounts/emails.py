@@ -2,6 +2,7 @@
 
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
+from django.utils.html import escape
 
 
 def send_institution_admin_invitation(*, recipient_email: str, acceptance_token: str, expires_at) -> None:
@@ -94,5 +95,32 @@ def send_employee_self_service_invitation(*, recipient_email: str, acceptance_to
       <p>This single-use link expires on <strong>{expires_text}</strong>.</p>
     </div>'''
     message = EmailMultiAlternatives(subject=subject, body=text_body, from_email=settings.DEFAULT_FROM_EMAIL, to=[recipient_email])
+    message.attach_alternative(html_body, "text/html")
+    message.send(fail_silently=False)
+
+
+def send_institution_access_request_notice(*, recipients: list[str], access_request) -> None:
+    """Tell platform administrators that an organization asked for an invitation."""
+    review_url = f"{settings.FRONTEND_PUBLIC_URL}/platform"
+    subject = f"New ErgonX access request: {access_request.institution_name}"
+    text_body = (
+        f"{access_request.contact_name} ({access_request.email}) asked for an invitation for "
+        f"{access_request.institution_name}.\n\n"
+        f"Review it in the platform console: {review_url}"
+    )
+    html_body = f"""
+    <div style=\"font-family:Arial,sans-serif;color:#0f172a;line-height:1.55;max-width:620px\">
+      <p style=\"font-weight:700;letter-spacing:0.12em;color:#0284c7\">ERGONX</p>
+      <h1 style=\"font-size:24px\">New access request</h1>
+      <p><strong>{escape(access_request.contact_name)}</strong> ({escape(access_request.email)}) asked for an invitation for <strong>{escape(access_request.institution_name)}</strong>.</p>
+      <p><a href=\"{review_url}\" style=\"display:inline-block;background:#0f172a;color:#fff;padding:12px 18px;border-radius:8px;text-decoration:none;font-weight:700\">Review request</a></p>
+    </div>
+    """
+    message = EmailMultiAlternatives(
+        subject=subject,
+        body=text_body,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=recipients,
+    )
     message.attach_alternative(html_body, "text/html")
     message.send(fail_silently=False)

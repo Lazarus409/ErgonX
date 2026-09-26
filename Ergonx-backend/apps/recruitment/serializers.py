@@ -118,4 +118,5 @@ class RejectionSerializer(serializers.Serializer):
 
 
 class HireCandidateSerializer(serializers.Serializer):
-    employee_number = serializers.CharField(max_length=50)
+    # Blank means "generate the next employee number".
+    employee_number = serializers.CharField(max_length=50, required=False, allow_blank=True, default="")

@@ -4,6 +4,7 @@ from django.db import models
 
 from apps.institutions.models import Institution, Role
 from common.models import TenantOwnedModel
+from common.permissions import READ_ONLY_ROLES
 
 
 class ApprovalWorkflowDefinition(TenantOwnedModel):
@@ -82,6 +83,12 @@ class ApprovalWorkflowStep(TenantOwnedModel):
                 institution_id=self.institution_id
             ).exists():
                 errors["approver_user"] = "Approver must belong to the same institution."
+        if self.approver_role_id and self.approver_role.code in READ_ONLY_ROLES:
+            errors["approver_role"] = "A read-only role cannot approve requests."
+        if self.approver_user_id and self.institution_id and self.approver_user.memberships.filter(
+            institution_id=self.institution_id, role__code__in=READ_ONLY_ROLES
+        ).exists():
+            errors["approver_user"] = "This user has a read-only role and cannot approve requests."
         if errors:
             raise ValidationError(errors)
 

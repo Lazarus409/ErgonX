@@ -18,6 +18,7 @@ from apps.scheduling.serializers import (
     ShiftSerializer,
     WorkScheduleSerializer,
 )
+from common.scoping import ATTENDANCE_BROAD, scope_to_employees
 from common.viewsets import TenantModelViewSet
 
 
@@ -87,9 +88,7 @@ class ScheduleAssignmentViewSet(ScheduleConfigurationViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset().select_related("employee", "work_schedule", "assigned_by")
-        if getattr(self.request, "membership", None) and self.request.membership.role.code == "EMPLOYEE":
-            queryset = queryset.filter(employee__user=self.request.user)
-        return queryset
+        return scope_to_employees(queryset, self.request, broad=ATTENDANCE_BROAD)
 
     def perform_create(self, serializer):
         serializer.save(

@@ -4,10 +4,15 @@ from django.db import models
 
 from apps.institutions.models import Institution
 from apps.organization.models import Department, Grade, Location, Position
+from common.codes import AutoCodeMixin
 from common.models import TenantOwnedModel
 
 
-class Employee(TenantOwnedModel):
+class Employee(AutoCodeMixin, TenantOwnedModel):
+    auto_code_field = "employee_number"
+    auto_code_prefix = "EMP"
+    auto_code_width = 6
+
     class Gender(models.TextChoices):
         MALE = "MALE", "Male"
         FEMALE = "FEMALE", "Female"
@@ -30,7 +35,7 @@ class Employee(TenantOwnedModel):
         blank=True,
         related_name="employee_profiles",
     )
-    employee_number = models.CharField(max_length=50)
+    employee_number = models.CharField(max_length=50, blank=True)
     first_name = models.CharField(max_length=100)
     middle_name = models.CharField(max_length=100, blank=True)
     last_name = models.CharField(max_length=100)

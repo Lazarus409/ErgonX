@@ -8,15 +8,19 @@ from apps.documents.models import Document
 from apps.employees.models import Employee, Employment
 from apps.institutions.models import Institution
 from apps.organization.models import Department, Grade, Location
+from common.codes import AutoCodeMixin
 from common.models import TenantOwnedModel
 
 
-class LeaveType(TenantOwnedModel):
+class LeaveType(AutoCodeMixin, TenantOwnedModel):
+    auto_code_prefix = "LVT"
+    auto_code_width = 3
+
     institution = models.ForeignKey(
         Institution, on_delete=models.CASCADE, related_name="leave_types"
     )
     name = models.CharField(max_length=150)
-    code = models.CharField(max_length=50)
+    code = models.CharField(max_length=50, blank=True)
     description = models.TextField(blank=True)
     is_paid = models.BooleanField(default=True)
     requires_approval = models.BooleanField(default=True)

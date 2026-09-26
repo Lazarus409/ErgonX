@@ -9,9 +9,17 @@ def _serializer(uploaded_file):
     return DocumentSerializer(data={"uploaded_file": uploaded_file}, context={"request": request})
 
 
-def test_managed_document_upload_rejects_mismatched_file_signature():
-    uploaded = SimpleUploadedFile("evidence.pdf", b"not a pdf", content_type="application/pdf")
+def test_managed_document_upload_accepts_any_file_type():
+    uploaded = SimpleUploadedFile("minutes.docx", b"PK\x03\x04word", content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
     serializer = _serializer(uploaded)
+
+    assert serializer.is_valid(), serializer.errors
+    assert serializer.validated_data["content_type"].endswith("wordprocessingml.document")
+
+
+def test_managed_document_upload_rejects_files_over_the_size_limit(settings):
+    settings.DOCUMENT_UPLOAD_MAX_BYTES = 4
+    serializer = _serializer(SimpleUploadedFile("big.bin", b"12345", content_type="application/octet-stream"))
 
     assert not serializer.is_valid()
     assert "uploaded_file" in serializer.errors

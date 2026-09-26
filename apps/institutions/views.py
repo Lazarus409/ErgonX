@@ -31,6 +31,7 @@ from apps.institutions.search import universal_search
 from apps.institutions.catalogues import locale_catalogues
 from common.serializers import call_validated_service
 from common.viewsets import TenantModelViewSet
+from common.scoping import scope_to_employees
 from common.permissions import TenantContextPermission, TenantRBACPermission
 
 
@@ -377,5 +378,6 @@ class UniversalSearchView(APIView):
             result_types=result_types,
             module=module,
             limit=limit,
+            scope=lambda queryset, employee_field, broad=None: scope_to_employees(queryset, request, employee_field, broad=broad),
         )
         return Response({"query": query, "results": results, "count": len(results)})

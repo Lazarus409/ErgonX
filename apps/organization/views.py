@@ -16,7 +16,7 @@ class DepartmentViewSet(TenantModelViewSet):
     ordering_fields = ("name", "code", "created_at", "updated_at")
 
     def get_queryset(self):
-        return super().get_queryset().select_related("parent")
+        return super().get_queryset().select_related("parent", "head")
 
 
 class PositionViewSet(TenantModelViewSet):

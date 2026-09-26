@@ -23,6 +23,7 @@ from apps.leave.services import (
     reject_leave_request,
     submit_leave_request,
 )
+from common.scoping import LEAVE_BROAD, scope_to_employees, sees_everyone
 from common.serializers import call_validated_service
 from common.viewsets import TenantModelViewSet
 
@@ -67,9 +68,7 @@ class LeaveBalanceViewSet(TenantModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset().select_related("employee", "leave_type")
-        if getattr(self.request, "membership", None) and self.request.membership.role.code == "EMPLOYEE":
-            queryset = queryset.filter(employee__user=self.request.user)
-        return queryset
+        return scope_to_employees(queryset, self.request, broad=LEAVE_BROAD)
 
     @action(detail=True, methods=("post",))
     def accrue(self, request, pk=None):
@@ -115,9 +114,9 @@ class LeaveRequestViewSet(TenantModelViewSet):
         }.get(self.action, "leave.view")
 
     def get_queryset(self):
-        queryset = super().get_queryset().select_related("employee", "leave_type", "attachment")
-        if getattr(self.request, "membership", None) and self.request.membership.role.code == "EMPLOYEE":
-            queryset = queryset.filter(employee__user=self.request.user)
+        queryset = scope_to_employees(
+            super().get_queryset().select_related("employee", "leave_type", "attachment"), self.request, broad=LEAVE_BROAD
+        )
         if self.action == "calendar":
             queryset = queryset.filter(
                 status__in=(LeaveRequest.Status.PENDING, LeaveRequest.Status.APPROVED)
@@ -191,8 +190,7 @@ class LeaveApprovalViewSet(TenantModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset().select_related("leave_request", "approver")
-        if getattr(self.request, "membership", None) and self.request.membership.role.code == "EMPLOYEE":
-            queryset = queryset.filter(
-                Q(leave_request__employee__user=self.request.user) | Q(approver=self.request.user)
-            )
-        return queryset
+        if sees_everyone(self.request, LEAVE_BROAD):
+            return queryset
+        visible = scope_to_employees(queryset, self.request, "leave_request__employee", broad=LEAVE_BROAD).values("pk")
+        return queryset.filter(Q(pk__in=visible) | Q(approver=self.request.user))

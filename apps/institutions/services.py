@@ -29,6 +29,7 @@ RESERVED_ROLE_CODES = frozenset(
         "ACCOUNTANT",
         "FINANCE_MANAGER",
         "AUDITOR",
+        "DEPARTMENT_HEAD",
     }
 )
 
@@ -171,6 +172,7 @@ PERMISSIONS = {
     "dashboard.attendance.view": "View attendance dashboard",
     "dashboard.payroll.view": "View payroll dashboard",
     "dashboard.finance.view": "View finance dashboard",
+    "dashboard.department.view": "View the dashboard for departments the member heads",
     "institution.view": "View current institution",
     "organization.view": "View organization records",
     "organization.create": "Create organization records",
@@ -230,6 +232,19 @@ PERMISSION_MODULES = {
     if code.startswith(("job_posting.", "candidate.", "recruitment_stage.", "interview.", "candidate_evaluation.", "offer."))
 }
 
+# What every staff member needs for their own leave, attendance and payslips.
+# Institution-wide roles holding these see only their own rows unless they
+# also hold the module's management permissions (see common.scoping).
+SELF_SERVICE_PERMISSIONS = (
+    "leave.view",
+    "leave.request",
+    "schedule.view",
+    "attendance.view",
+    "attendance.clock",
+    "attendance.adjust",
+    "payslip.view",
+)
+
 ROLE_PERMISSION_CODES = {
     "INSTITUTION_ADMIN": tuple(PERMISSIONS),
     "HR_ADMIN": tuple(
@@ -248,6 +263,7 @@ ROLE_PERMISSION_CODES = {
         }
     ),
     "DIRECTOR": (
+        *SELF_SERVICE_PERMISSIONS,
         "home.view",
         "search.use",
         "settings.profile.manage_self",
@@ -291,7 +307,32 @@ ROLE_PERMISSION_CODES = {
         "tax_relief.view",
         "tax_relief.claim",
     ),
+    # Data is limited to the member and the departments they head; pay records
+    # stay self-only (see common.scoping).
+    "DEPARTMENT_HEAD": (
+        "home.view",
+        "search.use",
+        "settings.profile.manage_self",
+        "institution.view",
+        "organization.view",
+        "employee.view",
+        "employment.view",
+        "leave.view",
+        "leave.request",
+        "leave.approve",
+        "leave.reject",
+        "schedule.view",
+        "attendance.view",
+        "attendance.clock",
+        "attendance.adjust",
+        "compensation.view",
+        "payslip.view",
+        "tax_relief.view",
+        "tax_relief.claim",
+        "dashboard.department.view",
+    ),
     "ACCOUNTANT": (
+        *SELF_SERVICE_PERMISSIONS,
         "home.view",
         "search.use",
         "settings.profile.manage_self",
@@ -328,6 +369,7 @@ ROLE_PERMISSION_CODES = {
         "dashboard.finance.view",
     ),
     "FINANCE_MANAGER": (
+        *SELF_SERVICE_PERMISSIONS,
         "home.view",
         "search.use",
         "settings.profile.manage_self",
@@ -344,6 +386,7 @@ ROLE_PERMISSION_CODES = {
         *ACCOUNTING_PERMISSIONS,
     ),
     "AUDITOR": (
+        *SELF_SERVICE_PERMISSIONS,
         "home.view",
         "search.use",
         "settings.profile.manage_self",
@@ -361,6 +404,8 @@ ROLE_PERMISSION_CODES = {
         "approval_request.view",
     ),
 }
+
+ROLE_PERMISSION_CODES = {code: tuple(dict.fromkeys(codes)) for code, codes in ROLE_PERMISSION_CODES.items()}
 
 
 def ensure_system_permissions():
@@ -894,7 +939,7 @@ def bootstrap_institution(institution):
         role, _ = Role.objects.update_or_create(
             institution=institution,
             code=code,
-            defaults={"name": code.replace("_", " ").title(), "is_system_role": True},
+            defaults={"name": code.replace("_", " ").title(), "is_system_role": True, "is_custom": False},
         )
         role.permissions.set(permissions[item] for item in permission_codes)
 

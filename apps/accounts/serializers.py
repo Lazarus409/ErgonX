@@ -31,6 +31,49 @@ def verify_totp(secret: str, code: str) -> bool:
     return bool(normalized) and any(hmac.compare_digest(_totp(secret, int(time.time()) + drift * 30), normalized) for drift in (-1, 0, 1))
 
 
+EMAIL_OTP_TTL = timedelta(minutes=5)
+EMAIL_OTP_MAX_ATTEMPTS = 5
+
+
+class EmailOTPDeliveryError(Exception):
+    """The email one-time code could not be issued or delivered."""
+
+
+def _email_otp_digest(code: str) -> str:
+    return salted_hmac("ergonx-email-mfa", code).hexdigest()
+
+
+def issue_email_otp(user) -> EmailOTPChallenge:
+    """Revoke open challenges, then store and email a fresh six-digit code."""
+    if not settings.EMAIL_DELIVERY_ENABLED:
+        raise EmailOTPDeliveryError("Email MFA delivery is not configured.")
+    EmailOTPChallenge.objects.filter(user=user, consumed_at__isnull=True).update(consumed_at=timezone.now())
+    plain_code = f"{secrets.randbelow(1_000_000):06d}"
+    now = timezone.now()
+    challenge = EmailOTPChallenge.objects.create(user=user, code_digest=_email_otp_digest(plain_code), expires_at=now + EMAIL_OTP_TTL, sent_at=now)
+    try:
+        send_email_mfa_code(recipient_email=user.email, code=plain_code, expires_at=challenge.expires_at)
+    except Exception as exc:
+        challenge.delete()
+        raise EmailOTPDeliveryError("Email MFA delivery failed.") from exc
+    return challenge
+
+
+def consume_email_otp(user, code: str) -> bool:
+    """Check a code against the latest open challenge; a match consumes it."""
+    code = str(code or "").strip()
+    challenge = EmailOTPChallenge.objects.filter(user=user, consumed_at__isnull=True).order_by("-created_at").first()
+    if not code or not challenge or challenge.expires_at <= timezone.now() or challenge.attempts >= EMAIL_OTP_MAX_ATTEMPTS:
+        return False
+    challenge.attempts += 1
+    challenge.save(update_fields=("attempts", "updated_at"))
+    if not hmac.compare_digest(challenge.code_digest, _email_otp_digest(code)):
+        return False
+    challenge.consumed_at = timezone.now()
+    challenge.save(update_fields=("consumed_at", "updated_at"))
+    return True
+
+
 class MFARequired(AuthenticationFailed):
     api_code = "mfa_required"
 
@@ -84,32 +127,13 @@ class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
         if mfa and mfa.method == UserMFA.Method.EMAIL_OTP:
             code = str(attrs.get("mfa_code", "")).strip()
             if not code:
-                if not settings.EMAIL_DELIVERY_ENABLED:
-                    raise AuthenticationFailed("Email MFA delivery is not configured.", code="email_otp_unavailable")
-                EmailOTPChallenge.objects.filter(user=self.user, consumed_at__isnull=True).update(consumed_at=timezone.now())
-                plain_code = f"{secrets.randbelow(1_000_000):06d}"
-                expires_at = timezone.now() + timedelta(minutes=5)
-                challenge = EmailOTPChallenge.objects.create(
-                    user=self.user,
-                    code_digest=salted_hmac("ergonx-email-mfa", plain_code).hexdigest(),
-                    expires_at=expires_at,
-                    sent_at=timezone.now(),
-                )
                 try:
-                    send_email_mfa_code(recipient_email=self.user.email, code=plain_code, expires_at=expires_at)
-                except Exception:
-                    challenge.delete()
-                    raise AuthenticationFailed("Email MFA delivery failed.", code="email_otp_unavailable")
+                    issue_email_otp(self.user)
+                except EmailOTPDeliveryError as exc:
+                    raise AuthenticationFailed(str(exc), code="email_otp_unavailable")
                 raise EmailOTPRequired("Enter the verification code sent to your email.")
-            challenge = EmailOTPChallenge.objects.filter(user=self.user, consumed_at__isnull=True).order_by("-created_at").first()
-            if not challenge or challenge.expires_at <= timezone.now() or challenge.attempts >= 5:
+            if not consume_email_otp(self.user, code):
                 raise AuthenticationFailed("The email verification code is invalid or expired.", code="email_otp_invalid")
-            challenge.attempts += 1
-            challenge.save(update_fields=("attempts", "updated_at"))
-            if not hmac.compare_digest(challenge.code_digest, salted_hmac("ergonx-email-mfa", code).hexdigest()):
-                raise AuthenticationFailed("The email verification code is invalid or expired.", code="email_otp_invalid")
-            challenge.consumed_at = timezone.now()
-            challenge.save(update_fields=("consumed_at", "updated_at"))
         elif mfa and not verify_totp(mfa.secret, attrs.get("mfa_code", "")):
             raise MFARequired("Enter the six-digit authenticator code to continue.")
         data["user"] = UserSerializer(self.user).data

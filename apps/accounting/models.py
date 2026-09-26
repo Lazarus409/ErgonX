@@ -10,6 +10,7 @@ from apps.compensation.models import PayComponent
 from apps.documents.models import Document
 from apps.institutions.models import Institution
 from apps.organization.models import Department, Location
+from common.codes import AutoCodeMixin
 from common.models import BaseModel, TenantOwnedModel
 
 
@@ -780,12 +781,16 @@ class JournalLine(BaseModel):
         return super().delete(*args, **kwargs)
 
 
-class Vendor(TenantOwnedModel):
+class Vendor(AutoCodeMixin, TenantOwnedModel):
+    auto_code_field = "vendor_code"
+    auto_code_prefix = "VEN"
+    auto_code_width = 4
+
     institution = models.ForeignKey(
         Institution, on_delete=models.CASCADE, related_name="vendors"
     )
     name = models.CharField(max_length=150)
-    vendor_code = models.CharField(max_length=50)
+    vendor_code = models.CharField(max_length=50, blank=True)
     email = models.EmailField(blank=True)
     phone = models.CharField(max_length=50, blank=True)
     address = models.TextField(blank=True)
@@ -1011,12 +1016,16 @@ class VendorBillLine(BaseModel):
         return super().delete(*args, **kwargs)
 
 
-class Customer(TenantOwnedModel):
+class Customer(AutoCodeMixin, TenantOwnedModel):
+    auto_code_field = "customer_code"
+    auto_code_prefix = "CUS"
+    auto_code_width = 4
+
     institution = models.ForeignKey(
         Institution, on_delete=models.CASCADE, related_name="customers"
     )
     name = models.CharField(max_length=150)
-    customer_code = models.CharField(max_length=50)
+    customer_code = models.CharField(max_length=50, blank=True)
     email = models.EmailField(blank=True)
     phone = models.CharField(max_length=50, blank=True)
     address = models.TextField(blank=True)
@@ -1048,7 +1057,12 @@ class Customer(TenantOwnedModel):
             raise ValidationError({"country_code": "Use a two-letter ISO country code."})
 
 
-class Invoice(TenantOwnedModel):
+class Invoice(AutoCodeMixin, TenantOwnedModel):
+    auto_code_field = "invoice_number"
+    auto_code_prefix = "INV"
+    auto_code_width = 6
+    auto_code_year_from = "invoice_date"
+
     class Status(models.TextChoices):
         DRAFT = "DRAFT", "Draft"
         ISSUED = "ISSUED", "Issued"
@@ -1060,7 +1074,7 @@ class Invoice(TenantOwnedModel):
         Institution, on_delete=models.CASCADE, related_name="invoices"
     )
     customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name="invoices")
-    invoice_number = models.CharField(max_length=80)
+    invoice_number = models.CharField(max_length=80, blank=True)
     invoice_date = models.DateField()
     due_date = models.DateField()
     currency = models.CharField(max_length=3)
@@ -1219,7 +1233,12 @@ class BankAccount(TenantOwnedModel):
             raise ValidationError(errors)
 
 
-class Payment(TenantOwnedModel):
+class Payment(AutoCodeMixin, TenantOwnedModel):
+    auto_code_field = "payment_number"
+    auto_code_prefix = "PAY"
+    auto_code_width = 6
+    auto_code_year_from = "payment_date"
+
     class Status(models.TextChoices):
         POSTED = "POSTED", "Posted"
         VOID = "VOID", "Void"
@@ -1235,7 +1254,7 @@ class Payment(TenantOwnedModel):
     institution = models.ForeignKey(
         Institution, on_delete=models.CASCADE, related_name="payments"
     )
-    payment_number = models.CharField(max_length=80)
+    payment_number = models.CharField(max_length=80, blank=True)
     payment_date = models.DateField()
     amount = models.DecimalField(max_digits=20, decimal_places=2)
     currency = models.CharField(max_length=3)
@@ -1307,7 +1326,12 @@ class Payment(TenantOwnedModel):
         super().save(*args, **kwargs)
 
 
-class Receipt(TenantOwnedModel):
+class Receipt(AutoCodeMixin, TenantOwnedModel):
+    auto_code_field = "receipt_number"
+    auto_code_prefix = "RCT"
+    auto_code_width = 6
+    auto_code_year_from = "receipt_date"
+
     class Status(models.TextChoices):
         POSTED = "POSTED", "Posted"
         VOID = "VOID", "Void"
@@ -1323,7 +1347,7 @@ class Receipt(TenantOwnedModel):
     institution = models.ForeignKey(
         Institution, on_delete=models.CASCADE, related_name="receipts"
     )
-    receipt_number = models.CharField(max_length=80)
+    receipt_number = models.CharField(max_length=80, blank=True)
     receipt_date = models.DateField()
     amount = models.DecimalField(max_digits=20, decimal_places=2)
     currency = models.CharField(max_length=3)

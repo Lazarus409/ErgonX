@@ -49,6 +49,7 @@ def test_required_tenant_roles_are_seeded(institution_factory):
         "ACCOUNTANT",
         "FINANCE_MANAGER",
         "AUDITOR",
+        "DEPARTMENT_HEAD",
     }
 
 

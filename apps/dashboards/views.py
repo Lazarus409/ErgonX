@@ -16,6 +16,8 @@ from apps.payroll.models import PayrollRecord, PayrollRun
 from apps.recruitment.models import Application, Candidate, Interview, JobPosting, Offer, RecruitmentStage
 from common.permissions import TenantContextPermission, TenantRBACPermission
 from apps.institutions.services import effective_permission_codes
+from apps.dashboards.department import department_dashboard
+from common.scoping import data_scope
 from apps.dashboards.home import home_payload
 from apps.dashboards.serializers import HomeSerializer
 
@@ -241,6 +243,22 @@ class DashboardViewSet(ViewSet):
                     institution=institution, status=Offer.Status.EXTENDED
                 ).count(),
             }
+        return Response(payload)
+
+    @extend_schema(
+        responses={200: OpenApiTypes.OBJECT},
+        description="Return roster, today's attendance, leave and trends for the departments the user heads.",
+    )
+    @action(detail=False, methods=("get",))
+    def department(self, request):
+        payload = department_dashboard(request.user, request.institution)
+        enabled = set(request.institution.modules.filter(is_enabled=True).values_list("module_code", flat=True))
+        if "LEAVE" not in enabled:
+            for key in ("on_leave_today", "upcoming_leave", "leave_by_type", "approval_queue"):
+                payload[key] = []
+            payload["pending_approvals"] = 0
+        if "ATTENDANCE" not in enabled:
+            payload["attendance_trend"] = []
         return Response(payload)
 
     @extend_schema(responses={200: OpenApiTypes.OBJECT}, description="Return tenant-scoped workforce dashboard rollups.")
@@ -686,5 +704,6 @@ class HomeViewSet(ViewSet):
             user=request.user,
             institution=request.institution,
             permission_codes=effective_permission_codes(request.membership),
+            data_scope=data_scope(request),
         )
         return Response(HomeSerializer(payload).data)

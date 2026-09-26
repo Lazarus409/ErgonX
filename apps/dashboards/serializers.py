@@ -8,3 +8,4 @@ class HomeSerializer(serializers.Serializer):
     attention_items = serializers.ListField(child=serializers.DictField())
     notifications_summary = serializers.DictField()
     optional_personal_snapshot = serializers.JSONField(allow_null=True)
+    team_snapshot = serializers.JSONField(allow_null=True)

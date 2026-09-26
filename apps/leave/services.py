@@ -50,7 +50,7 @@ def _employment_on(employee, on_date):
             start_date__lte=on_date,
         )
         .filter(Q(end_date__isnull=True) | Q(end_date__gte=on_date))
-        .select_related("department", "grade", "location", "reports_to__employee__user")
+        .select_related("department__head__user", "grade", "location", "reports_to__employee__user")
         .order_by("-is_current", "-start_date")
         .first()
     )
@@ -156,6 +156,35 @@ def _restore_balance(leave_request):
     balance.save(update_fields=("used", "updated_at"))
 
 
+def _is_active_member(user, institution):
+    return user is not None and user.memberships.filter(
+        institution=institution, status=InstitutionMembership.Status.ACTIVE
+    ).exists()
+
+
+def _department_head_approver(leave_request):
+    """Head of the requester's department, escalating to parent departments.
+
+    A head never approves their own request: when the requester heads their own
+    department the search continues with the parent department's head.
+    """
+    employment = _employment_on(leave_request.employee, leave_request.start_date)
+    department = employment.department if employment else None
+    seen = set()
+    while department is not None and department.id not in seen:
+        seen.add(department.id)
+        head = department.head
+        if (
+            department.is_active
+            and head is not None
+            and head.id != leave_request.employee_id
+            and _is_active_member(head.user, leave_request.institution)
+        ):
+            return head.user
+        department = department.parent
+    return None
+
+
 def _configured_approvers(leave_request):
     definition = (
         ApprovalWorkflowDefinition.objects.filter(
@@ -171,7 +200,10 @@ def _configured_approvers(leave_request):
         resolved = []
         for step in definition.steps.order_by("order"):
             approver = step.approver_user
-            if approver is None and step.approver_role_id:
+            if approver is None and step.approver_role_id and step.approver_role.code == "DEPARTMENT_HEAD":
+                # "Department Head" means the requester's own head, not any member holding the role.
+                approver = _department_head_approver(leave_request)
+            elif approver is None and step.approver_role_id:
                 membership = (
                     InstitutionMembership.objects.filter(
                         institution=leave_request.institution,
@@ -191,12 +223,15 @@ def _configured_approvers(leave_request):
         if resolved:
             return resolved
 
-    employment = _employment_on(leave_request.employee, leave_request.start_date)
+    requester = leave_request.employee.user
     fallback = []
-    if employment and employment.reports_to_id:
-        manager = employment.reports_to.employee.user
-        if manager:
-            fallback.append(manager)
+    first_approver = _department_head_approver(leave_request)
+    if first_approver is None:
+        employment = _employment_on(leave_request.employee, leave_request.start_date)
+        if employment and employment.reports_to_id:
+            first_approver = employment.reports_to.employee.user
+    if first_approver and first_approver != requester:
+        fallback.append(first_approver)
     hr_membership = (
         InstitutionMembership.objects.filter(
             institution=leave_request.institution,
@@ -207,8 +242,23 @@ def _configured_approvers(leave_request):
         .order_by("joined_at", "created_at")
         .first()
     )
-    if hr_membership and hr_membership.user not in fallback:
+    if hr_membership and hr_membership.user not in fallback and hr_membership.user != requester:
         fallback.append(hr_membership.user)
+    if not fallback:
+        # e.g. the only HR admin, with no head or manager: an institution admin decides.
+        admin_membership = (
+            InstitutionMembership.objects.filter(
+                institution=leave_request.institution,
+                role__code="INSTITUTION_ADMIN",
+                status=InstitutionMembership.Status.ACTIVE,
+            )
+            .exclude(user=requester)
+            .select_related("user")
+            .order_by("joined_at", "created_at")
+            .first()
+        )
+        if admin_membership:
+            fallback.append(admin_membership.user)
     if not fallback:
         raise ValidationError(
             {"approval": "No configured workflow, manager, or active HR approver exists."}

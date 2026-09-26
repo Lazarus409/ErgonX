@@ -1,4 +1,5 @@
 from django_filters.rest_framework import DjangoFilterBackend
+from django.db.models import Q
 from django.http import FileResponse
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, PermissionDenied
@@ -6,6 +7,7 @@ from rest_framework.exceptions import NotFound, PermissionDenied
 from apps.documents.models import Document, ImageAsset
 from apps.documents.serializers import DocumentSerializer, ImageAssetSerializer
 from apps.employees.models import Employee
+from common.scoping import LEAVE_BROAD, scope_to_employees
 from common.viewsets import TenantModelViewSet
 
 
@@ -36,6 +38,24 @@ class DocumentViewSet(TenantModelViewSet):
                 return "leave.request" if self.action == "create" else "leave.view"
         return super().get_required_permission()
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        membership = getattr(self.request, "membership", None)
+        if membership is not None and membership.role.permissions.filter(code="document.view").exists():
+            return queryset
+        # Reached through leave permissions only: a supporting document is visible
+        # to its uploader and to whoever can see or approve the request it supports.
+        from apps.leave.models import LeaveRequest
+
+        visible_requests = scope_to_employees(
+            LeaveRequest.objects.for_institution(self.request.institution), self.request, broad=LEAVE_BROAD
+        ).values("pk")
+        return queryset.filter(category="LEAVE_SUPPORTING").filter(
+            Q(uploaded_by=self.request.user)
+            | Q(leave_requests__in=visible_requests)
+            | Q(leave_requests__approvals__approver=self.request.user)
+        ).distinct()
+
     def perform_create(self, serializer):
         serializer.save(institution=self.request.institution, uploaded_by=self.request.user)
 
@@ -44,8 +64,13 @@ class DocumentViewSet(TenantModelViewSet):
         document = self.get_object()
         if not document.stored_file:
             raise NotFound("This document has no managed file content.")
-        response = FileResponse(document.stored_file.open("rb"), content_type=document.content_type)
-        response["Content-Disposition"] = f'attachment; filename="{document.original_filename}"'
+        response = FileResponse(
+            document.stored_file.open("rb"),
+            as_attachment=True,
+            filename=document.original_filename,
+            content_type=document.content_type or "application/octet-stream",
+        )
+        response["X-Content-Type-Options"] = "nosniff"
         return response
 
 
@@ -58,7 +83,8 @@ class ImageAssetViewSet(TenantModelViewSet):
     http_method_names = ("get", "post", "delete", "head", "options")
 
     def get_queryset(self):
-        return super().get_queryset().filter(is_active=True)
+        # filter_backends omits OrderingFilter, so order explicitly for stable pagination.
+        return super().get_queryset().filter(is_active=True).order_by("-created_at", "id")
 
     @property
     def required_module(self):

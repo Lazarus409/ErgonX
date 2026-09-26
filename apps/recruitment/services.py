@@ -252,8 +252,6 @@ def hire_candidate(*, offer, actor, employee_number=None, existing_employee=None
         return instance.hired_employee
     if instance.status != Offer.Status.ACCEPTED:
         raise ValidationError({"status": "Only accepted offers can be hired."})
-    if existing_employee is None and (not employee_number or not employee_number.strip()):
-        raise ValidationError({"employee_number": "An employee number is required."})
     candidate = Candidate.objects.select_for_update().get(pk=instance.application.candidate_id)
     if existing_employee is not None:
         employee = Employee.objects.select_for_update().get(pk=existing_employee.pk)
@@ -270,7 +268,7 @@ def hire_candidate(*, offer, actor, employee_number=None, existing_employee=None
     else:
         employee = Employee(
             institution=instance.institution,
-            employee_number=employee_number,
+            employee_number=(employee_number or "").strip(),
             first_name=candidate.first_name,
             middle_name=candidate.middle_name,
             last_name=candidate.last_name,

@@ -187,6 +187,18 @@ class LeaveRequestSerializer(ValidatedModelSerializer):
             self.fields["leave_type"].queryset = LeaveType.objects.for_institution(institution)
             self.fields["attachment"].queryset = Document.objects.for_institution(institution)
 
+    def validate_attachment(self, attachment):
+        """Only a leave supporting document the requester uploaded may be attached."""
+        if attachment is None:
+            return attachment
+        request = self.context["request"]
+        if attachment.category != "LEAVE_SUPPORTING":
+            raise serializers.ValidationError("Attach a leave supporting document.")
+        on_behalf = request.membership.role.permissions.filter(code="leave.configure").exists()
+        if attachment.uploaded_by_id != request.user.id and not on_behalf:
+            raise serializers.ValidationError("You can only attach documents you uploaded.")
+        return attachment
+
     def create(self, validated_data):
         return call_validated_service(
             create_leave_request,

@@ -34,7 +34,7 @@ def test_home_bootstrap_and_search_are_tenant_and_permission_scoped(
     assert home.status_code == 200
     assert set(home.data) == {
         "greeting_context", "quick_actions", "recent_work", "attention_items",
-        "notifications_summary", "optional_personal_snapshot",
+        "notifications_summary", "optional_personal_snapshot", "team_snapshot",
     }
     assert home.data["greeting_context"]["user_display_name"] == "Ada"
 

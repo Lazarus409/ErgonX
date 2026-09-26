@@ -1,5 +1,5 @@
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import APIException, PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
@@ -16,6 +16,7 @@ from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.db import transaction
 from django.utils.text import slugify
+from urllib.parse import quote
 from uuid import uuid4
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -34,6 +35,9 @@ from apps.accounts.serializers import (
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
     MFASetupSerializer,
+    EmailOTPDeliveryError,
+    consume_email_otp,
+    issue_email_otp,
 )
 from apps.institutions.services import create_membership, effective_permission_codes
 from apps.institutions.models import Institution, InstitutionInvitation, InstitutionMembership, InstitutionModule, Role
@@ -42,11 +46,21 @@ from apps.employees.models import Employee
 from apps.documents.models import ImageAsset
 from apps.accounts.emails import send_institution_admin_invitation, send_password_reset
 from apps.audit.services import record_audit_event
-from common.permissions import TenantContextPermission
+from common.scoping import data_scope
+from common.permissions import READ_ONLY_ROLES, TenantContextPermission
 
 
 class LoginView(TokenObtainPairView):
     serializer_class = EmailTokenObtainPairSerializer
+
+
+class MFAConflict(APIException):
+    status_code = 409
+    default_code = "invalid_state_transition"
+
+    def __init__(self, detail, api_code="invalid_state_transition"):
+        super().__init__(detail)
+        self.api_code = api_code
 
 
 class MFASettingsView(APIView):
@@ -60,9 +74,14 @@ class MFASettingsView(APIView):
     def post(self, request):
         mfa, _ = UserMFA.objects.get_or_create(user=request.user, defaults={"secret": base32_secret()})
         if mfa.is_enabled:
-            return Response({"detail": "MFA is already enabled."}, status=409)
+            raise MFAConflict("MFA is already enabled.")
+        if mfa.method != UserMFA.Method.AUTHENTICATOR_APP:
+            mfa.method = UserMFA.Method.AUTHENTICATOR_APP
+            mfa.save(update_fields=("method", "updated_at"))
         record_audit_event(actor=request.user, institution=getattr(request, "institution", None), entity=mfa, action="account.mfa.setup_started", metadata={"method": mfa.method})
-        return Response({"secret": mfa.secret, "otpauth_uri": f"otpauth://totp/ErgonX:{request.user.email}?secret={mfa.secret}&issuer=ErgonX"})
+        label = quote(f"ErgonX:{request.user.email}")
+        otpauth_uri = f"otpauth://totp/{label}?secret={mfa.secret}&issuer=ErgonX&algorithm=SHA1&digits=6&period=30"
+        return Response({"enabled": False, "pending": True, "method": mfa.method, "secret": mfa.secret, "otpauth_uri": otpauth_uri})
 
     def put(self, request):
         serializer = MFASetupSerializer(data=request.data, context={"request": request})
@@ -72,16 +91,31 @@ class MFASettingsView(APIView):
         mfa.confirmed_at = timezone.now()
         mfa.save(update_fields=("is_enabled", "confirmed_at", "updated_at"))
         record_audit_event(actor=request.user, institution=getattr(request, "institution", None), entity=mfa, action="account.mfa.enabled", metadata={"method": mfa.method})
-        return Response({"enabled": True, "pending": False})
+        return Response({"enabled": True, "pending": False, "method": mfa.method})
 
     def patch(self, request):
-        method = request.data.get("method")
-        if method not in UserMFA.Method.values:
-            return Response({"detail": "Unsupported MFA method."}, status=400)
+        """Switch to email OTP: without `code` a code is emailed; with `code` it is confirmed."""
+        if request.data.get("method") != UserMFA.Method.EMAIL_OTP:
+            raise ValidationError({"method": "Use the authenticator setup flow to enable an authenticator app."})
+        code = str(request.data.get("code") or "").strip()
+        if not code:
+            try:
+                challenge = issue_email_otp(request.user)
+            except EmailOTPDeliveryError as exc:
+                raise MFAConflict(str(exc), api_code="email_otp_unavailable")
+            current = UserMFA.objects.filter(user=request.user).first()
+            return Response({
+                "enabled": bool(current and current.is_enabled),
+                "pending": bool(current and not current.is_enabled),
+                "method": current.method if current else None,
+                "email_code_sent": True,
+                "email": request.user.email,
+                "expires_at": challenge.expires_at,
+            })
+        if not consume_email_otp(request.user, code):
+            raise ValidationError({"code": "The email verification code is invalid or expired."})
         mfa, _ = UserMFA.objects.get_or_create(user=request.user, defaults={"secret": base32_secret()})
-        if method == UserMFA.Method.EMAIL_OTP and not settings.EMAIL_DELIVERY_ENABLED:
-            return Response({"detail": "Email MFA delivery is not configured."}, status=409)
-        mfa.method = method
+        mfa.method = UserMFA.Method.EMAIL_OTP
         mfa.is_enabled = True
         mfa.confirmed_at = timezone.now()
         mfa.save(update_fields=("method", "is_enabled", "confirmed_at", "updated_at"))
@@ -336,6 +370,10 @@ class AuthBootstrapView(APIView):
                 "role_code": request.membership.role.code,
                 "role_name": request.membership.role.name,
                 "status": request.membership.status,
+                # INSTITUTION, DEPARTMENT or SELF: whose records this member works with.
+                "data_scope": data_scope(request),
+                # Read-only roles may view what they are granted but not change it.
+                "read_only": request.membership.role.code in READ_ONLY_ROLES,
             },
             "effective_permissions": list(permission_codes),
             "enabled_modules": enabled_modules,
@@ -445,7 +483,6 @@ class InvitationAcceptanceView(APIView):
                 institution=invitation.institution,
                 user=user,
                 defaults={
-                    "employee_number": f"NEW-{user.id.hex[:8].upper()}",
                     "first_name": user.first_name or "New",
                     "last_name": user.last_name or "Employee",
                     "personal_email": invitation.email,

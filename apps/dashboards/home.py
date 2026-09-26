@@ -1,5 +1,5 @@
 from collections import Counter
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from django.utils import timezone
@@ -7,6 +7,7 @@ from django.utils import timezone
 from apps.institutions.models import UserActivityEvent, UserPreference
 from apps.employees.models import Employee
 from apps.notifications.models import Notification
+from common.scoping import ATTENDANCE_BROAD, DEPARTMENT, INSTITUTION
 
 
 ACTION_CATALOG = {
@@ -50,13 +51,29 @@ RESUME_ROUTE_BUILDERS = {
 }
 
 
-def permitted_actions(*, institution, permission_codes):
+def _personal_routes(*, permissions, data_scope):
+    """Route overrides for members who act on their own or their team's records.
+
+    The module workspaces (/leave, /attendance, ...) are institution-wide; a
+    department head decides leave in /department and self-service users
+    correct attendance from /me.
+    """
+    routes = {}
+    if data_scope == DEPARTMENT:
+        routes["leave.approve"] = "/department/approvals"
+    if data_scope != INSTITUTION or not permissions & set(ATTENDANCE_BROAD):
+        routes["attendance.adjust"] = "/me/attendance"
+    return routes
+
+
+def permitted_actions(*, institution, permission_codes, data_scope=INSTITUTION):
     enabled_modules = set(
         institution.modules.filter(is_enabled=True).values_list("module_code", flat=True)
     )
     permissions = set(permission_codes)
+    overrides = _personal_routes(permissions=permissions, data_scope=data_scope)
     return {
-        code: {"code": code, **definition}
+        code: {"code": code, **definition, **({"route_hint": overrides[code]} if code in overrides else {})}
         for code, definition in ACTION_CATALOG.items()
         if definition["permission"] in permissions
         and (definition["module"] == "CORE_HR" or definition["module"] in enabled_modules)
@@ -80,8 +97,8 @@ def _greeting_context(user, institution):
     }
 
 
-def _quick_actions(*, user, institution, permission_codes):
-    available = permitted_actions(institution=institution, permission_codes=permission_codes)
+def _quick_actions(*, user, institution, permission_codes, data_scope):
+    available = permitted_actions(institution=institution, permission_codes=permission_codes, data_scope=data_scope)
     # Requesting leave is self-service. A role permission alone must not put a
     # broken action in Home for a user who has no employee record here.
     if "leave.request" in available and not Employee.objects.for_institution(institution).filter(user=user).exists():
@@ -103,8 +120,9 @@ def _quick_actions(*, user, institution, permission_codes):
     ]
 
 
-def _recent_work(*, user, institution, permission_codes):
-    available = permitted_actions(institution=institution, permission_codes=permission_codes)
+def _recent_work(*, user, institution, permission_codes, data_scope):
+    available = permitted_actions(institution=institution, permission_codes=permission_codes, data_scope=data_scope)
+    overrides = _personal_routes(permissions=set(permission_codes), data_scope=data_scope)
     events = (
         UserActivityEvent.objects.for_institution(institution)
         .filter(user=user, entity_id__isnull=False)
@@ -124,7 +142,7 @@ def _recent_work(*, user, institution, permission_codes):
             "title": available[event.activity_code]["label"],
             "status": "IN_PROGRESS",
             "resume_action": event.activity_code,
-            "resume_route": RESUME_ROUTE_BUILDERS.get(event.activity_code, lambda _entity_id: "")(event.entity_id),
+            "resume_route": overrides.get(event.activity_code) or RESUME_ROUTE_BUILDERS.get(event.activity_code, lambda _entity_id: "")(event.entity_id),
             "updated_at": event.occurred_at,
             "can_resume": True,
         })
@@ -133,7 +151,7 @@ def _recent_work(*, user, institution, permission_codes):
     return rows
 
 
-def _attention_items(*, institution, permission_codes):
+def _attention_items(*, user, institution, permission_codes):
     from apps.accounting.models import JournalEntry
     from apps.leave.models import LeaveRequest
     from apps.payroll.models import PayrollRun
@@ -148,6 +166,14 @@ def _attention_items(*, institution, permission_codes):
         ("ACCOUNTING", "journal.approve", JournalEntry.objects.for_institution(institution).filter(status=JournalEntry.Status.PENDING_APPROVAL), "JOURNAL_APPROVAL_REQUIRED", "Journals awaiting approval", "journal.approve"),
         ("RECRUITMENT", "interview.manage", Interview.objects.for_institution(institution).filter(status=Interview.Status.SCHEDULED, scheduled_at__date=timezone.localdate()), "INTERVIEWS_TODAY", "Interviews scheduled today", "interview.manage"),
     )
+    if "dashboard.department.view" in permissions and "leave.approve" in permissions and "dashboard.hr.view" not in permissions:
+        # Department heads act on their own approval queue, not every pending request.
+        from apps.dashboards.department import leave_awaiting_approval_by
+
+        definitions = (
+            ("LEAVE", "leave.approve", leave_awaiting_approval_by(user, institution), "LEAVE_APPROVAL_REQUIRED", "Team leave awaiting your approval", "leave.approve"),
+            *definitions[1:],
+        )
     for module, permission, queryset, code, title, action_code in definitions:
         if module not in enabled or permission not in permissions:
             continue
@@ -157,15 +183,108 @@ def _attention_items(*, institution, permission_codes):
     return items
 
 
-def home_payload(*, user, institution, permission_codes):
+def _personal_snapshot(*, user, institution, permission_codes):
+    """Self-service context for a user who is also an employee here.
+
+    Everything is scoped to the user's own employee record and gated by the
+    enabled modules and the user's effective permissions; no performance,
+    productivity or ranking metric is produced.
+    """
+    from django.core.exceptions import ValidationError as DjangoValidationError
+    from rest_framework.exceptions import ValidationError as ApiValidationError
+
+    from apps.attendance.models import AttendanceAdjustment, AttendanceRecord
+    from apps.documents.models import Document
+    from apps.leave.models import LeaveRequest
+    from apps.scheduling.services import schedule_assignment_for, schedule_expectation
+
+    employee = Employee.objects.for_institution(institution).filter(user=user).first()
+    if employee is None:
+        return None
+    permissions = set(permission_codes)
+    enabled = set(institution.modules.filter(is_enabled=True).values_list("module_code", flat=True))
+    try:
+        local_now = timezone.now().astimezone(ZoneInfo(institution.timezone))
+    except Exception:
+        local_now = timezone.localtime()
+    today = local_now.date()
+
+    upcoming_shifts = []
+    today_expectation = None
+    if "ATTENDANCE" in enabled and "schedule.view" in permissions:
+        for offset in range(7):
+            day = today + timedelta(days=offset)
+            assignment = schedule_assignment_for(employee, day)
+            if assignment is None:
+                continue
+            try:
+                expectation = schedule_expectation(assignment, day)
+            except (DjangoValidationError, ApiValidationError):
+                continue
+            if offset == 0:
+                today_expectation = expectation
+            upcoming_shifts.append({
+                "date": day.isoformat(),
+                "schedule": assignment.work_schedule.name,
+                "off_day": expectation["off_day"],
+                "flexible": expectation["flexible_rule"] is not None,
+                "start": expectation["start"].isoformat() if expectation["start"] else None,
+                "end": expectation["end"].isoformat() if expectation["end"] else None,
+                "required_minutes": expectation["required_minutes"],
+            })
+
+    attention = []
+
+    def add(code, severity, title, description, route):
+        attention.append({"code": code, "severity": severity, "title": title, "description": description, "route": route})
+
+    activity = {}
+    if "LEAVE" in enabled and "leave.request" in permissions:
+        mine = LeaveRequest.objects.for_institution(institution).filter(employee=employee)
+        pending = mine.filter(status=LeaveRequest.Status.PENDING).count()
+        if pending:
+            add("MY_LEAVE_PENDING", "NORMAL", "Leave request awaiting approval", f"{pending} of your leave requests are waiting for a decision.", "/me/leave")
+        activity["leave_requests_this_year"] = mine.filter(start_date__year=today.year).count()
+    if "ATTENDANCE" in enabled and "attendance.clock" in permissions:
+        if today_expectation and not today_expectation["off_day"] and today_expectation["start"] and local_now >= today_expectation["start"]:
+            clocked_in = AttendanceRecord.objects.for_institution(institution).filter(employee=employee, attendance_date=today, check_in__isnull=False).exists()
+            if not clocked_in:
+                add("MY_CLOCK_IN_MISSING", "HIGH", "You haven't clocked in yet", f"Your shift started at {today_expectation['start'].strftime('%H:%M')}.", "/me/attendance")
+    if "ATTENDANCE" in enabled and "attendance.adjust" in permissions:
+        adjustments = AttendanceAdjustment.objects.for_institution(institution).filter(attendance_record__employee=employee)
+        pending_adjustments = adjustments.filter(status=AttendanceAdjustment.Status.PENDING).count()
+        if pending_adjustments:
+            add("MY_ADJUSTMENT_PENDING", "NORMAL", "Attendance correction awaiting review", f"{pending_adjustments} of your correction requests are waiting for review.", "/me/attendance")
+        rejected = adjustments.filter(status=AttendanceAdjustment.Status.REJECTED, acted_at__date__gte=today - timedelta(days=14)).count()
+        if rejected:
+            add("MY_ADJUSTMENT_REJECTED", "HIGH", "Attendance correction was not approved", f"{rejected} correction request(s) were rejected in the last two weeks.", "/me/attendance")
+        activity["attendance_corrections_pending"] = pending_adjustments
+    unread = Notification.objects.for_institution(institution).filter(user=user, status__in=(Notification.Status.PENDING, Notification.Status.SENT)).count()
+    if unread:
+        add("MY_NOTIFICATIONS_UNREAD", "NORMAL", "Unread notifications", f"You have {unread} unread update(s).", "/notifications")
+    activity["documents_on_file"] = Document.objects.for_institution(institution).filter(entity_type="EMPLOYEE", entity_id=employee.id, is_active=True).count()
+
+    return {"upcoming_shifts": upcoming_shifts, "attention": attention, "activity": activity}
+
+
+def _team_snapshot(*, user, institution, permission_codes):
+    if "dashboard.department.view" not in set(permission_codes):
+        return None
+    from apps.dashboards.department import team_snapshot
+
+    return team_snapshot(user, institution)
+
+
+def home_payload(*, user, institution, permission_codes, data_scope=INSTITUTION):
     unread = Notification.objects.for_institution(institution).filter(
         user=user, status__in=(Notification.Status.PENDING, Notification.Status.SENT)
     )
     return {
         "greeting_context": _greeting_context(user, institution),
-        "quick_actions": _quick_actions(user=user, institution=institution, permission_codes=permission_codes),
-        "recent_work": _recent_work(user=user, institution=institution, permission_codes=permission_codes),
-        "attention_items": _attention_items(institution=institution, permission_codes=permission_codes),
+        "quick_actions": _quick_actions(user=user, institution=institution, permission_codes=permission_codes, data_scope=data_scope),
+        "recent_work": _recent_work(user=user, institution=institution, permission_codes=permission_codes, data_scope=data_scope),
+        "attention_items": _attention_items(user=user, institution=institution, permission_codes=permission_codes),
         "notifications_summary": {"unread_count": unread.count(), "latest": list(unread.values("id", "notification_type", "title", "message", "created_at")[:5])},
-        "optional_personal_snapshot": None,
+        "optional_personal_snapshot": _personal_snapshot(user=user, institution=institution, permission_codes=permission_codes),
+        "team_snapshot": _team_snapshot(user=user, institution=institution, permission_codes=permission_codes),
     }

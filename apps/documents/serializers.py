@@ -1,3 +1,6 @@
+import mimetypes
+
+from django.conf import settings
 from rest_framework import serializers
 
 from apps.documents.models import Document, ImageAsset
@@ -21,31 +24,23 @@ class DocumentSerializer(serializers.ModelSerializer):
             "size_bytes": {"required": False},
         }
 
-    ALLOWED_CONTENT_TYPES = {"application/pdf", "image/jpeg", "image/png"}
-    MAX_UPLOAD_BYTES = 10 * 1024 * 1024
-
     def validate(self, attrs):
         uploaded_file = attrs.get("uploaded_file")
         if uploaded_file is None and not attrs.get("file_reference", "").strip():
             raise serializers.ValidationError({"file_reference": "Provide an approved storage reference or upload a file."})
         if uploaded_file is not None:
-            content_type = (uploaded_file.content_type or "").lower()
-            if content_type not in self.ALLOWED_CONTENT_TYPES:
-                raise serializers.ValidationError({"uploaded_file": "Only PDF, JPEG, or PNG documents are supported."})
-            if uploaded_file.size > self.MAX_UPLOAD_BYTES:
-                raise serializers.ValidationError({"uploaded_file": "Documents must be 10 MB or smaller."})
-            header = uploaded_file.read(12)
-            uploaded_file.seek(0)
-            signatures = {
-                "application/pdf": header.startswith(b"%PDF-"),
-                "image/png": header.startswith(b"\x89PNG\r\n\x1a\n"),
-                "image/jpeg": header.startswith(b"\xff\xd8\xff"),
-            }
-            if not signatures.get(content_type, False):
-                raise serializers.ValidationError({"uploaded_file": "The file content does not match its declared type."})
-            attrs["content_type"] = content_type
+            # Any file type is accepted. Downloads are always sent as attachments
+            # with nosniff, so a stored file is never rendered inline.
+            max_bytes = settings.DOCUMENT_UPLOAD_MAX_BYTES
+            if uploaded_file.size > max_bytes:
+                raise serializers.ValidationError({"uploaded_file": f"Documents must be {max_bytes // (1024 * 1024)} MB or smaller."})
+            name = (uploaded_file.name or "document").replace("\\", "/").rsplit("/", 1)[-1][:255] or "document"
+            content_type = (uploaded_file.content_type or "").lower().split(";")[0].strip()
+            if not content_type or content_type == "application/octet-stream":
+                content_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
+            attrs["content_type"] = content_type[:150]
             attrs["size_bytes"] = uploaded_file.size
-            attrs["original_filename"] = uploaded_file.name[:255]
+            attrs["original_filename"] = name
         return attrs
 
     def create(self, validated_data):

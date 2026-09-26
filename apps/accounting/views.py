@@ -641,7 +641,8 @@ class ExpenseViewSet(TenantModelViewSet):
 
 
 class PayrollAccountMappingTemplateViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = PayrollAccountMappingTemplate.objects.select_related("accounting_preset_version")
+    # Stable order so pagination never repeats or skips templates.
+    queryset = PayrollAccountMappingTemplate.objects.select_related("accounting_preset_version").order_by("accounting_preset_version_id", "payroll_component_code", "id")
     serializer_class = PayrollAccountMappingTemplateSerializer
     permission_classes = (TenantContextPermission, TenantRBACPermission)
     required_module = "ACCOUNTING"
@@ -653,7 +654,7 @@ class PayComponentAccountMappingViewSet(TenantModelViewSet):
     serializer_class = PayComponentAccountMappingSerializer
     required_module = "ACCOUNTING"
     http_method_names = ("get", "post", "patch", "head", "options")
-    def get_required_permission(self): return "payroll_accounting.configure" if self.action in {"create", "partial_update"} else "payroll_accounting.view"
+    def get_required_permission(self): return "payroll_accounting.configure" if self.action in {"create", "partial_update", "apply_templates"} else "payroll_accounting.view"
 
     @extend_schema(request=PayrollMappingTemplateApplySerializer, responses=PayComponentAccountMappingSerializer(many=True), filters=False)
     @action(detail=False, methods=("post",), url_path="apply-templates", filter_backends=())

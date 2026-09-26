@@ -65,6 +65,7 @@ from apps.payroll.services import (
 )
 from apps.accounting.serializers import JournalEntrySerializer
 from apps.accounting.services import generate_payroll_journal
+from common.scoping import PAYSLIP_BROAD, scope_to_employees
 from common.permissions import TenantContextPermission, TenantRBACPermission
 from common.serializers import call_validated_service
 from common.viewsets import TenantModelViewSet
@@ -613,12 +614,7 @@ class EmployeeTaxReliefClaimViewSet(TenantModelViewSet):
         queryset = super().get_queryset().select_related(
             "employee", "relief_definition", "evidence", "approved_by"
         )
-        if (
-            getattr(self.request, "membership", None)
-            and self.request.membership.role.code == "EMPLOYEE"
-        ):
-            queryset = queryset.filter(employee__user=self.request.user)
-        return queryset
+        return scope_to_employees(queryset, self.request, allow_team=False)
 
     def perform_create(self, serializer):
         serializer.save(institution=self.request.institution, actor=self.request.user)
@@ -663,7 +659,7 @@ class PayslipViewSet(TenantModelViewSet):
     serializer_class = PayslipSerializer
     required_module = "PAYROLL"
     http_method_names = ("get", "head", "options")
-    filterset_fields = ("payroll_record", "generated_at")
+    filterset_fields = ("payroll_record", "payroll_record__employee", "generated_at")
     ordering_fields = ("generated_at", "created_at")
 
     def get_required_permission(self):
@@ -673,9 +669,6 @@ class PayslipViewSet(TenantModelViewSet):
         queryset = super().get_queryset().select_related(
             "payroll_record__employee", "payroll_record__payroll_run", "document_reference"
         ).prefetch_related("payroll_record__items")
-        if (
-            getattr(self.request, "membership", None)
-            and self.request.membership.role.code == "EMPLOYEE"
-        ):
-            queryset = queryset.filter(payroll_record__employee__user=self.request.user)
-        return queryset
+        return scope_to_employees(
+            queryset, self.request, "payroll_record__employee", allow_team=False, broad=PAYSLIP_BROAD
+        )

@@ -31,3 +31,15 @@ def test_integrated_demo_seed_is_idempotent_and_preserves_progressed_leave_workf
         "audit_events": institution.audit_logs.count(),
         "notifications": institution.notifications.count(),
     }
+
+
+@pytest.mark.django_db
+@override_settings(DEBUG=True)
+def test_integrated_seed_remains_valid_after_rolling_activity_is_seeded():
+    call_command("seed_ergonx_demo", password="ErgonxDemo!2026", stdout=StringIO())
+    call_command("seed_ergonx_activity", stdout=StringIO())
+
+    # The fixed fixture remains rerunnable after date-relative activity adds
+    # history such as extra candidates, overtime records, and payroll runs.
+    call_command("seed_ergonx_demo", password="ErgonxDemo!2026", stdout=StringIO())
+    call_command("seed_ergonx_demo", validate_only=True, stdout=StringIO())

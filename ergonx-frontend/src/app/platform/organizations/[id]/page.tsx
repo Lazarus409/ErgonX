@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Ban, Building2, History, KeyRound, LayoutGrid, MailCheck, PlayCircle, ShieldCheck, UsersRound } from "lucide-react";
+import { ArrowLeft, Ban, Building2, History, KeyRound, LayoutGrid, MailCheck, PlayCircle, ShieldCheck, UsersRound } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useCallback, useState } from "react";
 
@@ -9,14 +9,14 @@ import { countryName, formatDate, formatDateTime, formatRelative, onboardingLabe
 import Alert from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Card, MetricCard, SummaryList } from "@/components/ui/Card";
+import { Avatar, SummaryList } from "@/components/ui/Card";
+import { PlatformCard, SectionTitle, StatTile, platformCard, platformTable } from "@/components/platform/ui";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { DataTable } from "@/components/ui/DataTable";
 import ErrorState from "@/components/ui/ErrorState";
 import { Field, Textarea } from "@/components/ui/Field";
 import LoadingState from "@/components/ui/LoadingState";
 import { Dialog } from "@/components/ui/Overlay";
-import PageHeader from "@/components/ui/PageHeader";
 import { getApiErrorMessage, platformApi } from "@/lib/api";
 import { auditActionLabel, type PlatformInstitutionDetail } from "@/lib/api/platform";
 import { useApiResource } from "@/lib/useApiResource";
@@ -71,15 +71,20 @@ export default function PlatformOrganizationDetailPage() {
 
   return (
     <>
-      <PageHeader
-        title={data.name}
-        breadcrumbs={[{ label: "Organizations", href: "/platform/organizations" }, { label: data.name }]}
-        description={`${data.code} · ${countryName(data.country_code)} · joined ${formatDate(data.created_at)}`}
-        meta={data.is_active ? <Badge tone="success">Active</Badge> : <Badge tone="danger">Suspended</Badge>}
-        actions={data.is_active
+      <Link href="/platform/organizations" className="inline-flex items-center gap-2 text-sm font-semibold text-ink-muted hover:text-ink-strong"><ArrowLeft className="h-4 w-4" aria-hidden="true" />All organizations</Link>
+      <section className={`${platformCard} flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-7`}>
+        <div className="flex min-w-0 items-center gap-4">
+          <Avatar name={data.name} size="lg" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-primary-ink">Organization</p>
+            <h1 className="mt-1 flex flex-wrap items-center gap-2 text-2xl font-semibold tracking-tight text-ink-strong">{data.name}{data.is_active ? <Badge tone="success">Active</Badge> : <Badge tone="danger">Suspended</Badge>}</h1>
+            <p className="mt-1 text-sm text-ink-muted">{data.code} · {countryName(data.country_code)} · joined {formatDate(data.created_at)}</p>
+          </div>
+        </div>
+        {data.is_active
           ? <Button variant="danger" leadingIcon={<Ban className="h-4 w-4" />} onClick={() => { setActionError(null); setSuspending(true); }}>Suspend organization</Button>
           : <Button leadingIcon={<PlayCircle className="h-4 w-4" />} onClick={() => { setActionError(null); setReactivating(true); }}>Reactivate</Button>}
-      />
+      </section>
 
       {actionError && !suspending && <Alert tone="danger" title="That didn't work">{actionError}</Alert>}
       {!data.is_active && (
@@ -90,14 +95,14 @@ export default function PlatformOrganizationDetailPage() {
       )}
 
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" aria-label="Organization summary">
-        <MetricCard size="sm" label="Active users" value={data.member_count} icon={UsersRound} accent="brand" description={members.INVITED ? `${members.INVITED} invited` : undefined} />
-        <MetricCard size="sm" label="Employees" value={data.employee_count} icon={Building2} accent="hr" />
-        <MetricCard size="sm" label="Setup" value={onboardingLabel[data.onboarding_status] ?? data.onboarding_status} icon={LayoutGrid} accent="settings" />
-        <MetricCard size="sm" label="Last sign-in" value={formatRelative(data.last_sign_in_at)} icon={History} accent="audit" />
+        <StatTile label="Active users" value={data.member_count} icon={UsersRound} tone="sky" hint={members.INVITED ? `${members.INVITED} invited` : undefined} />
+        <StatTile label="Employees" value={data.employee_count} icon={Building2} tone="violet" />
+        <StatTile label="Setup" value={onboardingLabel[data.onboarding_status] ?? data.onboarding_status} icon={LayoutGrid} tone="amber" />
+        <StatTile label="Last sign-in" value={formatRelative(data.last_sign_in_at)} icon={History} tone="emerald" />
       </section>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <Card title="Organization details" icon={Building2} accent="brand">
+        <PlatformCard eyebrow="Profile" title="Organization details" icon={Building2}>
           <SummaryList items={[
             { label: "Type", value: data.institution_type.charAt(0) + data.institution_type.slice(1).toLowerCase() },
             { label: "Contact email", value: data.email || "—" },
@@ -106,8 +111,8 @@ export default function PlatformOrganizationDetailPage() {
             { label: "Currency", value: data.default_currency },
             { label: "Users by status", value: `${members.ACTIVE} active · ${members.INVITED} invited · ${members.SUSPENDED} suspended · ${members.INACTIVE} inactive` },
           ]} />
-        </Card>
-        <Card title="Modules" description={`${enabledModules.length} of ${data.modules.length} switched on by the organization.`} icon={LayoutGrid} accent="settings">
+        </PlatformCard>
+        <PlatformCard eyebrow="Configuration" title="Modules" description={`${enabledModules.length} of ${data.modules.length} switched on by the organization.`} icon={LayoutGrid}>
           <ul className="flex flex-wrap gap-2">
             {data.modules.map((module) => (
               <li key={module.code}><Badge tone={module.enabled ? "brand" : "neutral"}>{module.name}{module.enabled ? "" : " · off"}</Badge></li>
@@ -123,15 +128,16 @@ export default function PlatformOrganizationDetailPage() {
               <p className="mt-1 text-support text-ink-muted">No platform invitation on record. The organization was created before invitations were tracked, or by a data import.</p>
             )}
           </div>
-        </Card>
+        </PlatformCard>
       </div>
 
       <DataTable<Administrator>
+        className={platformTable}
         caption="Institution Admins"
         rows={data.administrators}
         rowKey={(admin) => admin.email}
         minWidth={640}
-        toolbar={<div><h2 className="text-card-title font-semibold text-ink-strong">Institution Admins</h2><p className="text-support text-ink-muted">People who can manage this organization&apos;s settings, roles and users.</p></div>}
+        toolbar={<SectionTitle eyebrow="Access" title="Institution Admins" description="People who can manage this organization's settings, roles and users." />}
         empty={{ title: "No administrators", description: "This organization has no active Institution Admin. Its users cannot change settings or invite anyone.", icon: ShieldCheck }}
         columns={[
           { key: "name", header: "Name", cell: (admin) => <span><span className="block font-semibold text-ink-strong">{admin.name}</span><span className="block text-caption text-ink-muted">{admin.email}</span></span> },
@@ -141,7 +147,7 @@ export default function PlatformOrganizationDetailPage() {
         ]}
       />
 
-      <Card title="Platform activity" description="Actions Super Admins have taken on this organization." icon={History} accent="audit" actions={<Link className="text-support font-semibold text-primary-ink hover:underline" href={`/platform/audit?institution=${data.id}`}>View all</Link>}>
+      <PlatformCard eyebrow="Activity" title="Platform activity" description="Actions Super Admins have taken on this organization." icon={History} actions={<Link className="text-support font-semibold text-primary-ink hover:underline" href={`/platform/audit?institution=${data.id}`}>View all</Link>}>
         {data.recent_events.length === 0 ? (
           <p className="text-support text-ink-muted">No platform actions recorded yet.</p>
         ) : (
@@ -157,7 +163,7 @@ export default function PlatformOrganizationDetailPage() {
             ))}
           </ol>
         )}
-      </Card>
+      </PlatformCard>
 
       <Dialog
         open={suspending}

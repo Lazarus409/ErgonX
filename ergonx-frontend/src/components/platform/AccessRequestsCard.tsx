@@ -10,6 +10,7 @@ import { Avatar } from "@/components/ui/Card";
 import { DataTable } from "@/components/ui/DataTable";
 import { Field, Input, Select, Textarea } from "@/components/ui/Field";
 import { Dialog } from "@/components/ui/Overlay";
+import { SectionTitle, platformTable } from "@/components/platform/ui";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { authApi, getApiErrorMessage } from "@/lib/api";
 import type { CreatedPlatformInstitutionAdminInvitation, InstitutionAccessRequest } from "@/lib/api/auth";
@@ -116,21 +117,18 @@ export default function AccessRequestsCard({ requests, onChanged }: { requests: 
       )}
 
       <DataTable<InstitutionAccessRequest>
+        className={platformTable}
         caption="Organization access requests"
         rows={rows}
         rowKey={(item) => item.id}
         minWidth={880}
         toolbar={
-          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-            <div>
-              <h2 className="flex items-center gap-2 text-card-title font-semibold text-ink-strong">
-                Access requests
-                {pending.length > 0 && <Badge size="sm" tone="warning">{pending.length} pending</Badge>}
-              </h2>
-              <p className="text-support text-ink-muted">Organizations asking to join from the Get Started page.</p>
-            </div>
-            <SegmentedControl<Filter> label="Filter requests" value={filter} onChange={setFilter} options={[{ value: "PENDING", label: "Pending" }, { value: "ALL", label: "All" }]} />
-          </div>
+          <SectionTitle
+            eyebrow="Get Started"
+            title={<span className="flex items-center gap-2">Access requests{pending.length > 0 && <Badge size="sm" tone="warning">{pending.length} pending</Badge>}</span>}
+            description="Organizations asking to join from the Get Started page."
+            meta={<SegmentedControl<Filter> label="Filter requests" value={filter} onChange={setFilter} options={[{ value: "PENDING", label: "Pending" }, { value: "ALL", label: "All" }]} />}
+          />
         }
         empty={{ title: filter === "PENDING" ? "No pending requests" : "No requests yet", description: "Requests submitted from the Get Started page appear here for review.", icon: Inbox }}
         columns={[

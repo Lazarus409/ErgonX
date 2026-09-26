@@ -193,6 +193,7 @@ export interface Department {
   code: string;
   description: string;
   parent: string | null;
+  parent_name: string | null;
   /** Employee id of the Department Head. */
   head: string | null;
   head_name: string | null;
@@ -204,6 +205,7 @@ export interface Department {
 export interface Position {
   id: string;
   department: string | null;
+  department_name: string | null;
   title: string;
   code: string;
   description: string;

@@ -1,127 +1,294 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, History, Inbox, LayoutGrid, TrendingUp, UsersRound } from "lucide-react";
-import { useCallback } from "react";
+import { ArrowUpRight, Ban, Check, Clock3, Copy, Inbox, MailPlus, RotateCw, UsersRound } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
 
-import ChartCard from "@/components/charts/ChartCard";
-import { BarsChart } from "@/components/charts/Charts";
-import HomeHero from "@/components/home/HomeHero";
 import { useAuth } from "@/components/guards/AuthProvider";
-import { formatDateTime, formatRelative, onboardingLabel } from "@/components/platform/format";
-import { Badge } from "@/components/ui/Badge";
-import { AttentionItem, Avatar, Card, MetricCard, SummaryList } from "@/components/ui/Card";
+import AccessRequestsCard from "@/components/platform/AccessRequestsCard";
+import { formatDateTime } from "@/components/platform/format";
+import { PlatformCard, PlatformHero, SectionTitle, StatTile, platformFieldLabel as fieldLabel, platformSolid, platformTable } from "@/components/platform/ui";
+import Alert from "@/components/ui/Alert";
+import { Badge, type BadgeTone } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import { DataTable, DataToolbar } from "@/components/ui/DataTable";
 import ErrorState from "@/components/ui/ErrorState";
+import { Field, Input, Select } from "@/components/ui/Field";
 import LoadingState from "@/components/ui/LoadingState";
-import { platformApi } from "@/lib/api";
-import { auditActionLabel } from "@/lib/api/platform";
+import { Dialog } from "@/components/ui/Overlay";
+import { SegmentedControl } from "@/components/ui/SegmentedControl";
+import { authApi, getApiErrorMessage } from "@/lib/api";
+import type { PlatformInstitutionAdminInvitation } from "@/lib/api/auth";
 import { useApiResource } from "@/lib/useApiResource";
 
-const growthSeries = [
-  { key: "institutions", label: "Organizations created", color: "var(--chart-1)" },
-  { key: "access_requests", label: "Access requests", color: "var(--chart-3)" },
-];
+type Invitation = PlatformInstitutionAdminInvitation;
+type StatusFilter = "ALL" | Invitation["status"];
+type IssuedLink = { email: string; url: string; delivery: "SENT" | "FAILED" | "MANUAL_DELIVERY_REQUIRED" };
 
-/** Super Admin home: platform health, what needs a decision, and recent activity. */
-export default function PlatformOverviewPage() {
+const statusTone: Record<Invitation["status"], BadgeTone> = {
+  ACCEPTED: "success",
+  PENDING: "warning",
+  EXPIRED: "neutral",
+  REVOKED: "danger",
+};
+
+const validityOptions = (
+  <>
+    <option value="24">24 hours</option>
+    <option value="72">3 days</option>
+    <option value="168">7 days</option>
+    <option value="336">14 days</option>
+  </>
+);
+
+const bigControl = "h-12 rounded-xl bg-surface-muted";
+
+function IssuedLinkNotice({ issued, onDismiss }: { issued: IssuedLink; onDismiss: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const message = issued.delivery === "SENT"
+    ? `Invitation emailed to ${issued.email}. Keep this link only as a secure recovery option.`
+    : issued.delivery === "FAILED"
+      ? "Email delivery failed. Copy and send this secure link through an approved channel."
+      : "Email delivery is not configured yet. Copy and send this secure link through an approved channel.";
+  return (
+    <div className="mt-6 rounded-2xl border border-success/30 bg-success-soft p-4 sm:p-5">
+      <div className="flex items-start gap-3">
+        <span className="mt-0.5 rounded-full bg-success p-1 text-white" aria-hidden="true"><Check className="h-3.5 w-3.5" /></span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-success-ink">Secure setup link created</p>
+          <p className="mt-1 text-xs text-success-ink">{message} It is shown only once.</p>
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            <input readOnly value={issued.url} aria-label="Secure setup link" className="h-11 min-w-0 flex-1 rounded-xl border border-success/30 bg-surface px-3 text-xs text-ink" />
+            <button type="button" onClick={() => { void navigator.clipboard.writeText(issued.url).then(() => setCopied(true)); }} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-success/40 bg-surface px-4 text-sm font-semibold text-success-ink transition hover:bg-success-soft">
+              {copied ? <><Check className="h-4 w-4" />Copied</> : <><Copy className="h-4 w-4" />Copy link</>}
+            </button>
+            <button type="button" onClick={onDismiss} className="inline-flex h-11 items-center justify-center rounded-xl px-4 text-sm font-semibold text-success-ink hover:underline">Done</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Super Admin home: invite organizations, review requests and manage every setup link. */
+export default function PlatformInvitationsPage() {
   const { user } = useAuth();
-  const loadOverview = useCallback(() => platformApi.getOverview(), []);
-  const { data, loading, error, reload } = useApiResource(loadOverview);
-  const loadActivity = useCallback(() => platformApi.listAuditEvents({ page: 1 }), []);
-  const { data: activity } = useApiResource(loadActivity);
+  const [email, setEmail] = useState("");
+  const [hours, setHours] = useState("168");
+  const [creating, setCreating] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [issued, setIssued] = useState<IssuedLink | null>(null);
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState<StatusFilter>("ALL");
+  const [revoking, setRevoking] = useState<Invitation | null>(null);
+  const [reissuing, setReissuing] = useState<Invitation | null>(null);
+  const [reissueHours, setReissueHours] = useState("168");
+  const [busy, setBusy] = useState(false);
+  const [rowError, setRowError] = useState<string | null>(null);
 
-  if (loading && !data) return <LoadingState variant="dashboard" />;
-  if (error || !data) return <ErrorState message={error ?? "Could not load the platform overview."} onRetry={reload} />;
+  const load = useCallback(() => authApi.listInstitutionAdminInvitations(), []);
+  const { data, loading, error, reload } = useApiResource(load);
+  const loadRequests = useCallback(() => authApi.listInstitutionAccessRequests(), []);
+  const { data: requests, loading: loadingRequests, error: requestsError, reload: reloadRequests } = useApiResource(loadRequests);
 
-  const growth = data.growth.months.map((month, index) => ({
-    month,
-    institutions: data.growth.institutions[index] ?? 0,
-    access_requests: data.growth.access_requests[index] ?? 0,
-  }));
-  const { institutions, users, pipeline, onboarding } = data;
-  const stuck = onboarding.BLOCKED;
-  const attention = [
-    pipeline.pending_requests > 0 && { title: `${pipeline.pending_requests} access request${pipeline.pending_requests === 1 ? "" : "s"} awaiting review`, description: "Organizations asked for an invitation from the Get Started page.", severity: "warning", href: "/platform/invitations" },
-    pipeline.invitations_expiring_48h > 0 && { title: `${pipeline.invitations_expiring_48h} invitation${pipeline.invitations_expiring_48h === 1 ? "" : "s"} expiring within 48 hours`, description: "Unused setup links lapse soon. Re-issue one if the recipient still needs it.", severity: "info", href: "/platform/invitations" },
-    stuck > 0 && { title: `${stuck} organization${stuck === 1 ? " is" : "s are"} blocked in setup`, description: "Their onboarding checklist reports a blocking problem.", severity: "warning", href: "/platform/organizations" },
-    institutions.suspended > 0 && { title: `${institutions.suspended} suspended organization${institutions.suspended === 1 ? "" : "s"}`, description: "Their users cannot sign in until reactivated.", severity: "info", href: "/platform/organizations" },
-  ].filter((item): item is { title: string; description: string; severity: string; href: string } => Boolean(item));
+  const counts = useMemo(() => {
+    const result: Record<StatusFilter, number> = { ALL: 0, PENDING: 0, ACCEPTED: 0, EXPIRED: 0, REVOKED: 0 };
+    for (const invitation of data ?? []) {
+      result.ALL += 1;
+      result[invitation.status] += 1;
+    }
+    return result;
+  }, [data]);
+  const pendingRequests = requests?.filter((item) => item.status === "PENDING").length ?? 0;
+
+  const rows = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return (data ?? []).filter((invitation) =>
+      (status === "ALL" || invitation.status === status)
+      && (!term || invitation.email.toLowerCase().includes(term) || (invitation.institution_name ?? "").toLowerCase().includes(term)),
+    );
+  }, [data, search, status]);
+
+  const showLink = (link: { email: string; acceptance_token: string; email_delivery_status: IssuedLink["delivery"] }) => {
+    setIssued({ email: link.email, url: `${window.location.origin}/create-organization/${link.acceptance_token}`, delivery: link.email_delivery_status });
+  };
+
+  const createInvitation = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setCreating(true);
+    setActionError(null);
+    setIssued(null);
+    try {
+      const invitation = await authApi.createInstitutionAdminInvitation({ email: email.trim(), expires_in_hours: Number(hours) });
+      showLink(invitation);
+      setEmail("");
+      reload();
+    } catch (caught) {
+      setActionError(getApiErrorMessage(caught));
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const revoke = async () => {
+    if (!revoking) return;
+    setBusy(true);
+    setRowError(null);
+    try {
+      await authApi.revokeInstitutionAdminInvitation(revoking.id);
+      reload();
+    } catch (caught) {
+      setRowError(getApiErrorMessage(caught));
+    } finally {
+      setBusy(false);
+      setRevoking(null);
+    }
+  };
+
+  const reissue = async () => {
+    if (!reissuing) return;
+    setBusy(true);
+    setRowError(null);
+    try {
+      const result = await authApi.reissueInstitutionAdminInvitation(reissuing.id, Number(reissueHours));
+      showLink(result.invitation);
+      reload();
+      reloadRequests();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (caught) {
+      setRowError(getApiErrorMessage(caught));
+    } finally {
+      setBusy(false);
+      setReissuing(null);
+    }
+  };
+
+  // Full loading state only on first load: a reload after an action must not wipe the one-time link.
+  if ((loading && !data) || (loadingRequests && !requests)) return <LoadingState />;
+
+  const requestsSection = requestsError || !requests
+    ? <ErrorState message={requestsError ?? "Could not load access requests."} onRetry={reloadRequests} />
+    : <AccessRequestsCard requests={requests} onChanged={() => { reloadRequests(); reload(); }} />;
 
   return (
     <>
-      <HomeHero eyebrow="ErgonX platform" title={`Good to see you, ${user?.firstName || "Super"}.`} subtitle="The health of every organization on ErgonX, and what needs your decision." />
+      <PlatformHero title={`Good to see you, ${user?.firstName || "Super"}.`} subtitle="Manage organizations and their administrator access from one place." />
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Platform summary">
-        <MetricCard size="sm" label="Organizations" value={institutions.total} icon={Building2} accent="brand" href="/platform/organizations" description={`${institutions.active} active · ${institutions.suspended} suspended`} />
-        <MetricCard size="sm" label="Users signed in, last 30 days" value={users.signed_in_last_30_days} icon={UsersRound} accent="hr" description={`of ${users.total.toLocaleString("en-GB")} user accounts`} />
-        <MetricCard size="sm" label="Employees managed" value={data.employees.total.toLocaleString("en-GB")} icon={LayoutGrid} accent="payroll" description="Across all organizations" />
-        <MetricCard size="sm" label="Requests awaiting review" value={pipeline.pending_requests} icon={Inbox} accent="recruitment" href="/platform/invitations" description={`${pipeline.pending_invitations} invitation${pipeline.pending_invitations === 1 ? "" : "s"} not yet accepted`} />
+      <section className="grid gap-4 sm:grid-cols-2 lg:max-w-4xl lg:grid-cols-4" aria-label="Invitation summary">
+        <StatTile label="Requests awaiting review" value={pendingRequests} icon={Inbox} tone="violet" />
+        <StatTile label="Total invitations" value={counts.ALL} icon={UsersRound} tone="sky" />
+        <StatTile label="Awaiting activation" value={counts.PENDING} icon={Clock3} tone="amber" />
+        <StatTile label="Organizations started" value={counts.ACCEPTED} icon={Check} tone="emerald" />
       </section>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-        <ChartCard
-          title="Growth"
-          description="New organizations and Get Started requests in each of the last 12 months."
-          icon={TrendingUp}
-          accent="brand"
-          legend={growthSeries.map((series) => ({ label: series.label, color: series.color }))}
-          empty={!growth.some((point) => point.institutions || point.access_requests)}
-          emptyDescription="Sign-ups and requests will appear here."
-          data={{ columns: ["Month", "Organizations created", "Access requests"], rows: growth.map((point) => [point.month, point.institutions, point.access_requests]) }}
-        >
-          <BarsChart data={growth} xKey="month" xFormat="month" height={250} series={growthSeries} />
-        </ChartCard>
+      {pendingRequests > 0 && requestsSection}
 
-        <Card title="Needs your attention" icon={Inbox} accent="brand">
-          {attention.length === 0 ? (
-            <p className="text-support text-ink-muted">Nothing is waiting on you. New requests and expiring invitations will show up here.</p>
-          ) : (
-            <div className="-m-3 space-y-1">{attention.map((item) => <AttentionItem key={item.title} {...item} />)}</div>
-          )}
-          <div className="mt-5 border-t border-line-soft pt-4">
-            <h3 className="text-support font-semibold text-ink-strong">Setup progress</h3>
-            <SummaryList className="mt-2" items={(["READY", "IN_PROGRESS", "NOT_STARTED", "BLOCKED"] as const).map((status) => ({ label: onboardingLabel[status], value: onboarding[status] }))} />
-          </div>
-        </Card>
-      </div>
+      <PlatformCard eyebrow="New organization" title="Invite an Institution Admin" description="The recipient creates their organization and becomes its primary administrator through a single-use secure link." icon={MailPlus}>
+        {actionError && <Alert tone="danger" title="Invitation could not be created" className="mb-5">{actionError}<p className="mt-1 text-caption">Use an email address that does not already have an ErgonX account.</p></Alert>}
+        <form onSubmit={createInvitation} className="grid gap-4 md:grid-cols-[minmax(0,1fr)_11.5rem_auto] md:items-end">
+          <label className="block"><span className={fieldLabel}>Administrator work email</span><Input required type="email" size="lg" className={bigControl} value={email} onChange={(event) => setEmail(event.target.value)} placeholder="administrator@organization.com" /></label>
+          <label className="block"><span className={fieldLabel}>Link validity</span><Select size="lg" className={bigControl} value={hours} onChange={(event) => setHours(event.target.value)}>{validityOptions}</Select></label>
+          <button type="submit" disabled={creating} className={`inline-flex h-12 items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold shadow-lg transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 ${platformSolid}`}>
+            {creating ? "Creating…" : <>Create invite <ArrowUpRight className="h-4 w-4" /></>}
+          </button>
+        </form>
+        {issued && <IssuedLinkNotice issued={issued} onDismiss={() => setIssued(null)} />}
+      </PlatformCard>
 
-      <div className="grid gap-5 xl:grid-cols-2">
-        <Card title="Newest organizations" icon={Building2} accent="brand" actions={<Link className="text-support font-semibold text-primary-ink hover:underline" href="/platform/organizations">All organizations</Link>}>
-          {data.recent_institutions.length === 0 ? (
-            <p className="text-support text-ink-muted">No organizations yet. They appear once an invitation is accepted.</p>
-          ) : (
-            <ul className="-mx-2 divide-y divide-line-soft">
-              {data.recent_institutions.map((institution) => (
-                <li key={institution.id}>
-                  <Link href={`/platform/organizations/${institution.id}`} className="flex items-center gap-3 rounded-lg px-2 py-3 hover:bg-surface-hover">
-                    <Avatar name={institution.name} size="sm" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-semibold text-ink-strong">{institution.name}</span>
-                      <span className="block truncate text-caption text-ink-muted">{institution.primary_admin?.email ?? "No active admin"} · joined {formatRelative(institution.created_at)}</span>
-                    </span>
-                    {institution.is_active ? <Badge size="sm" tone="neutral">{onboardingLabel[institution.onboarding_status]}</Badge> : <Badge size="sm" tone="danger">Suspended</Badge>}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
+      {rowError && <Alert tone="danger" title="That didn't work">{rowError}</Alert>}
 
-        <Card title="Recent platform activity" icon={History} accent="audit" actions={<Link className="text-support font-semibold text-primary-ink hover:underline" href="/platform/audit">Audit log</Link>}>
-          {!activity || activity.results.length === 0 ? (
-            <p className="text-support text-ink-muted">No platform actions recorded yet.</p>
-          ) : (
-            <ol className="divide-y divide-line-soft">
-              {activity.results.slice(0, 6).map((event) => (
-                <li key={event.id} className="py-3">
-                  <p className="font-semibold text-ink-strong">{auditActionLabel(event.action)}{event.institution ? <span className="font-normal text-ink-muted"> · {event.institution.name}</span> : typeof event.metadata.email === "string" ? <span className="font-normal text-ink-muted"> · {event.metadata.email}</span> : null}</p>
-                  <p className="text-caption text-ink-muted">{event.actor_email ?? "System"} · {formatDateTime(event.created_at)}</p>
-                </li>
-              ))}
-            </ol>
-          )}
-        </Card>
-      </div>
+      {error || !data ? (
+        <ErrorState message={error ?? "Could not load invitations."} onRetry={reload} />
+      ) : (
+        <DataTable<Invitation>
+          className={platformTable}
+          caption="Institution Admin invitations"
+          rows={rows}
+          rowKey={(invitation) => invitation.id}
+          minWidth={900}
+          toolbar={
+            <div className="space-y-4">
+              <SectionTitle eyebrow="Activity" title="Institution Admin invitations" meta={`${counts.ALL} invitation${counts.ALL === 1 ? "" : "s"} recorded`} />
+              {counts.ALL > 0 && (
+                <DataToolbar
+                  search={search}
+                  onSearchChange={setSearch}
+                  searchPlaceholder="Search email or organization…"
+                  filters={
+                    <SegmentedControl<StatusFilter>
+                      label="Invitation status"
+                      value={status}
+                      onChange={setStatus}
+                      options={(["ALL", "PENDING", "ACCEPTED", "EXPIRED", "REVOKED"] as const).map((value) => ({ value, label: `${value === "ALL" ? "All" : value.charAt(0) + value.slice(1).toLowerCase()} · ${counts[value]}` }))}
+                    />
+                  }
+                />
+              )}
+            </div>
+          }
+          empty={data.length === 0
+            ? { title: "No invitations yet", description: "Create the first secure setup link to begin onboarding an organization.", icon: MailPlus }
+            : { title: "No matching invitations", description: "Try a different search or status." }}
+          columns={[
+            { key: "email", header: "Administrator", sortValue: (invitation) => invitation.email, cell: (invitation) => <span className="block min-w-0"><span className="block truncate font-semibold text-ink-strong">{invitation.email}</span><span className="mt-0.5 block text-xs text-ink-muted">Institution Admin</span></span> },
+            { key: "status", header: "Status", sortValue: (invitation) => invitation.status, cell: (invitation) => <Badge size="sm" tone={statusTone[invitation.status] ?? "neutral"}>{invitation.status}</Badge> },
+            { key: "expires", header: "Expiration", sortValue: (invitation) => invitation.expires_at, cell: (invitation) => <span className="text-ink-muted">{formatDateTime(invitation.expires_at)}</span> },
+            { key: "created", header: "Created", hideBelow: "md", sortValue: (invitation) => invitation.created_at, cell: (invitation) => <span className="text-ink-muted">{formatDateTime(invitation.created_at)}</span> },
+            {
+              key: "by",
+              header: "Created by",
+              hideBelow: "lg",
+              cell: (invitation) => (
+                <span className="block text-ink-muted">
+                  {invitation.invited_by_email ?? "Platform administrator"}
+                  {invitation.institution_id && <Link className="mt-0.5 block text-xs font-semibold text-primary-ink hover:underline" href={`/platform/organizations/${invitation.institution_id}`}>{invitation.institution_name} →</Link>}
+                </span>
+              ),
+            },
+            {
+              key: "actions",
+              header: <span className="sr-only">Actions</span>,
+              cell: (invitation) => invitation.status === "ACCEPTED" ? null : (
+                <span className="flex justify-end gap-2">
+                  <Button size="sm" variant="secondary" leadingIcon={<RotateCw className="h-3.5 w-3.5" />} onClick={() => { setReissueHours("168"); setReissuing(invitation); }}>Re-issue</Button>
+                  {invitation.status === "PENDING" && <Button size="sm" variant="ghost" leadingIcon={<Ban className="h-3.5 w-3.5" />} onClick={() => setRevoking(invitation)}>Revoke</Button>}
+                </span>
+              ),
+            },
+          ]}
+        />
+      )}
+
+      {pendingRequests === 0 && requestsSection}
+
+      <ConfirmDialog
+        open={revoking !== null}
+        destructive
+        loading={busy}
+        title="Revoke this invitation?"
+        description={`The setup link sent to ${revoking?.email ?? ""} will stop working immediately. You can issue a new one later.`}
+        confirmLabel="Revoke link"
+        onConfirm={() => void revoke()}
+        onCancel={() => setRevoking(null)}
+      />
+
+      <Dialog
+        open={reissuing !== null}
+        onClose={() => { if (!busy) setReissuing(null); }}
+        dismissible={!busy}
+        size="sm"
+        title="Re-issue invitation"
+        description={reissuing ? `A new secure link will be created for ${reissuing.email}.${reissuing.status === "PENDING" ? " The current link will stop working." : ""}` : undefined}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setReissuing(null)} disabled={busy}>Cancel</Button>
+            <Button onClick={() => void reissue()} loading={busy} loadingLabel="Issuing…">Issue new link</Button>
+          </>
+        }
+      >
+        <Field label="Link validity"><Select value={reissueHours} onChange={(event) => setReissueHours(event.target.value)}>{validityOptions}</Select></Field>
+      </Dialog>
     </>
   );
 }

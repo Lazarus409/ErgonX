@@ -5,8 +5,9 @@ from apps.organization.models import Position
 
 
 @transaction.atomic
-def create_position(*, institution, department, title, code, **values):
-    if department.institution_id != institution.id:
+def create_position(*, institution, department=None, title, code="", **values):
+    # A blank code is filled in on save (AutoCodeMixin), like other organization records.
+    if department is not None and department.institution_id != institution.id:
         raise ValidationError(
             {"department": "Department must belong to the selected institution."}
         )

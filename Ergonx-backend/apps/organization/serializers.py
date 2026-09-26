@@ -23,6 +23,7 @@ class TenantValidationMixin:
 
 class DepartmentSerializer(TenantValidationMixin, ValidatedModelSerializer):
     head_name = serializers.CharField(source="head.full_name", read_only=True, default=None)
+    parent_name = serializers.CharField(source="parent.name", read_only=True, default=None)
 
     class Meta:
         model = Department
@@ -32,13 +33,14 @@ class DepartmentSerializer(TenantValidationMixin, ValidatedModelSerializer):
             "code",
             "description",
             "parent",
+            "parent_name",
             "head",
             "head_name",
             "is_active",
             "created_at",
             "updated_at",
         )
-        read_only_fields = ("id", "head_name", "created_at", "updated_at")
+        read_only_fields = ("id", "head_name", "parent_name", "created_at", "updated_at")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -58,11 +60,14 @@ class DepartmentSerializer(TenantValidationMixin, ValidatedModelSerializer):
 
 
 class PositionSerializer(TenantValidationMixin, ValidatedModelSerializer):
+    department_name = serializers.CharField(source="department.name", read_only=True, default=None)
+
     class Meta:
         model = Position
         fields = (
             "id",
             "department",
+            "department_name",
             "title",
             "code",
             "description",
@@ -70,7 +75,7 @@ class PositionSerializer(TenantValidationMixin, ValidatedModelSerializer):
             "created_at",
             "updated_at",
         )
-        read_only_fields = ("id", "created_at", "updated_at")
+        read_only_fields = ("id", "department_name", "created_at", "updated_at")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

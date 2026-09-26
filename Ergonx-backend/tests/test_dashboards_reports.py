@@ -105,12 +105,15 @@ def test_finance_manager_receives_finance_dashboard_and_report_access(
     assert report.status_code == 200
     assert report.data == {"report": "accounting", "rows": []}
 
-    recruitment_report = api_client.get("/api/v1/reports/recruitment/?export=csv")
-    assert recruitment_report.status_code == 200
-    assert recruitment_report["Content-Type"].startswith("text/csv")
+    # Recruitment data needs candidate.view, which finance roles do not hold.
+    assert api_client.get("/api/v1/reports/recruitment/?export=csv").status_code == 403
+
+    expenses_report = api_client.get("/api/v1/reports/expenses/?export=csv")
+    assert expenses_report.status_code == 200
+    assert expenses_report["Content-Type"].startswith("text/csv")
     # The common exporter labels an otherwise empty report truthfully; it does
-    # not manufacture a recruitment row merely to populate a CSV header.
-    assert recruitment_report.content.decode() == "empty\r\n"
+    # not manufacture a row merely to populate a CSV header.
+    assert expenses_report.content.decode() == "empty\r\n"
 
     filtered_accounting = api_client.get("/api/v1/reports/accounting/?status=POSTED")
     assert filtered_accounting.status_code == 200

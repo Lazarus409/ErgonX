@@ -1,11 +1,26 @@
 from django.http import HttpResponse
 from drf_spectacular.utils import OpenApiTypes, extend_schema
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
 from apps.reports.services import build_report_rows, rows_to_csv
+from apps.institutions.services import effective_permission_codes
 from common.permissions import TenantContextPermission, TenantRBACPermission
+
+# Beyond report.view, a report needs the permissions that already guard its data,
+# so a role never reads a summary of records it could not open directly.
+REPORT_PERMISSIONS = {
+    "workforce-cost": ("employee.view", "payroll.view"),
+    "recruitment": ("candidate.view",),
+    "leave": ("leave.view",),
+    "attendance": ("attendance.view",),
+    "payroll": ("payroll.view",),
+    "accounting": ("journal.view",),
+    "ap-ar": ("invoice.view", "vendor_bill.view"),
+    "expenses": ("expense.view",),
+}
 
 
 @extend_schema(responses={200: OpenApiTypes.OBJECT})
@@ -28,6 +43,10 @@ class ReportsViewSet(ViewSet):
         return "report.view"
 
     def _respond(self, request, name):
+        granted = set(effective_permission_codes(request.membership))
+        missing = [code for code in REPORT_PERMISSIONS[name] if code not in granted]
+        if missing:
+            raise PermissionDenied("Your role does not include access to this report.")
         rows = build_report_rows(
             request.institution,
             name,

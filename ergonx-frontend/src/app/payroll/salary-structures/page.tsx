@@ -19,12 +19,14 @@ import { formatNumber, humanizeEnum } from "@/lib/format";
 import { useApiResource } from "@/lib/useApiResource";
 import { MAX_PAGE_SIZE } from "@/types/api";
 import type { SalaryStructure, SalaryStructureComponent } from "@/types/payroll";
+import { useAccess } from "@/lib/access";
 
 const ALL = "ALL";
 type StructureForm = { code: string; name: string; description: string; is_active: boolean; components: string[] };
 const emptyForm: StructureForm = { code: "", name: "", description: "", is_active: true, components: [] };
 
 export default function SalaryStructuresPage() {
+  const { can } = useAccess();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState(ALL);
   const [modalOpen, setModalOpen] = useState(false);
@@ -43,13 +45,13 @@ export default function SalaryStructuresPage() {
   const filtered = useMemo(() => { const query = search.trim().toLowerCase(); return structures.filter((item) => !query || item.code.toLowerCase().includes(query) || item.name.toLowerCase().includes(query)); }, [structures, search]);
   const openCreate = () => { setEditing(null); setForm(emptyForm); setFormError(""); setModalOpen(true); };
   const openEdit = (item: SalaryStructure) => { setEditing(item); setForm({ code: item.code, name: item.name, description: item.description, is_active: item.is_active, components: (assignmentsByStructure.get(item.id) ?? []).sort((a, b) => a.sequence - b.sequence).map((entry) => entry.pay_component) }); setFormError(""); setModalOpen(true); };
-  const save = async () => { if (!form.code.trim() || !form.name.trim() || !form.components.length) { setFormError("Code, name, and at least one pay component are required."); return; } setSaving(true); setFormError(""); try { const payload = { code: form.code.trim().toUpperCase(), name: form.name.trim(), description: form.description.trim(), is_active: form.is_active }; const structure = editing ? await payrollApi.updateSalaryStructure(editing.id, payload) : await payrollApi.createSalaryStructure(payload); const existing = assignmentsByStructure.get(structure.id) ?? []; const selected = new Set(form.components); await Promise.all(existing.filter((entry) => !selected.has(entry.pay_component)).map((entry) => payrollApi.deleteSalaryStructureComponent(entry.id))); let nextSequence = Math.max(0, ...existing.map((entry) => entry.sequence)) + 1; for (const componentId of form.components) { if (!existing.some((entry) => entry.pay_component === componentId)) { await payrollApi.createSalaryStructureComponent({ salary_structure: structure.id, pay_component: componentId, default_amount: null, default_percentage: null, percentage_base_component: null, sequence: nextSequence++, is_required: true }); } } setModalOpen(false); reload(); } catch (caught) { setFormError(getApiErrorMessage(caught)); } finally { setSaving(false); } };
+  const save = async () => { if (!form.name.trim() || !form.components.length) { setFormError("Name and at least one pay component are required."); return; } setSaving(true); setFormError(""); try { const payload = { code: form.code.trim().toUpperCase(), name: form.name.trim(), description: form.description.trim(), is_active: form.is_active }; const structure = editing ? await payrollApi.updateSalaryStructure(editing.id, payload) : await payrollApi.createSalaryStructure(payload); const existing = assignmentsByStructure.get(structure.id) ?? []; const selected = new Set(form.components); await Promise.all(existing.filter((entry) => !selected.has(entry.pay_component)).map((entry) => payrollApi.deleteSalaryStructureComponent(entry.id))); let nextSequence = Math.max(0, ...existing.map((entry) => entry.sequence)) + 1; for (const componentId of form.components) { if (!existing.some((entry) => entry.pay_component === componentId)) { await payrollApi.createSalaryStructureComponent({ salary_structure: structure.id, pay_component: componentId, default_amount: null, default_percentage: null, percentage_base_component: null, sequence: nextSequence++, is_required: true }); } } setModalOpen(false); reload(); } catch (caught) { setFormError(getApiErrorMessage(caught)); } finally { setSaving(false); } };
   const remove = async () => { if (!deleting) return; setSaving(true); try { await payrollApi.deleteSalaryStructure(deleting.id); setDeleting(null); reload(); } catch (caught) { setFormError(getApiErrorMessage(caught)); setDeleting(null); } finally { setSaving(false); } };
   const toggle = (id: string) => setForm((current) => ({ ...current, components: current.components.includes(id) ? current.components.filter((item) => item !== id) : [...current.components, id] }));
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Payroll" title="Salary structures" description="Define reusable salary structures and associate approved pay components." icon={WalletCards} accent="payroll" actions={<Button leadingIcon={<Plus className="h-4 w-4" />} onClick={openCreate}>Add structure</Button>} />
+      <PageHeader eyebrow="Payroll" title="Salary structures" description="Define reusable salary structures and associate approved pay components." icon={WalletCards} accent="payroll" actions={can("compensation.configure") ? <Button leadingIcon={<Plus className="h-4 w-4" />} onClick={openCreate}>Add structure</Button> : null} />
       <section className="grid gap-4 sm:grid-cols-3" aria-label="Structure summary">
         <MetricCard size="sm" label="Total structures" value={formatNumber(data?.[0].count ?? 0)} accent="payroll" loading={loading && !data} />
         <MetricCard size="sm" label="Active" value={formatNumber(structures.filter((item) => item.is_active).length)} accent="accounting" loading={loading && !data} />
@@ -73,13 +75,13 @@ export default function SalaryStructuresPage() {
             onClear={search || status !== ALL ? () => { setSearch(""); setStatus(ALL); } : undefined}
           />
         }
-        empty={{ title: "No salary structures found", description: "Create a structure and attach the pay components it uses.", icon: WalletCards, action: <Button variant="secondary" leadingIcon={<Plus className="h-4 w-4" />} onClick={openCreate}>Add structure</Button> }}
+        empty={{ title: "No salary structures found", description: "Create a structure and attach the pay components it uses.", icon: WalletCards, action: can("compensation.configure") ? <Button variant="secondary" leadingIcon={<Plus className="h-4 w-4" />} onClick={openCreate}>Add structure</Button> : undefined }}
         columns={[
           { key: "code", header: "Code", sortValue: (item) => item.code, cell: (item) => <span className="font-mono font-semibold text-ink-strong">{item.code}</span> },
           { key: "name", header: "Structure", sortValue: (item) => item.name, cell: (item) => <span><span className="block font-semibold text-ink-strong">{item.name}</span>{item.description && <span className="block max-w-sm truncate text-caption text-ink-muted" title={item.description}>{item.description}</span>}</span> },
           { key: "components", header: "Components", cell: (item) => { const entries = assignmentsByStructure.get(item.id) ?? []; return <span className="flex flex-wrap gap-1">{entries.slice(0, 3).map((entry) => <Badge key={entry.id} size="sm" accent="payroll">{componentById.get(entry.pay_component)?.code ?? entry.pay_component}</Badge>)}{entries.length > 3 && <Badge size="sm">+{entries.length - 3}</Badge>}{!entries.length && <span className="text-caption text-ink-subtle">None</span>}</span>; } },
           { key: "status", header: "Status", cell: (item) => <StatusBadge status={item.is_active ? "ACTIVE" : "INACTIVE"} size="sm" /> },
-          { key: "actions", header: <span className="sr-only">Actions</span>, cell: (item) => <div className="flex justify-end gap-1"><IconButton size="sm" label={`Edit ${item.name}`} onClick={() => openEdit(item)}><Edit3 className="h-4 w-4" /></IconButton><IconButton size="sm" label={`Delete ${item.name}`} className="text-danger-ink hover:bg-danger-soft" onClick={() => setDeleting(item)}><Trash2 className="h-4 w-4" /></IconButton></div> },
+          { key: "actions", header: <span className="sr-only">Actions</span>, cell: (item) => <div className="flex justify-end gap-1">{can("compensation.configure") && <IconButton size="sm" label={`Edit ${item.name}`} onClick={() => openEdit(item)}><Edit3 className="h-4 w-4" /></IconButton>}{can("compensation.configure") && <IconButton size="sm" label={`Delete ${item.name}`} className="text-danger-ink hover:bg-danger-soft" onClick={() => setDeleting(item)}><Trash2 className="h-4 w-4" /></IconButton>}</div> },
         ]}
       />
 
@@ -95,7 +97,7 @@ export default function SalaryStructuresPage() {
         <div className="space-y-5">
           {formError && <Alert tone="danger">{formError}</Alert>}
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Code" required><Input value={form.code} onChange={(event) => setForm({ ...form, code: event.target.value.toUpperCase() })} className="font-mono" data-autofocus /></Field>
+            <Field label="Code" optional><Input value={form.code} onChange={(event) => setForm({ ...form, code: event.target.value.toUpperCase() })} placeholder="Auto-generated if left blank" className="font-mono" data-autofocus /></Field>
             <Field label="Name" required><Input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></Field>
           </div>
           <Field label="Description" optional><Textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} rows={3} /></Field>

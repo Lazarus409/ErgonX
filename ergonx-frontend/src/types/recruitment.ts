@@ -17,7 +17,8 @@ export interface JobPosting {
 }
 
 export interface JobPostingPayload {
-  code: string;
+  /** Omit to have the next JOB-YYYY-##### code generated. */
+  code?: string;
   title: string;
   department: string;
   position: string;

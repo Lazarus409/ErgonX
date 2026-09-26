@@ -28,7 +28,6 @@ type FormData = {
   lastName: string;
   email: string;
   phone: string;
-  employeeNumber: string;
   hireDate: string;
   gender: string;
   department: string;
@@ -45,7 +44,6 @@ const initialForm: FormData = {
   lastName: "",
   email: "",
   phone: "",
-  employeeNumber: "",
   hireDate: "",
   gender: "",
   department: "",
@@ -82,6 +80,7 @@ export default function CreateEmployeePage() {
   const [form, setForm] = useState<FormData>(initialForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState(false);
+  const [savedEmployee, setSavedEmployee] = useState<{ id: string; number: string } | null>(null);
   const [lookups, setLookups] = useState<OrganizationLookups>(emptyLookups);
   const [lookupsLoading, setLookupsLoading] = useState(true);
   const [lookupsError, setLookupsError] = useState<string | null>(null);
@@ -165,10 +164,6 @@ export default function CreateEmployeePage() {
       nextErrors.email = "Email address is required.";
     }
 
-    if (!form.employeeNumber.trim()) {
-      nextErrors.employeeNumber = "Employee number is required.";
-    }
-
     if (!form.hireDate) {
       nextErrors.hireDate = "Hire date is required.";
     }
@@ -216,7 +211,6 @@ export default function CreateEmployeePage() {
         first_name: form.firstName.trim(),
         middle_name: form.middleName.trim(),
         last_name: form.lastName.trim(),
-        employee_number: form.employeeNumber.trim(),
         work_email: form.email.trim(),
         phone: form.phone.trim(),
         gender: form.gender,
@@ -242,6 +236,11 @@ export default function CreateEmployeePage() {
         );
       }
 
+      // Clear the form so a second click cannot create the same person again;
+      // employee numbers are generated, so nothing else would catch the duplicate.
+      setForm(initialForm);
+      setErrors({});
+      setSavedEmployee({ id: employee.id, number: employee.employee_number });
       setSaved(true);
     } catch (caught) {
       const apiError = isApiRequestError(caught) ? caught : null;
@@ -249,7 +248,6 @@ export default function CreateEmployeePage() {
         first_name: "firstName",
         middle_name: "middleName",
         last_name: "lastName",
-        employee_number: "employeeNumber",
         work_email: "email",
         phone: "phone",
         gender: "gender",
@@ -297,11 +295,16 @@ export default function CreateEmployeePage() {
 
           <div>
             <p className="text-sm font-semibold text-success-ink">
-              Employee record saved
+              {savedEmployee ? `Employee ${savedEmployee.number} saved` : "Employee record saved"}
             </p>
             <p className="mt-0.5 text-sm text-success-ink">
               {invitationStatus ?? "The employee and their current employment assignment have been saved."}
             </p>
+            {savedEmployee && (
+              <Link href={`/hr/employees/${savedEmployee.id}`} className="mt-1 inline-block text-sm font-semibold text-success-ink underline">
+                View employee profile
+              </Link>
+            )}
           </div>
         </div>
       )}
@@ -404,15 +407,6 @@ export default function CreateEmployeePage() {
           </div>
 
           <div className="grid grid-cols-1 gap-5 p-6 md:grid-cols-2 lg:grid-cols-3">
-            <Field
-              label="Employee Number"
-              required
-              value={form.employeeNumber}
-              placeholder="e.g. EMP-0009"
-              error={errors.employeeNumber}
-              onChange={(value) => updateField("employeeNumber", value)}
-            />
-
             <Field
               label="Hire Date"
               required

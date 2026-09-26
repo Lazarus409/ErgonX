@@ -61,7 +61,8 @@ export interface Employee {
 
 export interface EmployeePayload {
   user?: string | null;
-  employee_number: string;
+  /** Omit or leave blank to have the next EMP-###### number generated. */
+  employee_number?: string;
   first_name: string;
   middle_name?: string;
   last_name: string;
@@ -192,6 +193,9 @@ export interface Department {
   code: string;
   description: string;
   parent: string | null;
+  /** Employee id of the Department Head. */
+  head: string | null;
+  head_name: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;

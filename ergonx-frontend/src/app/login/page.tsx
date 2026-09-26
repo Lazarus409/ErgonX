@@ -65,6 +65,20 @@ export default function LoginPage() {
     }
   };
 
+  const resendEmailCode = async () => {
+    setError("");
+    setMfaCode("");
+    try {
+      setLoading(true);
+      await login(email, password);
+    } catch (err: unknown) {
+      if ((err as { code?: string }).code === "email_otp_required") setError("Enter the six-digit verification code sent to your email. A new code was sent; earlier codes no longer work.");
+      else setError(getApiErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <AuthShell>
       <AuthHeading eyebrow="Secure sign in" title="Welcome back" description="Sign in to continue to your ErgonX workspace." />
@@ -97,9 +111,12 @@ export default function LoginPage() {
           <PasswordStrength value={password} />
         </div>
         {mfaRequired && (
+          <div>
           <Field label={emailOtp ? "Email verification code" : "Authenticator code"}>
             <Input id="mfa-code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} required size="lg" value={mfaCode} onChange={(event) => setMfaCode(event.target.value.replace(/\D/g, ""))} placeholder="000000" autoComplete="one-time-code" className="text-center text-lg tracking-[0.4em] tabular-nums" />
           </Field>
+          {emailOtp && <button type="button" disabled={loading} onClick={() => void resendEmailCode()} className="mt-2 text-support font-semibold text-primary-ink hover:underline disabled:opacity-60">Resend code</button>}
+          </div>
         )}
         <Button type="submit" size="lg" block loading={loading} loadingLabel="Signing in…" trailingIcon={<ArrowRight className="h-4 w-4" />}>Sign in</Button>
       </form>

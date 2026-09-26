@@ -6,7 +6,9 @@ import AppShell from "@/components/layout/AppShell";
 export default function HomePage() {
   return (
     <AuthenticationGate>
-      <AppShell><WorkspaceHome areaLabel="Home" showGreeting /></AppShell>
+      <AppShell>
+        <WorkspaceHome areaLabel="Home" showGreeting />
+      </AppShell>
     </AuthenticationGate>
   );
 }

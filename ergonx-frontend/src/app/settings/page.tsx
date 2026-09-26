@@ -17,10 +17,10 @@ export const settingsAreas: Array<{ title: string; description: string; href: st
   { title: "Roles & Permissions", description: "Manage institution roles and assigned permissions.", href: "/settings/roles", icon: ShieldCheck, permission: "settings.roles.manage" },
   { title: "Approval Workflows", description: "Review approval definitions used by operational processes.", href: "/settings/approval-workflows", icon: GitPullRequest, permission: "approval_workflow.view" },
   { title: "Notifications", description: "Review in-app notification history for your active institution.", href: "/notifications", icon: Bell, permission: "home.view" },
-  { title: "Organization", description: "Review the institution's department, position, grade, and location catalogues.", href: "/hr/departments", icon: BriefcaseBusiness, permission: "department.view", module: "HR" },
+  { title: "Organization", description: "Review the institution's department, position, grade, and location catalogues.", href: "/hr/departments", icon: BriefcaseBusiness, permission: "organization.view", module: "HR" },
   { title: "Recruitment", description: "Manage the ordered recruitment stages used by the institution pipeline.", href: "/recruitment/stages", icon: BriefcaseBusiness, permission: "recruitment_stage.view", module: "RECRUITMENT" },
-  { title: "Leave", description: "Manage the institution's leave types and effective leave policies.", href: "/leave/policies", icon: CalendarDays, permission: "leave.view", module: "LEAVE" },
-  { title: "Attendance", description: "Manage authorized work schedules, shift patterns, rotations, and assignments.", href: "/attendance/schedules", icon: Clock3, permission: "schedule.view", module: "ATTENDANCE" },
+  { title: "Leave", description: "Manage the institution's leave types and effective leave policies.", href: "/leave/policies", icon: CalendarDays, permission: "leave.configure", module: "LEAVE" },
+  { title: "Attendance", description: "Manage authorized work schedules, shift patterns, rotations, and assignments.", href: "/attendance/schedules", icon: Clock3, permission: "schedule.manage", module: "ATTENDANCE" },
 ];
 
 export default function SettingsPage() {

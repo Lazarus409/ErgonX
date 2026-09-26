@@ -93,7 +93,7 @@ export default function SelfServiceHome() {
           ]).then(([types, balances, requests]) => ({ types: new Map(types.map((type) => [type.id, type])), balances, requests }))
         : Promise.resolve(null),
       showPayroll
-        ? payrollApi.listPayslips({ page_size: 6, ordering: "-generated_at" }).then((page) => page.results).catch(() => null)
+        ? payrollApi.listPayslips({ payroll_record__employee: employee.id, page_size: 6, ordering: "-generated_at" }).then((page) => page.results).catch(() => null)
         : Promise.resolve(null),
       notificationsApi.getNotifications().then((items) => items.slice(0, 4)).catch(() => null),
     ]);

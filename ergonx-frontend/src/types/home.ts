@@ -6,6 +6,8 @@
  * backend-owned navigation rather than reconstructed in the browser.
  */
 
+import type { TeamSnapshot } from "@/types/dashboards";
+
 export interface HomeGreetingContext {
   greeting: string;
   user_display_name: string;
@@ -64,6 +66,8 @@ export interface HomePayload {
   };
   /** Self-service context; null when the user has no employee record here. */
   optional_personal_snapshot: PersonalSnapshot | null;
+  /** "Team today" for members who head a department; null otherwise. */
+  team_snapshot: TeamSnapshot | null;
 }
 
 export interface PersonalShift {

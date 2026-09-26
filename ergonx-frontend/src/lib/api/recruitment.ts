@@ -110,8 +110,8 @@ export function offerAction(id: string, action: "extend" | "accept" | "decline" 
   return apiAction<RecruitmentOffer>(`/recruitment/offers/${id}/${action}/`);
 }
 
-export function hireOfferCandidate(id: string, employee_number: string): Promise<{ employee_id: string; employee_number: string }> {
-  return apiAction<{ employee_id: string; employee_number: string }, { employee_number: string }>(`/recruitment/offers/${id}/hire/`, { employee_number });
+export function hireOfferCandidate(id: string): Promise<{ employee_id: string; employee_number: string }> {
+  return apiAction<{ employee_id: string; employee_number: string }, Record<string, never>>(`/recruitment/offers/${id}/hire/`, {});
 }
 
 export function listRecruitmentStages(params?: ListParams): Promise<PaginatedData<RecruitmentStage>> {

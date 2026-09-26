@@ -16,8 +16,10 @@ import { getApiErrorMessage, workflowsApi } from "@/lib/api";
 import { formatDateTime, humanizeEnum } from "@/lib/format";
 import { useApiResource } from "@/lib/useApiResource";
 import type { ApprovalRequest } from "@/types/workflows";
+import { useAccess } from "@/lib/access";
 
 export default function ApprovalsPage() {
+  const { readOnly } = useAccess();
   const load = useCallback(async () => { const [requests, actions] = await Promise.all([workflowsApi.listApprovalRequests(), workflowsApi.listApprovalActions()]); return { requests: requests.results, actions: actions.results }; }, []);
   const { data, loading, error, reload } = useApiResource(load);
   const [selected, setSelected] = useState<ApprovalRequest | null>(null);
@@ -49,8 +51,8 @@ export default function ApprovalsPage() {
                   <StatusBadge status={request.status} size="sm" />
                   {request.status === "PENDING" && (
                     <div className="flex gap-2">
-                      <Button size="sm" variant="secondary" className="text-danger-ink" leadingIcon={<X className="h-3.5 w-3.5" />} onClick={() => { setDecision("reject"); setSelected(request); }}>Reject</Button>
-                      <Button size="sm" leadingIcon={<Check className="h-3.5 w-3.5" />} onClick={() => { setDecision("approve"); setSelected(request); }}>Approve</Button>
+                      {!readOnly && <Button size="sm" variant="secondary" className="text-danger-ink" leadingIcon={<X className="h-3.5 w-3.5" />} onClick={() => { setDecision("reject"); setSelected(request); }}>Reject</Button>}
+                      {!readOnly && <Button size="sm" leadingIcon={<Check className="h-3.5 w-3.5" />} onClick={() => { setDecision("approve"); setSelected(request); }}>Approve</Button>}
                     </div>
                   )}
                 </li>

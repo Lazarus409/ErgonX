@@ -18,6 +18,7 @@ import { formatNumber, humanizeEnum } from "@/lib/format";
 import { useApiResource } from "@/lib/useApiResource";
 import { MAX_PAGE_SIZE } from "@/types/api";
 import type { PayComponent, PayComponentCalculationType, PayComponentCashOrKind, PayComponentType } from "@/types/payroll";
+import { useAccess } from "@/lib/access";
 
 const ALL = "ALL";
 type ComponentForm = { code: string; name: string; component_type: PayComponentType; calculation_type: PayComponentCalculationType; taxable: boolean; pensionable: boolean; cash_or_kind: PayComponentCashOrKind; recurring: boolean; is_active: boolean };
@@ -25,6 +26,7 @@ const emptyForm: ComponentForm = { code: "", name: "", component_type: "EARNING"
 const typeTone = { EARNING: "success", DEDUCTION: "danger", EMPLOYER_CONTRIBUTION: "brand" } as const;
 
 export default function PayComponentsPage() {
+  const { can } = useAccess();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState(ALL);
   const [statusFilter, setStatusFilter] = useState(ALL);
@@ -40,13 +42,13 @@ export default function PayComponentsPage() {
   const filtered = useMemo(() => { const query = search.trim().toLowerCase(); return components.filter((item) => !query || item.code.toLowerCase().includes(query) || item.name.toLowerCase().includes(query)); }, [components, search]);
   const openCreate = () => { setEditing(null); setForm(emptyForm); setFormError(""); setModalOpen(true); };
   const openEdit = (item: PayComponent) => { setEditing(item); setForm({ code: item.code, name: item.name, component_type: item.component_type, calculation_type: item.calculation_type, taxable: item.taxable, pensionable: item.pensionable, cash_or_kind: item.cash_or_kind, recurring: item.recurring, is_active: item.is_active }); setFormError(""); setModalOpen(true); };
-  const save = async () => { if (!form.code.trim() || !form.name.trim()) { setFormError("Code and component name are required."); return; } setSaving(true); setFormError(""); try { const payload = { ...form, code: form.code.trim().toUpperCase(), name: form.name.trim() }; if (editing) await payrollApi.updatePayComponent(editing.id, payload); else await payrollApi.createPayComponent(payload); setModalOpen(false); reload(); } catch (caught) { setFormError(getApiErrorMessage(caught)); } finally { setSaving(false); } };
+  const save = async () => { if (!form.name.trim()) { setFormError("Component name is required."); return; } setSaving(true); setFormError(""); try { const payload = { ...form, code: form.code.trim().toUpperCase(), name: form.name.trim() }; if (editing) await payrollApi.updatePayComponent(editing.id, payload); else await payrollApi.createPayComponent(payload); setModalOpen(false); reload(); } catch (caught) { setFormError(getApiErrorMessage(caught)); } finally { setSaving(false); } };
   const remove = async () => { if (!deleting) return; setSaving(true); try { await payrollApi.deletePayComponent(deleting.id); setDeleting(null); reload(); } catch (caught) { setFormError(getApiErrorMessage(caught)); setDeleting(null); } finally { setSaving(false); } };
   const set = <K extends keyof ComponentForm>(key: K, value: ComponentForm[K]) => setForm((current) => ({ ...current, [key]: value }));
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Payroll" title="Pay components" description="Configure earnings, deductions and employer contributions used by payroll." icon={Banknote} accent="payroll" actions={<Button leadingIcon={<Plus className="h-4 w-4" />} onClick={openCreate}>Add component</Button>} />
+      <PageHeader eyebrow="Payroll" title="Pay components" description="Configure earnings, deductions and employer contributions used by payroll." icon={Banknote} accent="payroll" actions={can("compensation.configure") ? <Button leadingIcon={<Plus className="h-4 w-4" />} onClick={openCreate}>Add component</Button> : null} />
       <section className="grid gap-4 sm:grid-cols-3" aria-label="Component summary">
         <MetricCard size="sm" label="Total components" value={formatNumber(data?.count ?? 0)} accent="payroll" loading={loading && !data} />
         <MetricCard size="sm" label="Active" value={formatNumber(components.filter((item) => item.is_active).length)} accent="accounting" loading={loading && !data} />
@@ -75,7 +77,7 @@ export default function PayComponentsPage() {
             onClear={search || typeFilter !== ALL || statusFilter !== ALL ? () => { setSearch(""); setTypeFilter(ALL); setStatusFilter(ALL); } : undefined}
           />
         }
-        empty={{ title: "No pay components found", description: "Add earnings, deductions and employer contributions to build salary structures.", icon: Banknote, action: <Button variant="secondary" leadingIcon={<Plus className="h-4 w-4" />} onClick={openCreate}>Add component</Button> }}
+        empty={{ title: "No pay components found", description: "Add earnings, deductions and employer contributions to build salary structures.", icon: Banknote, action: can("compensation.configure") ? <Button variant="secondary" leadingIcon={<Plus className="h-4 w-4" />} onClick={openCreate}>Add component</Button> : undefined }}
         columns={[
           { key: "code", header: "Code", sortValue: (item) => item.code, cell: (item) => <span className="font-mono font-semibold text-ink-strong">{item.code}</span> },
           { key: "name", header: "Component", sortValue: (item) => item.name, cell: (item) => <span>{item.name}{!item.recurring && <Badge size="sm" className="ml-2">One-off</Badge>}</span> },
@@ -84,7 +86,7 @@ export default function PayComponentsPage() {
           { key: "taxable", header: "Taxable", hideBelow: "lg", cell: (item) => (item.taxable ? "Yes" : "No") },
           { key: "pensionable", header: "Pensionable", hideBelow: "lg", cell: (item) => (item.pensionable ? "Yes" : "No") },
           { key: "status", header: "Status", cell: (item) => <StatusBadge status={item.is_active ? "ACTIVE" : "INACTIVE"} size="sm" /> },
-          { key: "actions", header: <span className="sr-only">Actions</span>, cell: (item) => <div className="flex justify-end gap-1"><IconButton size="sm" label={`Edit ${item.name}`} onClick={() => openEdit(item)}><Edit3 className="h-4 w-4" /></IconButton><IconButton size="sm" label={`Delete ${item.name}`} className="text-danger-ink hover:bg-danger-soft" onClick={() => setDeleting(item)}><Trash2 className="h-4 w-4" /></IconButton></div> },
+          { key: "actions", header: <span className="sr-only">Actions</span>, cell: (item) => <div className="flex justify-end gap-1">{can("compensation.configure") && <IconButton size="sm" label={`Edit ${item.name}`} onClick={() => openEdit(item)}><Edit3 className="h-4 w-4" /></IconButton>}{can("compensation.configure") && <IconButton size="sm" label={`Delete ${item.name}`} className="text-danger-ink hover:bg-danger-soft" onClick={() => setDeleting(item)}><Trash2 className="h-4 w-4" /></IconButton>}</div> },
         ]}
       />
 
@@ -100,7 +102,7 @@ export default function PayComponentsPage() {
         <div className="space-y-5">
           {formError && <Alert tone="danger">{formError}</Alert>}
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Code" required><Input value={form.code} onChange={(event) => set("code", event.target.value.toUpperCase())} className="font-mono" data-autofocus /></Field>
+            <Field label="Code" optional helper="Leave blank to generate one, or use a meaningful code such as BASIC."><Input value={form.code} onChange={(event) => set("code", event.target.value.toUpperCase())} placeholder="Auto-generated" className="font-mono" data-autofocus /></Field>
             <Field label="Name" required><Input value={form.name} onChange={(event) => set("name", event.target.value)} /></Field>
             <Field label="Type"><Select value={form.component_type} onChange={(event) => set("component_type", event.target.value as PayComponentType)}><option value="EARNING">Earning</option><option value="DEDUCTION">Deduction</option><option value="EMPLOYER_CONTRIBUTION">Employer contribution</option></Select></Field>
             <Field label="Calculation"><Select value={form.calculation_type} onChange={(event) => set("calculation_type", event.target.value as PayComponentCalculationType)}><option value="FIXED">Fixed</option><option value="PERCENTAGE">Percentage</option></Select></Field>

@@ -44,6 +44,7 @@ export function resolveApiBaseUrl(): string {
 export const API_BASE_URL = resolveApiBaseUrl();
 
 const REQUEST_TIMEOUT_MS = 30000;
+const UPLOAD_TIMEOUT_MS = 5 * 60 * 1000;
 
 /* -------------------------------------------------------------------------- */
 /* Token and tenant storage                                                   */
@@ -456,6 +457,11 @@ export async function apiPostMultipart<T>(
 ): Promise<T> {
   try {
     const response = await apiClient.post<ApiResponse<T>>(url, body, {
+      // The instance default is JSON, which makes axios serialize FormData to a
+      // JSON object and drop the file. This header keeps it multipart; the
+      // browser then adds the boundary itself.
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: UPLOAD_TIMEOUT_MS,
       onUploadProgress: (event) => {
         if (event.total) onUploadProgress?.(Math.round((event.loaded / event.total) * 100));
       },

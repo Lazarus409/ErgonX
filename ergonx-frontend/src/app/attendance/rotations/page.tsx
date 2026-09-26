@@ -190,8 +190,8 @@ export default function RotationsPage() {
   }, [patterns, search, statusFilter]);
 
   const savePattern = useCallback(async () => {
-    if (!patternForm.name.trim() || !patternForm.code.trim()) {
-      setFormError("Rotation name and code are required.");
+    if (!patternForm.name.trim()) {
+      setFormError("Rotation name is required.");
       return;
     }
 
@@ -537,7 +537,7 @@ export default function RotationsPage() {
                   onChange={(event) =>
                     setPatternForm({ ...patternForm, code: event.target.value })
                   }
-                  placeholder="e.g. SEC-3R"
+                  placeholder="Auto-generated if left blank"
                   className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
                 />
               </label>

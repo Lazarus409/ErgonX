@@ -39,6 +39,7 @@ import { useApiResource } from "@/lib/useApiResource";
 import { formatAmount, formatNumber, humanizeEnum } from "@/lib/format";
 import { cx } from "@/lib/cx";
 import { moduleAccents, type ModuleAccent } from "@/lib/moduleTheme";
+import type { TeamSnapshot } from "@/types/dashboards";
 import type { HomeQuickAction } from "@/types/home";
 
 interface WorkspaceHomeProps {
@@ -128,6 +129,8 @@ export default function WorkspaceHome({ areaLabel, continueHref, continueTitle, 
       </HomeHero>
 
       {error && <ErrorState variant="inline" title="Unable to load your workspace" message={error} onRetry={reload} />}
+
+      {data?.team_snapshot && <TeamToday snapshot={data.team_snapshot} />}
 
       {/* Quick actions */}
       <section aria-labelledby="quick-actions-heading" className="space-y-4">
@@ -249,6 +252,49 @@ export default function WorkspaceHome({ areaLabel, continueHref, continueTitle, 
         )}
       </div>
     </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Team today (department heads)                                               */
+/* -------------------------------------------------------------------------- */
+
+function TeamToday({ snapshot }: { snapshot: TeamSnapshot }) {
+  const { today } = snapshot;
+  const tiles = [
+    { label: "In today", value: today.present + today.remote, tone: "text-success-ink" },
+    { label: "Late", value: today.late, tone: today.late ? "text-warning-ink" : "text-ink-strong" },
+    { label: "Absent", value: today.absent, tone: today.absent ? "text-danger-ink" : "text-ink-strong" },
+    { label: "On leave", value: today.on_leave, tone: "text-ink-strong" },
+    { label: "Not recorded", value: today.not_recorded, tone: "text-ink-muted" },
+  ];
+  return (
+    <section aria-labelledby="team-today-heading" className="space-y-4">
+      <SectionHeading
+        title={<span id="team-today-heading">Team today</span>}
+        description={`${snapshot.departments.join(", ")} · ${formatNumber(snapshot.headcount)} people`}
+        actions={<Link href="/department" className="inline-flex items-center gap-1.5 text-support font-semibold text-primary-ink hover:underline">Open my department<ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>}
+      />
+      <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
+        <Card>
+          <dl className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+            {tiles.map((tile) => (
+              <div key={tile.label}>
+                <dt className="text-caption text-ink-muted">{tile.label}</dt>
+                <dd className={cx("mt-1 text-2xl font-semibold tabular-nums", tile.tone)}>{formatNumber(tile.value)}</dd>
+              </div>
+            ))}
+          </dl>
+        </Card>
+        <Link href="/department/approvals" className="flex items-center gap-3 rounded-2xl border border-line bg-surface p-5 shadow-elevation-1 transition-colors hover:bg-surface-hover">
+          <IconTile icon={ClipboardCheck} accent="leave" />
+          <span>
+            <span className="block text-2xl font-semibold tabular-nums text-ink-strong">{formatNumber(snapshot.pending_approvals)}</span>
+            <span className="block text-support text-ink-muted">Leave request{snapshot.pending_approvals === 1 ? "" : "s"} awaiting you</span>
+          </span>
+        </Link>
+      </div>
+    </section>
   );
 }
 

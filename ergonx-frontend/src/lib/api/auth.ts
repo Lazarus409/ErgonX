@@ -35,7 +35,7 @@ export interface LoginResult {
 }
 
 export type MFAMethod = "AUTHENTICATOR_APP" | "EMAIL_OTP";
-export interface MFAStatus { enabled: boolean; pending: boolean; method?: MFAMethod | null; secret?: string; otpauth_uri?: string; }
+export interface MFAStatus { enabled: boolean; pending: boolean; method?: MFAMethod | null; secret?: string; otpauth_uri?: string; email_code_sent?: boolean; email?: string; expires_at?: string; }
 
 export interface AuthBootstrap {
   user: AuthUser;
@@ -52,6 +52,10 @@ export interface AuthBootstrap {
     role_code: string;
     role_name: string;
     status: string;
+    /** INSTITUTION, DEPARTMENT or SELF; absent from older backends. */
+    data_scope?: "INSTITUTION" | "DEPARTMENT" | "SELF";
+    /** Read-only roles (e.g. Auditor) may view but never change institution data. */
+    read_only?: boolean;
   };
   effective_permissions: string[];
   enabled_modules: string[];
@@ -83,7 +87,8 @@ export function getMFAStatus(): Promise<MFAStatus> { return apiGet<MFAStatus>("/
 export function beginMFASetup(): Promise<MFAStatus> { return apiPost<MFAStatus, Record<string, never>>("/auth/security/mfa/", {}); }
 export function confirmMFASetup(code: string): Promise<MFAStatus> { return apiPut<MFAStatus, { code: string }>("/auth/security/mfa/", { code }); }
 export async function disableMFA(): Promise<MFAStatus> { await apiDelete("/auth/security/mfa/"); return { enabled: false, pending: false }; }
-export function setMFAMethod(method: MFAMethod): Promise<MFAStatus> { return apiPatch<MFAStatus, { method: MFAMethod }>("/auth/security/mfa/", { method }); }
+/** Without `code`, emails a verification code; with `code`, confirms it and switches to email OTP. */
+export function setMFAMethod(method: MFAMethod, code?: string): Promise<MFAStatus> { return apiPatch<MFAStatus, { method: MFAMethod; code?: string }>("/auth/security/mfa/", code ? { method, code } : { method }); }
 
 export interface AccountProfilePayload {
   email?: string;
@@ -180,6 +185,57 @@ export function listInstitutionAdminInvitations(): Promise<PlatformInstitutionAd
 
 export function createInstitutionAdminInvitation(payload: CreatePlatformInstitutionAdminInvitation): Promise<CreatedPlatformInstitutionAdminInvitation> {
   return apiPost<CreatedPlatformInstitutionAdminInvitation, CreatePlatformInstitutionAdminInvitation>("/auth/institution-admin-invitations/", payload);
+}
+
+export type OrganizationSize = "1-50" | "51-200" | "201-1000" | "1000+";
+
+/** Public Get Started request asking the Super Admin for an organization invitation. */
+export interface InstitutionAccessRequestPayload {
+  institution_name: string;
+  contact_name: string;
+  job_title?: string;
+  email: string;
+  phone?: string;
+  country_code: string;
+  organization_size?: OrganizationSize | "";
+  message?: string;
+  /** Honeypot: must stay empty. */
+  website?: string;
+}
+
+export interface InstitutionAccessRequest {
+  id: string;
+  institution_name: string;
+  contact_name: string;
+  job_title: string;
+  email: string;
+  phone: string;
+  country_code: string;
+  organization_size: OrganizationSize | "";
+  message: string;
+  status: "PENDING" | "INVITED" | "DECLINED";
+  reviewed_by_email: string | null;
+  reviewed_at: string | null;
+  decline_reason: string;
+  invitation: string | null;
+  has_account: boolean;
+  created_at: string;
+}
+
+export function submitInstitutionAccessRequest(payload: InstitutionAccessRequestPayload): Promise<{ received: boolean }> {
+  return apiPost<{ received: boolean }, InstitutionAccessRequestPayload>("/auth/institution-access-requests/", payload);
+}
+
+export function listInstitutionAccessRequests(): Promise<InstitutionAccessRequest[]> {
+  return apiGet<InstitutionAccessRequest[]>("/auth/institution-access-requests/");
+}
+
+export function approveInstitutionAccessRequest(id: string, expiresInHours: number): Promise<{ request: InstitutionAccessRequest; invitation: CreatedPlatformInstitutionAdminInvitation }> {
+  return apiPost(`/auth/institution-access-requests/${id}/approve/`, { expires_in_hours: expiresInHours });
+}
+
+export function declineInstitutionAccessRequest(id: string, reason: string): Promise<{ request: InstitutionAccessRequest }> {
+  return apiPost(`/auth/institution-access-requests/${id}/decline/`, { reason });
 }
 
 /** Clears tokens and the selected institution. Purely client-side. */

@@ -7,7 +7,8 @@ import { useState } from "react";
 
 import Logo from "@/components/brand/Logo";
 import SidebarLogo from "@/components/brand/SidebarLogo";
-import { navigation, selfServiceNavigation, type NavigationItem } from "@/components/navigation/navigation";
+import { canAccess, navigation, selfServiceNavigation, type NavigationItem } from "@/components/navigation/navigation";
+import { SELF_SERVICE_PERMISSIONS } from "@/lib/access";
 import { useAuth } from "@/components/guards/AuthProvider";
 import { hasModule } from "@/types/institutions";
 import { cx } from "@/lib/cx";
@@ -34,13 +35,11 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
   const [toggled, setToggled] = useState<Record<string, boolean>>({});
 
   const hasPermission = (permission: string) => permissions.includes("*") || permissions.includes(permission);
-  const hasAccess = (item: { module?: string; permission?: string; anyPermissions?: string[]; selfService?: boolean }) => {
-    const selfServiceEligible = ["leave.request", "attendance.clock", "payslip.view", "tax_relief.claim"].some(hasPermission);
+  const context = { can: hasPermission, moduleEnabled: (module: string) => hasModule(institution?.enabledModules, module), scope: user?.dataScope ?? "INSTITUTION" } as const;
+  const hasAccess = (item: NavigationItem) => {
+    const selfServiceEligible = SELF_SERVICE_PERMISSIONS.some(hasPermission);
     if (item.selfService && !selfServiceEligible) return false;
-    if (item.module && !hasModule(institution?.enabledModules, item.module)) return false;
-    if (item.permission && !hasPermission(item.permission)) return false;
-    if (item.anyPermissions?.length && !item.anyPermissions.some(hasPermission)) return false;
-    return true;
+    return canAccess(item, context);
   };
 
   const visibleNavigation = navigation.filter(hasAccess);

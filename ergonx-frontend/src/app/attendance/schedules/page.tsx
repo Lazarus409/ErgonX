@@ -286,8 +286,8 @@ export default function SchedulesPage() {
   };
 
   const saveSchedule = useCallback(async () => {
-    if (!form.name.trim() || !form.code.trim() || !form.effectiveFrom) {
-      setFormError("Name, code and effective-from are required.");
+    if (!form.name.trim() || !form.effectiveFrom) {
+      setFormError("Name and effective-from are required.");
       return;
     }
 
@@ -615,7 +615,7 @@ export default function SchedulesPage() {
                     onChange={(event) =>
                       setForm({ ...form, code: event.target.value })
                     }
-                    placeholder="e.g. STD-08"
+                    placeholder="Auto-generated if left blank"
                     className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
                   />
                 </label>

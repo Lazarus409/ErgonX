@@ -147,12 +147,8 @@ export default function RequestLeavePage() {
   const selectAttachment = async (file: File | undefined) => {
     if (!file) return;
     setError("");
-    if (!["application/pdf", "image/jpeg", "image/png"].includes(file.type)) {
-      setError("Supporting documents must be PDF, JPEG, or PNG files.");
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      setError("Supporting documents must be 10 MB or smaller.");
+    if (file.size > operationsApi.MAX_DOCUMENT_BYTES) {
+      setError("Supporting documents must be 25 MB or smaller.");
       return;
     }
     setUploading(true);
@@ -277,8 +273,8 @@ export default function RequestLeavePage() {
               <label htmlFor="leave-supporting-document" className="mb-1.5 block text-sm font-medium text-ink">
                 Supporting Document{selectedLeaveType?.requires_attachment ? " *" : " (optional)"}
               </label>
-              <p className="mb-2 text-xs text-ink-muted">PDF, JPEG, or PNG up to 10 MB. The document is stored in your institution&apos;s protected document area.</p>
-              {attachment ? <div className="flex items-center justify-between gap-3 rounded-lg border border-success/25 bg-success-soft px-3 py-2.5 text-sm"><span className="min-w-0 truncate text-success-ink">{attachment.original_filename}</span><button type="button" onClick={() => setAttachment(null)} className="shrink-0 font-medium text-success-ink underline">Remove</button></div> : <input id="leave-supporting-document" type="file" accept="application/pdf,image/jpeg,image/png" onChange={(event) => void selectAttachment(event.target.files?.[0])} disabled={uploading} className="block w-full rounded-lg border border-line px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-surface-sunken file:px-3 file:py-1.5 file:text-sm" />}
+              <p className="mb-2 text-xs text-ink-muted">Any file type, up to 25 MB. The document is stored in your institution&apos;s protected document area.</p>
+              {attachment ? <div className="flex items-center justify-between gap-3 rounded-lg border border-success/25 bg-success-soft px-3 py-2.5 text-sm"><span className="min-w-0 truncate text-success-ink">{attachment.original_filename}</span><button type="button" onClick={() => setAttachment(null)} className="shrink-0 font-medium text-success-ink underline">Remove</button></div> : <input id="leave-supporting-document" type="file" onChange={(event) => void selectAttachment(event.target.files?.[0])} disabled={uploading} className="block w-full rounded-lg border border-line px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-surface-sunken file:px-3 file:py-1.5 file:text-sm" />}
               {uploading && <div className="mt-2" aria-live="polite"><div className="h-2 overflow-hidden rounded-full bg-surface-sunken"><div className="h-full bg-primary transition-all" style={{ width: `${uploadProgress}%` }} /></div><p className="mt-1 text-xs text-ink-muted">Uploading… {uploadProgress}%</p></div>}
             </div>
 

@@ -14,11 +14,13 @@ import { EM_DASH, formatDateTime, humanizeEnum } from "@/lib/format";
 import { useApiResource } from "@/lib/useApiResource";
 import { MAX_PAGE_SIZE } from "@/types/api";
 import type { PayrollPeriod } from "@/types/payroll";
+import { useAccess } from "@/lib/access";
 
 const ALL = "ALL";
 const RUN_STATUSES = ["DRAFT", "CALCULATING", "CALCULATED", "UNDER_REVIEW", "APPROVED", "FINALIZED", "CANCELLED"];
 
 export default function PayrollRunsPage() {
+  const { can } = useAccess();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState(ALL);
   const [periods, setPeriods] = useState<PayrollPeriod[]>([]);
@@ -55,7 +57,7 @@ export default function PayrollRunsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Payroll" title="Payroll runs" description="Review payroll calculations, approvals and finalised runs." icon={ListChecks} accent="payroll" actions={<ButtonLink href="/payroll/periods" leadingIcon={<PlayCircle className="h-4 w-4" />}>Start from period</ButtonLink>} />
+      <PageHeader eyebrow="Payroll" title="Payroll runs" description="Review payroll calculations, approvals and finalised runs." icon={ListChecks} accent="payroll" actions={can("payroll.prepare") ? <ButtonLink href="/payroll/periods" leadingIcon={<PlayCircle className="h-4 w-4" />}>Start from period</ButtonLink> : null} />
       <DataTable
         caption="Payroll runs"
         rows={runs}

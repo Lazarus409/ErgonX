@@ -6,13 +6,18 @@ import { useCallback } from "react";
 
 import { DataTable } from "@/components/ui/DataTable";
 import PageHeader from "@/components/ui/PageHeader";
-import { payrollApi } from "@/lib/api";
+import { employeesApi, payrollApi } from "@/lib/api";
 import { formatAmount, formatDate } from "@/lib/format";
 import { useApiResource } from "@/lib/useApiResource";
 import { MAX_PAGE_SIZE } from "@/types/api";
 
 export default function MyPayslipsPage() {
-  const load = useCallback(() => payrollApi.listPayslips({ page_size: MAX_PAGE_SIZE, ordering: "-generated_at" }), []);
+  // Always filter to the member's own employee record: finance and HR roles can list everyone's payslips.
+  const load = useCallback(async () => {
+    const employee = await employeesApi.getCurrentEmployee();
+    if (!employee) return { count: 0, next: null, previous: null, results: [] };
+    return payrollApi.listPayslips({ payroll_record__employee: employee.id, page_size: MAX_PAGE_SIZE, ordering: "-generated_at" });
+  }, []);
   const { data, loading, error, reload } = useApiResource(load);
   const payslips = data?.results ?? [];
   return (

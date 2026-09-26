@@ -7,10 +7,10 @@ import ModuleLanding from "@/components/home/ModuleLanding";
 const areas = [
   { title: "HR Dashboard", description: "Review source-backed workforce composition, active employment, and recent hires.", href: "/hr/dashboard", icon: LayoutDashboard, permission: "dashboard.hr.view" },
   { title: "Employees", description: "Browse employee records and start an authorized employee creation workflow.", href: "/hr/employees", icon: Users, permission: "employee.view" },
-  { title: "Departments", description: "Review the institution's department catalogue.", href: "/hr/departments", icon: Building2, permission: "organization.view" },
-  { title: "Positions", description: "Review positions and their assigned department references.", href: "/hr/positions", icon: UserRoundCog, permission: "organization.view" },
-  { title: "Grades", description: "Review grade definitions maintained for this institution.", href: "/hr/grades", icon: GraduationCap, permission: "organization.view" },
-  { title: "Locations", description: "Review work locations, remote status, and locale details.", href: "/hr/locations", icon: MapPin, permission: "organization.view" },
+  { title: "Departments", description: "Add and organize departments and functional areas.", href: "/hr/departments", icon: Building2, permission: "organization.view" },
+  { title: "Positions", description: "Add job positions and the department each belongs to.", href: "/hr/positions", icon: UserRoundCog, permission: "organization.view" },
+  { title: "Grades", description: "Set up the grade levels used for employees and pay.", href: "/hr/grades", icon: GraduationCap, permission: "organization.view" },
+  { title: "Locations", description: "Add offices, sites and remote arrangements.", href: "/hr/locations", icon: MapPin, permission: "organization.view" },
 ];
 
 export default function HRHomePage() {

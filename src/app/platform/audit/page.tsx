@@ -10,7 +10,7 @@ import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { DataTable, DataToolbar, Pagination } from "@/components/ui/DataTable";
 import { Select } from "@/components/ui/Field";
 import LoadingState from "@/components/ui/LoadingState";
-import PageHeader from "@/components/ui/PageHeader";
+import { SectionTitle, platformTable } from "@/components/platform/ui";
 import { platformApi } from "@/lib/api";
 import { auditActionLabel, type PlatformAuditEvent } from "@/lib/api/platform";
 import { useApiResource } from "@/lib/useApiResource";
@@ -57,8 +57,8 @@ function AuditLog() {
 
   return (
     <>
-      <PageHeader title="Audit log" description="Every action a Super Admin has taken on the platform, and each organization sign-up. Entries cannot be edited or deleted." />
       <DataTable<PlatformAuditEvent>
+        className={platformTable}
         caption="Platform audit log"
         rows={data?.results}
         loading={loading && !data}
@@ -67,6 +67,8 @@ function AuditLog() {
         rowKey={(event) => event.id}
         minWidth={880}
         toolbar={
+          <div className="space-y-4">
+          <SectionTitle eyebrow="Accountability" title="Audit log" description="Every action a Super Admin has taken on the platform, and each organization sign-up. Entries cannot be edited or deleted." meta={data ? `${data.count} event${data.count === 1 ? "" : "s"}` : undefined} />
           <DataToolbar
             search={search}
             onSearchChange={setSearch}
@@ -84,6 +86,7 @@ function AuditLog() {
               </>
             }
           />
+          </div>
         }
         empty={{ title: "No platform activity yet", description: "Suspensions, invitations and request decisions appear here as they happen.", icon: History }}
         footer={data && data.count > DEFAULT_PAGE_SIZE ? <Pagination page={page} pageSize={DEFAULT_PAGE_SIZE} total={data.count} onPageChange={setPage} /> : undefined}

@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
-import { Building2, BriefcaseBusiness, ChevronRight, GraduationCap, MapPin, UserRoundCheck } from "lucide-react";
+import { Building2, BriefcaseBusiness, ChevronRight, GraduationCap, MapPin, Pencil, Plus, Power, UserRoundCheck } from "lucide-react";
 
+import OrganizationForm, { saveOrganizationRecord } from "@/components/organization/OrganizationForm";
 import BackNavigation from "@/components/ui/BackNavigation";
 import { Card, IconTile } from "@/components/ui/Card";
 import { DataTable, DataToolbar } from "@/components/ui/DataTable";
@@ -24,20 +25,25 @@ export type OrganizationResourceKind = "departments" | "positions" | "grades" | 
 type Resource = Department | Position | Grade | Location;
 
 const metadata: Record<OrganizationResourceKind, { singular: string; title: string; description: string; icon: typeof Building2 }> = {
-  departments: { singular: "Department", title: "Departments", description: "Tenant-scoped organization departments.", icon: Building2 },
-  positions: { singular: "Position", title: "Positions", description: "Tenant-scoped job positions and their departments.", icon: BriefcaseBusiness },
-  grades: { singular: "Grade", title: "Grades", description: "Tenant-scoped employee grade definitions.", icon: GraduationCap },
-  locations: { singular: "Location", title: "Locations", description: "Tenant-scoped work locations and locale details.", icon: MapPin },
+  departments: { singular: "Department", title: "Departments", description: "The departments and functional areas your people, positions and approvals are organized by.", icon: Building2 },
+  positions: { singular: "Position", title: "Positions", description: "Job positions and the department each one sits in.", icon: BriefcaseBusiness },
+  grades: { singular: "Grade", title: "Grades", description: "Grade levels used for employees and pay structures.", icon: GraduationCap },
+  locations: { singular: "Location", title: "Locations", description: "Offices, sites and remote arrangements people work from.", icon: MapPin },
 };
 
 function list(kind: OrganizationResourceKind): Promise<PaginatedData<Resource>> { switch (kind) { case "departments": return organizationApi.listDepartments({ page_size: 100 }) as Promise<PaginatedData<Resource>>; case "positions": return organizationApi.listPositions({ page_size: 100 }) as Promise<PaginatedData<Resource>>; case "grades": return organizationApi.listGrades({ page_size: 100 }) as Promise<PaginatedData<Resource>>; case "locations": return organizationApi.listLocations({ page_size: 100 }) as Promise<PaginatedData<Resource>>; } }
 function get(kind: OrganizationResourceKind, id: string): Promise<Resource> { switch (kind) { case "departments": return organizationApi.getDepartment(id) as Promise<Resource>; case "positions": return organizationApi.getPosition(id) as Promise<Resource>; case "grades": return organizationApi.getGrade(id) as Promise<Resource>; case "locations": return organizationApi.getLocation(id) as Promise<Resource>; } }
 function nameOf(item: Resource) { return "title" in item ? item.title : item.name; }
-function details(kind: OrganizationResourceKind, item: Resource): Array<[string, string]> { if (kind === "departments") { const value = item as Department; return [["Code", value.code], ["Department head", value.head_name ?? "Not assigned"], ["Description", value.description || "Not provided"], ["Parent reference", value.parent ?? "None"]]; } if (kind === "positions") { const value = item as Position; return [["Code", value.code], ["Department reference", value.department ?? "Not assigned"], ["Description", value.description || "Not provided"]]; } if (kind === "grades") { const value = item as Grade; return [["Code", value.code], ["Level", String(value.level ?? "Not set")], ["Description", value.description || "Not provided"]]; } const value = item as Location; return [["Code", value.code], ["Address", value.address || "Not provided"], ["City", value.city || "Not provided"], ["Country", value.country || "Not provided"], ["Time zone", value.timezone || "Not provided"], ["Work arrangement", value.is_remote ? "Remote" : "On site"]]; }
+function countryLabel(code: string) { if (!code) return "Not provided"; try { return new Intl.DisplayNames(["en"], { type: "region" }).of(code) ?? code; } catch { return code; } }
+function details(kind: OrganizationResourceKind, item: Resource): Array<[string, string]> { if (kind === "departments") { const value = item as Department; return [["Code", value.code], ["Department head", value.head_name ?? "Not assigned"], ["Part of", value.parent_name ?? "None (top level)"], ["Description", value.description || "Not provided"]]; } if (kind === "positions") { const value = item as Position; return [["Code", value.code], ["Department", value.department_name ?? "Not assigned"], ["Description", value.description || "Not provided"]]; } if (kind === "grades") { const value = item as Grade; return [["Code", value.code], ["Level", String(value.level ?? "Not set")], ["Description", value.description || "Not provided"]]; } const value = item as Location; return [["Code", value.code], ["Address", value.address || "Not provided"], ["City", value.city || "Not provided"], ["Country", countryLabel(value.country)], ["Time zone", value.timezone || "Same as the institution"], ["Work arrangement", value.is_remote ? "Remote or hybrid" : "On site"]]; }
 
 export function OrganizationResourceList({ kind }: { kind: OrganizationResourceKind }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("ALL");
+  const [creating, setCreating] = useState(false);
+  const { can, readOnly } = useAccess();
+  const { showToast } = useToast();
+  const canCreate = can("organization.create") && !readOnly;
   const meta = metadata[kind];
   const Icon = meta.icon;
   const load = useCallback(() => list(kind), [kind]);
@@ -46,7 +52,16 @@ export function OrganizationResourceList({ kind }: { kind: OrganizationResourceK
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Organization" title={meta.title} description={meta.description} icon={Icon} accent="hr" />
+      <PageHeader eyebrow="Organization" title={meta.title} description={meta.description} icon={Icon} accent="hr" actions={canCreate ? <Button leadingIcon={<Plus className="h-4 w-4" />} onClick={() => setCreating(true)}>New {meta.singular.toLowerCase()}</Button> : undefined} />
+      {creating && (
+        <OrganizationForm
+          kind={kind}
+          record={null}
+          open
+          onClose={() => setCreating(false)}
+          onSaved={(saved) => { setCreating(false); showToast({ tone: "success", message: `${nameOf(saved)} added.` }); reload(); }}
+        />
+      )}
       <DataTable<Resource>
         caption={meta.title}
         rows={items}
@@ -64,7 +79,7 @@ export function OrganizationResourceList({ kind }: { kind: OrganizationResourceK
             onClear={query || status !== "ALL" ? () => { setQuery(""); setStatus("ALL"); } : undefined}
           />
         }
-        empty={{ title: `No ${meta.title.toLowerCase()} found`, description: "Try a broader filter, or add organization records through the authorized API workflow.", icon: Icon }}
+        empty={{ title: `No ${meta.title.toLowerCase()} found`, description: query || status !== "ALL" ? "Try a broader search or status." : canCreate ? `Add the first ${meta.singular.toLowerCase()} to get started.` : `No ${meta.title.toLowerCase()} have been set up yet.`, icon: Icon, action: canCreate && !query && status === "ALL" ? <Button leadingIcon={<Plus className="h-4 w-4" />} onClick={() => setCreating(true)}>New {meta.singular.toLowerCase()}</Button> : undefined }}
         columns={[
           {
             key: "name",
@@ -75,7 +90,9 @@ export function OrganizationResourceList({ kind }: { kind: OrganizationResourceK
                 <IconTile icon={Icon} accent="hr" size="sm" />
                 <span className="min-w-0">
                   <span className="block truncate font-semibold text-ink-strong group-hover:text-primary-ink">{nameOf(record)}</span>
-                  {kind === "positions" && (record as Position).department && <span className="block truncate text-caption text-ink-muted">Department reference {(record as Position).department}</span>}
+                  {kind === "positions" && (record as Position).department_name && <span className="block truncate text-caption text-ink-muted">{(record as Position).department_name}</span>}
+                  {kind === "departments" && (record as Department).parent_name && <span className="block truncate text-caption text-ink-muted">Part of {(record as Department).parent_name}</span>}
+                  {kind === "locations" && (record as Location).city && <span className="block truncate text-caption text-ink-muted">{[(record as Location).city, (record as Location).is_remote ? "Remote or hybrid" : null].filter(Boolean).join(" · ")}</span>}
                 </span>
               </Link>
             ),
@@ -95,9 +112,26 @@ export function OrganizationResourceDetail({ kind, id }: { kind: OrganizationRes
   const Icon = meta.icon;
   const load = useCallback(() => get(kind, id), [kind, id]);
   const { data, loading, error, reload } = useApiResource(load);
+  const { can, readOnly } = useAccess();
+  const { showToast } = useToast();
+  const [editing, setEditing] = useState(false);
+  const [toggling, setToggling] = useState(false);
+  const canEdit = can("organization.update") && !readOnly;
   if (loading && !data) return <LoadingState variant="detail" />;
   if (error || !data) return <ErrorState title={`Unable to load ${meta.singular.toLowerCase()}`} message={error ?? "The requested record was not found."} onRetry={reload} />;
   const item = data as Resource;
+  const toggleActive = async () => {
+    setToggling(true);
+    try {
+      const saved = await saveOrganizationRecord(kind, item.id, { is_active: !item.is_active });
+      showToast({ tone: "success", message: `${nameOf(saved)} ${saved.is_active ? "reactivated" : "deactivated"}.` });
+      reload();
+    } catch (caught) {
+      showToast({ tone: "error", message: getApiErrorMessage(caught) });
+    } finally {
+      setToggling(false);
+    }
+  };
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <PageHeader
@@ -107,9 +141,24 @@ export function OrganizationResourceDetail({ kind, id }: { kind: OrganizationRes
         description={`${meta.singular} code: ${item.code}`}
         icon={Icon}
         accent="hr"
-        actions={<StatusBadge status={item.is_active ? "ACTIVE" : "INACTIVE"} />}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge status={item.is_active ? "ACTIVE" : "INACTIVE"} />
+            {canEdit && <Button variant="secondary" leadingIcon={<Power className="h-4 w-4" />} loading={toggling} onClick={() => void toggleActive()}>{item.is_active ? "Deactivate" : "Reactivate"}</Button>}
+            {canEdit && <Button leadingIcon={<Pencil className="h-4 w-4" />} onClick={() => setEditing(true)}>Edit</Button>}
+          </div>
+        }
       />
-      <Card title={`${meta.singular} details`} description="Server-owned organization data for the active institution." accent="hr" accentLine>
+      {editing && (
+        <OrganizationForm
+          kind={kind}
+          record={item}
+          open
+          onClose={() => setEditing(false)}
+          onSaved={(saved) => { setEditing(false); showToast({ tone: "success", message: `${nameOf(saved)} saved.` }); reload(); }}
+        />
+      )}
+      <Card title={`${meta.singular} details`} accent="hr" accentLine>
         <dl className="grid gap-x-6 gap-y-5 sm:grid-cols-2">
           {details(kind, item).map(([label, value]) => (
             <div key={label} className="min-w-0">

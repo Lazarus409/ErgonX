@@ -19,15 +19,17 @@ import { cx } from "@/lib/cx";
 import { moduleAccents, type ModuleAccent } from "@/lib/moduleTheme";
 import { humanizeEnum } from "@/lib/format";
 
+// `permissions` mirrors REPORT_PERMISSIONS in apps/reports/views.py: beyond report.view,
+// each report needs the permissions that guard its underlying records.
 const reports = [
-  { id: "workforce-cost", title: "Workforce Cost", group: "Workforce", module: "CORE_HR" },
-  { id: "recruitment", title: "Recruitment Activity", group: "Recruitment", module: "RECRUITMENT" },
-  { id: "leave", title: "Leave Activity", group: "Leave", module: "LEAVE" },
-  { id: "attendance", title: "Attendance", group: "Attendance", module: "ATTENDANCE" },
-  { id: "payroll", title: "Payroll", group: "Payroll", module: "PAYROLL" },
-  { id: "accounting", title: "Journal Activity", group: "Accounting", module: "ACCOUNTING" },
-  { id: "ap-ar", title: "AP / AR", group: "Accounting", module: "ACCOUNTING" },
-  { id: "expenses", title: "Expenses", group: "Accounting", module: "ACCOUNTING" },
+  { id: "workforce-cost", title: "Workforce Cost", group: "Workforce", module: "CORE_HR", permissions: ["employee.view", "payroll.view"] },
+  { id: "recruitment", title: "Recruitment Activity", group: "Recruitment", module: "RECRUITMENT", permissions: ["candidate.view"] },
+  { id: "leave", title: "Leave Activity", group: "Leave", module: "LEAVE", permissions: ["leave.view"] },
+  { id: "attendance", title: "Attendance", group: "Attendance", module: "ATTENDANCE", permissions: ["attendance.view"] },
+  { id: "payroll", title: "Payroll", group: "Payroll", module: "PAYROLL", permissions: ["payroll.view"] },
+  { id: "accounting", title: "Journal Activity", group: "Accounting", module: "ACCOUNTING", permissions: ["journal.view"] },
+  { id: "ap-ar", title: "AP / AR", group: "Accounting", module: "ACCOUNTING", permissions: ["invoice.view", "vendor_bill.view"] },
+  { id: "expenses", title: "Expenses", group: "Accounting", module: "ACCOUNTING", permissions: ["expense.view"] },
 ] as const;
 type ReportId = typeof reports[number]["id"];
 
@@ -46,7 +48,11 @@ type ReportRow = Record<string, string | number | null>;
 
 export default function ReportsDashboardPage() {
   const { institution, user } = useAuth();
-  const visibleReports = useMemo(() => reports.filter((item) => hasModule(institution?.enabledModules, item.module) && (user?.permissions.includes("*") || user?.permissions.includes("report.view"))), [institution?.enabledModules, user?.permissions]);
+  const visibleReports = useMemo(() => {
+    const granted = new Set(user?.permissions ?? []);
+    const has = (code: string) => granted.has("*") || granted.has(code);
+    return reports.filter((item) => hasModule(institution?.enabledModules, item.module) && has("report.view") && item.permissions.every(has));
+  }, [institution?.enabledModules, user?.permissions]);
   const [selected, setSelected] = useState<ReportId>("workforce-cost");
   const [status, setStatus] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -82,7 +88,7 @@ export default function ReportsDashboardPage() {
       <PageHeader
         eyebrow="Reports & Analytics"
         title="Reports & analytics"
-        description="Institution-scoped operational summaries. CSV is the currently supported export format."
+        description="Summaries of the areas your role can see. Download any report as CSV."
         icon={BarChart3}
         accent="reports"
         actions={<Button disabled={!visibleReports.length} loading={downloading} loadingLabel="Preparing CSV…" onClick={() => void download()} leadingIcon={<Download className="h-4 w-4" />}>Download CSV</Button>}
@@ -144,7 +150,7 @@ export default function ReportsDashboardPage() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h2 className="text-card-title font-semibold text-ink-strong">{report?.title}</h2>
-                    <p className="text-support text-ink-muted">Live server-owned summary. CSV includes the selected filters.</p>
+                    <p className="text-support text-ink-muted">Live summary. The CSV download uses the filters you set here.</p>
                   </div>
                   <span className="rounded-full bg-surface-muted px-2.5 py-1 text-caption font-semibold text-ink-muted tabular-nums">{data?.rows.length ?? 0} rows</span>
                 </div>

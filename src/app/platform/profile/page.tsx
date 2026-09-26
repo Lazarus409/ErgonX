@@ -5,7 +5,7 @@ import { KeyRound, Save, UserRound } from "lucide-react";
 import { useCallback, useState } from "react";
 
 import { useAuth } from "@/components/guards/AuthProvider";
-import HomeHero from "@/components/home/HomeHero";
+import { PlatformHero } from "@/components/platform/ui";
 import Alert from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -64,7 +64,7 @@ export default function PlatformProfilePage() {
           <ErrorState message={error ?? "Could not load your account."} onRetry={reload} />
         ) : (
           <>
-            <HomeHero eyebrow="Account settings" title="Your Super Admin profile" subtitle="Manage your platform identity and account security." />
+            <PlatformHero title="Your Super Admin profile" subtitle="Manage your platform identity and account security." />
             <div className="grid gap-6 lg:grid-cols-2">
               <Card as="form" onSubmit={saveProfile} title="Profile details" description="Your email is your sign-in identifier." icon={UserRound} accent="brand">
                 <div className="space-y-4">

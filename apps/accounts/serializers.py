@@ -193,10 +193,12 @@ class InstitutionAdminInvitationCreateSerializer(serializers.Serializer):
 
 class InstitutionAdminInvitationSerializer(serializers.ModelSerializer):
     invited_by_email = serializers.EmailField(source="invited_by.email", read_only=True)
+    institution_id = serializers.UUIDField(read_only=True, allow_null=True)
+    institution_name = serializers.CharField(source="institution.name", read_only=True, allow_null=True)
 
     class Meta:
         model = InstitutionAdminInvitation
-        fields = ("id", "email", "status", "expires_at", "accepted_at", "invited_by_email", "created_at")
+        fields = ("id", "email", "status", "expires_at", "accepted_at", "invited_by_email", "institution_id", "institution_name", "created_at")
         read_only_fields = fields
 
 

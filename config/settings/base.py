@@ -213,3 +213,5 @@ EMAIL_TIMEOUT = int(os.environ.get("EMAIL_TIMEOUT", "15"))
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "ErgonX <no-reply@ergonx.local>")
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
 FRONTEND_PUBLIC_URL = os.environ.get("FRONTEND_PUBLIC_URL", "http://localhost:3000").rstrip("/")
+# Anonymous Get Started access requests allowed per client address.
+INSTITUTION_ACCESS_REQUEST_RATE = os.environ.get("INSTITUTION_ACCESS_REQUEST_RATE", "5/hour")

@@ -12,7 +12,7 @@ import hashlib
 import hmac
 import struct
 import time
-from apps.accounts.models import EmailOTPChallenge, InstitutionAdminInvitation, User, UserMFA
+from apps.accounts.models import EmailOTPChallenge, InstitutionAccessRequest, InstitutionAdminInvitation, User, UserMFA
 from apps.accounts.emails import send_email_mfa_code
 from django.utils.crypto import salted_hmac
 
@@ -204,6 +204,61 @@ class InstitutionAdminInvitationAcceptanceSerializer(SelfServiceRegistrationSeri
     """Invitees establish their tenant and the first administrator account."""
 
     email = serializers.EmailField(read_only=True)
+
+
+class InstitutionAccessRequestCreateSerializer(serializers.ModelSerializer):
+    """Public Get Started form. ``website`` is a honeypot real visitors never see."""
+
+    website = serializers.CharField(required=False, allow_blank=True, write_only=True)
+
+    class Meta:
+        model = InstitutionAccessRequest
+        fields = ("institution_name", "contact_name", "job_title", "email", "phone", "country_code", "organization_size", "message", "website")
+        extra_kwargs = {"message": {"max_length": 2000}}
+
+    def validate_email(self, value):
+        return User.objects.normalize_email(value).lower()
+
+    def validate_country_code(self, value):
+        value = value.strip().upper()
+        if len(value) != 2 or not value.isalpha():
+            raise serializers.ValidationError("Use a two-letter country code.")
+        return value
+
+    def validate(self, attrs):
+        for field in ("institution_name", "contact_name", "job_title", "phone", "message"):
+            if field in attrs:
+                attrs[field] = attrs[field].strip()
+        if not attrs.get("institution_name"):
+            raise serializers.ValidationError({"institution_name": "Organization name is required."})
+        if not attrs.get("contact_name"):
+            raise serializers.ValidationError({"contact_name": "Your name is required."})
+        return attrs
+
+
+class InstitutionAccessRequestSerializer(serializers.ModelSerializer):
+    reviewed_by_email = serializers.EmailField(source="reviewed_by.email", read_only=True, default=None)
+    has_account = serializers.SerializerMethodField()
+
+    class Meta:
+        model = InstitutionAccessRequest
+        fields = (
+            "id", "institution_name", "contact_name", "job_title", "email", "phone", "country_code",
+            "organization_size", "message", "status", "reviewed_by_email", "reviewed_at", "decline_reason",
+            "invitation", "has_account", "created_at",
+        )
+        read_only_fields = fields
+
+    def get_has_account(self, obj) -> bool:
+        return obj.email in self.context.get("existing_emails", set())
+
+
+class InstitutionAccessRequestApproveSerializer(serializers.Serializer):
+    expires_in_hours = serializers.IntegerField(required=False, default=168, min_value=1, max_value=720)
+
+
+class InstitutionAccessRequestDeclineSerializer(serializers.Serializer):
+    reason = serializers.CharField(required=False, allow_blank=True, max_length=1000, default="")
 
 
 class AccountProfileSerializer(serializers.ModelSerializer):

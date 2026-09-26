@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 
-from apps.accounts.models import InstitutionAdminInvitation, User
+from apps.accounts.models import InstitutionAccessRequest, InstitutionAdminInvitation, User
 
 
 @admin.register(User)
@@ -44,3 +44,11 @@ class InstitutionAdminInvitationAdmin(admin.ModelAdmin):
     list_filter = ("status",)
     search_fields = ("email",)
     readonly_fields = ("token_hash", "accepted_at", "created_at", "updated_at")
+
+
+@admin.register(InstitutionAccessRequest)
+class InstitutionAccessRequestAdmin(admin.ModelAdmin):
+    list_display = ("institution_name", "contact_name", "email", "status", "created_at")
+    list_filter = ("status",)
+    search_fields = ("institution_name", "contact_name", "email")
+    readonly_fields = ("reviewed_by", "reviewed_at", "invitation", "created_at", "updated_at")

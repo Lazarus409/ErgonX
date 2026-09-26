@@ -84,3 +84,43 @@ class InstitutionAdminInvitation(BaseModel):
 
     def __str__(self):
         return f"Institution Admin invitation for {self.email}"
+
+
+class InstitutionAccessRequest(BaseModel):
+    """A public request from an organization asking to be invited onto ErgonX.
+
+    Submitted without an account from the Get Started page and reviewed by a
+    platform administrator, who either issues an Institution Admin invitation
+    or declines it.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        INVITED = "INVITED", "Invited"
+        DECLINED = "DECLINED", "Declined"
+
+    class Size(models.TextChoices):
+        UP_TO_50 = "1-50", "1–50 employees"
+        UP_TO_200 = "51-200", "51–200 employees"
+        UP_TO_1000 = "201-1000", "201–1,000 employees"
+        OVER_1000 = "1000+", "More than 1,000 employees"
+
+    institution_name = models.CharField(max_length=200)
+    contact_name = models.CharField(max_length=150)
+    job_title = models.CharField(max_length=120, blank=True)
+    email = models.EmailField()
+    phone = models.CharField(max_length=40, blank=True)
+    country_code = models.CharField(max_length=2, default="GH")
+    organization_size = models.CharField(max_length=10, choices=Size.choices, blank=True)
+    message = models.TextField(blank=True)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="reviewed_access_requests")
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    decline_reason = models.TextField(blank=True)
+    invitation = models.OneToOneField(InstitutionAdminInvitation, on_delete=models.SET_NULL, null=True, blank=True, related_name="access_request")
+
+    class Meta:
+        indexes = [models.Index(fields=("status", "created_at")), models.Index(fields=("email", "status"))]
+
+    def __str__(self):
+        return f"Access request from {self.institution_name} ({self.email})"

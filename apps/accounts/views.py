@@ -3,6 +3,7 @@ from rest_framework.exceptions import APIException, PermissionDenied, Validation
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
+from rest_framework.throttling import AnonRateThrottle
 from django.conf import settings
 from django.core.mail import BadHeaderError
 from smtplib import SMTPException
@@ -14,7 +15,7 @@ from django.utils.crypto import salted_hmac
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
-from django.db import transaction
+from django.db import models, transaction
 from django.utils.text import slugify
 from urllib.parse import quote
 from uuid import uuid4
@@ -30,6 +31,10 @@ from apps.accounts.serializers import (
     InstitutionAdminInvitationCreateSerializer,
     InstitutionAdminInvitationAcceptanceSerializer,
     InstitutionAdminInvitationSerializer,
+    InstitutionAccessRequestApproveSerializer,
+    InstitutionAccessRequestCreateSerializer,
+    InstitutionAccessRequestDeclineSerializer,
+    InstitutionAccessRequestSerializer,
     AccountProfileSerializer,
     PasswordChangeSerializer,
     PasswordResetConfirmSerializer,
@@ -41,10 +46,10 @@ from apps.accounts.serializers import (
 )
 from apps.institutions.services import create_membership, effective_permission_codes
 from apps.institutions.models import Institution, InstitutionInvitation, InstitutionMembership, InstitutionModule, Role
-from apps.accounts.models import InstitutionAdminInvitation, User, UserMFA
+from apps.accounts.models import InstitutionAccessRequest, InstitutionAdminInvitation, User, UserMFA
 from apps.employees.models import Employee
 from apps.documents.models import ImageAsset
-from apps.accounts.emails import send_institution_admin_invitation, send_password_reset
+from apps.accounts.emails import send_institution_access_request_notice, send_institution_admin_invitation, send_password_reset
 from apps.audit.services import record_audit_event
 from common.scoping import data_scope
 from common.permissions import READ_ONLY_ROLES, TenantContextPermission
@@ -150,45 +155,151 @@ class SelfServiceRegistrationView(APIView):
         raise PermissionDenied("Organization creation is available only through an Institution Admin invitation.")
 
 
+def _assert_platform_admin(request):
+    if not (request.user.is_platform_admin or request.user.is_superuser):
+        raise PermissionDenied("Only a platform administrator can manage Institution Admin invitations.")
+
+
+def issue_institution_admin_invitation(*, email, expires_in_hours, invited_by):
+    """Create an invitation and try to email it; the raw token is returned once."""
+    token = uuid4().hex + uuid4().hex
+    invitation = InstitutionAdminInvitation.objects.create(
+        email=email,
+        token_hash=salted_hmac("institution-admin-invitation", token).hexdigest(),
+        expires_at=timezone.now() + timedelta(hours=expires_in_hours),
+        invited_by=invited_by,
+    )
+    delivery_status = "MANUAL_DELIVERY_REQUIRED"
+    if settings.EMAIL_DELIVERY_ENABLED:
+        try:
+            send_institution_admin_invitation(
+                recipient_email=invitation.email,
+                acceptance_token=token,
+                expires_at=invitation.expires_at,
+            )
+            delivery_status = "SENT"
+        except (BadHeaderError, OSError, SMTPException):
+            delivery_status = "FAILED"
+    return invitation, token, delivery_status
+
+
 class InstitutionAdminInvitationView(APIView):
     """Platform-only issuance and public acceptance of new-tenant invitations."""
 
     permission_classes = [IsAuthenticated]
 
-    def _assert_platform_admin(self, request):
-        if not (request.user.is_platform_admin or request.user.is_superuser):
-            raise PermissionDenied("Only a platform administrator can manage Institution Admin invitations.")
-
     @extend_schema(responses=InstitutionAdminInvitationSerializer(many=True))
     def get(self, request):
-        self._assert_platform_admin(request)
+        _assert_platform_admin(request)
         invitations = InstitutionAdminInvitation.objects.select_related("invited_by").order_by("-created_at")
         return Response(InstitutionAdminInvitationSerializer(invitations, many=True).data)
 
     @extend_schema(request=InstitutionAdminInvitationCreateSerializer, responses={201: OpenApiTypes.OBJECT})
     def post(self, request):
-        self._assert_platform_admin(request)
+        _assert_platform_admin(request)
         serializer = InstitutionAdminInvitationCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        token = uuid4().hex + uuid4().hex
-        invitation = InstitutionAdminInvitation.objects.create(
+        invitation, token, delivery_status = issue_institution_admin_invitation(
             email=serializer.validated_data["email"],
-            token_hash=salted_hmac("institution-admin-invitation", token).hexdigest(),
-            expires_at=timezone.now() + timedelta(hours=serializer.validated_data["expires_in_hours"]),
+            expires_in_hours=serializer.validated_data["expires_in_hours"],
             invited_by=request.user,
         )
-        delivery_status = "MANUAL_DELIVERY_REQUIRED"
-        if settings.EMAIL_DELIVERY_ENABLED:
-            try:
-                send_institution_admin_invitation(
-                    recipient_email=invitation.email,
-                    acceptance_token=token,
-                    expires_at=invitation.expires_at,
-                )
-                delivery_status = "SENT"
-            except (BadHeaderError, OSError, SMTPException):
-                delivery_status = "FAILED"
         return Response({"id": str(invitation.id), "email": invitation.email, "expires_at": invitation.expires_at, "acceptance_token": token, "email_delivery_status": delivery_status}, status=201)
+
+
+class InstitutionAccessRequestThrottle(AnonRateThrottle):
+    """Caps anonymous Get Started submissions per client address."""
+
+    scope = "institution_access_request"
+
+    def get_rate(self):
+        return settings.INSTITUTION_ACCESS_REQUEST_RATE
+
+
+class InstitutionAccessRequestView(APIView):
+    """Public submission of an access request; platform admins list them."""
+
+    def get_permissions(self):
+        return [AllowAny()] if self.request.method == "POST" else [IsAuthenticated()]
+
+    def get_throttles(self):
+        return [InstitutionAccessRequestThrottle()] if self.request.method == "POST" else []
+
+    @extend_schema(responses=InstitutionAccessRequestSerializer(many=True))
+    def get(self, request):
+        _assert_platform_admin(request)
+        requests = list(InstitutionAccessRequest.objects.select_related("reviewed_by").order_by("-created_at"))
+        existing_emails = set(User.objects.filter(email__in=[item.email for item in requests]).values_list("email", flat=True))
+        return Response(InstitutionAccessRequestSerializer(requests, many=True, context={"existing_emails": existing_emails}).data)
+
+    @extend_schema(request=InstitutionAccessRequestCreateSerializer, responses={202: OpenApiTypes.OBJECT})
+    def post(self, request):
+        serializer = InstitutionAccessRequestCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        values = dict(serializer.validated_data)
+        honeypot = values.pop("website", "")
+        # The same answer is given whether the request was stored, was a
+        # duplicate, or tripped the honeypot, so the endpoint reveals nothing.
+        duplicate = InstitutionAccessRequest.objects.filter(email=values["email"], status=InstitutionAccessRequest.Status.PENDING).exists()
+        if not honeypot and not duplicate:
+            access_request = InstitutionAccessRequest.objects.create(**values)
+            if settings.EMAIL_DELIVERY_ENABLED:
+                recipients = list(
+                    User.objects.filter(is_active=True)
+                    .filter(models.Q(is_platform_admin=True) | models.Q(is_superuser=True))
+                    .values_list("email", flat=True)
+                )
+                if recipients:
+                    try:
+                        send_institution_access_request_notice(recipients=recipients, access_request=access_request)
+                    except (BadHeaderError, OSError, SMTPException):
+                        pass
+        return Response({"received": True}, status=202)
+
+
+class InstitutionAccessRequestDecisionView(APIView):
+    """Platform admins approve (issue an invitation) or decline a request."""
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(request=InstitutionAccessRequestApproveSerializer, responses={200: OpenApiTypes.OBJECT})
+    @transaction.atomic
+    def post(self, request, pk, decision):
+        _assert_platform_admin(request)
+        if decision not in ("approve", "decline"):
+            return Response({"detail": "Unknown decision."}, status=404)
+        access_request = InstitutionAccessRequest.objects.select_for_update().filter(pk=pk).first()
+        if access_request is None:
+            return Response({"detail": "Access request not found."}, status=404)
+        if access_request.status != InstitutionAccessRequest.Status.PENDING:
+            return Response({"detail": f"This request has already been {access_request.get_status_display().lower()}."}, status=409)
+        if decision == "decline":
+            serializer = InstitutionAccessRequestDeclineSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            access_request.status = InstitutionAccessRequest.Status.DECLINED
+            access_request.decline_reason = serializer.validated_data["reason"].strip()
+            access_request.reviewed_by = request.user
+            access_request.reviewed_at = timezone.now()
+            access_request.save(update_fields=("status", "decline_reason", "reviewed_by", "reviewed_at", "updated_at"))
+            return Response({"request": InstitutionAccessRequestSerializer(access_request).data})
+        serializer = InstitutionAccessRequestApproveSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        if User.objects.filter(email=access_request.email).exists():
+            return Response({"detail": "This email already has an ErgonX account, so it cannot receive an organization invitation."}, status=409)
+        invitation, token, delivery_status = issue_institution_admin_invitation(
+            email=access_request.email,
+            expires_in_hours=serializer.validated_data["expires_in_hours"],
+            invited_by=request.user,
+        )
+        access_request.status = InstitutionAccessRequest.Status.INVITED
+        access_request.invitation = invitation
+        access_request.reviewed_by = request.user
+        access_request.reviewed_at = timezone.now()
+        access_request.save(update_fields=("status", "invitation", "reviewed_by", "reviewed_at", "updated_at"))
+        return Response({
+            "request": InstitutionAccessRequestSerializer(access_request).data,
+            "invitation": {"id": str(invitation.id), "email": invitation.email, "expires_at": invitation.expires_at, "acceptance_token": token, "email_delivery_status": delivery_status},
+        })
 
 
 @extend_schema(responses={200: OpenApiTypes.OBJECT, 201: OpenApiTypes.OBJECT})

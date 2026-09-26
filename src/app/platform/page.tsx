@@ -5,6 +5,7 @@ import {
   Check,
   Clock3,
   Copy,
+  Inbox,
   LogOut,
   MailPlus,
   Moon,
@@ -17,6 +18,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import HomeHero from "@/components/home/HomeHero";
+import AccessRequestsCard from "@/components/platform/AccessRequestsCard";
 import { AdaptiveLogo } from "@/components/brand/Logo";
 import { useTheme } from "@/components/context/ThemeProvider";
 import { useAuth } from "@/components/guards/AuthProvider";
@@ -60,12 +62,15 @@ export default function PlatformAdminPage() {
   const [copied, setCopied] = useState(false);
   const load = useCallback(() => authApi.listInstitutionAdminInvitations(), []);
   const { data, loading: loadingInvitations, error, reload } = useApiResource(load);
+  const loadRequests = useCallback(() => authApi.listInstitutionAccessRequests(), []);
+  const { data: requests, loading: loadingRequests, error: requestsError, reload: reloadRequests } = useApiResource(loadRequests);
 
   const metrics = useMemo(() => ({
     total: data?.length ?? 0,
     pending: data?.filter((invitation) => invitation.status === "PENDING").length ?? 0,
     accepted: data?.filter((invitation) => invitation.status === "ACCEPTED").length ?? 0,
-  }), [data]);
+    requests: requests?.filter((item) => item.status === "PENDING").length ?? 0,
+  }), [data, requests]);
 
   const createInvitation = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -96,7 +101,7 @@ export default function PlatformAdminPage() {
     setCopied(true);
   };
 
-  if (loading || loadingInvitations) return <LoadingState variant="splash" />;
+  if (loading || (loadingInvitations && !data) || (loadingRequests && !requests)) return <LoadingState variant="splash" />;
   if (!isPlatformAdmin) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-canvas p-6">
@@ -137,11 +142,18 @@ export default function PlatformAdminPage() {
           <>
             <HomeHero eyebrow="ErgonX platform" title={`Good to see you, ${firstName}.`} subtitle="Manage organizations and their administrator access from one place." />
 
-            <section className="grid gap-4 sm:grid-cols-3 lg:max-w-4xl" aria-label="Invitation summary">
+            <section className="grid gap-4 sm:grid-cols-2 lg:max-w-6xl lg:grid-cols-4" aria-label="Invitation summary">
+              <MetricCard size="sm" label="Requests awaiting review" value={metrics.requests} icon={Inbox} accent="brand" />
               <MetricCard size="sm" label="Total invitations" value={metrics.total} icon={UsersRound} accent="brand" />
               <MetricCard size="sm" label="Awaiting activation" value={metrics.pending} icon={Clock3} accent="payroll" />
               <MetricCard size="sm" label="Organizations started" value={metrics.accepted} icon={Check} accent="accounting" />
             </section>
+
+            {requestsError || !requests ? (
+              <ErrorState message={requestsError ?? "Could not load access requests."} onRetry={reloadRequests} />
+            ) : (
+              <AccessRequestsCard requests={requests} onChanged={() => { reloadRequests(); reload(); }} />
+            )}
 
             <Card title="Invite an Institution Admin" description="The recipient creates their organization and becomes its primary administrator through a single-use secure link." icon={MailPlus} accent="brand" accentLine>
               {actionError && <Alert tone="danger" title="Invitation could not be created" className="mb-5">{actionError}<p className="mt-1 text-caption">Use an email address that does not already have an ErgonX account.</p></Alert>}

@@ -187,6 +187,57 @@ export function createInstitutionAdminInvitation(payload: CreatePlatformInstitut
   return apiPost<CreatedPlatformInstitutionAdminInvitation, CreatePlatformInstitutionAdminInvitation>("/auth/institution-admin-invitations/", payload);
 }
 
+export type OrganizationSize = "1-50" | "51-200" | "201-1000" | "1000+";
+
+/** Public Get Started request asking the Super Admin for an organization invitation. */
+export interface InstitutionAccessRequestPayload {
+  institution_name: string;
+  contact_name: string;
+  job_title?: string;
+  email: string;
+  phone?: string;
+  country_code: string;
+  organization_size?: OrganizationSize | "";
+  message?: string;
+  /** Honeypot: must stay empty. */
+  website?: string;
+}
+
+export interface InstitutionAccessRequest {
+  id: string;
+  institution_name: string;
+  contact_name: string;
+  job_title: string;
+  email: string;
+  phone: string;
+  country_code: string;
+  organization_size: OrganizationSize | "";
+  message: string;
+  status: "PENDING" | "INVITED" | "DECLINED";
+  reviewed_by_email: string | null;
+  reviewed_at: string | null;
+  decline_reason: string;
+  invitation: string | null;
+  has_account: boolean;
+  created_at: string;
+}
+
+export function submitInstitutionAccessRequest(payload: InstitutionAccessRequestPayload): Promise<{ received: boolean }> {
+  return apiPost<{ received: boolean }, InstitutionAccessRequestPayload>("/auth/institution-access-requests/", payload);
+}
+
+export function listInstitutionAccessRequests(): Promise<InstitutionAccessRequest[]> {
+  return apiGet<InstitutionAccessRequest[]>("/auth/institution-access-requests/");
+}
+
+export function approveInstitutionAccessRequest(id: string, expiresInHours: number): Promise<{ request: InstitutionAccessRequest; invitation: CreatedPlatformInstitutionAdminInvitation }> {
+  return apiPost(`/auth/institution-access-requests/${id}/approve/`, { expires_in_hours: expiresInHours });
+}
+
+export function declineInstitutionAccessRequest(id: string, reason: string): Promise<{ request: InstitutionAccessRequest }> {
+  return apiPost(`/auth/institution-access-requests/${id}/decline/`, { reason });
+}
+
 /** Clears tokens and the selected institution. Purely client-side. */
 export function logout(): void {
   void apiPost<{ logged_out: boolean }>("/auth/logout/").catch(() => {

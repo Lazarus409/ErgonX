@@ -1,11 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, KeyRound, Save, ShieldAlert, UserRound } from "lucide-react";
+import { KeyRound, Save, UserRound } from "lucide-react";
 import { useCallback, useState } from "react";
-import { useRouter } from "next/navigation";
 
-import { AdaptiveLogo } from "@/components/brand/Logo";
 import { useAuth } from "@/components/guards/AuthProvider";
 import HomeHero from "@/components/home/HomeHero";
 import Alert from "@/components/ui/Alert";
@@ -19,8 +17,7 @@ import { authApi, getApiErrorMessage } from "@/lib/api";
 import { useApiResource } from "@/lib/useApiResource";
 
 export default function PlatformProfilePage() {
-  const router = useRouter();
-  const { isPlatformAdmin, loading, refreshSession } = useAuth();
+  const { refreshSession } = useAuth();
   const load = useCallback(() => authApi.getAccountProfile(), []);
   const { data, loading: loadingProfile, error, reload } = useApiResource(load);
   const [profile, setProfile] = useState<{ first_name?: string; last_name?: string; email?: string }>({});
@@ -58,25 +55,11 @@ export default function PlatformProfilePage() {
     } catch (caught) { setPasswordError(getApiErrorMessage(caught)); } finally { setSavingPassword(false); }
   };
 
-  if (loading || loadingProfile) return <LoadingState variant="splash" />;
-  if (!isPlatformAdmin) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-canvas p-6">
-        <div className="max-w-md rounded-3xl border border-line bg-surface p-8 text-center shadow-elevation-3">
-          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-danger-soft text-danger" aria-hidden="true"><ShieldAlert className="h-6 w-6" /></span>
-          <h1 className="mt-5 text-heading font-semibold text-ink-strong">Platform access required</h1>
-        </div>
-      </main>
-    );
-  }
+  // The /platform layout already guards access and renders the console header.
+  if (loadingProfile && !data) return <LoadingState />;
 
   return (
-    <main className="min-h-screen bg-canvas px-4 py-6 text-ink sm:px-6 lg:px-10 lg:py-8">
-      <div className="mx-auto max-w-5xl space-y-6">
-        <div className="flex items-center justify-between gap-4">
-          <button type="button" onClick={() => router.push("/platform")} className="inline-flex items-center gap-2 text-support font-semibold text-ink-muted transition-colors hover:text-ink-strong"><ArrowLeft className="h-4 w-4" aria-hidden="true" />Back to platform workspace</button>
-          <AdaptiveLogo height={24} />
-        </div>
+    <div className="mx-auto max-w-5xl space-y-6">
         {error || !data ? (
           <ErrorState message={error ?? "Could not load your account."} onRetry={reload} />
         ) : (
@@ -110,7 +93,6 @@ export default function PlatformProfilePage() {
             </div>
           </>
         )}
-      </div>
-    </main>
+    </div>
   );
 }

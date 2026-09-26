@@ -12,7 +12,9 @@ export const settingsAreas: Array<{ title: string; description: string; href: st
   { title: "Profile", description: "Update supported personal contact details and review employment identity.", href: "/me/profile", icon: UserRound, anyPermissions: ["leave.request", "attendance.clock", "payslip.view", "tax_relief.claim"] },
   { title: "Personal Preferences", description: "Manage supported workspace preferences.", href: "/settings/profile", icon: SlidersHorizontal, permission: "settings.profile.manage_self" },
   { title: "Security", description: "Change your password using your current account credentials.", href: "/settings/security", icon: KeyRound, permission: "home.view" },
-  { title: "Institution Settings", description: "Review institution identity and configuration exposed to your role.", href: "/settings/institution", icon: Building2, permission: "institution.view" },
+  // Every role holds institution.view (the app needs the institution's name and locale),
+  // so this Institution Admin area is keyed on the manage permission instead.
+  { title: "Institution Settings", description: "Manage the institution's identity, logo and operational locale.", href: "/settings/institution", icon: Building2, permission: "settings.institution.manage" },
   { title: "Modules", description: "Review enabled ERP modules and configuration status.", href: "/settings/modules", icon: Puzzle, permission: "settings.modules.manage" },
   { title: "Roles & Permissions", description: "Manage institution roles and assigned permissions.", href: "/settings/roles", icon: ShieldCheck, permission: "settings.roles.manage" },
   { title: "Approval Workflows", description: "Review approval definitions used by operational processes.", href: "/settings/approval-workflows", icon: GitPullRequest, permission: "approval_workflow.view" },
@@ -23,13 +25,14 @@ export const settingsAreas: Array<{ title: string; description: string; href: st
   { title: "Attendance", description: "Manage authorized work schedules, shift patterns, rotations, and assignments.", href: "/attendance/schedules", icon: Clock3, permission: "schedule.manage", module: "ATTENDANCE" },
 ];
 
+export function canUseSettingsArea(area: (typeof settingsAreas)[number], permissions: string[], enabledModules: string[] | undefined): boolean {
+  const authorized = permissions.includes("*") || (area.permission ? permissions.includes(area.permission) : Boolean(area.anyPermissions?.some((permission) => permissions.includes(permission))));
+  return authorized && (!area.module || hasModule(enabledModules, area.module));
+}
+
 export default function SettingsPage() {
   const { user, institution } = useAuth();
-  const visibleAreas = settingsAreas.filter((area) => {
-    const permissions = user?.permissions ?? [];
-    const authorized = permissions.includes("*") || (area.permission ? permissions.includes(area.permission) : Boolean(area.anyPermissions?.some((permission) => permissions.includes(permission))));
-    return authorized && (!area.module || hasModule(institution?.enabledModules, area.module));
-  });
+  const visibleAreas = settingsAreas.filter((area) => canUseSettingsArea(area, user?.permissions ?? [], institution?.enabledModules));
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <PageHeader eyebrow="Administration" title="Settings" description="Only settings authorized by your active institution membership are shown." icon={SlidersHorizontal} accent="settings" />

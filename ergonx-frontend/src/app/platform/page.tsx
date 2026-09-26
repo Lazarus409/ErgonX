@@ -1,201 +1,127 @@
 "use client";
 
-import {
-  ArrowUpRight,
-  Check,
-  Clock3,
-  Copy,
-  Inbox,
-  LogOut,
-  MailPlus,
-  Moon,
-  ShieldAlert,
-  Sun,
-  UserRoundCog,
-  UsersRound,
-} from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Building2, History, Inbox, LayoutGrid, TrendingUp, UsersRound } from "lucide-react";
+import { useCallback } from "react";
 
+import ChartCard from "@/components/charts/ChartCard";
+import { BarsChart } from "@/components/charts/Charts";
 import HomeHero from "@/components/home/HomeHero";
-import AccessRequestsCard from "@/components/platform/AccessRequestsCard";
-import { AdaptiveLogo } from "@/components/brand/Logo";
-import { useTheme } from "@/components/context/ThemeProvider";
 import { useAuth } from "@/components/guards/AuthProvider";
-import Alert from "@/components/ui/Alert";
-import { Badge, type BadgeTone } from "@/components/ui/Badge";
-import { Button, IconButton } from "@/components/ui/Button";
-import { Avatar, Card, MetricCard } from "@/components/ui/Card";
-import { DataTable } from "@/components/ui/DataTable";
+import { formatDateTime, formatRelative, onboardingLabel } from "@/components/platform/format";
+import { Badge } from "@/components/ui/Badge";
+import { AttentionItem, Avatar, Card, MetricCard, SummaryList } from "@/components/ui/Card";
 import ErrorState from "@/components/ui/ErrorState";
-import { Field, Input, Select } from "@/components/ui/Field";
 import LoadingState from "@/components/ui/LoadingState";
-import { authApi, getApiErrorMessage } from "@/lib/api";
+import { platformApi } from "@/lib/api";
+import { auditActionLabel } from "@/lib/api/platform";
 import { useApiResource } from "@/lib/useApiResource";
-import type { PlatformInstitutionAdminInvitation } from "@/lib/api/auth";
 
-const statusTone: Record<PlatformInstitutionAdminInvitation["status"], BadgeTone> = {
-  ACCEPTED: "success",
-  PENDING: "warning",
-  EXPIRED: "neutral",
-  REVOKED: "danger",
-};
+const growthSeries = [
+  { key: "institutions", label: "Organizations created", color: "var(--chart-1)" },
+  { key: "access_requests", label: "Access requests", color: "var(--chart-3)" },
+];
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
-}
+/** Super Admin home: platform health, what needs a decision, and recent activity. */
+export default function PlatformOverviewPage() {
+  const { user } = useAuth();
+  const loadOverview = useCallback(() => platformApi.getOverview(), []);
+  const { data, loading, error, reload } = useApiResource(loadOverview);
+  const loadActivity = useCallback(() => platformApi.listAuditEvents({ page: 1 }), []);
+  const { data: activity } = useApiResource(loadActivity);
 
-/**
- * Super Admin platform workspace. Uses the single canonical theme; the former
- * Platform-only colour mode is migrated by ThemeProvider on first load.
- */
-export default function PlatformAdminPage() {
-  const router = useRouter();
-  const { isPlatformAdmin, loading, logout, user } = useAuth();
-  const { theme, toggleTheme } = useTheme();
-  const [email, setEmail] = useState("");
-  const [hours, setHours] = useState("168");
-  const [creating, setCreating] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [acceptanceUrl, setAcceptanceUrl] = useState<string | null>(null);
-  const [deliveryStatus, setDeliveryStatus] = useState<"SENT" | "FAILED" | "MANUAL_DELIVERY_REQUIRED" | null>(null);
-  const [copied, setCopied] = useState(false);
-  const load = useCallback(() => authApi.listInstitutionAdminInvitations(), []);
-  const { data, loading: loadingInvitations, error, reload } = useApiResource(load);
-  const loadRequests = useCallback(() => authApi.listInstitutionAccessRequests(), []);
-  const { data: requests, loading: loadingRequests, error: requestsError, reload: reloadRequests } = useApiResource(loadRequests);
+  if (loading && !data) return <LoadingState variant="dashboard" />;
+  if (error || !data) return <ErrorState message={error ?? "Could not load the platform overview."} onRetry={reload} />;
 
-  const metrics = useMemo(() => ({
-    total: data?.length ?? 0,
-    pending: data?.filter((invitation) => invitation.status === "PENDING").length ?? 0,
-    accepted: data?.filter((invitation) => invitation.status === "ACCEPTED").length ?? 0,
-    requests: requests?.filter((item) => item.status === "PENDING").length ?? 0,
-  }), [data, requests]);
-
-  const createInvitation = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setCreating(true);
-    setActionError(null);
-    setAcceptanceUrl(null);
-    setDeliveryStatus(null);
-    setCopied(false);
-    try {
-      const invitation = await authApi.createInstitutionAdminInvitation({
-        email: email.trim(),
-        expires_in_hours: Number(hours),
-      });
-      setAcceptanceUrl(`${window.location.origin}/create-organization/${invitation.acceptance_token}`);
-      setDeliveryStatus(invitation.email_delivery_status);
-      setEmail("");
-      reload();
-    } catch (caught) {
-      setActionError(getApiErrorMessage(caught));
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const copy = async () => {
-    if (!acceptanceUrl) return;
-    await navigator.clipboard.writeText(acceptanceUrl);
-    setCopied(true);
-  };
-
-  if (loading || (loadingInvitations && !data) || (loadingRequests && !requests)) return <LoadingState variant="splash" />;
-  if (!isPlatformAdmin) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-canvas p-6">
-        <div className="max-w-md rounded-3xl border border-line bg-surface p-8 text-center shadow-elevation-3">
-          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-danger-soft text-danger" aria-hidden="true"><ShieldAlert className="h-6 w-6" /></span>
-          <h1 className="mt-5 text-heading font-semibold text-ink-strong">Platform access required</h1>
-          <p className="mt-2 text-support text-ink-muted">This workspace is only available to ErgonX Super Admins.</p>
-        </div>
-      </main>
-    );
-  }
-
-  const firstName = user?.firstName || "Super";
-  const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || "Super Administrator";
+  const growth = data.growth.months.map((month, index) => ({
+    month,
+    institutions: data.growth.institutions[index] ?? 0,
+    access_requests: data.growth.access_requests[index] ?? 0,
+  }));
+  const { institutions, users, pipeline, onboarding } = data;
+  const stuck = onboarding.BLOCKED;
+  const attention = [
+    pipeline.pending_requests > 0 && { title: `${pipeline.pending_requests} access request${pipeline.pending_requests === 1 ? "" : "s"} awaiting review`, description: "Organizations asked for an invitation from the Get Started page.", severity: "warning", href: "/platform/invitations" },
+    pipeline.invitations_expiring_48h > 0 && { title: `${pipeline.invitations_expiring_48h} invitation${pipeline.invitations_expiring_48h === 1 ? "" : "s"} expiring within 48 hours`, description: "Unused setup links lapse soon. Re-issue one if the recipient still needs it.", severity: "info", href: "/platform/invitations" },
+    stuck > 0 && { title: `${stuck} organization${stuck === 1 ? " is" : "s are"} blocked in setup`, description: "Their onboarding checklist reports a blocking problem.", severity: "warning", href: "/platform/organizations" },
+    institutions.suspended > 0 && { title: `${institutions.suspended} suspended organization${institutions.suspended === 1 ? "" : "s"}`, description: "Their users cannot sign in until reactivated.", severity: "info", href: "/platform/organizations" },
+  ].filter((item): item is { title: string; description: string; severity: string; href: string } => Boolean(item));
 
   return (
-    <main className="min-h-screen bg-canvas text-ink">
-      <header className="sticky top-0 z-30 border-b border-line/80 bg-surface/85 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 max-w-[1440px] items-center gap-4 px-4 sm:px-6 lg:px-10">
-          <AdaptiveLogo height={26} priority />
-          <span className="hidden h-6 w-px bg-line sm:block" aria-hidden="true" />
-          <p className="hidden text-sm font-semibold text-ink-strong sm:block">Platform control</p>
-          <div className="flex-1" />
-          <IconButton label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} onClick={toggleTheme}>{theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}</IconButton>
-          <div className="hidden items-center gap-2.5 md:flex">
-            <Avatar name={fullName} size="sm" />
-            <div className="leading-tight"><p className="text-support font-semibold text-ink-strong">{fullName}</p><p className="text-caption text-ink-muted">Super Administrator</p></div>
+    <>
+      <HomeHero eyebrow="ErgonX platform" title={`Good to see you, ${user?.firstName || "Super"}.`} subtitle="The health of every organization on ErgonX, and what needs your decision." />
+
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Platform summary">
+        <MetricCard size="sm" label="Organizations" value={institutions.total} icon={Building2} accent="brand" href="/platform/organizations" description={`${institutions.active} active · ${institutions.suspended} suspended`} />
+        <MetricCard size="sm" label="Users signed in, last 30 days" value={users.signed_in_last_30_days} icon={UsersRound} accent="hr" description={`of ${users.total.toLocaleString("en-GB")} user accounts`} />
+        <MetricCard size="sm" label="Employees managed" value={data.employees.total.toLocaleString("en-GB")} icon={LayoutGrid} accent="payroll" description="Across all organizations" />
+        <MetricCard size="sm" label="Requests awaiting review" value={pipeline.pending_requests} icon={Inbox} accent="recruitment" href="/platform/invitations" description={`${pipeline.pending_invitations} invitation${pipeline.pending_invitations === 1 ? "" : "s"} not yet accepted`} />
+      </section>
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <ChartCard
+          title="Growth"
+          description="New organizations and Get Started requests in each of the last 12 months."
+          icon={TrendingUp}
+          accent="brand"
+          legend={growthSeries.map((series) => ({ label: series.label, color: series.color }))}
+          empty={!growth.some((point) => point.institutions || point.access_requests)}
+          emptyDescription="Sign-ups and requests will appear here."
+          data={{ columns: ["Month", "Organizations created", "Access requests"], rows: growth.map((point) => [point.month, point.institutions, point.access_requests]) }}
+        >
+          <BarsChart data={growth} xKey="month" xFormat="month" height={250} series={growthSeries} />
+        </ChartCard>
+
+        <Card title="Needs your attention" icon={Inbox} accent="brand">
+          {attention.length === 0 ? (
+            <p className="text-support text-ink-muted">Nothing is waiting on you. New requests and expiring invitations will show up here.</p>
+          ) : (
+            <div className="-m-3 space-y-1">{attention.map((item) => <AttentionItem key={item.title} {...item} />)}</div>
+          )}
+          <div className="mt-5 border-t border-line-soft pt-4">
+            <h3 className="text-support font-semibold text-ink-strong">Setup progress</h3>
+            <SummaryList className="mt-2" items={(["READY", "IN_PROGRESS", "NOT_STARTED", "BLOCKED"] as const).map((status) => ({ label: onboardingLabel[status], value: onboarding[status] }))} />
           </div>
-          <Button variant="secondary" size="sm" className="hidden md:inline-flex" leadingIcon={<UserRoundCog className="h-4 w-4" />} onClick={() => router.push("/platform/profile")}>My profile</Button>
-          <Button variant="ghost" size="sm" leadingIcon={<LogOut className="h-4 w-4" />} onClick={() => { logout(); router.replace("/login"); }}><span className="hidden sm:inline">Sign out</span></Button>
-        </div>
-      </header>
-
-      <div className="mx-auto max-w-[1440px] space-y-6 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
-        {error || !data ? (
-          <ErrorState message={error ?? "Could not load invitations."} onRetry={reload} />
-        ) : (
-          <>
-            <HomeHero eyebrow="ErgonX platform" title={`Good to see you, ${firstName}.`} subtitle="Manage organizations and their administrator access from one place." />
-
-            <section className="grid gap-4 sm:grid-cols-2 lg:max-w-6xl lg:grid-cols-4" aria-label="Invitation summary">
-              <MetricCard size="sm" label="Requests awaiting review" value={metrics.requests} icon={Inbox} accent="brand" />
-              <MetricCard size="sm" label="Total invitations" value={metrics.total} icon={UsersRound} accent="brand" />
-              <MetricCard size="sm" label="Awaiting activation" value={metrics.pending} icon={Clock3} accent="payroll" />
-              <MetricCard size="sm" label="Organizations started" value={metrics.accepted} icon={Check} accent="accounting" />
-            </section>
-
-            {requestsError || !requests ? (
-              <ErrorState message={requestsError ?? "Could not load access requests."} onRetry={reloadRequests} />
-            ) : (
-              <AccessRequestsCard requests={requests} onChanged={() => { reloadRequests(); reload(); }} />
-            )}
-
-            <Card title="Invite an Institution Admin" description="The recipient creates their organization and becomes its primary administrator through a single-use secure link." icon={MailPlus} accent="brand" accentLine>
-              {actionError && <Alert tone="danger" title="Invitation could not be created" className="mb-5">{actionError}<p className="mt-1 text-caption">Use an email address that does not already have an ErgonX account.</p></Alert>}
-              <form onSubmit={createInvitation} className="grid items-end gap-4 md:grid-cols-[minmax(0,1fr)_12rem_auto]">
-                <Field label="Administrator work email"><Input required type="email" size="lg" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="administrator@organization.com" /></Field>
-                <Field label="Link validity"><Select size="lg" value={hours} onChange={(event) => setHours(event.target.value)}><option value="24">24 hours</option><option value="72">3 days</option><option value="168">7 days</option><option value="336">14 days</option></Select></Field>
-                <Button type="submit" size="lg" loading={creating} loadingLabel="Creating…" trailingIcon={<ArrowUpRight className="h-4 w-4" />}>Create invite</Button>
-              </form>
-              {acceptanceUrl && (
-                <Alert tone="success" title="Secure setup link created" className="mt-5">
-                  <p>{deliveryStatus === "SENT" ? "Invitation email sent successfully. Keep this link only as a secure recovery option." : deliveryStatus === "FAILED" ? "Email delivery failed. Copy and send this secure link through an approved channel." : "Email delivery is not configured yet. Copy and send this secure link through an approved channel."}</p>
-                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                    <Input readOnly value={acceptanceUrl} aria-label="Secure setup link" className="font-mono text-caption" />
-                    <Button variant="secondary" onClick={() => void copy()} leadingIcon={copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}>{copied ? "Copied" : "Copy link"}</Button>
-                  </div>
-                </Alert>
-              )}
-            </Card>
-
-            <DataTable<PlatformInstitutionAdminInvitation>
-              caption="Institution Admin invitations"
-              rows={data}
-              rowKey={(invitation) => invitation.id}
-              minWidth={760}
-              toolbar={
-                <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
-                  <div><h2 className="text-card-title font-semibold text-ink-strong">Institution Admin invitations</h2><p className="text-support text-ink-muted">Every invitation issued from this platform.</p></div>
-                  <span className="text-support text-ink-muted">{metrics.total} invitation{metrics.total === 1 ? "" : "s"} recorded</span>
-                </div>
-              }
-              empty={{ title: "No invitations yet", description: "Create the first secure setup link to begin onboarding an organization.", icon: MailPlus }}
-              columns={[
-                { key: "email", header: "Administrator", sortValue: (invitation) => invitation.email, cell: (invitation) => <span className="flex items-center gap-3"><Avatar name={invitation.email} size="sm" /><span><span className="block font-semibold text-ink-strong">{invitation.email}</span><span className="block text-caption text-ink-muted">Institution Admin</span></span></span> },
-                { key: "status", header: "Status", cell: (invitation) => <Badge size="sm" tone={statusTone[invitation.status] ?? "neutral"}>{invitation.status.charAt(0) + invitation.status.slice(1).toLowerCase()}</Badge> },
-                { key: "expires", header: "Expiration", sortValue: (invitation) => invitation.expires_at, cell: (invitation) => formatDate(invitation.expires_at) },
-                { key: "created", header: "Created", sortValue: (invitation) => invitation.created_at, cell: (invitation) => formatDate(invitation.created_at) },
-                { key: "by", header: "Created by", hideBelow: "lg", cell: (invitation) => invitation.invited_by_email ?? "Platform administrator" },
-              ]}
-            />
-          </>
-        )}
+        </Card>
       </div>
-    </main>
+
+      <div className="grid gap-5 xl:grid-cols-2">
+        <Card title="Newest organizations" icon={Building2} accent="brand" actions={<Link className="text-support font-semibold text-primary-ink hover:underline" href="/platform/organizations">All organizations</Link>}>
+          {data.recent_institutions.length === 0 ? (
+            <p className="text-support text-ink-muted">No organizations yet. They appear once an invitation is accepted.</p>
+          ) : (
+            <ul className="-mx-2 divide-y divide-line-soft">
+              {data.recent_institutions.map((institution) => (
+                <li key={institution.id}>
+                  <Link href={`/platform/organizations/${institution.id}`} className="flex items-center gap-3 rounded-lg px-2 py-3 hover:bg-surface-hover">
+                    <Avatar name={institution.name} size="sm" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-semibold text-ink-strong">{institution.name}</span>
+                      <span className="block truncate text-caption text-ink-muted">{institution.primary_admin?.email ?? "No active admin"} · joined {formatRelative(institution.created_at)}</span>
+                    </span>
+                    {institution.is_active ? <Badge size="sm" tone="neutral">{onboardingLabel[institution.onboarding_status]}</Badge> : <Badge size="sm" tone="danger">Suspended</Badge>}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+
+        <Card title="Recent platform activity" icon={History} accent="audit" actions={<Link className="text-support font-semibold text-primary-ink hover:underline" href="/platform/audit">Audit log</Link>}>
+          {!activity || activity.results.length === 0 ? (
+            <p className="text-support text-ink-muted">No platform actions recorded yet.</p>
+          ) : (
+            <ol className="divide-y divide-line-soft">
+              {activity.results.slice(0, 6).map((event) => (
+                <li key={event.id} className="py-3">
+                  <p className="font-semibold text-ink-strong">{auditActionLabel(event.action)}{event.institution ? <span className="font-normal text-ink-muted"> · {event.institution.name}</span> : typeof event.metadata.email === "string" ? <span className="font-normal text-ink-muted"> · {event.metadata.email}</span> : null}</p>
+                  <p className="text-caption text-ink-muted">{event.actor_email ?? "System"} · {formatDateTime(event.created_at)}</p>
+                </li>
+              ))}
+            </ol>
+          )}
+        </Card>
+      </div>
+    </>
   );
 }

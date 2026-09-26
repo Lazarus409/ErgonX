@@ -5,6 +5,10 @@ export const runtime = "nodejs";
 const ACCESS_COOKIE = "ergonx_access";
 const REFRESH_COOKIE = "ergonx_refresh";
 const SESSION_COOKIE = "ergonx_session";
+// Present only when the user ticked "Keep me signed in"; non-sensitive, so the
+// client can read it to decide whether the inactivity sign-out applies.
+const REMEMBER_COOKIE = "ergonx_remember";
+const REMEMBER_SECONDS = 60 * 60 * 24 * 7;
 const API_PREFIX = "/api/v1/";
 const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
@@ -23,23 +27,25 @@ function cookieIsSecure(request: NextRequest): boolean {
 }
 
 function clearSession(request: NextRequest, response: NextResponse): NextResponse {
-  for (const name of [ACCESS_COOKIE, REFRESH_COOKIE, SESSION_COOKIE]) {
-    response.cookies.set({ name, value: "", httpOnly: name !== SESSION_COOKIE, sameSite: "lax", secure: cookieIsSecure(request), path: "/", maxAge: 0 });
+  for (const name of [ACCESS_COOKIE, REFRESH_COOKIE, SESSION_COOKIE, REMEMBER_COOKIE]) {
+    response.cookies.set({ name, value: "", httpOnly: name === ACCESS_COOKIE || name === REFRESH_COOKIE, sameSite: "lax", secure: cookieIsSecure(request), path: "/", maxAge: 0 });
   }
   return response;
 }
 
-function establishSession(request: NextRequest, response: NextResponse, access: string, refresh?: string): NextResponse {
-  const cookieOptions = {
-    httpOnly: true,
-    sameSite: "lax" as const,
-    secure: cookieIsSecure(request),
-    path: "/",
-  };
-  response.cookies.set({ name: ACCESS_COOKIE, value: access, ...cookieOptions, maxAge: 60 * 15 });
-  if (refresh) response.cookies.set({ name: REFRESH_COOKIE, value: refresh, ...cookieOptions, maxAge: 60 * 60 * 24 * 7 });
+/**
+ * Remembered sessions survive a browser restart for up to seven days. Otherwise
+ * every cookie is a browser-session cookie, so closing the browser signs out.
+ */
+function establishSession(request: NextRequest, response: NextResponse, access: string, refresh: string | undefined, remember: boolean): NextResponse {
+  const base = { sameSite: "lax" as const, secure: cookieIsSecure(request), path: "/" };
+  const lifetime = remember ? { maxAge: REMEMBER_SECONDS } : {};
+  response.cookies.set({ name: ACCESS_COOKIE, value: access, ...base, httpOnly: true, ...(remember ? { maxAge: 60 * 15 } : {}) });
+  if (refresh) response.cookies.set({ name: REFRESH_COOKIE, value: refresh, ...base, httpOnly: true, ...lifetime });
   // This non-sensitive hint lets client route guards decide whether to hydrate.
-  response.cookies.set({ name: SESSION_COOKIE, value: "1", httpOnly: false, sameSite: "lax", secure: cookieIsSecure(request), path: "/", maxAge: 60 * 60 * 24 * 7 });
+  response.cookies.set({ name: SESSION_COOKIE, value: "1", ...base, httpOnly: false, ...lifetime });
+  if (remember) response.cookies.set({ name: REMEMBER_COOKIE, value: "1", ...base, httpOnly: false, ...lifetime });
+  else response.cookies.set({ name: REMEMBER_COOKIE, value: "", ...base, httpOnly: false, maxAge: 0 });
   return response;
 }
 
@@ -97,8 +103,21 @@ export async function handler(request: NextRequest, context: RouteContext): Prom
   if (access) headers.set("authorization", `Bearer ${access}`);
 
   let body: BodyInit | undefined;
+  let remember = request.cookies.get(REMEMBER_COOKIE)?.value === "1";
   if (!["GET", "HEAD"].includes(request.method)) {
-    if (route === "auth/refresh") {
+    if (route === "auth/login") {
+      // "Keep me signed in" only decides cookie lifetimes here; the API never sees it.
+      const raw = await request.text();
+      try {
+        const credentials = JSON.parse(raw) as Record<string, unknown>;
+        remember = credentials.remember === true;
+        delete credentials.remember;
+        body = JSON.stringify(credentials);
+      } catch {
+        remember = false;
+        body = raw;
+      }
+    } else if (route === "auth/refresh") {
       const refresh = request.cookies.get(REFRESH_COOKIE)?.value;
       body = JSON.stringify(refresh ? { refresh } : {});
       headers.set("content-type", "application/json");
@@ -130,7 +149,7 @@ export async function handler(request: NextRequest, context: RouteContext): Prom
   if (isTokenRoute && upstream.headers.get("content-type")?.includes("application/json")) {
     const tokenResult = safeAuthPayload(await upstream.json());
     const response = NextResponse.json(tokenResult.body, { status: upstream.status, headers: responseHeaders });
-    return tokenResult.access ? establishSession(request, response, tokenResult.access, tokenResult.refresh) : response;
+    return tokenResult.access ? establishSession(request, response, tokenResult.access, tokenResult.refresh, remember) : response;
   }
 
   return new NextResponse(upstream.body, { status: upstream.status, headers: responseHeaders });

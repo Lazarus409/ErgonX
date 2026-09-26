@@ -28,6 +28,8 @@ export interface LoginCredentials {
   email: string;
   password: string;
   mfa_code?: string;
+  /** "Keep me signed in": the BFF keeps the session for 7 days instead of until the browser closes. */
+  remember?: boolean;
 }
 
 export interface LoginResult {
@@ -166,6 +168,9 @@ export interface PlatformInstitutionAdminInvitation {
   expires_at: string;
   accepted_at: string | null;
   invited_by_email: string | null;
+  /** The organization created by accepting this invitation. */
+  institution_id: string | null;
+  institution_name: string | null;
   created_at: string;
 }
 
@@ -185,6 +190,15 @@ export function listInstitutionAdminInvitations(): Promise<PlatformInstitutionAd
 
 export function createInstitutionAdminInvitation(payload: CreatePlatformInstitutionAdminInvitation): Promise<CreatedPlatformInstitutionAdminInvitation> {
   return apiPost<CreatedPlatformInstitutionAdminInvitation, CreatePlatformInstitutionAdminInvitation>("/auth/institution-admin-invitations/", payload);
+}
+
+export function revokeInstitutionAdminInvitation(id: string): Promise<{ invitation: PlatformInstitutionAdminInvitation }> {
+  return apiPost(`/auth/institution-admin-invitations/${id}/revoke/`, {});
+}
+
+/** Issues a fresh link to the same email; a still-pending original is revoked. */
+export function reissueInstitutionAdminInvitation(id: string, expiresInHours: number): Promise<{ invitation: Pick<CreatedPlatformInstitutionAdminInvitation, "id" | "email" | "expires_at" | "acceptance_token" | "email_delivery_status"> }> {
+  return apiPost(`/auth/institution-admin-invitations/${id}/reissue/`, { expires_in_hours: expiresInHours });
 }
 
 export type OrganizationSize = "1-50" | "51-200" | "201-1000" | "1000+";

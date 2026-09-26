@@ -415,12 +415,8 @@ export default function EmployeeDetailPage() {
 
   const uploadEmployeeDocument = async (file: File | undefined) => {
     if (!file) return;
-    if (!["application/pdf", "image/jpeg", "image/png"].includes(file.type)) {
-      setDocumentsError("Employee documents must be PDF, JPEG, or PNG files.");
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      setDocumentsError("Employee documents must be 10 MB or smaller.");
+    if (file.size > operationsApi.MAX_DOCUMENT_BYTES) {
+      setDocumentsError("Employee documents must be 25 MB or smaller.");
       return;
     }
     setDocumentUploading(true);
@@ -496,7 +492,6 @@ export default function EmployeeDetailPage() {
 
     try {
       const updated = await employeesApi.updateEmployee(formData.id, {
-        employee_number: formData.employeeNumber.trim(),
         first_name: formData.firstName.trim(),
         middle_name: formData.middleName.trim(),
         last_name: formData.lastName.trim(),
@@ -1128,7 +1123,6 @@ export default function EmployeeDetailPage() {
                 {documentUploading ? `Uploading… ${documentProgress}%` : "Add Document"}
                 <input
                   type="file"
-                  accept="application/pdf,image/jpeg,image/png"
                   className="sr-only"
                   disabled={documentUploading}
                   onChange={(event) => {
@@ -1634,12 +1628,7 @@ export default function EmployeeDetailPage() {
             description="Update the employee's core employment information."
           >
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              <Field
-                label="Employee Number"
-                value={formData.employeeNumber}
-                required
-                onChange={(value) => updateField("employeeNumber", value)}
-              />
+              <InfoItem label="Employee Number" value={formData.employeeNumber} />
 
               <Field
                 label="Hire Date"

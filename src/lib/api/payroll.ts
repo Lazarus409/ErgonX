@@ -76,7 +76,7 @@ export async function getPayrollRecord(id: string): Promise<PayrollRecord> {
   return apiGet<PayrollRecord>(`/payroll-records/${id}/`);
 }
 
-export async function listPayslips(params?: ListParams & { payroll_record?: string; generated_at?: string }): Promise<PaginatedData<Payslip>> {
+export async function listPayslips(params?: ListParams & { payroll_record?: string; payroll_record__employee?: string; generated_at?: string }): Promise<PaginatedData<Payslip>> {
   return apiGetList<Payslip>("/payslips/", params);
 }
 

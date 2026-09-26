@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "@/components/guards/AuthProvider";
+import type { DataScope } from "@/components/navigation/navigation";
 import { hasModule } from "@/types/institutions";
 
 /** Permissions that make a membership eligible for personal self-service. */
@@ -17,5 +18,7 @@ export function useAccess() {
   const canAny = (list: readonly string[]) => list.some(can);
   const moduleEnabled = (module: string) => hasModule(institution?.enabledModules, module);
   const selfServiceEligible = canAny(SELF_SERVICE_PERMISSIONS);
-  return { user, institution, can, canAny, moduleEnabled, selfServiceEligible };
+  const scope: DataScope = user?.dataScope ?? "INSTITUTION";
+  const readOnly = Boolean(user?.readOnly);
+  return { user, institution, can, canAny, moduleEnabled, selfServiceEligible, scope, readOnly };
 }

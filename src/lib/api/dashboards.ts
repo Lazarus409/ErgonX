@@ -12,6 +12,7 @@
 import { apiGet } from "./client";
 import type {
   AttendanceDashboard,
+  DepartmentDashboard,
   ExecutiveDashboard,
   FinanceDashboard,
   HrDashboard,
@@ -22,6 +23,11 @@ import type {
 
 export async function getExecutiveDashboard(): Promise<ExecutiveDashboard> {
   return apiGet<ExecutiveDashboard>("/dashboards/executive/");
+}
+
+/** Roster, today's attendance and leave for the departments the user heads. */
+export async function getDepartmentDashboard(): Promise<DepartmentDashboard> {
+  return apiGet<DepartmentDashboard>("/dashboards/department/");
 }
 
 export async function getHrDashboard(): Promise<HrDashboard> {

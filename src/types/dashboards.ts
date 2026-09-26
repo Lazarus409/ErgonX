@@ -216,3 +216,77 @@ export interface RecruitmentDashboard {
   /** Accepted offers bucketed by days from application to acceptance. */
   time_to_hire?: Array<{ bucket: string; hires: number }>;
 }
+
+/* Department Head workspace (`/dashboards/department/`) -------------------- */
+
+export interface DepartmentTodayCounts {
+  present: number;
+  late: number;
+  absent: number;
+  on_leave: number;
+  remote: number;
+  not_recorded: number;
+}
+
+export interface DepartmentTeamMember {
+  employee_id: string;
+  employee_number: string;
+  full_name: string;
+  work_email: string;
+  phone: string;
+  status: string;
+  department: string;
+  position: string;
+  grade: string;
+  employment_type: string;
+  reports_to: string | null;
+  today_status: string | null;
+}
+
+export interface DepartmentLeaveItem {
+  id: string;
+  employee: string;
+  leave_type: string;
+  start_date: string;
+  end_date: string;
+  requested_days?: string;
+  status?: string;
+}
+
+export interface DepartmentApprovalItem {
+  id: string;
+  employee: string;
+  employee_number: string;
+  leave_type: string;
+  start_date: string;
+  end_date: string;
+  requested_days: string;
+  reason: string;
+  submitted_at: string | null;
+  step: number;
+  available_balance: string | null;
+  also_off: string[];
+}
+
+export interface DepartmentDashboard {
+  as_of: string;
+  departments: Array<{ id: string; name: string; code: string; headcount: number }>;
+  headcount: number;
+  team: DepartmentTeamMember[];
+  today: Partial<DepartmentTodayCounts>;
+  on_leave_today: DepartmentLeaveItem[];
+  upcoming_leave: DepartmentLeaveItem[];
+  pending_approvals: number;
+  approval_queue: DepartmentApprovalItem[];
+  leave_by_type: Array<{ leave_type__name: string; days: string; requests: number }>;
+  attendance_trend: Array<{ date: string; present: number; late: number; absent: number }>;
+  by_position: Array<{ position: string; count: number }>;
+}
+
+/** Compact Home card for members who head a department. */
+export interface TeamSnapshot {
+  departments: string[];
+  headcount: number;
+  today: DepartmentTodayCounts;
+  pending_approvals: number;
+}

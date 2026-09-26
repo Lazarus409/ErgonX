@@ -16,11 +16,13 @@ import { EM_DASH, formatAmount, formatDateTime } from "@/lib/format";
 import { useApiResource } from "@/lib/useApiResource";
 import { MAX_PAGE_SIZE } from "@/types/api";
 import type { PayComponent, PayrollAdjustment, PayrollPeriod } from "@/types/payroll";
+import { useAccess } from "@/lib/access";
 
 const ALL = "ALL";
 const emptyForm = { employee: "", payroll_period: "", pay_component: "", amount: "", reason: "" };
 
 export default function PayrollAdjustmentsPage() {
+  const { can } = useAccess();
   const [status, setStatus] = useState(ALL);
   const [search, setSearch] = useState("");
   const [modal, setModal] = useState(false);
@@ -42,7 +44,7 @@ export default function PayrollAdjustmentsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Payroll" title="Payroll adjustments" description="Create and approve adjustments before payroll calculation." icon={FileCog} accent="payroll" actions={<Button leadingIcon={<Plus className="h-4 w-4" />} onClick={() => { setFormError(""); setModal(true); }}>New adjustment</Button>} />
+      <PageHeader eyebrow="Payroll" title="Payroll adjustments" description="Create and approve adjustments before payroll calculation." icon={FileCog} accent="payroll" actions={can("payroll.prepare") ? <Button leadingIcon={<Plus className="h-4 w-4" />} onClick={() => { setFormError(""); setModal(true); }}>New adjustment</Button> : null} />
       {formError && !modal && <Alert tone="danger" onDismiss={() => setFormError("")}>{formError}</Alert>}
       <DataTable<PayrollAdjustment>
         caption="Payroll adjustments"
@@ -61,7 +63,7 @@ export default function PayrollAdjustmentsPage() {
             onClear={search || status !== ALL ? () => { setSearch(""); setStatus(ALL); } : undefined}
           />
         }
-        empty={{ title: "No payroll adjustments found", description: "Adjustments submitted for review will appear here.", icon: FileCog, action: <Button variant="secondary" leadingIcon={<Plus className="h-4 w-4" />} onClick={() => { setFormError(""); setModal(true); }}>New adjustment</Button> }}
+        empty={{ title: "No payroll adjustments found", description: "Adjustments submitted for review will appear here.", icon: FileCog, action: can("payroll.prepare") ? <Button variant="secondary" leadingIcon={<Plus className="h-4 w-4" />} onClick={() => { setFormError(""); setModal(true); }}>New adjustment</Button> : undefined }}
         columns={[
           { key: "employee", header: "Employee", sortValue: (item) => names.get(item.employee) ?? item.employee, cell: (item) => { const name = names.get(item.employee) ?? item.employee; return <span className="flex items-center gap-3"><Avatar name={name} size="sm" /><span className="font-semibold text-ink-strong">{name}</span></span>; } },
           { key: "component", header: "Component", cell: (item) => componentNames.get(item.pay_component) ?? item.pay_component },
@@ -74,8 +76,8 @@ export default function PayrollAdjustmentsPage() {
             header: <span className="sr-only">Review</span>,
             cell: (item) => item.status === "PENDING" ? (
               <div className="flex justify-end gap-1">
-                <IconButton size="sm" label="Reject adjustment" className="text-danger-ink hover:bg-danger-soft" onClick={() => setPending({ id: item.id, action: "reject" })}><XCircle className="h-4 w-4" /></IconButton>
-                <IconButton size="sm" label="Approve adjustment" className="text-success-ink hover:bg-success-soft" onClick={() => setPending({ id: item.id, action: "approve" })}><Check className="h-4 w-4" /></IconButton>
+                {can("payroll.approve") && <IconButton size="sm" label="Reject adjustment" className="text-danger-ink hover:bg-danger-soft" onClick={() => setPending({ id: item.id, action: "reject" })}><XCircle className="h-4 w-4" /></IconButton>}
+                {can("payroll.approve") && <IconButton size="sm" label="Approve adjustment" className="text-success-ink hover:bg-success-soft" onClick={() => setPending({ id: item.id, action: "approve" })}><Check className="h-4 w-4" /></IconButton>}
               </div>
             ) : null,
           },

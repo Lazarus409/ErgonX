@@ -14,11 +14,13 @@ import { getApiErrorMessage, payrollApi } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { useApiResource } from "@/lib/useApiResource";
 import { MAX_PAGE_SIZE } from "@/types/api";
+import { useAccess } from "@/lib/access";
 
 const ALL = "ALL";
 const emptyForm = { name: "", start_date: "", end_date: "", pay_date: "" };
 
 export default function PayrollPeriodsPage() {
+  const { can } = useAccess();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState(ALL);
   const [formOpen, setFormOpen] = useState(false);
@@ -62,7 +64,7 @@ export default function PayrollPeriodsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Payroll" title="Payroll periods" description="Manage payroll periods and their processing status." icon={CalendarDays} accent="payroll" actions={<Button leadingIcon={<Plus className="h-4 w-4" />} onClick={() => { setFormError(""); setFormOpen(true); }}>New period</Button>} />
+      <PageHeader eyebrow="Payroll" title="Payroll periods" description="Manage payroll periods and their processing status." icon={CalendarDays} accent="payroll" actions={can("payroll.prepare") ? <Button leadingIcon={<Plus className="h-4 w-4" />} onClick={() => { setFormError(""); setFormOpen(true); }}>New period</Button> : null} />
       <DataTable
         caption="Payroll periods"
         rows={periods}
@@ -80,7 +82,7 @@ export default function PayrollPeriodsPage() {
             onClear={search || status !== ALL ? () => { setSearch(""); setStatus(ALL); } : undefined}
           />
         }
-        empty={{ title: "No payroll periods found", description: "Open a period to begin processing payroll.", icon: CalendarDays, action: <Button variant="secondary" leadingIcon={<Plus className="h-4 w-4" />} onClick={() => { setFormError(""); setFormOpen(true); }}>New period</Button> }}
+        empty={{ title: "No payroll periods found", description: "Open a period to begin processing payroll.", icon: CalendarDays, action: can("payroll.prepare") ? <Button variant="secondary" leadingIcon={<Plus className="h-4 w-4" />} onClick={() => { setFormError(""); setFormOpen(true); }}>New period</Button> : undefined }}
         footer={<p className="flex items-center gap-2 text-caption text-ink-muted"><CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />Period dates and processing status are controlled by the payroll backend. Closed periods cannot be changed.</p>}
         columns={[
           { key: "name", header: "Period", sortValue: (period) => period.name, cell: (period) => <span className="font-semibold text-ink-strong">{period.name}</span> },

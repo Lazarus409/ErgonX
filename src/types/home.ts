@@ -6,6 +6,8 @@
  * backend-owned navigation rather than reconstructed in the browser.
  */
 
+import type { TeamSnapshot } from "@/types/dashboards";
+
 export interface HomeGreetingContext {
   greeting: string;
   user_display_name: string;
@@ -62,5 +64,33 @@ export interface HomePayload {
     unread_count: number;
     latest: HomeNotification[];
   };
-  optional_personal_snapshot: Record<string, unknown> | null;
+  /** Self-service context; null when the user has no employee record here. */
+  optional_personal_snapshot: PersonalSnapshot | null;
+  /** "Team today" for members who head a department; null otherwise. */
+  team_snapshot: TeamSnapshot | null;
+}
+
+export interface PersonalShift {
+  date: string;
+  schedule: string;
+  off_day: boolean;
+  flexible: boolean;
+  start: string | null;
+  end: string | null;
+  required_minutes: number;
+}
+
+export interface PersonalAttentionItem {
+  code: string;
+  severity: "HIGH" | "NORMAL";
+  title: string;
+  description: string;
+  route: string;
+}
+
+export interface PersonalSnapshot {
+  /** Up to seven days from today, resolved from the employee's schedule. */
+  upcoming_shifts: PersonalShift[];
+  attention: PersonalAttentionItem[];
+  activity: { leave_requests_this_year?: number; attendance_corrections_pending?: number; documents_on_file: number };
 }

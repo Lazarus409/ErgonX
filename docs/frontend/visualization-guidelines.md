@@ -50,8 +50,10 @@ Pie charts only when composition genuinely warrants it; prefer donut. Scatter on
 | **Employee Home** | Area | Hours worked + overtime, last 7 recorded days | Personal weekly effort |
 | | Calendar grid | Attendance status, last 4 weeks | Pattern of presence/lateness/leave (letters + colour) |
 | | Donut | Leave available by type | Composition of remaining entitlement |
-| | Vertical bars | Net pay, recent payslips | Recent pay comparison |
-| | Timeline | Upcoming approved leave | Sequence of time off |
+| | Line | Net pay across recent payslips (Payroll only) | Pay trend |
+| | Vertical bars | Overtime hours by Monday-start week (last 5) | Overtime load |
+| | Timeline ×2 | Next seven days of shifts (server-resolved); upcoming approved leave | Schedule and time off in sequence |
+| | Attention list + summary | Personal items from `/home` (pending leave, corrections, missed clock-in, unread updates); activity counts | What needs the employee (no performance/productivity scores) |
 | **Executive** | KPI ×4 | Workforce, payroll cost, net result (with Δ), pending leave / open roles | Headline indicators |
 | | Multi-series line | Revenue, expenses, net result by month | Financial trajectory |
 | | Area | Gross payroll by finalized period | Payroll cost trajectory |
@@ -106,7 +108,7 @@ Pie charts only when composition genuinely warrants it; prefer donut. Scatter on
 
 | Type | Uses | Within target? |
 |---|---|---|
-| Line / multi-series line | 4 (Executive, Attendance, Recruitment, Accounting) | Yes (max 6) |
+| Line / multi-series line | 5 (Employee Home, Executive, Attendance, Recruitment, Accounting) | Yes (max 6) |
 | Area | 5 (Employee Home, Executive, Leave, Attendance, Payroll) | Yes (max 5–6) |
 | Donut | 5 (Employee Home, HR, Leave, Accounting, Recruitment) | Yes, at the ceiling (max 5) |
 | Vertical bars (single series / distribution) | 4 (Employee Home, HR ×2, Recruitment) | Yes |
@@ -117,7 +119,7 @@ Pie charts only when composition genuinely warrants it; prefer donut. Scatter on
 | Segmented bar | 3 (Executive ×2, HR) | Yes |
 | Heatmap / calendar | 3 (Attendance, Employee Home, Leave) | Yes (max 5) |
 | Progress meter | 2 (Leave, Attendance) (+ onboarding progress) | Yes (max 5) |
-| Timeline | 1 dashboard (+ Approvals page) | Yes |
+| Timeline | 1 dashboard, ×2 on Employee Home (schedule, upcoming leave) (+ Approvals page) | Yes |
 | Sparkline | 4 surfaces (Home ≤4 tiles; Attendance and Payroll ×2 each; Accounting ×1) | Yes; at most two per module dashboard |
 
 No module dashboard uses more than two of the same type (Executive: segmented ×2; HR: vertical bars ×2, ranking ×2; Accounting: grouped bars ×2; Attendance and Payroll: sparklines ×2). Home's snapshot tiles carry up to four sparklines, one per permitted module pulse. Donuts and rankings are at their ceilings: new composition questions should prefer a segmented bar or status list, and new comparisons a table, unless a donut or ranking is clearly the better answer.

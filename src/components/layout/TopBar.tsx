@@ -19,6 +19,7 @@ import {
   Sun,
   UserRound,
   X,
+  Eye,
 } from "lucide-react";
 
 import { getApiErrorMessage, institutionsApi, notificationsApi, searchApi } from "@/lib/api";
@@ -261,6 +262,12 @@ export default function TopBar({ onOpenSidebar }: TopBarProps) {
         <button type="button" data-search-trigger onClick={(event) => { event.stopPropagation(); openSearch(); }} className={cx(iconButton, "md:hidden")} aria-label="Search">
           <Search className="h-[18px] w-[18px]" />
         </button>
+
+        {user?.readOnly && (
+          <span className="hidden items-center gap-1.5 rounded-full border border-line bg-surface-muted px-2.5 py-1 text-caption font-semibold text-ink-muted sm:inline-flex" title="Your role can view records but not create, change or approve them.">
+            <Eye className="h-3.5 w-3.5" aria-hidden="true" />Read-only access
+          </span>
+        )}
 
         <span className={cx(iconButton, "hidden cursor-help sm:inline-flex")} title="Help and support is not configured for this release." aria-label="Help and support is not configured for this release" role="img">
           <CircleHelp className="h-[18px] w-[18px]" />

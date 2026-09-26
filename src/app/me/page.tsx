@@ -6,6 +6,7 @@ import {
   ArrowRight,
   Bell,
   CalendarClock,
+  CheckCircle2,
   CalendarDays,
   CalendarPlus,
   CircleDollarSign,
@@ -24,13 +25,13 @@ import ChartCard from "@/components/charts/ChartCard";
 import { BarsChart, DonutChart, TrendChart, donutLegend } from "@/components/charts/Charts";
 import { Timeline } from "@/components/charts/Visuals";
 import { ButtonLink } from "@/components/ui/Button";
-import { Card, IconTile, SectionHeading, SummaryList } from "@/components/ui/Card";
+import { AttentionItem, Card, IconTile, SectionHeading, SummaryList } from "@/components/ui/Card";
 import ErrorState from "@/components/ui/ErrorState";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { attendanceApi, employeesApi, homeApi, leaveApi, notificationsApi, payrollApi, schedulingApi } from "@/lib/api";
+import { attendanceApi, employeesApi, homeApi, leaveApi, notificationsApi, payrollApi } from "@/lib/api";
 import { useAccess } from "@/lib/access";
 import { useApiResource } from "@/lib/useApiResource";
-import { EM_DASH, formatAmount, formatDate, formatDateTime, formatNumber, humanizeEnum, toISODate } from "@/lib/format";
+import { EM_DASH, formatAmount, formatDate, formatDateTime, formatNumber, toISODate } from "@/lib/format";
 import { cx } from "@/lib/cx";
 import type { ModuleAccent } from "@/lib/moduleTheme";
 import { MAX_PAGE_SIZE } from "@/types/api";
@@ -47,8 +48,6 @@ interface PersonalData {
   attendance: AttendanceRecord[] | null;
   leave: { balances: LeaveBalance[]; requests: LeaveRequest[]; types: Map<string, LeaveType> } | null;
   payslips: Payslip[] | null;
-  /** Current schedule assignment (self-scoped by the backend for employees). */
-  schedule: { name: string; scheduleType: string; effectiveFrom: string; effectiveTo: string | null } | null;
   updates: AppNotification[] | null;
 }
 
@@ -80,9 +79,9 @@ export default function SelfServiceHome() {
       employeesApi.getCurrentEmployee(),
       homeApi.getHome().catch(() => null),
     ]);
-    if (!employee) return { employee: null, home, attendance: null, leave: null, payslips: null, schedule: null, updates: null };
+    if (!employee) return { employee: null, home, attendance: null, leave: null, payslips: null, updates: null };
 
-    const [attendance, leave, payslips, schedule, updates] = await Promise.all([
+    const [attendance, leave, payslips, updates] = await Promise.all([
       showAttendance
         ? attendanceApi.listAttendanceRecords({ employee: employee.id, page_size: 35, ordering: "-attendance_date" }).then((page) => page.results).catch(() => null)
         : Promise.resolve(null),
@@ -94,22 +93,12 @@ export default function SelfServiceHome() {
           ]).then(([types, balances, requests]) => ({ types: new Map(types.map((type) => [type.id, type])), balances, requests }))
         : Promise.resolve(null),
       showPayroll
-        ? payrollApi.listPayslips({ page_size: 6, ordering: "-generated_at" }).then((page) => page.results).catch(() => null)
-        : Promise.resolve(null),
-      showSchedule
-        ? schedulingApi.listScheduleAssignments({ employee: employee.id, is_current: true, page_size: 1 })
-            .then(async (page) => {
-              const assignment = page.results[0];
-              if (!assignment) return null;
-              const workSchedule = await schedulingApi.getWorkSchedule(assignment.work_schedule);
-              return { name: workSchedule.name, scheduleType: String(workSchedule.schedule_type), effectiveFrom: assignment.effective_from, effectiveTo: assignment.effective_to };
-            })
-            .catch(() => null)
+        ? payrollApi.listPayslips({ payroll_record__employee: employee.id, page_size: 6, ordering: "-generated_at" }).then((page) => page.results).catch(() => null)
         : Promise.resolve(null),
       notificationsApi.getNotifications().then((items) => items.slice(0, 4)).catch(() => null),
     ]);
-    return { employee, home, attendance, leave, payslips, schedule, updates };
-  }, [showAttendance, showLeave, showPayroll, showSchedule]);
+    return { employee, home, attendance, leave, payslips, updates };
+  }, [showAttendance, showLeave, showPayroll]);
 
   const { data, loading, error, reload } = useApiResource(load);
   const employee = data?.employee ?? null;
@@ -126,6 +115,10 @@ export default function SelfServiceHome() {
   const pendingLeave = requests.filter((request) => ["PENDING", "SUBMITTED", "DRAFT"].includes(String(request.status).toUpperCase()));
   const upcomingLeave = requests.filter((request) => String(request.status).toUpperCase() === "APPROVED" && request.end_date >= todayIso).sort((a, b) => a.start_date.localeCompare(b.start_date));
   const payslips = [...(data?.payslips ?? [])].sort((a, b) => a.payroll_period.pay_date.localeCompare(b.payroll_period.pay_date));
+  const snapshot = data?.home?.optional_personal_snapshot ?? null;
+  const upcomingShifts = snapshot?.upcoming_shifts ?? [];
+  const nextShift = upcomingShifts.find((shift) => !shift.off_day && shift.end && new Date(shift.end) > new Date());
+  const overtimeWeeks = overtimeByWeek(history);
   const latestPayslip = payslips.at(-1);
   const firstName = employee?.first_name || user?.firstName || "there";
   const greeting = data?.home?.greeting_context.greeting ?? `Welcome, ${firstName}`;
@@ -145,8 +138,8 @@ export default function SelfServiceHome() {
     <div className="mx-auto max-w-7xl space-y-8">
       <HomeHero
         eyebrow="Employee Home"
-        title={`${greeting}.`}
-        subtitle="Everything about your work today — attendance, time off and pay — in one place."
+        title={<>{greeting} <span aria-hidden="true">👋</span></>}
+        subtitle="Here's your workday at a glance."
         aside={
           showAttendance ? (
             <div className="rounded-2xl bg-white/[0.08] p-5 ring-1 ring-inset ring-white/15 backdrop-blur-sm">
@@ -162,8 +155,8 @@ export default function SelfServiceHome() {
         }
       >
         <div className="grid max-w-xl grid-cols-3 gap-3">
-          {showAttendance && <HeroStat label="Hours this week" value={data ? `${hours(weekMinutes)}h` : "–"} />}
           {showLeave && <HeroStat label="Leave days available" value={data ? formatNumber(leaveAvailable) : "–"} />}
+          {showSchedule && <HeroStat label="Next shift" value={data ? shiftLabel(nextShift) : "–"} />}
           {showPayroll && <HeroStat label="Latest net pay" value={latestPayslip ? formatAmount(latestPayslip.payload.net_pay, latestPayslip.payload.currency) : data ? EM_DASH : "–"} />}
           {!showAttendance && !showLeave && !showPayroll && <HeroStat label="Employee number" value={employee?.employee_number ?? "–"} />}
         </div>
@@ -248,8 +241,8 @@ export default function SelfServiceHome() {
           )}
           {showPayroll && (
             <ChartCard
-              title="Recent net pay"
-              description="Net pay from your latest payslips."
+              title="Pay trend"
+              description="Net pay across your latest payslips."
               accent="payroll"
               icon={CircleDollarSign}
               loading={loading && !data}
@@ -261,9 +254,10 @@ export default function SelfServiceHome() {
               data={{ columns: ["Period", "Net pay"], rows: payslips.map((slip) => [slip.payroll_period.name, formatAmount(slip.payload.net_pay, slip.payload.currency)]) }}
               footer={latestPayslip ? <span>Latest: <Link href={`/payroll/payslips/${latestPayslip.id}`} className="font-semibold text-primary-ink hover:underline">{latestPayslip.payroll_period.name}</Link> · paid {formatDate(latestPayslip.payroll_period.pay_date)}</span> : undefined}
             >
-              <BarsChart
+              <TrendChart
                 data={payslips.map((slip) => ({ period: slip.payroll_period.name, net: Number(slip.payload.net_pay) }))}
                 xKey="period"
+                xFormat="label"
                 series={[{ key: "net", label: "Net pay", color: "var(--mod-payroll)" }]}
                 format="currency"
                 currency={latestPayslip?.payload.currency}
@@ -300,27 +294,61 @@ export default function SelfServiceHome() {
         </div>
       )}
 
-      {/* Schedule + updates */}
-      {employee && (showSchedule || data?.updates) && (
-        <div className={cx("grid gap-5", showSchedule && "lg:grid-cols-2")}>
+      {/* Schedule + overtime */}
+      {employee && (showSchedule || showAttendance) && (
+        <div className={cx("grid gap-5", showSchedule && showAttendance && "lg:grid-cols-2")}>
           {showSchedule && (
-            <Card title="My schedule" description="Your current work schedule assignment." icon={CalendarClock} accent="attendance">
-              {data?.schedule ? (
-                <div className="space-y-3">
-                  <p className="text-heading font-semibold text-ink-strong">{data.schedule.name}</p>
-                  <SummaryList
-                    items={[
-                      { label: "Schedule type", value: humanizeEnum(data.schedule.scheduleType) },
-                      { label: "Effective from", value: formatDate(data.schedule.effectiveFrom) },
-                      { label: "Until", value: data.schedule.effectiveTo ? formatDate(data.schedule.effectiveTo) : "Ongoing" },
-                    ]}
-                  />
-                </div>
+            <Card title="Upcoming schedule" description={upcomingShifts[0] ? `Your next seven days on ${upcomingShifts[0].schedule}.` : "Your shifts for the next seven days."} icon={CalendarClock} accent="attendance">
+              {upcomingShifts.length ? (
+                <Timeline items={upcomingShifts.map((shift) => ({ id: shift.date, title: dayLabel(shift.date), time: shift.off_day ? "Day off" : shift.flexible ? `Flexible · ${hours(shift.required_minutes)}h` : `${clockTime(shift.start)} – ${clockTime(shift.end)}`, description: shift.off_day ? undefined : shift.flexible ? `Between ${clockTime(shift.start)} and ${clockTime(shift.end)}` : undefined, tone: shift.off_day ? ("neutral" as const) : ("brand" as const) }))} />
               ) : (
-                <p className="text-support text-ink-muted">{loading && !data ? "Loading…" : "No current schedule is assigned to you. Your manager or HR assigns schedules."}</p>
+                <p className="text-support text-ink-muted">{loading && !data ? "Loading…" : "No schedule is assigned to you for the coming week. Your manager or HR assigns schedules."}</p>
               )}
             </Card>
           )}
+          {showAttendance && (
+            <ChartCard
+              title="Overtime by week"
+              description="Recorded overtime hours in each of your recent weeks."
+              accent="attendance"
+              icon={Timer}
+              loading={loading && !data}
+              error={!data && error ? "This data is unavailable right now." : null}
+              empty={!overtimeWeeks.some((week) => week.overtime > 0)}
+              emptyTitle="No overtime recorded"
+              emptyDescription="Overtime you work will appear here."
+              data={{ columns: ["Week of", "Overtime (h)"], rows: overtimeWeeks.map((week) => [week.label, week.overtime]) }}
+            >
+              <BarsChart data={overtimeWeeks} xKey="label" height={220} series={[{ key: "overtime", label: "Overtime (h)", color: "var(--chart-3)" }]} />
+            </ChartCard>
+          )}
+        </div>
+      )}
+
+      {/* Attention + updates */}
+      {employee && (
+        <div className="grid gap-5 lg:grid-cols-2">
+          <Card title="Needs your attention" description="Things waiting on you or about you." icon={CheckCircle2} accent="brand">
+            {snapshot?.attention.length ? (
+              <div className="-mx-3 space-y-1">
+                {snapshot.attention.map((item) => (
+                  <AttentionItem key={item.code} title={item.title} description={item.description} severity={item.severity === "HIGH" ? "high" : "info"} href={item.route} />
+                ))}
+              </div>
+            ) : (
+              <p className="text-support text-ink-muted">{loading && !data ? "Loading…" : "Nothing needs your attention right now."}</p>
+            )}
+            {snapshot && (
+              <SummaryList
+                className="mt-4 border-t border-line-soft pt-4"
+                items={[
+                  ...(snapshot.activity.leave_requests_this_year !== undefined ? [{ label: "Leave requests this year", value: formatNumber(snapshot.activity.leave_requests_this_year) }] : []),
+                  ...(snapshot.activity.attendance_corrections_pending !== undefined ? [{ label: "Attendance corrections pending", value: formatNumber(snapshot.activity.attendance_corrections_pending) }] : []),
+                  { label: "Documents on file", value: formatNumber(snapshot.activity.documents_on_file) },
+                ]}
+              />
+            )}
+          </Card>
           <Card
             title="Recent updates"
             description="Your latest notifications."
@@ -436,3 +464,34 @@ function AttendanceCalendar({ records, todayIso }: { records: AttendanceRecord[]
   );
 }
 
+/** "Today 08:00", "Tomorrow 08:00", "Tue 08:00", or a flexible window. */
+function shiftLabel(shift: { date: string; start: string | null; flexible: boolean } | undefined): string {
+  if (!shift) return "None scheduled";
+  const day = dayLabel(shift.date, true);
+  return shift.flexible ? `${day}, flexible` : `${day} ${clockTime(shift.start)}`;
+}
+
+function dayLabel(iso: string, short = false): string {
+  const date = new Date(`${iso}T00:00:00`);
+  const todayIso = toISODate(new Date());
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  if (iso === todayIso) return "Today";
+  if (iso === toISODate(tomorrow)) return "Tomorrow";
+  return date.toLocaleDateString("en-GB", short ? { weekday: "short" } : { weekday: "long", day: "numeric", month: "short" });
+}
+
+/** Recorded overtime grouped into Monday-start weeks, oldest first (at most five). */
+function overtimeByWeek(records: AttendanceRecord[]): Array<{ label: string; overtime: number }> {
+  const weeks = new Map<string, number>();
+  for (const record of records) {
+    const date = new Date(`${record.attendance_date}T00:00:00`);
+    date.setDate(date.getDate() - ((date.getDay() + 6) % 7));
+    const key = toISODate(date);
+    weeks.set(key, (weeks.get(key) ?? 0) + record.overtime_minutes);
+  }
+  return [...weeks.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .slice(-5)
+    .map(([key, minutes]) => ({ label: new Date(`${key}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "short" }), overtime: hours(minutes) }));
+}

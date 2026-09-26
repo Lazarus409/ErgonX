@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
+import PermissionGuard from "@/components/guards/PermissionGuard";
 import BackNavigation from "@/components/ui/BackNavigation";
 import ErrorState from "@/components/ui/ErrorState";
 import PageHeader from "@/components/ui/PageHeader";
@@ -14,7 +15,12 @@ import { buttonClasses } from "@/components/ui/Button";
 type Line = { id: number; account: string; description: string; debit: string; credit: string };
 const blankLine = (): Line => ({ id: Date.now() + Math.random(), account: "", description: "", debit: "", credit: "" });
 
+/** Journal creation is a write: members without journal.create never reach the form. */
 export default function NewJournalPage() {
+  return <PermissionGuard permission="journal.create"><NewJournalForm /></PermissionGuard>;
+}
+
+function NewJournalForm() {
   const router = useRouter(); const [entryDate, setEntryDate] = useState(new Date().toISOString().slice(0, 10)); const [period, setPeriod] = useState(""); const [reference, setReference] = useState(""); const [description, setDescription] = useState(""); const [lines, setLines] = useState<Line[]>([blankLine(), blankLine()]); const [saving, setSaving] = useState(false); const [formError, setFormError] = useState("");
   const load = useCallback(() => Promise.all([accountingApi.listAccounts({ page_size: MAX_PAGE_SIZE, is_active: true, is_postable: true, ordering: "code" }), accountingApi.listAccountingPeriods({ page_size: MAX_PAGE_SIZE, status: "OPEN", ordering: "start_date" })]), []); const { data, loading, error, reload } = useApiResource(load); const accounts = data?.[0].results ?? []; const periods = data?.[1].results ?? [];
   const debit = useMemo(() => lines.reduce((sum, line) => sum + Number(line.debit || 0), 0), [lines]); const credit = useMemo(() => lines.reduce((sum, line) => sum + Number(line.credit || 0), 0), [lines]); const difference = debit - credit; const balanced = Math.abs(difference) < 0.001 && debit > 0;

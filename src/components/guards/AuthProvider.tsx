@@ -103,6 +103,8 @@ async function loadLiveSession(): Promise<{
     role: context.active_membership.role_code,
     institutionId: institution.id,
     permissions: context.effective_permissions,
+    dataScope: context.active_membership.data_scope ?? "INSTITUTION",
+    readOnly: context.active_membership.read_only ?? false,
     institution,
   };
 

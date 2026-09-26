@@ -162,8 +162,8 @@ export default function AttendanceShiftsPage() {
   };
 
   const saveShift = useCallback(async () => {
-    if (!form.name.trim() || !form.code.trim() || !form.startTime || !form.endTime) {
-      setFormError("Name, code, start time and end time are required.");
+    if (!form.name.trim() || !form.startTime || !form.endTime) {
+      setFormError("Name, start time and end time are required.");
       return;
     }
 
@@ -521,7 +521,7 @@ export default function AttendanceShiftsPage() {
                     onChange={(event) =>
                       setForm({ ...form, code: event.target.value })
                     }
-                    placeholder="e.g. MORNING"
+                    placeholder="Auto-generated if left blank"
                     className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
                   />
                 </label>
@@ -646,7 +646,7 @@ export default function AttendanceShiftsPage() {
 
               <button
                 onClick={saveShift}
-                disabled={saving || !form.name.trim() || !form.code.trim()}
+                disabled={saving || !form.name.trim()}
                 className={buttonClasses({ variant: "primary" })}
               >
                 {saving

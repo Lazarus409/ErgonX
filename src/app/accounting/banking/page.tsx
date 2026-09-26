@@ -66,7 +66,6 @@ export default function BankingPage() {
   const save = async (value: CashForm) => {
     if (!creating) return;
     if (
-      !value.number.trim() ||
       !value.date ||
       !value.amount ||
       !value.currency ||
@@ -352,8 +351,9 @@ function CashModal({
         )}
         <div className="grid gap-4 p-5 sm:grid-cols-2">
           <Input
-            label="Reference number"
+            label="Reference number (optional)"
             value={form.number}
+            placeholder="Auto-generated if left blank"
             onChange={(number) => update({ number })}
           />
           <Input
@@ -469,11 +469,13 @@ function Input({
   value,
   onChange,
   type = "text",
+  placeholder,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   type?: string;
+  placeholder?: string;
 }) {
   return (
     <label className="space-y-1">
@@ -482,6 +484,7 @@ function Input({
         type={type}
         value={value}
         onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
         className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink-strong shadow-elevation-1 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/15 w-full"
       />
     </label>

@@ -37,6 +37,10 @@ export interface SessionUser {
   institutionId: string;
   /** Permission codes, or `["*"]` for the development bypass user. */
   permissions: string[];
+  /** Whose records this membership works with (see `common/scoping.py`). */
+  dataScope?: "INSTITUTION" | "DEPARTMENT" | "SELF";
+  /** Read-only role: the UI shows no create, edit or approve controls. */
+  readOnly?: boolean;
   isPlatformAdmin?: boolean;
   institution?: SessionInstitution;
 }

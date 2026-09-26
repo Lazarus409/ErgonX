@@ -169,8 +169,8 @@ export default function ShiftPatternsPage() {
   };
 
   const savePattern = useCallback(async () => {
-    if (!form.name.trim() || !form.code.trim()) {
-      setFormError("Pattern name and code are required.");
+    if (!form.name.trim()) {
+      setFormError("Pattern name is required.");
       return;
     }
 
@@ -495,7 +495,7 @@ export default function ShiftPatternsPage() {
                   onChange={(event) =>
                     setForm({ ...form, code: event.target.value })
                   }
-                  placeholder="e.g. SP-001"
+                  placeholder="Auto-generated if left blank"
                   className="w-full h-9 rounded-lg border border-line-strong px-3 text-sm outline-none focus:border-primary"
                 />
               </label>
@@ -544,7 +544,7 @@ export default function ShiftPatternsPage() {
 
               <button
                 onClick={savePattern}
-                disabled={saving || !form.name.trim() || !form.code.trim()}
+                disabled={saving || !form.name.trim()}
                 className={buttonClasses({ variant: "primary" })}
               >
                 {saving

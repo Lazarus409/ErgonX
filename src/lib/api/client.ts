@@ -50,7 +50,10 @@ const UPLOAD_TIMEOUT_MS = 5 * 60 * 1000;
 /* Token and tenant storage                                                   */
 /* -------------------------------------------------------------------------- */
 
-export const SESSION_HINT_KEY = "ergonx_session_hint";
+/** Non-HttpOnly hint cookie the BFF sets alongside the session; it expires with it. */
+export const SESSION_HINT_COOKIE = "ergonx_session";
+/** Present only for "Keep me signed in" sessions. */
+export const REMEMBER_COOKIE = "ergonx_remember";
 export const INSTITUTION_ID_KEY = "ergonx_institution_id";
 
 /**
@@ -98,18 +101,37 @@ export function getRefreshToken(): string | null {
   return null;
 }
 
+function readCookie(name: string): string | null {
+  if (!isBrowser()) return null;
+  const match = document.cookie.split("; ").find((part) => part.startsWith(`${name}=`));
+  return match ? decodeURIComponent(match.slice(name.length + 1)) : null;
+}
+
+function expireCookie(name: string): void {
+  if (isBrowser()) document.cookie = `${name}=; Max-Age=0; path=/; SameSite=Lax`;
+}
+
+/**
+ * Whether a server session probably exists. It reads the BFF's hint cookie, which
+ * shares the session's lifetime: a browser-session sign-in ends when the browser closes.
+ */
 export function hasSessionHint(): boolean {
-  return readStorage(SESSION_HINT_KEY) === "1";
+  return readCookie(SESSION_HINT_COOKIE) === "1";
+}
+
+/** True when the user chose "Keep me signed in" for this session. */
+export function isRememberedSession(): boolean {
+  return readCookie(REMEMBER_COOKIE) === "1";
 }
 
 export function setAuthTokens(...tokens: Array<string | null | undefined>): void {
-  // Session credentials are deliberately owned by the HttpOnly BFF cookies.
+  // Session credentials are owned by the HttpOnly BFF cookies, which also set the hint.
   void tokens;
-  writeStorage(SESSION_HINT_KEY, "1");
 }
 
 export function clearAuthTokens(): void {
-  writeStorage(SESSION_HINT_KEY, null);
+  expireCookie(SESSION_HINT_COOKIE);
+  expireCookie(REMEMBER_COOKIE);
 }
 
 const UUID_PATTERN =

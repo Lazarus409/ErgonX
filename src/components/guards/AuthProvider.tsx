@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 
+import IdleSignOut, { markActivity } from "@/components/guards/IdleSignOut";
 import { authApi, hasSessionHint, institutionsApi } from "@/lib/api";
 import type { SessionBootstrap, SessionInstitution, SessionUser } from "@/types/auth";
 
@@ -58,7 +59,7 @@ interface AuthContextValue {
   isLiveSession: boolean;
   isPlatformAdmin: boolean;
   bootstrap: SessionBootstrap | null;
-  login: (email: string, password: string, mfaCode?: string) => Promise<SessionBootstrap>;
+  login: (email: string, password: string, mfaCode?: string, remember?: boolean) => Promise<SessionBootstrap>;
   logout: () => void;
   refreshSession: () => Promise<SessionBootstrap>;
   /** Selects only an existing active membership, then refreshes all bootstrap-derived state. */
@@ -241,11 +242,12 @@ export default function AuthProvider({
   }, []);
 
   const login = useCallback(
-    async (email: string, password: string, mfaCode?: string) => {
+    async (email: string, password: string, mfaCode?: string, remember = false) => {
       setLoading(true);
 
       try {
-        await authApi.login({ email, password, mfa_code: mfaCode });
+        await authApi.login({ email, password, mfa_code: mfaCode, remember });
+        markActivity();
         return await applyLiveSession();
       } finally {
         setLoading(false);
@@ -292,7 +294,10 @@ export default function AuthProvider({
   );
 
   return (
-    <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={value}>
+      {children}
+      <IdleSignOut />
+    </AuthContext.Provider>
   );
 }
 

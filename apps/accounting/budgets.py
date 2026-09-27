@@ -305,6 +305,18 @@ class BudgetViewSet(RecordAttachmentsMixin, TenantModelViewSet):
         return Response({"id": str(note.id), "author": _person(request.user), "body": note.body, "created_at": note.created_at}, status=201)
 
     @action(detail=False, methods=("get",), filter_backends=())
+    def options(self, request):
+        """Choices for the budget form, available to anyone who can view budgets."""
+        institution = request.institution
+        return Response({
+            "fiscal_years": [{"id": str(item.id), "name": item.name, "start_date": item.start_date, "end_date": item.end_date}
+                             for item in FiscalYear.objects.for_institution(institution).order_by("-start_date")],
+            "departments": [{"id": str(item.id), "name": item.name} for item in Department.objects.for_institution(institution).order_by("name")],
+            "accounts": [{"id": str(item.id), "code": item.code, "name": item.name, "account_type": item.account_type}
+                         for item in Account.objects.for_institution(institution).filter(is_active=True, is_postable=True, account_type__in=(Account.AccountType.EXPENSE, Account.AccountType.ASSET)).order_by("code")],
+        })
+
+    @action(detail=False, methods=("get",), filter_backends=())
     def overview(self, request):
         """Folders by department, the category overview and department comparison for one fiscal year."""
         years = FiscalYear.objects.for_institution(request.institution).order_by("-start_date")

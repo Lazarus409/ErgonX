@@ -61,3 +61,34 @@ def test_positions_and_departments_expose_related_names(api_client, institution_
     renamed = api_client.patch(f"/api/v1/locations/{location.data['id']}/", {"name": "Kumasi Office", "is_active": False}, format="json")
     assert renamed.status_code == 200, renamed.data
     assert renamed.data["name"] == "Kumasi Office" and renamed.data["is_active"] is False
+
+
+def test_directors_and_auditors_read_every_report_but_auditors_do_not_approve(
+    api_client, institution_factory, user_factory, membership_factory, employee_factory,
+):
+    from datetime import date
+
+    from apps.attendance.models import AttendanceRecord
+
+    institution = institution_factory(code="REPORT-OVERSIGHT")
+    for module in ("LEAVE", "ATTENDANCE", "PAYROLL", "ACCOUNTING", "RECRUITMENT", "REPORTS"):
+        institution.modules.filter(module_code=module).update(is_enabled=True)
+    absent = employee_factory(institution, first_name="Kofi", last_name="Boateng")
+    AttendanceRecord.objects.create(institution=institution, employee=absent, attendance_date=date(2026, 9, 10), status="ABSENT", source="MANUAL")
+
+    for role_code in ("DIRECTOR", "AUDITOR"):
+        user = user_factory()
+        membership_factory(user=user, institution=institution, role_code=role_code, is_primary=True)
+        api_client.force_authenticate(user)
+        assert _visible(api_client) == set(REPORTS), role_code
+        # Drill-downs are institution-wide, not limited to the viewer's own records.
+        details = api_client.get("/api/v1/reports/attendance/", {"group": "ABSENT"})
+        assert [row["employee"] for row in details.data["rows"]] == ["Kofi Boateng"], role_code
+
+    # The auditor reads, but never sees or acts on the approval queue.
+    assert api_client.get("/api/v1/approval-requests/").status_code == 403
+
+    hr = user_factory()
+    membership_factory(user=hr, institution=institution, role_code="HR_ADMIN", is_primary=True)
+    api_client.force_authenticate(hr)
+    assert _visible(api_client).isdisjoint({"accounting", "ap-ar", "expenses"})

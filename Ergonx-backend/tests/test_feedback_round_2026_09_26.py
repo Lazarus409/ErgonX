@@ -230,3 +230,25 @@ def test_report_rows_open_to_the_records_they_count(
 
     assert api_client.get("/api/v1/reports/accounting/", {"group": "MANUAL"}).status_code in (400, 403)
     assert api_client.get("/api/v1/reports/attendance/", {"group": ["ABSENT", "EXTRA"]}).status_code == 400
+
+
+def test_system_roles_are_resynced_to_the_code_on_migrate(api_client, institution_factory, user_factory, membership_factory, employee_factory):
+    from apps.institutions.models import Permission, Role
+    from apps.institutions.services import sync_system_role_permissions
+    from apps.organization.models import Department
+
+    institution = institution_factory()
+    head = user_factory()
+    membership_factory(user=head, institution=institution, role_code="DEPARTMENT_HEAD")
+    employee = employee_factory(institution, user=head)
+    Department.objects.create(institution=institution, name="Operations", code="OPS", head=employee)
+    role = Role.objects.get(institution=institution, code="DEPARTMENT_HEAD")
+    # Drift as seen on a deployed database: the dashboard permission went missing.
+    role.permissions.remove(Permission.objects.get(code="dashboard.department.view"))
+    api_client.force_authenticate(head)
+    assert api_client.get("/api/v1/dashboards/department/").status_code == 403
+
+    changes = sync_system_role_permissions()
+    assert changes["DEPARTMENT_HEAD"] == {"added": ["dashboard.department.view"], "removed": []}
+    assert api_client.get("/api/v1/dashboards/department/").status_code == 200
+    assert sync_system_role_permissions() == {}

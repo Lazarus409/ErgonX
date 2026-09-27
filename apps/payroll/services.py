@@ -16,6 +16,8 @@ from apps.institutions.services import record_user_activity
 from apps.payroll.calculation import calculate_employee_record, money
 from apps.payroll.custom_rules import normalize_custom_rules, normalize_pay_day_rule
 from apps.payroll.models import (
+    PayrollRecord,
+    PayrollRunException,
     EmployeeTaxReliefClaim,
     EmployeePayrollProfile,
     InstitutionPayrollConfiguration,
@@ -584,6 +586,7 @@ def calculate_payroll_run(*, payroll_run, actor):
         )
     run.status = PayrollRun.Status.CALCULATED
     run.save(update_fields=("status", "updated_at"))
+    detect_payroll_exceptions(run)
     record_audit_event(
         actor=actor,
         institution=run.institution,
@@ -608,6 +611,14 @@ def submit_payroll_run_for_review(*, payroll_run, actor):
         raise CodedValidationError(
             {"status": "Only calculated runs can enter review."},
             api_code="invalid_state_transition",
+        )
+    blocking = run.exceptions.filter(
+        status=PayrollRunException.Status.OPEN, severity=PayrollRunException.Severity.HIGH
+    ).count()
+    if blocking:
+        raise CodedValidationError(
+            {"exceptions": f"Resolve {blocking} high-severity payroll exception(s) before submitting for review."},
+            api_code="payroll_exceptions_open",
         )
     run.status = PayrollRun.Status.UNDER_REVIEW
     run.save(update_fields=("status", "updated_at"))
@@ -1247,3 +1258,137 @@ def decide_tax_relief_claim(*, claim, actor, approve, approved_amount=None):
         ),
     )
     return claim
+
+
+LARGE_NET_CHANGE_RATIO = Decimal("0.25")
+
+
+def detect_payroll_exceptions(run):
+    """(Re)compute a calculated run's exceptions.
+
+    New issues are opened, issues that disappeared are resolved automatically,
+    and acknowledged or resolved decisions on issues that persist are kept.
+    """
+    from apps.employees.models import Employee
+
+    detected = {}
+
+    def add(code, severity, message, employee=None, **details):
+        detected[(code, employee.id if employee else None)] = (code, severity, message, employee, details)
+
+    records = list(run.records.select_related("employee"))
+    for record in records:
+        if record.status == PayrollRecord.Status.ERROR:
+            add(PayrollRunException.Code.CALCULATION_ERROR, PayrollRunException.Severity.HIGH, "Payroll record could not be calculated.", record.employee)
+        if record.net_pay <= 0:
+            add(PayrollRunException.Code.NON_POSITIVE_NET_PAY, PayrollRunException.Severity.HIGH, f"Net pay is {record.net_pay} {record.currency}.", record.employee, net_pay=str(record.net_pay))
+
+    for discrepancy in reconcile_payroll_run(run)["discrepancies"]:
+        employee = next((record.employee for record in records if str(record.employee_id) == discrepancy["employee_id"]), None)
+        add(
+            PayrollRunException.Code.RECONCILIATION_DISCREPANCY, PayrollRunException.Severity.HIGH,
+            f"{discrepancy['field'].replace('_', ' ').capitalize()} stored {discrepancy['stored']} but items total {discrepancy['calculated']}.",
+            employee, **discrepancy,
+        )
+
+    previous_run = (
+        PayrollRun.objects.filter(institution=run.institution, status=PayrollRun.Status.FINALIZED)
+        .exclude(pk=run.pk)
+        .filter(payroll_period__start_date__lt=run.payroll_period.start_date)
+        .order_by("-payroll_period__start_date", "-run_number")
+        .first()
+    )
+    if previous_run:
+        previous_net = dict(previous_run.records.values_list("employee_id", "net_pay"))
+        for record in records:
+            before = previous_net.get(record.employee_id)
+            if before and before > 0 and abs(record.net_pay - before) / before > LARGE_NET_CHANGE_RATIO:
+                change = (record.net_pay - before) / before * 100
+                add(
+                    PayrollRunException.Code.LARGE_NET_PAY_CHANGE, PayrollRunException.Severity.MEDIUM,
+                    f"Net pay changed {change:+.0f}% from the previous finalized run ({before} to {record.net_pay}).",
+                    record.employee, previous=str(before), current=str(record.net_pay),
+                )
+
+    included = {record.employee_id for record in records}
+    for employee in Employee.objects.filter(
+        institution=run.institution, status=Employee.Status.ACTIVE, hire_date__lte=run.payroll_period.end_date,
+        employments__is_current=True,
+    ).exclude(id__in=included).distinct():
+        add(PayrollRunException.Code.NOT_IN_RUN, PayrollRunException.Severity.MEDIUM, "Active employee has no payroll record in this run (no compensation for the period).", employee)
+
+    with_profile = set(
+        EmployeePayrollProfile.objects.filter(institution=run.institution, employee_id__in=included).values_list("employee_id", flat=True)
+    )
+    for record in records:
+        if record.employee_id not in with_profile:
+            add(PayrollRunException.Code.MISSING_PAYROLL_PROFILE, PayrollRunException.Severity.LOW, "Employee payroll profile (tax residency and identifiers) is not configured.", record.employee)
+
+    existing = {(item.code, item.employee_id): item for item in run.exceptions.all()}
+    now = timezone.now()
+    for key, (code, severity, message, employee, details) in detected.items():
+        item = existing.get(key)
+        if item is None:
+            PayrollRunException.objects.create(
+                institution=run.institution, payroll_run=run, employee=employee,
+                code=code, severity=severity, message=message, details=_json_safe(details),
+            )
+        else:
+            item.severity, item.message, item.details = severity, message, _json_safe(details)
+            if item.status == PayrollRunException.Status.RESOLVED and item.resolved_by_id is None:
+                item.status = PayrollRunException.Status.OPEN
+                item.resolution_note = ""
+                item.resolved_at = None
+            item.save()
+    for key, item in existing.items():
+        if key not in detected and item.status != PayrollRunException.Status.RESOLVED:
+            item.status = PayrollRunException.Status.RESOLVED
+            item.resolution_note = "No longer detected on revalidation."
+            item.resolved_by = None
+            item.resolved_at = now
+            item.save(update_fields=("status", "resolution_note", "resolved_by", "resolved_at", "updated_at"))
+    return run.exceptions.all()
+
+
+def _json_safe(details):
+    return {key: str(value) if not isinstance(value, (str, int, float, bool, type(None))) else value for key, value in details.items()}
+
+
+@transaction.atomic
+def revalidate_payroll_run(*, payroll_run, actor):
+    run = PayrollRun.objects.select_for_update().get(pk=payroll_run.pk)
+    _membership_with_permission(actor, run.institution, "payroll.prepare")
+    if run.status not in {PayrollRun.Status.CALCULATED, PayrollRun.Status.UNDER_REVIEW}:
+        raise CodedValidationError(
+            {"status": "Only calculated or in-review runs can be validated."}, api_code="invalid_state_transition"
+        )
+    detect_payroll_exceptions(run)
+    record_audit_event(actor=actor, institution=run.institution, entity=run, action="payroll.run.validated",
+                       metadata={"open_exceptions": run.exceptions.filter(status=PayrollRunException.Status.OPEN).count()})
+    return run
+
+
+@transaction.atomic
+def update_payroll_exception(*, exception, actor, status, note=""):
+    exception = PayrollRunException.objects.select_for_update().select_related("payroll_run").get(pk=exception.pk)
+    _membership_with_permission(actor, exception.institution, "payroll.prepare")
+    if exception.payroll_run.status in {PayrollRun.Status.FINALIZED, PayrollRun.Status.CANCELLED}:
+        raise ValidationError({"payroll_run": "Exceptions on finalized or cancelled runs are read-only."})
+    if status not in PayrollRunException.Status.values:
+        raise ValidationError({"status": "Unknown exception status."})
+    if status == PayrollRunException.Status.ACKNOWLEDGED and exception.severity == PayrollRunException.Severity.HIGH:
+        raise ValidationError({"status": "High-severity exceptions must be resolved, not acknowledged."})
+    if status != PayrollRunException.Status.OPEN and not (note or "").strip():
+        raise ValidationError({"note": "Record how the exception was handled."})
+    before = exception.status
+    exception.status = status
+    exception.resolution_note = (note or "").strip() if status != PayrollRunException.Status.OPEN else ""
+    exception.resolved_by = actor if status != PayrollRunException.Status.OPEN else None
+    exception.resolved_at = timezone.now() if status != PayrollRunException.Status.OPEN else None
+    exception.save(update_fields=("status", "resolution_note", "resolved_by", "resolved_at", "updated_at"))
+    record_audit_event(
+        actor=actor, institution=exception.institution, entity=exception.payroll_run,
+        action="payroll.exception.updated",
+        metadata={"exception_id": str(exception.id), "code": exception.code, "from": before, "to": status, "note": exception.resolution_note},
+    )
+    return exception

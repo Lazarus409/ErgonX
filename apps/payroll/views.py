@@ -1,3 +1,4 @@
+from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiExample, extend_schema, extend_schema_view
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -25,6 +26,8 @@ from apps.payroll.models import (
     TaxRule,
 )
 from apps.payroll.serializers import (
+    PayrollExceptionUpdateSerializer,
+    PayrollRunExceptionSerializer,
     ComplianceDeadlineSerializer,
     ContributionAllocationSerializer,
     ContributionRuleSerializer,
@@ -54,6 +57,8 @@ from apps.payroll.services import (
     calculate_payroll_run,
     cancel_payroll_run,
     compliance_deadlines_for_period,
+    revalidate_payroll_run,
+    update_payroll_exception,
     decide_payroll_adjustment,
     decide_tax_relief_claim,
     finalize_payroll_run,
@@ -371,6 +376,8 @@ class PayrollRunViewSet(TenantModelViewSet):
             "approve": "payroll.approve",
             "finalize": "payroll.finalize",
             "generate_accounting_journal": "journal.create",
+            "validate": "payroll.prepare",
+            "update_exception": "payroll.prepare",
         }.get(self.action, "payroll.view")
 
     def get_queryset(self):
@@ -420,6 +427,55 @@ class PayrollRunViewSet(TenantModelViewSet):
     @action(detail=True, methods=("post",), filter_backends=())
     def cancel(self, request, pk=None):
         return self._transition(request, cancel_payroll_run)
+
+    @extend_schema(request=None, responses=PayrollRunSerializer, filters=False)
+    @action(detail=True, methods=("post",), filter_backends=())
+    def validate(self, request, pk=None):
+        """Re-run exception detection on a calculated or in-review run."""
+        return self._transition(request, revalidate_payroll_run)
+
+    @extend_schema(request=None, responses=PayrollRunExceptionSerializer(many=True), filters=False)
+    @action(detail=True, methods=("get",), filter_backends=(), pagination_class=None)
+    def exceptions(self, request, pk=None):
+        run = self.get_object()
+        items = run.exceptions.select_related("employee", "resolved_by").order_by("status", "severity", "created_at")
+        return Response(PayrollRunExceptionSerializer(items, many=True).data)
+
+    @extend_schema(request=PayrollExceptionUpdateSerializer, responses=PayrollRunExceptionSerializer, filters=False)
+    @action(detail=True, methods=("post",), filter_backends=(), url_path=r"exceptions/(?P<exception_id>[0-9a-f-]+)")
+    def update_exception(self, request, pk=None, exception_id=None):
+        from rest_framework.exceptions import NotFound
+
+        run = self.get_object()
+        exception = run.exceptions.filter(pk=exception_id).first()
+        if exception is None:
+            raise NotFound("Payroll exception not found.")
+        payload = PayrollExceptionUpdateSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        updated = call_validated_service(
+            update_payroll_exception, exception=exception, actor=request.user,
+            status=payload.validated_data["status"], note=payload.validated_data.get("note", ""),
+        )
+        return Response(PayrollRunExceptionSerializer(updated).data)
+
+    @extend_schema(request=None, responses=OpenApiTypes.OBJECT, filters=False)
+    @action(detail=True, methods=("get",), filter_backends=(), pagination_class=None)
+    def activity(self, request, pk=None):
+        """Audit trail for this run (status changes, validation, exception handling)."""
+        from apps.audit.models import AuditLog
+
+        run = self.get_object()
+        entries = AuditLog.objects.filter(institution=request.institution, entity_id=run.id).select_related("actor").order_by("-created_at")[:100]
+        return Response([
+            {
+                "id": str(entry.id),
+                "action": entry.action,
+                "actor": (entry.actor.get_full_name() or entry.actor.email) if entry.actor else "System",
+                "created_at": entry.created_at,
+                "metadata": entry.metadata,
+            }
+            for entry in entries
+        ])
 
     @extend_schema(
         filters=False,

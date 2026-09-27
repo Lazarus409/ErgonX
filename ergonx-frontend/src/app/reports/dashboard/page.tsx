@@ -1,7 +1,7 @@
 "use client";
 
-import { BarChart3, Briefcase, CalendarDays, Clock3, Download, FileBarChart, Receipt, Scale, Users, WalletCards, type LucideIcon } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { BarChart3, Briefcase, CalendarDays, ChevronRight, Clock3, Download, FileBarChart, ListTree, Receipt, Scale, Users, WalletCards, X, type LucideIcon } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import ChartCard from "@/components/charts/ChartCard";
 import { BarsChart } from "@/components/charts/Charts";
@@ -11,7 +11,9 @@ import ErrorState from "@/components/ui/ErrorState";
 import EmptyState from "@/components/ui/EmptyState";
 import { Field, Input } from "@/components/ui/Field";
 import PageHeader from "@/components/ui/PageHeader";
+import StatusBadge from "@/components/ui/StatusBadge";
 import { apiDownload, getApiErrorMessage, reportsApi } from "@/lib/api";
+import { REPORT_GROUP_FIELDS, reportPath, type ReportFilters } from "@/lib/api/reports";
 import { useApiResource } from "@/lib/useApiResource";
 import { useAuth } from "@/components/guards/AuthProvider";
 import { hasModule } from "@/types/institutions";
@@ -46,6 +48,71 @@ const reportVisuals: Record<ReportId, { icon: LucideIcon; accent: ModuleAccent }
 
 type ReportRow = Record<string, string | number | null>;
 
+const isNumericValue = (value: unknown) => typeof value === "number" || (typeof value === "string" && /^-?\d+(\.\d+)?$/.test(value));
+const numericColumn = (rows: ReportRow[], column: string) => rows.length > 0 && rows.every((row) => row[column] === null || row[column] === undefined || isNumericValue(row[column]));
+const sortValue = (value: string | number | null) => (typeof value === "number" ? value : value !== null && isNumericValue(value) ? Number(value) : value);
+
+async function downloadCsv(path: string, filters: ReportFilters, filename: string) {
+  const blob = await apiDownload(path, { export: "csv", ...filters });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url; link.download = filename; link.click(); URL.revokeObjectURL(url);
+}
+
+/** The records behind one summary row, e.g. every employee counted as ABSENT. */
+function ReportDrillDown({ report, title, group, filters, onClose }: { report: ReportId; title: string; group: string[]; filters: ReportFilters; onClose: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const load = useCallback(() => reportsApi.getReportDetails(report, group, filters), [report, group, filters]);
+  const { data, loading, error, reload } = useApiResource(load);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const rows = useMemo(() => data?.rows ?? [], [data]);
+  const columns = useMemo(() => Array.from(new Set(rows.flatMap((row) => Object.keys(row)))), [rows]);
+  const label = group.map((value) => humanizeEnum(value)).join(" · ");
+  useEffect(() => { ref.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, [group]);
+  const download = async () => {
+    setDownloading(true); setDownloadError(null);
+    try { await downloadCsv(reportPath(report, group), filters, `ergonx-${report}-${group.join("-").toLowerCase()}.csv`); }
+    catch (caught) { setDownloadError(getApiErrorMessage(caught)); }
+    finally { setDownloading(false); }
+  };
+  return (
+    <div ref={ref} className="scroll-mt-24 space-y-3">
+      {downloadError && <ErrorState variant="inline" title="Unable to export these records" message={downloadError} />}
+      <DataTable<ReportRow>
+        caption={`${title}: ${label}`}
+        rows={data?.rows}
+        rowKey={(_, index) => `${report}-${group.join("-")}-${index}`}
+        loading={loading}
+        error={error}
+        onRetry={reload}
+        minWidth={Math.max(640, columns.length * 130)}
+        empty={{ title: "No records", description: "Nothing in this row matches the current filters.", icon: ListTree }}
+        toolbar={
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="flex items-center gap-1 text-caption font-medium text-ink-muted">{title}<ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />Details</p>
+              <h2 className="text-card-title font-semibold text-ink-strong">{label}</h2>
+              <p className="text-support text-ink-muted">{loading && !data ? "Loading records…" : `${rows.length} record${rows.length === 1 ? "" : "s"}${rows.length >= 1000 ? " (first 1,000 shown; the CSV has the same limit)" : ""}.`}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="secondary" size="sm" loading={downloading} loadingLabel="Preparing…" onClick={() => void download()} leadingIcon={<Download className="h-4 w-4" />} disabled={!rows.length}>CSV</Button>
+              <Button variant="ghost" size="sm" onClick={onClose} leadingIcon={<X className="h-4 w-4" />}>Close</Button>
+            </div>
+          </div>
+        }
+        columns={columns.map((column) => ({
+          key: column,
+          header: humanizeEnum(column),
+          numeric: numericColumn(rows, column),
+          sortValue: (row: ReportRow) => sortValue(row[column]),
+          cell: (row: ReportRow) => (column === "status" && row[column] ? <StatusBadge status={String(row[column])} size="sm" /> : ((row[column] === "" ? "—" : row[column]) ?? "—") as React.ReactNode),
+        }))}
+      />
+    </div>
+  );
+}
+
 export default function ReportsDashboardPage() {
   const { institution, user } = useAuth();
   const visibleReports = useMemo(() => {
@@ -59,6 +126,7 @@ export default function ReportsDashboardPage() {
   const [dateTo, setDateTo] = useState("");
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [drill, setDrill] = useState<string[] | null>(null);
   const activeSelected = visibleReports.some((item) => item.id === selected) ? selected : (visibleReports[0]?.id ?? selected);
   const supportsStatus = activeSelected !== "ap-ar";
   const filters = useMemo(() => ({ ...(supportsStatus ? { status: status || undefined } : {}), date_from: dateFrom || undefined, date_to: dateTo || undefined }), [supportsStatus, status, dateFrom, dateTo]);
@@ -69,13 +137,18 @@ export default function ReportsDashboardPage() {
   const download = async () => {
     setDownloading(true); setDownloadError(null);
     try {
-      const blob = await apiDownload(`/reports/${activeSelected}/`, { export: "csv", ...filters });
-      const url = URL.createObjectURL(blob); const link = document.createElement("a");
-      link.href = url; link.download = `ergonx-${activeSelected}${status ? `-${status.toLowerCase()}` : ""}.csv`; link.click(); URL.revokeObjectURL(url);
+      await downloadCsv(reportPath(activeSelected), filters, `ergonx-${activeSelected}${status ? `-${status.toLowerCase()}` : ""}.csv`);
     } catch (caught) { setDownloadError(getApiErrorMessage(caught)); }
     finally { setDownloading(false); }
   };
-  const isNumericColumn = (column: string) => (data?.rows ?? []).length > 0 && (data?.rows ?? []).every((row) => row[column] === null || row[column] === undefined || typeof row[column] === "number" || (typeof row[column] === "string" && /^-?\d+(\.\d+)?$/.test(String(row[column]))));
+  const isNumericColumn = (column: string) => numericColumn(data?.rows ?? [], column);
+  const groupFields = REPORT_GROUP_FIELDS[activeSelected];
+  const openRow = (row: ReportRow) => {
+    const group = groupFields.map((field) => String(row[field] ?? ""));
+    if (group.every(Boolean)) setDrill(group);
+  };
+  // A drill-down belongs to the report and filters it was opened from.
+  const setFilter = (update: () => void) => { update(); setDrill(null); };
 
   // At-a-glance visual: the first descriptive column against the first measure.
   const labelColumn = columns.find((column) => !isNumericColumn(column));
@@ -108,7 +181,7 @@ export default function ReportsDashboardPage() {
                   type="button"
                   key={item.id}
                   aria-pressed={active}
-                  onClick={() => { setSelected(item.id); setStatus(""); }}
+                  onClick={() => { setSelected(item.id); setStatus(""); setDrill(null); }}
                   className={cx(
                     "group relative flex items-center gap-3 overflow-hidden rounded-2xl border bg-surface p-4 text-left shadow-elevation-1 transition-[box-shadow,border-color,transform] duration-200 hover:-translate-y-0.5 hover:shadow-elevation-2",
                     active ? "border-mod-reports ring-4 ring-mod-reports/12" : "border-line",
@@ -143,6 +216,7 @@ export default function ReportsDashboardPage() {
             loading={loading}
             error={error}
             onRetry={reload}
+            onRowClick={openRow}
             minWidth={Math.max(600, columns.length * 140)}
             empty={{ title: "No report rows", description: "No report rows found for this institution and filter selection.", icon: FileBarChart }}
             toolbar={
@@ -150,19 +224,19 @@ export default function ReportsDashboardPage() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h2 className="text-card-title font-semibold text-ink-strong">{report?.title}</h2>
-                    <p className="text-support text-ink-muted">Live summary. The CSV download uses the filters you set here.</p>
+                    <p className="text-support text-ink-muted">Live summary. Select a row to see the records behind it. The CSV download uses the filters you set here.</p>
                   </div>
                   <span className="rounded-full bg-surface-muted px-2.5 py-1 text-caption font-semibold text-ink-muted tabular-nums">{data?.rows.length ?? 0} rows</span>
                 </div>
                 <DataToolbar
                   filters={
                     <div className="grid w-full gap-3 sm:grid-cols-3 lg:w-auto">
-                      {supportsStatus && <Field label="Status"><Input size="sm" value={status} onChange={(event) => setStatus(event.target.value.toUpperCase())} placeholder="e.g. APPROVED" /></Field>}
-                      <Field label="From"><Input size="sm" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} /></Field>
-                      <Field label="To"><Input size="sm" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} /></Field>
+                      {supportsStatus && <Field label="Status"><Input size="sm" value={status} onChange={(event) => { const value = event.target.value.toUpperCase(); setFilter(() => setStatus(value)); }} placeholder="e.g. APPROVED" /></Field>}
+                      <Field label="From"><Input size="sm" type="date" value={dateFrom} onChange={(event) => { const value = event.target.value; setFilter(() => setDateFrom(value)); }} /></Field>
+                      <Field label="To"><Input size="sm" type="date" value={dateTo} onChange={(event) => { const value = event.target.value; setFilter(() => setDateTo(value)); }} /></Field>
                     </div>
                   }
-                  onClear={status || dateFrom || dateTo ? () => { setStatus(""); setDateFrom(""); setDateTo(""); } : undefined}
+                  onClear={status || dateFrom || dateTo ? () => setFilter(() => { setStatus(""); setDateFrom(""); setDateTo(""); }) : undefined}
                 />
               </div>
             }
@@ -170,13 +244,17 @@ export default function ReportsDashboardPage() {
               key: column,
               header: humanizeEnum(column),
               numeric: isNumericColumn(column),
-              sortValue: (row: ReportRow) => {
-                const value = row[column];
-                return typeof value === "number" ? value : value !== null && /^-?\d+(\.\d+)?$/.test(String(value)) ? Number(value) : value;
+              sortValue: (row: ReportRow) => sortValue(row[column]),
+              cell: (row: ReportRow) => {
+                const value = (row[column] ?? "—") as React.ReactNode;
+                const opensRow = column === groupFields[groupFields.length - 1] && groupFields.every((field) => row[field]);
+                const selectedRow = drill !== null && groupFields.every((field, index) => String(row[field] ?? "") === drill[index]);
+                return opensRow ? <span className={cx("inline-flex items-center gap-1 font-semibold", selectedRow ? "text-primary-ink" : "text-ink-strong group-hover:text-primary-ink")}>{value}<ChevronRight className="h-3.5 w-3.5 opacity-60" aria-hidden="true" /></span> : value;
               },
-              cell: (row: ReportRow) => (row[column] ?? "—") as React.ReactNode,
             }))}
           />
+
+          {drill && report && <ReportDrillDown report={activeSelected} title={report.title} group={drill} filters={filters} onClose={() => setDrill(null)} />}
         </>
       )}
     </div>

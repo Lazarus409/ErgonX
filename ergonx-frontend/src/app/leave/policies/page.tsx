@@ -24,6 +24,8 @@ import { ACCRUAL_METHODS } from "@/types/leave";
 import type { LeavePolicy, LeavePolicyPayload, LeaveType } from "@/types/leave";
 import { formatDate, formatNumber, humanizeEnum } from "@/lib/format";
 import { buttonClasses } from "@/components/ui/Button";
+import LeaveTypesCard from "@/components/leave/LeaveTypesCard";
+import { useAccess } from "@/lib/access";
 
 const ALL_TYPES = "ALL_TYPES";
 const ALL_STATUSES = "ALL_STATUSES";
@@ -92,6 +94,7 @@ const emptyReference: Reference = {
 };
 
 export default function LeavePoliciesPage() {
+  const { can } = useAccess();
   const [policies, setPolicies] = useState<LeavePolicy[]>([]);
   const [reference, setReference] = useState<Reference>(emptyReference);
   const [loading, setLoading] = useState(true);
@@ -202,10 +205,10 @@ export default function LeavePoliciesPage() {
     });
   }, [policies, search, statusFilter, typeFilter, leaveTypeNames]);
 
-  const openCreate = () => {
+  const openCreate = (leaveType = "") => {
     setEditingPolicy(null);
     setFormError("");
-    setForm(emptyForm);
+    setForm({ ...emptyForm, leaveType });
     setModalOpen(true);
   };
 
@@ -355,7 +358,7 @@ export default function LeavePoliciesPage() {
         description="Configure leave entitlement, accrual rules and employee eligibility."
         actions={
           <button
-            onClick={openCreate}
+            onClick={() => openCreate()}
             className={buttonClasses({ variant: "primary" })}
           >
             <Plus className="h-4 w-4" />
@@ -365,6 +368,16 @@ export default function LeavePoliciesPage() {
       />
 
       {error && <ErrorState message={error} onRetry={reload} />}
+
+      {!loading && (
+        <LeaveTypesCard
+          types={reference.leaveTypes}
+          policyTypeIds={new Set(policies.filter((policy) => policy.is_active).map((policy) => policy.leave_type))}
+          canConfigure={can("leave.configure")}
+          onChanged={reload}
+          onAddPolicy={openCreate}
+        />
+      )}
 
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="rounded-xl border border-line bg-surface p-5 shadow-sm">

@@ -1727,3 +1727,96 @@ class BankReconciliationSession(TenantOwnedModel):
             raise ValidationError({"bank_account": "Bank account belongs to another institution."})
         if self.period_end and self.period_start and self.period_end < self.period_start:
             raise ValidationError({"period_end": "Period end cannot precede its start."})
+
+
+class Budget(AutoCodeMixin, TenantOwnedModel):
+    """A departmental or institution-wide budget for a fiscal year (concept "Budgets")."""
+
+    auto_code_field = "code"
+    auto_code_prefix = "BUD"
+    auto_code_width = 4
+    auto_code_year_from = "today"
+
+    class BudgetType(models.TextChoices):
+        OPERATING = "OPERATING", "Operating"
+        CAPITAL = "CAPITAL", "Capital"
+        PROJECT = "PROJECT", "Project"
+
+    class Status(models.TextChoices):
+        DRAFT = "DRAFT", "Draft"
+        PENDING_APPROVAL = "PENDING_APPROVAL", "Pending approval"
+        APPROVED = "APPROVED", "Approved"
+        RETURNED = "RETURNED", "Changes requested"
+        CLOSED = "CLOSED", "Closed"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="budgets")
+    code = models.CharField(max_length=50, blank=True)
+    name = models.CharField(max_length=150)
+    fiscal_year = models.ForeignKey(FiscalYear, on_delete=models.PROTECT, related_name="budgets")
+    department = models.ForeignKey(Department, on_delete=models.PROTECT, null=True, blank=True, related_name="budgets")
+    budget_type = models.CharField(max_length=10, choices=BudgetType.choices, default=BudgetType.OPERATING)
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="budgets_owned")
+    description = models.TextField(blank=True, max_length=2000)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.DRAFT)
+    version = models.PositiveIntegerField(default=1)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="budgets_created")
+    submitted_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="budgets_submitted")
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="budgets_approved")
+    approved_at = models.DateTimeField(null=True, blank=True)
+    approval_note = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        constraints = [models.UniqueConstraint(fields=("institution", "code"), name="uniq_budget_code_per_institution")]
+        indexes = [models.Index(fields=("institution", "fiscal_year", "status"))]
+
+    def clean(self):
+        errors = {}
+        for name in ("fiscal_year", "department"):
+            obj = getattr(self, name, None)
+            if obj and obj.institution_id != self.institution_id:
+                errors[name] = "Referenced record must belong to the same institution."
+        if self.owner_id and not self.owner.memberships.filter(institution_id=self.institution_id, status="ACTIVE").exists():
+            errors["owner"] = "Owner must be an active institution member."
+        if errors:
+            raise ValidationError(errors)
+
+
+class BudgetLine(TenantOwnedModel):
+    class Category(models.TextChoices):
+        PERSONNEL = "PERSONNEL", "Personnel"
+        OPERATING = "OPERATING", "Operating expenses"
+        SUPPLIES = "SUPPLIES", "Supplies & materials"
+        TRAVEL = "TRAVEL", "Travel"
+        CAPITAL = "CAPITAL", "Capital equipment"
+        TRANSFERS = "TRANSFERS", "Transfers"
+        OTHER = "OTHER", "Other"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="budget_lines")
+    budget = models.ForeignKey(Budget, on_delete=models.CASCADE, related_name="lines")
+    category = models.CharField(max_length=10, choices=Category.choices)
+    account = models.ForeignKey(Account, on_delete=models.PROTECT, null=True, blank=True, related_name="budget_lines")
+    description = models.CharField(max_length=200, blank=True)
+    initiative = models.CharField(max_length=120, blank=True)
+    allocated = models.DecimalField(max_digits=20, decimal_places=2)
+
+    class Meta:
+        ordering = ("category", "created_at")
+        constraints = [models.CheckConstraint(condition=Q(allocated__gte=0), name="budget_line_allocated_nonnegative")]
+
+    def clean(self):
+        if self.account_id and self.account.institution_id != self.institution_id:
+            raise ValidationError({"account": "Account belongs to another institution."})
+        if self.account_id and self.account.account_type not in (Account.AccountType.EXPENSE, Account.AccountType.ASSET):
+            raise ValidationError({"account": "Budget lines track expense or capital (asset) accounts."})
+
+
+class BudgetNote(TenantOwnedModel):
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="budget_notes")
+    budget = models.ForeignKey(Budget, on_delete=models.CASCADE, related_name="notes")
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="budget_notes")
+    body = models.TextField(max_length=4000)
+
+    class Meta:
+        ordering = ("-created_at",)

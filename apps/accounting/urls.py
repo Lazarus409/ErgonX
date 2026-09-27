@@ -1,3 +1,4 @@
+from apps.accounting.budgets import BudgetViewSet
 from rest_framework.routers import DefaultRouter
 
 from apps.accounting.views import (
@@ -79,6 +80,7 @@ router.register("fiscal-years", FiscalYearViewSet, basename="fiscal-year")
 router.register("accounting-periods", AccountingPeriodViewSet, basename="accounting-period")
 router.register("journal-entries", JournalEntryViewSet, basename="journal-entry")
 router.register("bank-reconciliations", BankReconciliationSessionViewSet, basename="bank-reconciliation")
+router.register("budgets", BudgetViewSet, basename="budget")
 router.register("journal-lines", JournalLineViewSet, basename="journal-line")
 router.register("accounting-reports", AccountingReportViewSet, basename="accounting-report")
 

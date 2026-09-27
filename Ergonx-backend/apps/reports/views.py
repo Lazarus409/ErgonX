@@ -1,13 +1,16 @@
+import re
+
 from django.http import HttpResponse
 from drf_spectacular.utils import OpenApiTypes, extend_schema
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
-from apps.reports.services import build_report_rows, rows_to_csv
+from apps.reports.services import build_report_details, build_report_rows, rows_to_csv
 from apps.institutions.services import effective_permission_codes
 from common.permissions import TenantContextPermission, TenantRBACPermission
+from common.scoping import scope_to_employees
 
 # Beyond report.view, a report needs the permissions that already guard its data,
 # so a role never reads a summary of records it could not open directly.
@@ -47,17 +50,32 @@ class ReportsViewSet(ViewSet):
         missing = [code for code in REPORT_PERMISSIONS[name] if code not in granted]
         if missing:
             raise PermissionDenied("Your role does not include access to this report.")
-        rows = build_report_rows(
-            request.institution,
-            name,
-            status=request.query_params.get("status"),
-            date_from=request.query_params.get("date_from"),
-            date_to=request.query_params.get("date_to"),
-        )
+        filters = {
+            "status": request.query_params.get("status"),
+            "date_from": request.query_params.get("date_from"),
+            "date_to": request.query_params.get("date_to"),
+        }
+        # ?group=<value>[&group=<value>] opens one summary row: the records it counted.
+        group = request.query_params.getlist("group")
+        try:
+            if group:
+                rows = build_report_details(
+                    request.institution,
+                    name,
+                    group,
+                    scope=lambda queryset, field, **options: scope_to_employees(queryset, request, field, **options),
+                    **filters,
+                )
+            else:
+                rows = build_report_rows(request.institution, name, **filters)
+        except ValueError as exc:
+            raise ValidationError({"detail": str(exc)}) from exc
         if request.query_params.get("export") != "csv":
-            return Response({"report": name, "rows": rows})
+            return Response({"report": name, "group": group, "rows": rows} if group else {"report": name, "rows": rows})
+        # Group values come from the query string, so only safe characters reach the header.
+        filename = re.sub(r"[^a-z0-9-]+", "-", "-".join([name, *group]).lower()).strip("-")
         response = HttpResponse(rows_to_csv(rows), content_type="text/csv")
-        response["Content-Disposition"] = f'attachment; filename="{name}.csv"'
+        response["Content-Disposition"] = f'attachment; filename="{filename}.csv"'
         return response
 
     @action(detail=False, methods=("get",), url_path="workforce-cost")

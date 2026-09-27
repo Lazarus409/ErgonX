@@ -435,7 +435,7 @@ def test_approved_leave_blocks_clock_in(
         assigned_by=hr,
     )
     leave_type = LeaveType.objects.create(
-        institution=institution, name="Annual", code="ANNUAL"
+        institution=institution, name="Annual", code="TEST-ANNUAL"
     )
     LeaveRequest.objects.create(
         institution=institution,

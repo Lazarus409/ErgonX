@@ -237,6 +237,7 @@ class InstitutionPayrollConfigurationSerializer(TenantRelationSerializer):
             "selected_payroll_preset_version",
             "pay_day_rule",
             "rounding_rule",
+            "custom_rules",
             "is_configured",
             "configured_by",
             "configured_at",
@@ -271,6 +272,7 @@ class InstitutionPayrollConfigurationSerializer(TenantRelationSerializer):
                 "selected_payroll_preset_version",
                 "pay_day_rule",
                 "rounding_rule",
+                "custom_rules",
                 "is_configured",
             )
         }
@@ -392,12 +394,17 @@ class PayrollRunSerializer(TenantRelationSerializer):
 
 
 class PayrollRecordSerializer(serializers.ModelSerializer):
+    employee_name = serializers.CharField(source="employee.full_name", read_only=True)
+    employee_number = serializers.CharField(source="employee.employee_number", read_only=True)
+
     class Meta:
         model = PayrollRecord
         fields = (
             "id",
             "payroll_run",
             "employee",
+            "employee_name",
+            "employee_number",
             "gross_pay",
             "taxable_income",
             "total_deductions",

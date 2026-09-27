@@ -504,6 +504,9 @@ class InstitutionPayrollConfiguration(TenantOwnedModel):
     )
     pay_day_rule = models.JSONField(default=dict, blank=True)
     rounding_rule = models.JSONField(default=dict, blank=True)
+    # Income tax and contribution rules the institution defines itself in CUSTOM
+    # mode; see apps.payroll.custom_rules. Always empty in PRESET mode.
+    custom_rules = models.JSONField(default=dict, blank=True)
     is_configured = models.BooleanField(default=False)
     configured_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,

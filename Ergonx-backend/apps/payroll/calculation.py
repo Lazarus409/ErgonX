@@ -9,6 +9,7 @@ from apps.compensation.models import EmployeeCompensation, PayComponent
 from apps.compensation.services import compensation_for, resolve_compensation
 from apps.employees.models import Employment
 from apps.leave.models import LeaveRequest
+from apps.payroll.custom_rules import progressive_tax
 from apps.payroll.localizations import calculate_localized_statutory
 from apps.payroll.models import (
     ContributionRule,
@@ -126,6 +127,65 @@ def _create_item(
     )
 
 
+def _apply_custom_rules(record, *, payroll_run, compensation, gross_pay, taxable_income):
+    """Evaluate a CUSTOM configuration's own rules, as frozen on the run's snapshot."""
+    rules = (payroll_run.statutory_snapshot or {}).get("configuration", {}).get("custom_rules") or {}
+    statutory_deductions = Decimal("0")
+    employee_contributions = Decimal("0")
+    employer_contributions = Decimal("0")
+
+    def basis_of(basis):
+        return _basis_value(basis, compensation=compensation, gross_pay=gross_pay, taxable_income=taxable_income)
+
+    tax = rules.get("income_tax") or {}
+    if tax.get("method") in ("FLAT", "PROGRESSIVE"):
+        basis = max(Decimal("0"), basis_of(tax["basis"]) - Decimal(tax.get("threshold") or "0"))
+        if tax["method"] == "FLAT":
+            amount = money(basis * Decimal(tax["rate"]) / Decimal("100"))
+        else:
+            amount = money(progressive_tax(tax["bands"], basis))
+        if amount:
+            statutory_deductions += amount
+            _create_item(
+                record,
+                code="INCOME_TAX",
+                name=tax.get("name") or "Income tax",
+                source=PayrollItem.Source.STATUTORY,
+                amount=amount,
+                effect="DEDUCTION",
+                rate=tax.get("rate"),
+                metadata={"custom_rule": "income_tax", "basis": tax["basis"], "method": tax["method"]},
+            )
+
+    for rule in rules.get("contributions") or []:
+        basis = basis_of(rule["basis"])
+        if rule.get("maximum_basis") is not None:
+            basis = min(basis, Decimal(rule["maximum_basis"]))
+        for side, rate_key, effect in (
+            ("employee", "employee_rate", "EMPLOYEE_CONTRIBUTION"),
+            ("employer", "employer_rate", "EMPLOYER_CONTRIBUTION"),
+        ):
+            rate = Decimal(rule[rate_key])
+            amount = money(basis * rate / Decimal("100"))
+            if not amount:
+                continue
+            if side == "employee":
+                employee_contributions += amount
+            else:
+                employer_contributions += amount
+            _create_item(
+                record,
+                code=f"{rule['code']}_{side.upper()}",
+                name=f"{rule['name']} - {side}",
+                source=PayrollItem.Source.STATUTORY,
+                amount=amount,
+                effect=effect,
+                rate=rate,
+                metadata={"custom_rule": rule["code"], "basis": rule["basis"]},
+            )
+    return statutory_deductions, employee_contributions, employer_contributions
+
+
 def _apply_statutory_rules(
     record,
     *,
@@ -139,7 +199,13 @@ def _apply_statutory_rules(
     statutory_deductions = Decimal("0")
     preset_version = payroll_run.preset_version
     if preset_version is None:
-        return statutory_deductions, employee_contributions, employer_contributions
+        return _apply_custom_rules(
+            record,
+            payroll_run=payroll_run,
+            compensation=compensation,
+            gross_pay=gross_pay,
+            taxable_income=taxable_income,
+        )
 
     evaluator_code = preset_version.source_metadata.get("evaluator")
     if evaluator_code:

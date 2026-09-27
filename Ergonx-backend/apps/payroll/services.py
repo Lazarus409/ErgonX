@@ -14,6 +14,7 @@ from apps.notifications.models import Notification
 from apps.institutions.models import Institution
 from apps.institutions.services import record_user_activity
 from apps.payroll.calculation import calculate_employee_record, money
+from apps.payroll.custom_rules import normalize_custom_rules, normalize_pay_day_rule
 from apps.payroll.models import (
     EmployeeTaxReliefClaim,
     EmployeePayrollProfile,
@@ -112,6 +113,7 @@ def configure_payroll(
     selected_payroll_preset_version=None,
     pay_day_rule=None,
     rounding_rule=None,
+    custom_rules=None,
     is_configured=True,
 ):
     _membership_with_permission(actor, institution, "payroll.configure")
@@ -164,8 +166,13 @@ def configure_payroll(
     configuration.payroll_frequency = payroll_frequency
     configuration.payroll_setup_mode = payroll_setup_mode
     configuration.selected_payroll_preset_version = selected_payroll_preset_version
-    configuration.pay_day_rule = pay_day_rule or {}
+    configuration.pay_day_rule = normalize_pay_day_rule(pay_day_rule)
     configuration.rounding_rule = rounding_rule
+    configuration.custom_rules = (
+        normalize_custom_rules(custom_rules)
+        if payroll_setup_mode == InstitutionPayrollConfiguration.SetupMode.CUSTOM
+        else {}
+    )
     configuration.is_configured = is_configured
     configuration.configured_by = actor
     configuration.configured_at = timezone.now()
@@ -345,8 +352,8 @@ def create_payroll_run(*, institution, payroll_period, actor, idempotency_key):
     return run
 
 
-def _preset_snapshot(run, configuration):
-    configuration_snapshot = {
+def _configuration_snapshot(configuration):
+    snapshot = {
         "country_code": configuration.country_code,
         "currency": configuration.currency,
         "payroll_frequency": configuration.payroll_frequency,
@@ -359,6 +366,14 @@ def _preset_snapshot(run, configuration):
         "pay_day_rule": configuration.pay_day_rule,
         "rounding_rule": configuration.rounding_rule,
     }
+    # Only present when set, so runs snapshotted before custom rules existed still match.
+    if configuration.custom_rules:
+        snapshot["custom_rules"] = configuration.custom_rules
+    return snapshot
+
+
+def _preset_snapshot(run, configuration):
+    configuration_snapshot = _configuration_snapshot(configuration)
     version = run.preset_version
     if version is None:
         return {
@@ -524,19 +539,7 @@ def calculate_payroll_run(*, payroll_run, actor):
     if configuration is None or not configuration.is_configured:
         raise ValidationError({"institution": "Payroll configuration is incomplete."})
     snapshot_configuration = run.statutory_snapshot.get("configuration")
-    current_configuration = {
-        "country_code": configuration.country_code,
-        "currency": configuration.currency,
-        "payroll_frequency": configuration.payroll_frequency,
-        "payroll_setup_mode": configuration.payroll_setup_mode,
-        "selected_payroll_preset_version_id": (
-            str(configuration.selected_payroll_preset_version_id)
-            if configuration.selected_payroll_preset_version_id
-            else None
-        ),
-        "pay_day_rule": configuration.pay_day_rule,
-        "rounding_rule": configuration.rounding_rule,
-    }
+    current_configuration = _configuration_snapshot(configuration)
     if snapshot_configuration and snapshot_configuration != current_configuration:
         raise ValidationError(
             {"configuration": "Payroll configuration changed; cancel and create a new run."}

@@ -21,7 +21,7 @@ def staff(institution_factory, user_factory, membership_factory, employee_factor
     grade, location = assignment_dimensions_factory(institution)
     department = Department.objects.create(institution=institution, name="Finance", code="FIN")
     position = Position.objects.create(institution=institution, department=department, title="Staff", code="STAFF")
-    leave_type = LeaveType.objects.create(institution=institution, name="Annual Leave", code="annual")
+    leave_type = LeaveType.objects.create(institution=institution, name="Annual Leave", code="test-annual")
     people = {}
     for key, role in (("accountant", "ACCOUNTANT"), ("hr", "HR_ADMIN"), ("employee", "EMPLOYEE")):
         user = user_factory(email=f"{key}@example.com")

@@ -98,7 +98,7 @@ export default function GetStartedPage() {
         <div className="flex gap-4">
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary-ink" aria-hidden="true"><CircleHelp className="h-6 w-6" /></span>
           <div>
-            <h2 className="font-bold text-headline">Joining an organization already on ErgonX?</h2>
+            <h2 className="text-card-title font-bold text-headline">Joining an organization already on ErgonX?</h2>
             <p className="mt-1 text-support leading-6 text-ink-muted">You don&apos;t need to request access. Ask your organization&apos;s administrator or HR team to invite you, then use the link in the email.</p>
           </div>
         </div>

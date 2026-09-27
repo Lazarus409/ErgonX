@@ -103,7 +103,7 @@ export interface MetricCardProps {
 }
 
 /** Plain text of a rendered value, used only to pick a type size. */
-function textOf(node: ReactNode): string {
+export function textOf(node: ReactNode): string {
   if (node === null || node === undefined || typeof node === "boolean") return "";
   if (typeof node === "string" || typeof node === "number") return String(node);
   if (Array.isArray(node)) return node.map(textOf).join("");

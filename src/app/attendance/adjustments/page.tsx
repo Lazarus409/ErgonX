@@ -408,7 +408,7 @@ export default function AttendanceAdjustmentsPage() {
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-xl border border-line bg-surface">
+      <section className="overflow-hidden rounded-2xl border border-line bg-surface shadow-elevation-1">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-left">
             <thead className="border-b border-line bg-surface-muted">

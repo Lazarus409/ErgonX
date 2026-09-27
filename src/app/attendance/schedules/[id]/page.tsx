@@ -187,7 +187,7 @@ export default function ScheduleDetailPage() {
         />
       </section>
 
-      <section className="rounded-xl border border-line bg-surface">
+      <section className="rounded-2xl border border-line bg-surface shadow-elevation-1">
         <div className="border-b border-line px-5 py-4">
           <h2 className="text-base font-bold text-headline">
             Schedule Configuration
@@ -219,7 +219,7 @@ export default function ScheduleDetailPage() {
         </dl>
       </section>
 
-      <section className="rounded-xl border border-line bg-surface">
+      <section className="rounded-2xl border border-line bg-surface shadow-elevation-1">
         <div className="border-b border-line px-5 py-4">
           <h2 className="text-base font-bold text-headline">
             Assignment History

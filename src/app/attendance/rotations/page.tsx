@@ -386,7 +386,7 @@ export default function RotationsPage() {
             return (
               <section
                 key={pattern.id}
-                className="rounded-xl border border-line bg-surface"
+                className="rounded-2xl border border-line bg-surface shadow-elevation-1"
               >
                 <div className="flex flex-col gap-3 border-b border-line p-5 sm:flex-row sm:items-center sm:justify-between">
                   <div>

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { textOf } from "@/components/ui/Card";
 import { cx } from "@/lib/cx";
 
 /**
@@ -29,7 +30,7 @@ export const heroPanelClass = "block rounded-2xl border border-primary/15 bg-pri
 export function HeroStat({ label, value, tone = "default" }: { label: string; value: ReactNode; tone?: "default" | "attention" }) {
   return (
     <div className="min-w-0 rounded-2xl border border-line bg-surface px-4 py-3.5 shadow-elevation-1">
-      <p className={cx("text-heading font-bold tabular-nums sm:text-kpi-sm", tone === "attention" ? "text-warning-ink" : "text-headline")}>{value}</p>
+      <p className={cx("font-bold tabular-nums", textOf(value).length > 9 ? "break-words text-[0.9375rem] leading-6 sm:whitespace-nowrap sm:text-heading sm:leading-7" : "text-heading sm:text-kpi-sm", tone === "attention" ? "text-warning-ink" : "text-headline")}>{value}</p>
       <p className="mt-0.5 line-clamp-2 text-caption leading-tight text-ink-muted">{label}</p>
     </div>
   );

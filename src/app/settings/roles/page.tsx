@@ -90,7 +90,7 @@ export default function RoleSettingsPage() {
 
       {editorRole !== undefined && (
         <form onSubmit={requestSave} className="rounded-2xl border border-line bg-surface p-5">
-          <div className="flex items-start justify-between gap-4"><div><h2 className="font-bold text-headline">{editorRole ? `Edit ${editorRole.name}` : "Create custom role"}</h2><p className="mt-1 text-sm text-ink-muted">Only custom roles can be changed after creation.</p></div><button type="button" onClick={() => setEditorRole(undefined)} className="text-sm font-medium text-ink-muted">Cancel</button></div>
+          <div className="flex items-start justify-between gap-4"><div><h2 className="text-card-title font-bold text-headline">{editorRole ? `Edit ${editorRole.name}` : "Create custom role"}</h2><p className="mt-1 text-sm text-ink-muted">Only custom roles can be changed after creation.</p></div><button type="button" onClick={() => setEditorRole(undefined)} className="text-sm font-medium text-ink-muted">Cancel</button></div>
           <div className="mt-5 grid gap-4 md:grid-cols-2"><label className="text-sm font-medium text-ink">Role name<input value={name} onChange={(event) => setName(event.target.value)} className="mt-1 w-full h-9 rounded-lg border border-line-strong px-3" /></label><label className="text-sm font-medium text-ink">Role code<input value={code} disabled={Boolean(editorRole)} onChange={(event) => setCode(event.target.value.toUpperCase())} placeholder="PEOPLE_MANAGER" className="mt-1 w-full h-9 rounded-lg border border-line-strong px-3 disabled:bg-surface-muted" /></label><label className="text-sm font-medium text-ink md:col-span-2">Description<textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={2} className="mt-1 w-full rounded-lg border border-line-strong px-3 py-2.5" /></label></div>
           {editorRole && <label className="mt-4 inline-flex items-center gap-2 text-sm text-ink"><input type="checkbox" checked={isActive} onChange={(event) => setIsActive(event.target.checked)} /> Active role</label>}
           <fieldset className="mt-5"><legend className="text-sm font-semibold text-ink-strong">Permissions</legend><div className="mt-3 grid max-h-64 gap-2 overflow-auto rounded-xl border border-line p-3 sm:grid-cols-2 lg:grid-cols-3">{data.permissions.map((permission) => <label key={permission.code} className="flex items-start gap-2 rounded-lg p-2 text-sm text-ink hover:bg-surface-hover"><input type="checkbox" checked={permissionCodes.includes(permission.code)} onChange={() => togglePermission(permission.code)} className="mt-1" /><span><span className="block font-medium">{permission.name}</span><span className="text-xs text-ink-muted">{permission.code}</span></span></label>)}</div></fieldset>
@@ -100,7 +100,7 @@ export default function RoleSettingsPage() {
 
       <section className="rounded-2xl border border-line bg-surface">
         <div className="border-b border-line-soft px-5 py-4">
-          <h2 className="font-bold text-headline">Institution roles</h2>
+          <h2 className="text-card-title font-bold text-headline">Institution roles</h2>
           <p className="mt-1 text-sm text-ink-muted">{data.roles.length} role{data.roles.length === 1 ? "" : "s"} available in this institution.</p>
         </div>
         {data.roles.length === 0 ? (
@@ -128,7 +128,7 @@ export default function RoleSettingsPage() {
       <ConfirmDialog open={confirming} title={editorRole ? "Update custom role?" : "Create custom role?"} description={editorRole ? "The selected permissions and status will immediately apply to memberships using this custom role." : "The new role will be available for institution membership assignment."} confirmLabel={editorRole ? "Update role" : "Create role"} loading={saving} onConfirm={() => void save()} onCancel={() => setConfirming(false)} />
 
       <section className="rounded-2xl border border-line bg-surface p-5">
-        <h2 className="font-bold text-headline">Permission catalogue</h2>
+        <h2 className="text-card-title font-bold text-headline">Permission catalogue</h2>
         <p className="mt-1 text-sm text-ink-muted">Available permissions by module. This is read-only so current access can be reviewed safely.</p>
         <div className="mt-4 flex flex-wrap gap-2">
           {Object.entries(permissionGroups).map(([module, count]) => (

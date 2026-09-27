@@ -189,7 +189,6 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
                         <li className="relative ml-3 mt-1 space-y-0.5 pb-1">
                           {selfServicePages.map((page) => {
                             const active = isActive(page.href);
-                            const Icon = page.icon;
                             return (
                               <Link
                                 key={page.href}
@@ -202,7 +201,7 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
                                   active ? "bg-primary/25 text-white" : "text-white/75 hover:bg-white/[0.05] hover:text-white",
                                 )}
                               >
-                                <Icon className={cx("h-4 w-4 shrink-0", active ? "text-white" : "text-white/45")} aria-hidden="true" />
+                                <span aria-hidden="true" className={cx("h-1.5 w-1.5 shrink-0 rounded-full", active ? "bg-accent-sky" : "bg-white/70")} />
                                 <span className="truncate">{page.label}</span>
                               </Link>
                             );

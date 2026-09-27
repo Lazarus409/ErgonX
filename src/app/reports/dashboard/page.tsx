@@ -25,6 +25,7 @@ import { humanizeEnum } from "@/lib/format";
 // each report needs the permissions that guard its underlying records. Each inner list
 // is one requirement, met by any of its codes. Leave and attendance need a management
 // permission, since leave.view / attendance.view alone are self-service.
+// report.all (directors, auditors) opens every report, read-only.
 const LEAVE_BROAD = ["leave.approve", "leave.reject", "leave.configure", "leave.balance.manage", "dashboard.leave.view"];
 const ATTENDANCE_BROAD = ["attendance.manage", "attendance.approve", "schedule.manage", "dashboard.attendance.view"];
 const reports = [
@@ -122,7 +123,7 @@ export default function ReportsDashboardPage() {
   const visibleReports = useMemo(() => {
     const granted = new Set(user?.permissions ?? []);
     const has = (code: string) => granted.has("*") || granted.has(code);
-    return reports.filter((item) => hasModule(institution?.enabledModules, item.module) && has("report.view") && item.permissions.every((requirement) => requirement.some(has)));
+    return reports.filter((item) => hasModule(institution?.enabledModules, item.module) && has("report.view") && (has("report.all") || item.permissions.every((requirement) => requirement.some(has))));
   }, [institution?.enabledModules, user?.permissions]);
   const [selected, setSelected] = useState<ReportId>("workforce-cost");
   const [status, setStatus] = useState("");

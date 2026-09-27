@@ -314,7 +314,7 @@ class BudgetViewSet(RecordAttachmentsMixin, TenantModelViewSet):
             budgets = budgets.filter(fiscal_year=year)
         department = request.query_params.get("department")
         scoped = budgets.filter(department_id=department) if department else budgets
-        categories, comparisons = {}, {}
+        categories, comparisons, initiatives = {}, {}, {}
         for budget in budgets:
             rows, totals = budget_figures(budget)
             key = budget.department.name if budget.department_id else "Institution-wide"
@@ -324,6 +324,11 @@ class BudgetViewSet(RecordAttachmentsMixin, TenantModelViewSet):
                 comparison[field] += totals[field]
             if budget in scoped:
                 for row in rows:
+                    name = row["line"].initiative or "Unassigned"
+                    initiative = initiatives.setdefault(name, {"initiative": name, "allocated": ZERO, "actual": ZERO, "committed": ZERO, "budgets": set()})
+                    for field in ("allocated", "actual", "committed"):
+                        initiative[field] += row[field]
+                    initiative["budgets"].add(budget.name)
                     bucket = categories.setdefault(row["line"].category, {"category": row["line"].category, "label": row["line"].get_category_display(), **{k: ZERO for k in ("allocated", "committed", "actual", "variance")}})
                     for field in ("allocated", "committed", "actual", "variance"):
                         bucket[field] += row[field]
@@ -338,6 +343,7 @@ class BudgetViewSet(RecordAttachmentsMixin, TenantModelViewSet):
             "folders": sorted(folders.values(), key=lambda row: row["name"]),
             "total_budgets": budgets.count(),
             "categories": [{**{k: (str(v) if isinstance(v, Decimal) else v) for k, v in bucket.items()}, "status": _status_for(bucket)} for bucket in categories.values()],
+            "initiatives": [{"initiative": row["initiative"], "allocated": str(row["allocated"]), "actual": str(row["actual"]), "committed": str(row["committed"]), "budgets": sorted(row["budgets"])} for row in initiatives.values()],
             "comparisons": [{**{k: (str(v) if isinstance(v, Decimal) else v) for k, v in row.items()}} for row in comparisons.values()],
             "budgets": [
                 {"id": str(item.id), "code": item.code, "name": item.name, "department": item.department.name if item.department_id else "Institution-wide",

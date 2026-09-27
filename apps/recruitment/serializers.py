@@ -159,13 +159,47 @@ class ApplicationStageHistorySerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+def _person(user):
+    return (user.get_full_name() or user.email) if user else None
+
+
 class InterviewSerializer(TenantRelationSerializer):
     tenant_relations = {"application": Application}
+    candidate_id = serializers.UUIDField(source="application.candidate_id", read_only=True)
+    candidate_name = serializers.CharField(source="application.candidate.full_name", read_only=True)
+    job_title = serializers.CharField(source="application.job_posting.title", read_only=True)
+    interviewer_name = serializers.SerializerMethodField()
+    panel_members = serializers.SerializerMethodField()
+
+    def get_interviewer_name(self, obj):
+        return _person(obj.interviewer)
+
+    def get_panel_members(self, obj):
+        return [{"id": str(user.id), "name": _person(user)} for user in obj.panel.all()]
 
     class Meta:
         model = Interview
-        fields = ("id", "application", "scheduled_at", "duration_minutes", "interview_type", "location_or_link", "interviewer", "status", "notes", "created_at", "updated_at")
-        read_only_fields = ("id", "status", "created_at", "updated_at")
+        fields = (
+            "id", "application", "candidate_id", "candidate_name", "job_title", "scheduled_at", "duration_minutes", "interview_type",
+            "interview_stage", "mode", "time_zone", "agenda", "location_or_link", "interviewer", "interviewer_name", "panel_members",
+            "candidate_message", "invitation_sent_at", "invitation_status", "status", "notes", "created_at", "updated_at",
+        )
+        read_only_fields = ("id", "status", "candidate_message", "invitation_sent_at", "invitation_status", "created_at", "updated_at")
+
+
+class InterviewScheduleSerializer(serializers.Serializer):
+    application = serializers.UUIDField()
+    scheduled_at = serializers.DateTimeField()
+    duration_minutes = serializers.IntegerField(min_value=15, max_value=480)
+    interview_stage = serializers.ChoiceField(choices=Interview.Stage.choices)
+    mode = serializers.ChoiceField(choices=Interview.Mode.choices)
+    time_zone = serializers.CharField(max_length=64)
+    location_or_link = serializers.CharField(required=False, allow_blank=True, max_length=500)
+    agenda = serializers.CharField(required=False, allow_blank=True, max_length=500)
+    panel = serializers.ListField(child=serializers.UUIDField(), required=False, default=list)
+    candidate_message = serializers.CharField(required=False, allow_blank=True, max_length=4000)
+    draft = serializers.BooleanField(required=False, default=False)
+    send_invitation = serializers.BooleanField(required=False, default=True)
 
     def validate_interviewer(self, value):
         institution = self.context["request"].institution
@@ -189,12 +223,60 @@ class CandidateEvaluationSerializer(TenantRelationSerializer):
 
 
 class OfferSerializer(TenantRelationSerializer):
-    tenant_relations = {"application": Application, "department": Department, "position": Position, "grade": Grade, "location": Location, "salary_structure": SalaryStructure}
+    tenant_relations = {"application": Application, "department": Department, "position": Position, "grade": Grade, "location": Location, "salary_structure": SalaryStructure, "reports_to": Position}
+    candidate_id = serializers.UUIDField(source="application.candidate_id", read_only=True)
+    candidate_name = serializers.CharField(source="application.candidate.full_name", read_only=True)
+    job_posting_id = serializers.UUIDField(source="application.job_posting_id", read_only=True)
+    job_title = serializers.CharField(source="application.job_posting.title", read_only=True)
+    job_code = serializers.CharField(source="application.job_posting.code", read_only=True)
+    department_name = serializers.CharField(source="department.name", read_only=True)
+    position_title = serializers.CharField(source="position.title", read_only=True)
+    grade_name = serializers.CharField(source="grade.name", read_only=True)
+    location_name = serializers.CharField(source="location.name", read_only=True)
+    reports_to_title = serializers.CharField(source="reports_to.title", read_only=True, default=None)
+    salary_structure_name = serializers.CharField(source="salary_structure.name", read_only=True, default=None)
+    submitted_by_name = serializers.SerializerMethodField()
+    approved_by_name = serializers.SerializerMethodField()
+    response_recorded_by_name = serializers.SerializerMethodField()
+
+    def get_submitted_by_name(self, obj):
+        return _person(obj.submitted_by)
+
+    def get_approved_by_name(self, obj):
+        return _person(obj.approved_by)
+
+    def get_response_recorded_by_name(self, obj):
+        return _person(obj.response_recorded_by)
 
     class Meta:
         model = Offer
-        fields = ("id", "application", "status", "proposed_start_date", "expires_on", "employment_type", "department", "position", "grade", "location", "staff_category", "salary_structure", "base_salary", "currency", "extended_at", "accepted_at", "declined_at", "hired_employee", "terms", "created_at", "updated_at")
-        read_only_fields = ("id", "status", "extended_at", "accepted_at", "declined_at", "hired_employee", "created_at", "updated_at")
+        fields = (
+            "id", "application", "candidate_id", "candidate_name", "job_posting_id", "job_title", "job_code", "status",
+            "proposed_start_date", "expires_on", "employment_type", "department", "department_name", "position", "position_title",
+            "grade", "grade_name", "location", "location_name", "staff_category", "salary_structure", "salary_structure_name",
+            "base_salary", "currency", "contract_length_months", "working_pattern", "reports_to", "reports_to_title",
+            "letter_body", "letter_generated_at", "submitted_by", "submitted_by_name", "submitted_at", "approved_by", "approved_by_name",
+            "approved_at", "approval_note", "response_note", "response_recorded_by_name", "extended_at", "accepted_at", "declined_at",
+            "hired_employee", "terms", "created_at", "updated_at",
+        )
+        read_only_fields = (
+            "id", "status", "letter_generated_at", "submitted_by", "submitted_at", "approved_by", "approved_at", "approval_note",
+            "response_note", "extended_at", "accepted_at", "declined_at", "hired_employee", "created_at", "updated_at",
+        )
+
+    def update(self, instance, validated_data):
+        if instance.status not in {Offer.Status.DRAFT, Offer.Status.APPROVED}:
+            raise serializers.ValidationError({"status": "Only draft or approved offers can be edited."})
+        if instance.status == Offer.Status.APPROVED and set(validated_data) - {"letter_body"}:
+            # Changing approved terms sends the offer back for approval.
+            instance.status = Offer.Status.DRAFT
+            instance.approved_by = None
+            instance.approved_at = None
+        return super().update(instance, validated_data)
+
+
+class OfferResponseSerializer(serializers.Serializer):
+    note = serializers.CharField(required=False, allow_blank=True, max_length=4000)
 
 
 class CommentSerializer(serializers.Serializer):

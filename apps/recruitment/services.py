@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -168,7 +168,9 @@ def update_interview_status(*, interview, actor, status):
         raise ValidationError({"status": "Use COMPLETED, CANCELLED, or NO_SHOW for an interview action."})
     if instance.status == status:
         return instance
-    if instance.status != Interview.Status.SCHEDULED:
+    if instance.status == Interview.Status.DRAFT and status == Interview.Status.CANCELLED:
+        pass
+    elif instance.status != Interview.Status.SCHEDULED:
         raise ValidationError({"status": "Only scheduled interviews can be completed, cancelled, or marked no-show."})
     instance.status = status
     instance.save(update_fields=("status", "updated_at"))
@@ -195,13 +197,19 @@ def extend_offer(*, offer, actor):
     _active_member(actor, instance.institution)
     if instance.status == Offer.Status.EXTENDED:
         return instance
-    if instance.status != Offer.Status.DRAFT:
-        raise ValidationError({"status": "Only draft offers can be extended."})
+    if instance.status not in (Offer.Status.DRAFT, Offer.Status.APPROVED):
+        raise ValidationError({"status": "Only approved offers can be sent."})
     if instance.application.status != Application.Status.ACTIVE:
         raise ValidationError({"application": "Only active applications can receive an offer."})
+    if instance.status == Offer.Status.DRAFT:
+        # An approver may send a draft directly; that records their approval.
+        if not _can(actor, instance.institution, "offer.approve"):
+            raise ValidationError({"status": "Submit the offer for approval before sending it."})
+        instance.approved_by = actor
+        instance.approved_at = timezone.now()
     instance.status = Offer.Status.EXTENDED
     instance.extended_at = timezone.now()
-    instance.save(update_fields=("status", "extended_at", "updated_at"))
+    instance.save(update_fields=("status", "extended_at", "approved_by", "approved_at", "updated_at"))
     instance.application.status = Application.Status.OFFERED
     instance.application.save(update_fields=("status", "updated_at"))
     record_audit_event(actor=actor, institution=instance.institution, entity=instance, action="recruitment.offer.extended")
@@ -211,7 +219,7 @@ def extend_offer(*, offer, actor):
 
 
 @transaction.atomic
-def decide_offer(*, offer, actor, accepted):
+def decide_offer(*, offer, actor, accepted, note=""):
     instance = Offer.objects.select_for_update().select_related("application").get(pk=offer.pk)
     _active_member(actor, instance.institution)
     target = Offer.Status.ACCEPTED if accepted else Offer.Status.DECLINED
@@ -221,14 +229,16 @@ def decide_offer(*, offer, actor, accepted):
         raise ValidationError({"status": "Only extended offers can be accepted or declined."})
     instance.status = target
     now = timezone.now()
+    instance.response_note = (note or "").strip()
+    instance.response_recorded_by = actor
     if accepted:
         instance.accepted_at = now
-        fields = ("status", "accepted_at", "updated_at")
+        fields = ("status", "accepted_at", "response_note", "response_recorded_by", "updated_at")
     else:
         instance.declined_at = now
-        fields = ("status", "declined_at", "updated_at")
+        fields = ("status", "declined_at", "response_note", "response_recorded_by", "updated_at")
     instance.save(update_fields=fields)
-    record_audit_event(actor=actor, institution=instance.institution, entity=instance, action=f"recruitment.offer.{target.lower()}")
+    record_audit_event(actor=actor, institution=instance.institution, entity=instance, action=f"recruitment.offer.{target.lower()}", metadata={"note": instance.response_note})
     return instance
 
 
@@ -238,8 +248,8 @@ def withdraw_offer(*, offer, actor):
     _active_member(actor, instance.institution)
     if instance.status == Offer.Status.WITHDRAWN:
         return instance
-    if instance.status not in (Offer.Status.DRAFT, Offer.Status.EXTENDED):
-        raise ValidationError({"status": "Only draft or extended offers can be withdrawn."})
+    if instance.status not in (Offer.Status.DRAFT, Offer.Status.PENDING_APPROVAL, Offer.Status.APPROVED, Offer.Status.EXTENDED):
+        raise ValidationError({"status": "Only offers that have not been decided can be withdrawn."})
     instance.status = Offer.Status.WITHDRAWN
     instance.save(update_fields=("status", "updated_at"))
     if instance.application.status == Application.Status.OFFERED:
@@ -546,3 +556,271 @@ def remove_candidate_document(*, candidate, document, actor):
     document.save(update_fields=("is_active", "updated_at"))
     record_audit_event(actor=actor, institution=candidate.institution, entity=candidate, action="recruitment.candidate.document_removed",
                        metadata={"document_id": str(document.id), "filename": document.original_filename})
+
+
+# --- Interview scheduling (concept "Interview scheduling") -----------------
+
+SLOT_HOURS = range(9, 18)
+
+
+def _zone(name):
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+    try:
+        return ZoneInfo(name or "UTC")
+    except (ZoneInfoNotFoundError, ValueError):
+        raise ValidationError({"time_zone": "Use an IANA time zone such as Africa/Accra."})
+
+
+def _busy_interviews(institution, user_ids, start, end, exclude_id=None):
+    from django.db.models import Q
+
+    candidates = Interview.objects.for_institution(institution).filter(
+        status=Interview.Status.SCHEDULED, scheduled_at__lt=end, scheduled_at__gte=start - timedelta(hours=12),
+    ).filter(Q(interviewer_id__in=user_ids) | Q(panel__in=user_ids)).distinct()
+    if exclude_id:
+        candidates = candidates.exclude(pk=exclude_id)
+    return [item for item in candidates if item.scheduled_at + timedelta(minutes=item.duration_minutes) > start]
+
+
+def _users_on_leave(institution, user_ids, day):
+    from apps.leave.models import LeaveRequest
+
+    return set(
+        LeaveRequest.objects.filter(
+            institution=institution, status="APPROVED", start_date__lte=day, end_date__gte=day, employee__user_id__in=user_ids,
+        ).values_list("employee__user_id", flat=True)
+    )
+
+
+def interview_availability(*, institution, day, interviewer_ids, duration_minutes=60, time_zone="UTC", exclude_interview=None):
+    """Hourly slots for one day: available, conflict (a panel member is already
+    interviewing) or unavailable (in the past, or a panel member is on approved leave)."""
+    from datetime import datetime, time
+
+    zone = _zone(time_zone)
+    ids = [value for value in interviewer_ids if value]
+    on_leave = _users_on_leave(institution, ids, day) if ids else set()
+    now = timezone.now()
+    slots = []
+    for hour in SLOT_HOURS:
+        start = datetime.combine(day, time(hour, 0), tzinfo=zone)
+        end = start + timedelta(minutes=duration_minutes)
+        if start <= now:
+            state, reason = "unavailable", "In the past"
+        elif on_leave:
+            state, reason = "unavailable", "A panel member is on approved leave"
+        else:
+            busy = _busy_interviews(institution, ids, start, end, exclude_interview) if ids else []
+            state, reason = ("conflict", "A panel member has another interview") if busy else ("available", "")
+        slots.append({"time": f"{hour:02d}:00", "start": start.isoformat(), "state": state, "reason": reason})
+    return {"date": day.isoformat(), "time_zone": str(zone), "slots": slots}
+
+
+def default_candidate_message(*, interview):
+    candidate = interview.application.candidate
+    posting = interview.application.job_posting
+    zone = _zone(interview.time_zone)
+    local = interview.scheduled_at.astimezone(zone)
+    end = local + timedelta(minutes=interview.duration_minutes)
+    names = ", ".join((user.get_full_name() or user.email) for user in interview.panel.all()) or "the hiring team"
+    stage = interview.get_interview_stage_display().lower() if interview.interview_stage else "interview"
+    where = {"VIDEO": "Video call (link will be sent)", "PHONE": "Phone call", "IN_PERSON": "In person"}.get(interview.mode, "")
+    if interview.location_or_link:
+        where = f"{where}: {interview.location_or_link}" if where else interview.location_or_link
+    return (
+        f"Hi {candidate.first_name},\n\n"
+        f"You're invited to a {stage} for the {posting.title} role at {interview.institution.name}.\n\n"
+        f"Date: {local:%A, %d %b %Y}\n"
+        f"Time: {local:%H:%M} – {end:%H:%M} ({zone})\n"
+        + (f"Where: {where}\n" if where else "")
+        + f"Interviewers: {names}\n\n"
+        "We look forward to speaking with you.\n"
+        f"The {interview.institution.name} Recruitment Team"
+    )
+
+
+def _send_candidate_invitation(interview):
+    from django.conf import settings as django_settings
+    from django.core.mail import send_mail
+
+    candidate = interview.application.candidate
+    subject = f"Interview invitation – {interview.application.job_posting.title}"
+    if not getattr(django_settings, "EMAIL_HOST", "") and "smtp" in getattr(django_settings, "EMAIL_BACKEND", "smtp"):
+        return "NOT_CONFIGURED"
+    try:
+        send_mail(subject, interview.candidate_message, django_settings.DEFAULT_FROM_EMAIL, [candidate.email], fail_silently=False)
+        return "SENT"
+    except Exception:  # noqa: BLE001 - delivery failure is recorded, not fatal
+        return "FAILED"
+
+
+@transaction.atomic
+def schedule_interview(*, application, actor, scheduled_at, duration_minutes, interview_stage, mode, time_zone, location_or_link="",
+                       agenda="", panel=(), candidate_message="", draft=False, send_invitation=True, interview=None):
+    """Create or update an interview. Drafts keep the details without holding
+    the panel's time; scheduling checks leave and clashes for every panel member."""
+    _active_member(actor, application.institution)
+    if application.status not in (Application.Status.ACTIVE, Application.Status.OFFERED):
+        raise ValidationError({"application": "Interviews can only be scheduled for active applications."})
+    panel = [user for user in panel if user is not None]
+    for user in panel:
+        if not user.memberships.filter(institution=application.institution, status="ACTIVE").exists():
+            raise ValidationError({"panel": "Interviewers must be active institution members."})
+    was_scheduled = interview is not None and interview.status == Interview.Status.SCHEDULED
+    if interview is None:
+        interview = Interview(institution=application.institution, application=application)
+    elif interview.status not in (Interview.Status.DRAFT, Interview.Status.SCHEDULED):
+        raise ValidationError({"status": "Completed or cancelled interviews cannot be rescheduled."})
+    interview.scheduled_at = scheduled_at
+    interview.duration_minutes = duration_minutes
+    interview.interview_stage = interview_stage
+    interview.interview_type = dict(Interview.Stage.choices).get(interview_stage, interview.interview_type or "Interview")
+    interview.mode = mode
+    interview.time_zone = time_zone
+    interview.location_or_link = location_or_link
+    interview.agenda = agenda
+    interview.interviewer = panel[0] if panel else None
+    interview.status = Interview.Status.DRAFT if draft else Interview.Status.SCHEDULED
+    if not draft:
+        if scheduled_at <= timezone.now():
+            raise ValidationError({"scheduled_at": "Choose a time in the future."})
+        if not panel:
+            raise ValidationError({"panel": "Add at least one interviewer."})
+        ids = [user.id for user in panel]
+        if _users_on_leave(application.institution, ids, scheduled_at.astimezone(_zone(time_zone)).date()):
+            raise ValidationError({"scheduled_at": "A panel member is on approved leave that day."})
+        end = scheduled_at + timedelta(minutes=duration_minutes)
+        if _busy_interviews(application.institution, ids, scheduled_at, end, interview.pk):
+            raise ValidationError({"scheduled_at": "A panel member already has an interview at this time."})
+    interview.full_clean()
+    interview.save()
+    interview.panel.set(panel)
+    interview.candidate_message = candidate_message.strip() or default_candidate_message(interview=interview)
+    fields = ["candidate_message", "updated_at"]
+    if not draft and send_invitation:
+        interview.invitation_status = _send_candidate_invitation(interview)
+        interview.invitation_sent_at = timezone.now() if interview.invitation_status == "SENT" else None
+        fields += ["invitation_status", "invitation_sent_at"]
+    interview.save(update_fields=fields)
+    action = "recruitment.interview.drafted" if draft else ("recruitment.interview.rescheduled" if was_scheduled else "recruitment.interview.scheduled")
+    record_audit_event(actor=actor, institution=application.institution, entity=interview, action=action,
+                       metadata={"application_id": str(application.id), "scheduled_at": scheduled_at.isoformat(), "invitation": interview.invitation_status})
+    if not draft:
+        for user in panel:
+            _notify(user, interview, "RECRUITMENT_INTERVIEW_SCHEDULED", "Interview scheduled",
+                    f"{application.candidate.full_name} · {application.job_posting.title} on {scheduled_at.astimezone(_zone(time_zone)):%d %b %Y %H:%M}.")
+    return interview
+
+
+# --- Offer approval and letter (concept "Offer management") -----------------
+
+@transaction.atomic
+def submit_offer_for_approval(*, offer, actor):
+    instance = Offer.objects.select_for_update().get(pk=offer.pk)
+    _active_member(actor, instance.institution)
+    if instance.status == Offer.Status.PENDING_APPROVAL:
+        return instance
+    if instance.status != Offer.Status.DRAFT:
+        raise ValidationError({"status": "Only draft offers can be submitted for approval."})
+    if instance.base_salary is None:
+        raise ValidationError({"base_salary": "Add compensation before submitting the offer for approval."})
+    instance.status = Offer.Status.PENDING_APPROVAL
+    instance.submitted_by = actor
+    instance.submitted_at = timezone.now()
+    instance.approval_note = ""
+    instance.save(update_fields=("status", "submitted_by", "submitted_at", "approval_note", "updated_at"))
+    record_audit_event(actor=actor, institution=instance.institution, entity=instance, action="recruitment.offer.submitted")
+    from apps.institutions.models import InstitutionMembership
+
+    for membership in InstitutionMembership.objects.filter(
+        institution=instance.institution, status="ACTIVE", role__permissions__code="offer.approve"
+    ).exclude(user=actor).select_related("user").distinct():
+        _notify(membership.user, instance, "RECRUITMENT_OFFER_APPROVAL", "Offer awaiting approval", f"An offer for {instance.application.candidate.full_name} needs approval.")
+    return instance
+
+
+@transaction.atomic
+def approve_offer(*, offer, actor, comment=""):
+    instance = Offer.objects.select_for_update().get(pk=offer.pk)
+    if not _can(actor, instance.institution, "offer.approve"):
+        raise ValidationError({"actor": "Only offer approvers can approve."})
+    if instance.status != Offer.Status.PENDING_APPROVAL:
+        raise ValidationError({"status": "Only offers pending approval can be approved."})
+    if instance.submitted_by_id == actor.id:
+        raise ValidationError({"actor": "Offers must be approved by someone other than the submitter."})
+    instance.status = Offer.Status.APPROVED
+    instance.approved_by = actor
+    instance.approved_at = timezone.now()
+    instance.approval_note = (comment or "").strip()
+    instance.save(update_fields=("status", "approved_by", "approved_at", "approval_note", "updated_at"))
+    record_audit_event(actor=actor, institution=instance.institution, entity=instance, action="recruitment.offer.approved", metadata={"comment": instance.approval_note})
+    _notify(instance.submitted_by, instance, "RECRUITMENT_OFFER_APPROVED", "Offer approved", f"The offer for {instance.application.candidate.full_name} was approved and can be sent.")
+    return instance
+
+
+@transaction.atomic
+def return_offer(*, offer, actor, comment=""):
+    instance = Offer.objects.select_for_update().get(pk=offer.pk)
+    if not _can(actor, instance.institution, "offer.approve"):
+        raise ValidationError({"actor": "Only offer approvers can return offers."})
+    if instance.status != Offer.Status.PENDING_APPROVAL:
+        raise ValidationError({"status": "Only offers pending approval can be returned."})
+    if not (comment or "").strip():
+        raise ValidationError({"comment": "Explain what needs to change."})
+    instance.status = Offer.Status.DRAFT
+    instance.approval_note = comment.strip()
+    instance.save(update_fields=("status", "approval_note", "updated_at"))
+    record_audit_event(actor=actor, institution=instance.institution, entity=instance, action="recruitment.offer.returned", metadata={"comment": instance.approval_note})
+    _notify(instance.submitted_by, instance, "RECRUITMENT_OFFER_RETURNED", "Offer returned for changes", instance.approval_note)
+    return instance
+
+
+def _money(amount, currency):
+    return f"{currency} {amount:,.2f}" if amount is not None else "to be confirmed"
+
+
+@transaction.atomic
+def generate_offer_letter(*, offer, actor):
+    # Lock only the offer row: Postgres rejects FOR UPDATE across the nullable reports_to join.
+    instance = Offer.objects.select_for_update(of=("self",)).select_related(
+        "application__candidate", "application__job_posting", "position", "department", "location", "grade", "reports_to", "institution"
+    ).get(pk=offer.pk)
+    _active_member(actor, instance.institution)
+    if instance.status not in (Offer.Status.DRAFT, Offer.Status.APPROVED):
+        raise ValidationError({"status": "The letter can only be regenerated while the offer is a draft or approved."})
+    candidate = instance.application.candidate
+    lines = [
+        f"{timezone.localdate():%d %B %Y}",
+        "",
+        f"Dear {candidate.first_name} {candidate.last_name},",
+        "",
+        f"Offer of employment: {instance.position.title}",
+        "",
+        f"We are pleased to offer you the position of {instance.position.title} in {instance.department.name} at "
+        f"{instance.institution.name}, based at {instance.location.name}.",
+        "",
+        "Terms of the offer:",
+        f"- Employment type: {instance.get_employment_type_display()}",
+    ]
+    if instance.contract_length_months:
+        lines.append(f"- Contract length: {instance.contract_length_months} months")
+    if instance.working_pattern:
+        lines.append(f"- Working pattern: {instance.get_working_pattern_display()}")
+    lines += [
+        f"- Grade: {instance.grade.name}",
+        f"- Salary: {_money(instance.base_salary, instance.currency)} per month",
+        f"- Start date: {instance.proposed_start_date:%d %B %Y}",
+    ]
+    if instance.reports_to_id:
+        lines.append(f"- Reporting to: {instance.reports_to.title}")
+    if instance.terms.strip():
+        lines += ["", instance.terms.strip()]
+    if instance.expires_on:
+        lines += ["", f"Please confirm your acceptance by {instance.expires_on:%d %B %Y}."]
+    lines += ["", "We look forward to welcoming you.", "", "Yours sincerely,", "", f"{instance.institution.name} Recruitment Team"]
+    instance.letter_body = "\n".join(lines)
+    instance.letter_generated_at = timezone.now()
+    instance.save(update_fields=("letter_body", "letter_generated_at", "updated_at"))
+    record_audit_event(actor=actor, institution=instance.institution, entity=instance, action="recruitment.offer.letter_generated")
+    return instance

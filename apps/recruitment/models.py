@@ -255,10 +255,24 @@ class ApplicationStageHistory(TenantOwnedModel):
 
 class Interview(TenantOwnedModel):
     class Status(models.TextChoices):
+        DRAFT = "DRAFT", "Draft"
         SCHEDULED = "SCHEDULED", "Scheduled"
         COMPLETED = "COMPLETED", "Completed"
         CANCELLED = "CANCELLED", "Cancelled"
         NO_SHOW = "NO_SHOW", "No show"
+
+    class Stage(models.TextChoices):
+        SCREENING = "SCREENING", "Screening call"
+        FIRST_ROUND = "FIRST_ROUND", "First round interview"
+        SECOND_ROUND = "SECOND_ROUND", "Second round interview"
+        TECHNICAL = "TECHNICAL", "Technical assessment"
+        FINAL = "FINAL", "Final interview"
+
+    class Mode(models.TextChoices):
+        VIDEO = "VIDEO", "Video call"
+        PHONE = "PHONE", "Phone call"
+        IN_PERSON = "IN_PERSON", "In person"
+        OTHER = "OTHER", "Other"
 
     institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="interviews")
     application = models.ForeignKey(Application, on_delete=models.CASCADE, related_name="interviews")
@@ -269,6 +283,14 @@ class Interview(TenantOwnedModel):
     interviewer = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="recruitment_interviews")
     status = models.CharField(max_length=12, choices=Status.choices, default=Status.SCHEDULED)
     notes = models.TextField(blank=True)
+    interview_stage = models.CharField(max_length=16, choices=Stage.choices, blank=True)
+    mode = models.CharField(max_length=12, choices=Mode.choices, blank=True)
+    time_zone = models.CharField(max_length=64, blank=True)
+    agenda = models.TextField(blank=True, max_length=500)
+    panel = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name="interview_panels")
+    candidate_message = models.TextField(blank=True, max_length=4000)
+    invitation_sent_at = models.DateTimeField(null=True, blank=True)
+    invitation_status = models.CharField(max_length=16, blank=True)
 
     class Meta:
         ordering = ("scheduled_at",)
@@ -281,6 +303,11 @@ class Interview(TenantOwnedModel):
             errors["application"] = "Application must belong to the same institution."
         if self.interviewer_id and not self.interviewer.memberships.filter(institution_id=self.institution_id, status="ACTIVE").exists():
             errors["interviewer"] = "Interviewer must be an active institution member."
+        if self.time_zone:
+            from zoneinfo import available_timezones
+
+            if self.time_zone not in available_timezones():
+                errors["time_zone"] = "Use an IANA time zone such as Africa/Accra."
         if errors:
             raise ValidationError(errors)
 
@@ -314,7 +341,9 @@ class CandidateEvaluation(TenantOwnedModel):
 class Offer(TenantOwnedModel):
     class Status(models.TextChoices):
         DRAFT = "DRAFT", "Draft"
-        EXTENDED = "EXTENDED", "Extended"
+        PENDING_APPROVAL = "PENDING_APPROVAL", "Pending approval"
+        APPROVED = "APPROVED", "Approved"
+        EXTENDED = "EXTENDED", "Sent"
         ACCEPTED = "ACCEPTED", "Accepted"
         DECLINED = "DECLINED", "Declined"
         WITHDRAWN = "WITHDRAWN", "Withdrawn"
@@ -322,7 +351,7 @@ class Offer(TenantOwnedModel):
 
     institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="offers")
     application = models.OneToOneField(Application, on_delete=models.PROTECT, related_name="offer")
-    status = models.CharField(max_length=12, choices=Status.choices, default=Status.DRAFT)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.DRAFT)
     proposed_start_date = models.DateField()
     expires_on = models.DateField(null=True, blank=True)
     employment_type = models.CharField(max_length=12, choices=Employment.EmploymentType.choices)
@@ -339,6 +368,18 @@ class Offer(TenantOwnedModel):
     declined_at = models.DateTimeField(null=True, blank=True)
     hired_employee = models.OneToOneField(Employee, null=True, blank=True, on_delete=models.PROTECT, related_name="recruitment_offer")
     terms = models.TextField(blank=True)
+    contract_length_months = models.PositiveSmallIntegerField(null=True, blank=True)
+    working_pattern = models.CharField(max_length=12, choices=Employment.WorkingPattern.choices, blank=True)
+    reports_to = models.ForeignKey(Position, null=True, blank=True, on_delete=models.PROTECT, related_name="recruitment_offers_reporting")
+    letter_body = models.TextField(blank=True, max_length=20000)
+    letter_generated_at = models.DateTimeField(null=True, blank=True)
+    submitted_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="submitted_recruitment_offers")
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="approved_recruitment_offers")
+    approved_at = models.DateTimeField(null=True, blank=True)
+    approval_note = models.TextField(blank=True)
+    response_note = models.TextField(blank=True)
+    response_recorded_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="recorded_offer_responses")
 
     class Meta:
         ordering = ("-created_at",)
@@ -348,7 +389,7 @@ class Offer(TenantOwnedModel):
     def clean(self):
         self.currency = self.currency.strip().upper()
         errors = {}
-        for name in ("application", "department", "position", "grade", "location", "salary_structure", "hired_employee"):
+        for name in ("application", "department", "position", "grade", "location", "salary_structure", "hired_employee", "reports_to"):
             obj = getattr(self, name, None)
             if obj and obj.institution_id != self.institution_id:
                 errors[name] = "Referenced record must belong to the same institution."

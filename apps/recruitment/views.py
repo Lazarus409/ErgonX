@@ -6,8 +6,8 @@ from rest_framework.response import Response
 
 from apps.recruitment.models import Application, ApplicationStageHistory, Candidate, CandidateEvaluation, Interview, JobPosting, Offer, RecruitmentStage
 from apps.recruitment.selectors import applications_for_institution, candidate_scorecard, recruitment_pipeline
-from apps.recruitment.serializers import (JobPostingTeamMemberSerializer, RequisitionDecisionSerializer, ApplicationSerializer, ApplicationStageHistorySerializer, CandidateEvaluationSerializer, CandidateSerializer, CommentSerializer, HireCandidateSerializer, InterviewSerializer, InterviewStatusSerializer, JobPostingSerializer, OfferSerializer, RecruitmentStageSerializer, RejectionSerializer, ScorecardSerializer, StageMoveSerializer)
-from apps.recruitment.services import (CANDIDATE_DOCUMENT_CATEGORIES, application_scorecard, attach_candidate_document, remove_candidate_document, save_application_scorecard, add_hiring_team_member, approve_job_posting, remove_hiring_team_member, return_job_posting, submit_job_posting_for_approval, close_job_posting, decide_offer, extend_offer, hire_candidate, move_application_stage, publish_job_posting, reject_application, submit_application, update_interview_status, withdraw_application, withdraw_offer)
+from apps.recruitment.serializers import (JobPostingTeamMemberSerializer, RequisitionDecisionSerializer, ApplicationSerializer, ApplicationStageHistorySerializer, CandidateEvaluationSerializer, CandidateSerializer, CommentSerializer, HireCandidateSerializer, InterviewSerializer, InterviewStatusSerializer, JobPostingSerializer, OfferSerializer, RecruitmentStageSerializer, RejectionSerializer, ScorecardSerializer, StageMoveSerializer, InterviewScheduleSerializer, OfferResponseSerializer)
+from apps.recruitment.services import (approve_offer, generate_offer_letter, interview_availability, return_offer, schedule_interview, submit_offer_for_approval, CANDIDATE_DOCUMENT_CATEGORIES, application_scorecard, attach_candidate_document, remove_candidate_document, save_application_scorecard, add_hiring_team_member, approve_job_posting, remove_hiring_team_member, return_job_posting, submit_job_posting_for_approval, close_job_posting, decide_offer, extend_offer, hire_candidate, move_application_stage, publish_job_posting, reject_application, submit_application, update_interview_status, withdraw_application, withdraw_offer)
 from apps.institutions.services import record_user_activity
 from apps.documents.models import Document
 from apps.documents.serializers import DocumentSerializer
@@ -361,7 +361,52 @@ class InterviewViewSet(RecruitmentViewSet):
     ordering_fields = ("scheduled_at", "created_at", "updated_at")
 
     def get_queryset(self):
-        return super().get_queryset().select_related("application__candidate", "interviewer")
+        return super().get_queryset().select_related("application__candidate", "application__job_posting", "interviewer").prefetch_related("panel")
+
+    @action(detail=False, methods=("get",))
+    def availability(self, request):
+        from datetime import date as date_type
+
+        try:
+            day = date_type.fromisoformat(request.query_params.get("date", ""))
+            duration = int(request.query_params.get("duration", 60))
+        except ValueError:
+            from rest_framework.exceptions import ValidationError as DRFValidationError
+
+            raise DRFValidationError({"date": "Use YYYY-MM-DD and a whole number of minutes."})
+        ids = [value for value in request.query_params.get("interviewers", "").split(",") if value]
+        return Response(call_validated_service(
+            interview_availability, institution=request.institution, day=day, interviewer_ids=ids, duration_minutes=duration,
+            time_zone=request.query_params.get("time_zone", "UTC"), exclude_interview=request.query_params.get("exclude") or None,
+        ))
+
+    def _schedule(self, request, interview=None):
+        from django.contrib.auth import get_user_model
+
+        payload = InterviewScheduleSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        data = payload.validated_data
+        application = Application.objects.for_institution(request.institution).filter(pk=data["application"]).first()
+        if application is None:
+            raise NotFound("Application not found.")
+        users = {str(user.id): user for user in get_user_model().objects.filter(pk__in=data["panel"])}
+        created = interview is None
+        interview = call_validated_service(
+            schedule_interview, application=application, actor=request.user, interview=interview,
+            scheduled_at=data["scheduled_at"], duration_minutes=data["duration_minutes"], interview_stage=data["interview_stage"],
+            mode=data["mode"], time_zone=data["time_zone"], location_or_link=data.get("location_or_link", ""), agenda=data.get("agenda", ""),
+            panel=[users.get(str(value)) for value in data["panel"]], candidate_message=data.get("candidate_message", ""),
+            draft=data["draft"], send_invitation=data["send_invitation"],
+        )
+        return Response(self.get_serializer(interview).data, status=201 if created else 200)
+
+    @action(detail=False, methods=("post",))
+    def schedule(self, request):
+        return self._schedule(request)
+
+    @action(detail=True, methods=("post",), url_path="reschedule")
+    def reschedule(self, request, pk=None):
+        return self._schedule(request, interview=self.get_object())
 
     @action(detail=True, methods=("post",), url_path="set-status")
     def set_status(self, request, pk=None):
@@ -370,7 +415,7 @@ class InterviewViewSet(RecruitmentViewSet):
         return Response(self.get_serializer(interview).data)
 
     def get_required_permission(self):
-        if self.action == "set_status":
+        if self.action in {"set_status", "schedule", "reschedule", "availability"}:
             return "interview.manage"
         return super().get_required_permission()
 
@@ -395,10 +440,45 @@ class OfferViewSet(RecruitmentViewSet):
     ordering_fields = ("proposed_start_date", "created_at", "updated_at")
 
     def get_queryset(self):
-        return super().get_queryset().select_related("application__candidate", "application__job_posting", "department", "position", "grade", "location", "salary_structure", "hired_employee")
+        return super().get_queryset().select_related("application__candidate", "application__job_posting", "department", "position", "grade", "location", "salary_structure", "hired_employee", "reports_to", "submitted_by", "approved_by", "response_recorded_by")
 
     def get_required_permission(self):
-        return {"extend": "offer.create", "accept": "offer.manage", "decline": "offer.manage", "withdraw": "offer.manage", "hire": "offer.manage"}.get(self.action, super().get_required_permission())
+        return {
+            "extend": "offer.create", "accept": "offer.manage", "decline": "offer.manage", "withdraw": "offer.manage", "hire": "offer.manage",
+            "submit_approval": "offer.create", "generate_letter": "offer.create", "approve": "offer.approve", "return_for_changes": "offer.approve",
+            "activity": "offer.view", "update": "offer.create", "partial_update": "offer.create",
+        }.get(self.action, super().get_required_permission())
+
+    @action(detail=True, methods=("post",), url_path="submit-approval")
+    def submit_approval(self, request, pk=None):
+        return Response(self.get_serializer(call_validated_service(submit_offer_for_approval, offer=self.get_object(), actor=request.user)).data)
+
+    @action(detail=True, methods=("post",))
+    def approve(self, request, pk=None):
+        payload = RequisitionDecisionSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        return Response(self.get_serializer(call_validated_service(approve_offer, offer=self.get_object(), actor=request.user, comment=payload.validated_data.get("comment", ""))).data)
+
+    @action(detail=True, methods=("post",), url_path="return")
+    def return_for_changes(self, request, pk=None):
+        payload = RequisitionDecisionSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        return Response(self.get_serializer(call_validated_service(return_offer, offer=self.get_object(), actor=request.user, comment=payload.validated_data.get("comment", ""))).data)
+
+    @action(detail=True, methods=("post",), url_path="generate-letter")
+    def generate_letter(self, request, pk=None):
+        return Response(self.get_serializer(call_validated_service(generate_offer_letter, offer=self.get_object(), actor=request.user)).data)
+
+    @action(detail=True, methods=("get",))
+    def activity(self, request, pk=None):
+        from apps.audit.models import AuditLog
+
+        offer = self.get_object()
+        entries = AuditLog.objects.filter(institution=request.institution, entity_id=offer.id).select_related("actor").order_by("-created_at")[:50]
+        return Response([
+            {"id": str(entry.id), "action": entry.action, "actor": (entry.actor.get_full_name() or entry.actor.email) if entry.actor else "System", "created_at": entry.created_at, "metadata": entry.metadata}
+            for entry in entries
+        ])
 
     @action(detail=True, methods=("post",))
     def extend(self, request, pk=None):
@@ -406,11 +486,13 @@ class OfferViewSet(RecruitmentViewSet):
 
     @action(detail=True, methods=("post",))
     def accept(self, request, pk=None):
-        return Response(self.get_serializer(call_validated_service(decide_offer, offer=self.get_object(), actor=request.user, accepted=True)).data)
+        payload = OfferResponseSerializer(data=request.data); payload.is_valid(raise_exception=True)
+        return Response(self.get_serializer(call_validated_service(decide_offer, offer=self.get_object(), actor=request.user, accepted=True, note=payload.validated_data.get("note", ""))).data)
 
     @action(detail=True, methods=("post",))
     def decline(self, request, pk=None):
-        return Response(self.get_serializer(call_validated_service(decide_offer, offer=self.get_object(), actor=request.user, accepted=False)).data)
+        payload = OfferResponseSerializer(data=request.data); payload.is_valid(raise_exception=True)
+        return Response(self.get_serializer(call_validated_service(decide_offer, offer=self.get_object(), actor=request.user, accepted=False, note=payload.validated_data.get("note", ""))).data)
 
     @action(detail=True, methods=("post",))
     def withdraw(self, request, pk=None):

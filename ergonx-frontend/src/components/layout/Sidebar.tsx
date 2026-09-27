@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronDown, ChevronsLeft, PanelLeftOpen, X } from "lucide-react";
+import { ChevronDown, ChevronsLeft, X } from "lucide-react";
 import { useState } from "react";
 
 import Logo from "@/components/brand/Logo";
@@ -73,12 +73,20 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
   // In the mobile drawer the sidebar is always rendered expanded.
   const renderPanel = (compact: boolean, mobile: boolean) => (
     <div className="flex h-full flex-col">
-      <div className={cx("flex h-[5.25rem] shrink-0 items-center justify-between gap-2 overflow-hidden", compact ? "gap-0 px-0" : "pl-7 pr-3")}>
+      <div className={cx("flex h-[5.25rem] shrink-0 items-center justify-between gap-2 overflow-hidden", compact ? "justify-center px-0" : "pl-7 pr-3")}>
         <Link
           href="/"
-          onClick={closeMobile}
+          onClick={(event) => {
+            if (compact && !mobile) {
+              event.preventDefault();
+              onCollapsedChange(false);
+              return;
+            }
+            closeMobile();
+          }}
           className={cx("rounded-lg focus-visible:outline-offset-4", compact && !mobile ? "h-12 w-9 shrink-0 overflow-hidden" : "min-w-0")}
-          aria-label="ErgonX home"
+          aria-label={compact && !mobile ? "Expand sidebar" : "ErgonX home"}
+          title={compact && !mobile ? "Expand sidebar" : undefined}
         >
           <SidebarLogo collapsed={compact} />
         </Link>
@@ -86,17 +94,17 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
           <button type="button" onClick={closeMobile} className="rounded-xl p-2 text-white/70 transition-colors hover:bg-white/10 hover:text-white" aria-label="Close navigation">
             <X className="h-5 w-5" />
           </button>
-        ) : (
+        ) : !compact ? (
           <button
             type="button"
             onClick={() => onCollapsedChange(!compact)}
-            className={cx("shrink-0 rounded-xl p-2 text-white/65 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-sky", compact && "flex h-9 w-9 items-center justify-center p-1.5")}
-            aria-label={compact ? "Expand sidebar" : "Collapse sidebar"}
-            title={compact ? "Expand sidebar" : "Collapse sidebar"}
+            className="shrink-0 rounded-xl p-2 text-white/65 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-sky"
+            aria-label="Collapse sidebar"
+            title="Collapse sidebar"
           >
-            {compact ? <PanelLeftOpen className="h-5 w-5" /> : <ChevronsLeft className="h-5 w-5" />}
+            <ChevronsLeft className="h-5 w-5" />
           </button>
-        )}
+        ) : null}
       </div>
 
       <nav aria-label="Primary navigation" className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-3 [scrollbar-color:rgb(255_255_255/0.18)_transparent]">

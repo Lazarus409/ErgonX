@@ -288,7 +288,7 @@ class BudgetViewSet(RecordAttachmentsMixin, TenantModelViewSet):
             "initiatives": [{k: (str(v) if isinstance(v, Decimal) else v) for k, v in bucket.items()} for bucket in initiatives.values()],
             "notes": [{"id": str(note.id), "author": _person(note.author), "body": note.body, "created_at": note.created_at} for note in budget.notes.select_related("author")],
             "attachments": self._record_context(budget)["attachments"],
-            "people": {"created_by": _person(budget.created_by), "submitted_by": _person(budget.submitted_by), "approved_by": _person(budget.approved_by)},
+            "people": {"created_by": _person(budget.created_by), "submitted_by": _person(budget.submitted_by), "submitted_by_id": str(budget.submitted_by_id) if budget.submitted_by_id else None, "approved_by": _person(budget.approved_by)},
             "audit": [{"id": str(entry.id), "action": entry.action, "actor": _person(entry.actor) or "System", "created_at": entry.created_at, "metadata": entry.metadata} for entry in audit],
         })
 

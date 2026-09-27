@@ -1,4 +1,4 @@
-export type AccountType = "ASSET" | "LIABILITY" | "EQUITY" | "REVENUE" | "EXPENSE";
+export type AccountType = "ASSET" | "LIABILITY" | "EQUITY" | "INCOME" | "EXPENSE";
 export type NormalBalance = "DEBIT" | "CREDIT";
 
 export interface Account {

@@ -1623,3 +1623,16 @@ class Expense(TenantOwnedModel):
         if self.pk and Expense.objects.filter(pk=self.pk, status__in=(self.Status.POSTED, self.Status.REJECTED)).exists():
             raise ValidationError({"status": "Posted or rejected expenses are immutable."})
         super().save(*args, **kwargs)
+
+
+class JournalEntryNote(TenantOwnedModel):
+    """Reviewer and preparer notes on a journal (concept "Journal entry detail")."""
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="journal_notes")
+    journal_entry = models.ForeignKey(JournalEntry, on_delete=models.CASCADE, related_name="notes")
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="journal_notes")
+    body = models.TextField(max_length=4000)
+
+    class Meta:
+        ordering = ("-created_at",)
+        indexes = [models.Index(fields=("institution", "journal_entry"))]

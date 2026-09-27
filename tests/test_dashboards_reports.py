@@ -93,6 +93,10 @@ def test_finance_manager_receives_finance_dashboard_and_report_access(
         "accounts_payable_aging", "accounts_receivable_aging", "journals_by_status",
         "profit_and_loss_trend", "bank_balance", "registered_bank_accounts", "cash_flow_trend",
         "expenses_by_account", "unreconciled_bank_lines",
+        # Accounting dashboard concept workspace.
+        "range_months", "range_start", "cash_flow_range", "reconciliation_exceptions", "pending_approvals",
+        "pending_approvals_breakdown", "unposted_journals", "close_status", "needs_attention", "needs_attention_total",
+        "recent_journals", "controls",
     }
     assert len(response.data["accounts_payable_aging"]) == 4
     assert len(response.data["accounts_receivable_aging"]) == 4

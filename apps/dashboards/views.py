@@ -1,7 +1,8 @@
 from datetime import date, timedelta
 from decimal import Decimal
 
-from django.db.models import Count, Q, Sum
+from django.utils import timezone
+from django.db.models import Count, F, Q, Sum
 from django.db.models.functions import ExtractYear, TruncMonth
 from drf_spectacular.utils import OpenApiTypes, extend_schema
 from rest_framework.decorators import action
@@ -835,7 +836,9 @@ class DashboardViewSet(ViewSet):
             institution=institution,
             status__in=(BankStatementLine.Status.UNMATCHED, BankStatementLine.Status.EXCEPTION),
         )
+        concept = _accounting_workspace(institution, request, journals, unreconciled, bank_cash_position)
         return Response({
+            **concept,
             "pending_journals": journals.filter(status=JournalEntry.Status.PENDING_APPROVAL).count(),
             "accounts_payable": open_bills.aggregate(total=Sum("amount_payable"))["total"] or 0,
             "accounts_receivable": open_invoices.aggregate(total=Sum("total_amount"))["total"] or 0,
@@ -867,6 +870,77 @@ class DashboardViewSet(ViewSet):
                 ],
             },
         })
+
+
+def _accounting_workspace(institution, request, journals, unreconciled, bank_cash_position):
+    """Concept "Accounting dashboard": range, KPIs, needs-attention queue,
+    recent journal activity and control checks. All derived from live records."""
+    from apps.accounting.models import AccountingPeriod
+    from apps.audit.models import AuditLog
+
+    today = timezone.localdate()
+    try:
+        span = int(request.query_params.get("months", 12))
+    except (TypeError, ValueError):
+        span = 12
+    span = span if span in (3, 6, 12) else 12
+    range_start = today.replace(day=1)
+    for _ in range(span - 1):
+        range_start = (range_start - timedelta(days=1)).replace(day=1)
+    trend = [row for row in bank_cash_position["cash_flow_trend"] if row["month"] >= range_start.isoformat()]
+
+    pending_bills = VendorBill.objects.filter(institution=institution, status=VendorBill.Status.PENDING)
+    pending_expenses = Expense.objects.filter(institution=institution, status=Expense.Status.PENDING)
+    pending_journals = journals.filter(status=JournalEntry.Status.PENDING_APPROVAL)
+    overdue_invoices = Invoice.objects.filter(
+        institution=institution, status__in=(Invoice.Status.ISSUED, Invoice.Status.PART_PAID), due_date__lt=today,
+    )
+    stale_periods = AccountingPeriod.objects.filter(institution=institution, status=AccountingPeriod.Status.OPEN, end_date__lt=today)
+    current = AccountingPeriod.objects.filter(institution=institution, start_date__lte=today, end_date__gte=today).first()
+
+    attention = []
+    for journal in pending_journals.order_by("entry_date")[:5]:
+        attention.append({"type": "Journal", "description": journal.description[:80], "entity": journal.journal_number, "date": journal.entry_date, "status": journal.status, "href": f"/accounting/journals/{journal.id}"})
+    for bill in pending_bills.select_related("vendor").order_by("bill_date")[:5]:
+        attention.append({"type": "Vendor bill", "description": f"Approve bill from {bill.vendor.name}", "entity": bill.bill_number, "date": bill.bill_date, "status": bill.status, "href": f"/accounting/payables/bills/{bill.id}"})
+    for invoice in overdue_invoices.select_related("customer").order_by("due_date")[:5]:
+        attention.append({"type": "Overdue invoice", "description": f"{invoice.customer.name} is past due", "entity": invoice.invoice_number, "date": invoice.due_date, "status": "OVERDUE", "href": f"/accounting/receivables/invoices/{invoice.id}"})
+    for expense in pending_expenses.order_by("expense_date")[:5]:
+        attention.append({"type": "Expense", "description": (expense.description or "Expense claim")[:80], "entity": str(expense.id)[:8].upper(), "date": expense.expense_date, "status": expense.status, "href": "/accounting/expenses"})
+    for line in unreconciled.filter(status=BankStatementLine.Status.EXCEPTION).select_related("bank_account").order_by("statement_date")[:5]:
+        attention.append({"type": "Bank exception", "description": (line.description or line.reference or "Statement line")[:80], "entity": line.bank_account.name, "date": line.statement_date, "status": line.status, "href": "/accounting/banking"})
+    for period in stale_periods.order_by("end_date")[:3]:
+        attention.append({"type": "Period close", "description": f"{period.name} ended but is still open", "entity": period.name, "date": period.end_date, "status": period.status, "href": "/accounting/periods"})
+    attention.sort(key=lambda row: row["date"])
+
+    since = timezone.now() - timedelta(days=30)
+    self_approved = journals.filter(approved_by__isnull=False, approved_by=F("created_by")).count()
+    return {
+        "range_months": span,
+        "range_start": range_start.isoformat(),
+        "cash_flow_range": trend,
+        "reconciliation_exceptions": unreconciled.count(),
+        "pending_approvals": pending_journals.count() + pending_bills.count() + pending_expenses.count(),
+        "pending_approvals_breakdown": {"journals": pending_journals.count(), "vendor_bills": pending_bills.count(), "expenses": pending_expenses.count()},
+        "unposted_journals": journals.filter(status__in=(JournalEntry.Status.DRAFT, JournalEntry.Status.PENDING_APPROVAL, JournalEntry.Status.APPROVED)).count(),
+        "close_status": {
+            "current_period": current.name if current else None,
+            "current_status": current.status if current else None,
+            "current_end": current.end_date.isoformat() if current else None,
+            "overdue_open_periods": stale_periods.count(),
+        },
+        "needs_attention": attention[:10],
+        "needs_attention_total": len(attention),
+        "recent_journals": [
+            {"id": str(row.id), "entry_date": row.entry_date, "journal_number": row.journal_number, "description": row.description[:90], "source": row.source, "status": row.status}
+            for row in journals.order_by("-created_at")[:8]
+        ],
+        "controls": {
+            "period_close": {"ok": not stale_periods.exists(), "detail": f"{stale_periods.count()} past period(s) still open" if stale_periods.exists() else "All past periods are closed"},
+            "segregation_of_duties": {"ok": self_approved == 0, "detail": f"{self_approved} journal(s) approved by their preparer" if self_approved else "Preparers and approvers are different people"},
+            "audit_trail": {"ok": True, "detail": f"{AuditLog.objects.filter(institution=institution, action__startswith='accounting.', created_at__gte=since).count()} accounting events logged in the last 30 days"},
+        },
+    }
 
 
 TIME_TO_HIRE_BUCKETS = (("0–14 days", 0, 14), ("15–30 days", 15, 30), ("31–60 days", 31, 60), ("61+ days", 61, None))

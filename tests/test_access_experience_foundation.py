@@ -220,14 +220,18 @@ def test_approval_workspace_permission_is_enforced_for_reviewer_roles(
     institution = institution_factory(code="APPROVAL-WORKSPACE")
     reviewer = user_factory()
     employee = user_factory()
-    membership_factory(user=reviewer, institution=institution, role_code="AUDITOR", is_primary=True)
+    auditor = user_factory()
+    membership_factory(user=reviewer, institution=institution, role_code="INSTITUTION_ADMIN", is_primary=True)
     membership_factory(user=employee, institution=institution, role_code="EMPLOYEE", is_primary=True)
+    membership_factory(user=auditor, institution=institution, role_code="AUDITOR", is_primary=True)
 
     _authenticate(api_client, reviewer, institution)
     assert api_client.get("/api/v1/approval-requests/").status_code == 200
 
-    _authenticate(api_client, employee, institution)
-    assert api_client.get("/api/v1/approval-requests/").status_code == 403
+    # Auditors review the record read-only; the approval queue is not theirs.
+    for user in (employee, auditor):
+        _authenticate(api_client, user, institution)
+        assert api_client.get("/api/v1/approval-requests/").status_code == 403
 
 
 def test_offboarding_ends_only_the_institution_membership(

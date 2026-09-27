@@ -166,6 +166,7 @@ PERMISSIONS = {
     "document.update": "Update shared document metadata",
     "document.delete": "Deactivate shared documents",
     "report.view": "View and export institution reports",
+    "report.all": "View every report institution-wide, read-only, without the underlying module permissions",
     "dashboard.executive.view": "View executive dashboard",
     "dashboard.hr.view": "View HR dashboard",
     "dashboard.leave.view": "View leave dashboard",
@@ -263,6 +264,8 @@ ROLE_PERMISSION_CODES = {
             # The audit trail is an oversight record for administrators, directors
             # and auditors; HR's own actions are recorded there.
             "audit.view",
+            # HR's reports stay limited to the people data its role already opens.
+            "report.all",
         }
     ),
     "DIRECTOR": (
@@ -293,6 +296,7 @@ ROLE_PERMISSION_CODES = {
         "offer.view",
         "dashboard.executive.view",
         "report.view",
+        "report.all",
     ),
     "EMPLOYEE": (
         "home.view",
@@ -403,8 +407,9 @@ ROLE_PERMISSION_CODES = {
         "dashboard.executive.view",
         "dashboard.finance.view",
         "report.view",
+        # Oversight is read-only: every report, but no approval queue.
+        "report.all",
         "audit.view",
-        "approval_request.view",
     ),
 }
 
@@ -423,6 +428,28 @@ def ensure_system_permissions():
         )
         permissions[code] = permission
     return permissions
+
+
+def sync_system_role_permissions():
+    """Give every built-in role exactly the permissions defined in ROLE_PERMISSION_CODES.
+
+    Runs after each migrate (so on every deploy). System roles cannot be edited in
+    the app, so this only repairs drift, e.g. a role left without a permission that
+    a later release added. Returns ``{role_code: {"added": [...], "removed": [...]}}``
+    for roles that changed.
+    """
+    permissions = {permission.code: permission for permission in Permission.objects.filter(code__in=PERMISSIONS)}
+    changes = {}
+    for role in Role.objects.filter(is_system_role=True, code__in=ROLE_PERMISSION_CODES).prefetch_related("permissions"):
+        wanted = {code for code in ROLE_PERMISSION_CODES[role.code] if code in permissions}
+        current = {permission.code for permission in role.permissions.all()}
+        if wanted == current:
+            continue
+        role.permissions.set(permissions[code] for code in wanted)
+        change = changes.setdefault(role.code, {"added": set(), "removed": set()})
+        change["added"] |= wanted - current
+        change["removed"] |= current - wanted
+    return {code: {key: sorted(values) for key, values in change.items()} for code, change in changes.items()}
 
 
 def effective_permission_codes(membership):

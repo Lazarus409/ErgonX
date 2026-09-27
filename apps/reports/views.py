@@ -51,7 +51,9 @@ class ReportsViewSet(ViewSet):
 
     def _respond(self, request, name):
         granted = set(effective_permission_codes(request.membership))
-        if not all(granted & set(requirement) for requirement in REPORT_PERMISSIONS[name]):
+        # report.all (directors, auditors) opens every report read-only and institution-wide.
+        sees_all = "report.all" in granted
+        if not sees_all and not all(granted & set(requirement) for requirement in REPORT_PERMISSIONS[name]):
             raise PermissionDenied("Your role does not include access to this report.")
         filters = {
             "status": request.query_params.get("status"),
@@ -66,7 +68,7 @@ class ReportsViewSet(ViewSet):
                     request.institution,
                     name,
                     group,
-                    scope=lambda queryset, field, **options: scope_to_employees(queryset, request, field, **options),
+                    scope=(lambda queryset, field, **options: queryset) if sees_all else (lambda queryset, field, **options: scope_to_employees(queryset, request, field, **options)),
                     **filters,
                 )
             else:

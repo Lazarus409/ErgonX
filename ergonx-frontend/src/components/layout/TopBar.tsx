@@ -32,6 +32,7 @@ import { Avatar } from "@/components/ui/Card";
 import { cx } from "@/lib/cx";
 import { accentForPath, moduleAccents } from "@/lib/moduleTheme";
 import { formatDateTime } from "@/lib/format";
+import { imageContentUrl } from "@/lib/api/images";
 
 interface TopBarProps {
   onOpenSidebar?: () => void;
@@ -394,7 +395,7 @@ export default function TopBar({ onOpenSidebar }: TopBarProps) {
             aria-haspopup="menu"
             aria-expanded={profileOpen}
           >
-            <Avatar name={fullName} size="md" solid />
+            <Avatar name={fullName} src={user?.profileImageId ? imageContentUrl(user.profileImageId) : null} size="md" solid />
             <span className="hidden min-w-0 text-left leading-tight xl:block">
               <span className="block max-w-40 truncate text-sm font-bold text-ink-strong">{fullName}</span>
               <span className="block max-w-40 truncate text-caption text-heading-support">{user?.role ? user.role.replaceAll("_", " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase()) : ""}</span>
@@ -405,7 +406,7 @@ export default function TopBar({ onOpenSidebar }: TopBarProps) {
           {profileOpen && (
             <div role="menu" aria-label="Profile menu" className="absolute right-0 top-14 z-50 w-[min(calc(100vw-2rem),20rem)] origin-top-right animate-pop-in overflow-hidden rounded-2xl border border-line bg-surface shadow-overlay">
               <div className="flex items-center gap-3 border-b border-line-soft p-4">
-                <Avatar name={fullName} size="md" />
+                <Avatar name={fullName} src={user?.profileImageId ? imageContentUrl(user.profileImageId) : null} size="md" />
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-ink-strong">{fullName}</p>
                   <p className="truncate text-caption text-ink-muted">{user?.email ?? ""}</p>

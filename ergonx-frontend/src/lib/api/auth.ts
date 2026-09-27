@@ -21,6 +21,8 @@ export interface AuthUser {
   first_name: string;
   last_name: string;
   is_platform_admin: boolean;
+  /** Active user avatar image, scoped to the selected institution. */
+  profile_image_id?: string | null;
   created_at: string;
 }
 

@@ -15,14 +15,14 @@ import { cx } from "@/lib/cx";
 import type { Employee } from "@/types/hr";
 
 export default function MyProfilePage() {
-  const { user } = useAuth();
+  const { user, refreshSession } = useAuth();
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [phone, setPhone] = useState("");
   const [personalEmail, setPersonalEmail] = useState("");
   const [avatarKey, setAvatarKey] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [imageId, setImageId] = useState<string | null>(null);
+  const [imageId, setImageId] = useState<string | null>(user?.profileImageId ?? null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -35,6 +35,10 @@ export default function MyProfilePage() {
       setAvatarKey(value?.avatar_key ?? "");
     }).catch((caught) => setError(getApiErrorMessage(caught)));
   }, []);
+
+  useEffect(() => {
+    setImageId(user?.profileImageId ?? null);
+  }, [user?.profileImageId]);
 
   async function save(event: FormEvent) {
     event.preventDefault(); setError(null); setMessage(null);
@@ -56,9 +60,11 @@ export default function MyProfilePage() {
     }
     setUploading(true); setUploadProgress(0);
     try {
-      const image = await imagesApi.uploadImage(file, "EMPLOYEE", employee.id, setUploadProgress);
-      await imagesApi.uploadImage(file, "USER", user.id, setUploadProgress);
-      setImageId(image.id); setMessage("Profile picture updated.");
+      await imagesApi.uploadImage(file, "EMPLOYEE", employee.id, setUploadProgress);
+      const userImage = await imagesApi.uploadImage(file, "USER", user.id, setUploadProgress);
+      setImageId(userImage.id);
+      await refreshSession();
+      setMessage("Profile picture updated.");
     } catch (caught) { setError(getApiErrorMessage(caught)); }
     finally { setUploading(false); }
   }

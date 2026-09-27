@@ -99,11 +99,26 @@ export interface RequisitionHistoryEntry {
   metadata: Record<string, unknown>;
 }
 
-export interface Candidate {
+export interface CandidateProfileFields {
+  location?: string;
+  employment_status?: string;
+  linkedin_url?: string;
+  current_employer?: string;
+  current_title?: string;
+  years_experience?: number | null;
+  highest_qualification?: string;
+  field_of_study?: string;
+  education_institution?: string;
+  skills?: string;
+  notice_period_weeks?: number | null;
+}
+
+export interface Candidate extends CandidateProfileFields {
   id: string;
   first_name: string;
   middle_name: string;
   last_name: string;
+  full_name?: string;
   email: string;
   phone: string;
   source: string;
@@ -113,7 +128,7 @@ export interface Candidate {
   updated_at: string;
 }
 
-export interface CandidatePayload {
+export interface CandidatePayload extends CandidateProfileFields {
   first_name: string;
   middle_name?: string;
   last_name: string;
@@ -121,6 +136,54 @@ export interface CandidatePayload {
   phone?: string;
   source?: string;
   notes?: string;
+}
+
+export const EMPLOYMENT_STATUSES: Array<[string, string]> = [["EMPLOYED", "Employed"], ["SELF_EMPLOYED", "Self-employed"], ["UNEMPLOYED", "Not currently employed"], ["STUDENT", "Student or graduate"], ["OTHER", "Other"]];
+export const QUALIFICATIONS: Array<[string, string]> = [["SECONDARY", "Secondary school"], ["DIPLOMA", "Diploma or certificate"], ["BACHELORS", "Bachelor's degree"], ["MASTERS", "Master's degree"], ["DOCTORATE", "Doctorate"], ["PROFESSIONAL", "Professional qualification"], ["OTHER", "Other"]];
+export const CANDIDATE_DOCUMENT_TYPES: Array<[string, string]> = [["CV", "CV / résumé"], ["COVER_LETTER", "Cover letter"], ["CERTIFICATE", "Certificate or transcript"], ["PORTFOLIO", "Portfolio or work sample"], ["REFERENCE", "Reference"], ["OTHER", "Other"]];
+export const COMPETENCY_RATINGS: Array<[string, string]> = [["NOT_ASSESSED", "Not yet assessed"], ["DOES_NOT_MEET", "Does not meet"], ["PARTIALLY_MEETS", "Partially meets"], ["MEETS", "Meets"], ["EXCEEDS", "Exceeds"]];
+
+export interface CandidateDocument {
+  id: string;
+  original_filename: string;
+  content_type: string;
+  size_bytes: number;
+  category: string;
+  created_at: string;
+}
+
+export interface ApplicationScorecard {
+  competencies: Array<{ id: string; name: string; description: string }>;
+  mine: Record<string, { rating: string; comment: string }>;
+  my_submitted_at: string | null;
+  can_evaluate: boolean;
+  locked: boolean;
+  evaluator_count: number;
+  summary: Array<{ competency: string; counts: Record<string, number> }>;
+}
+
+export interface InterviewFeedback {
+  id: string;
+  interviewer_name: string | null;
+  score: string | number;
+  recommendation: string;
+  comments: string;
+  created_at: string;
+}
+
+export interface ApplicationOverview {
+  application: { id: string; status: string; applied_at: string | null; created_at: string; notes: string; rejection_reason: string; current_stage: string | null; current_stage_name: string | null };
+  candidate: Candidate;
+  job: { id: string; code: string; title: string; status: string; department_name: string; location_name: string; employment_type: string };
+  stages: Array<{ id: string; name: string; sequence: number }>;
+  next_stage: { id: string; name: string } | null;
+  interviews: Array<{ id: string; scheduled_at: string; duration_minutes: number; interview_type: string; location_or_link: string; status: string; interviewer_name: string | null; feedback: InterviewFeedback[] }>;
+  general_feedback: InterviewFeedback[];
+  documents: CandidateDocument[];
+  other_applications: Array<{ id: string; job_title: string; status: string; stage: string | null }>;
+  offer: { id: string; status: string } | null;
+  activity: RequisitionHistoryEntry[];
+  actions: { can_move: boolean; can_reject: boolean; can_schedule_interview: boolean; can_create_offer: boolean; can_upload_documents: boolean };
 }
 
 export interface CandidateScorecard {

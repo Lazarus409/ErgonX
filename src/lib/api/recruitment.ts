@@ -1,6 +1,6 @@
-import { apiAction, apiDelete, apiGetList, apiGet, apiPatch, apiPost } from "./client";
+import { apiAction, apiDelete, apiDownload, apiGetList, apiGet, apiPatch, apiPost, apiPostMultipart } from "./client";
 import type { ListParams, PaginatedData } from "@/types/api";
-import type { HiringTeamMember, RecruitmentPerson, RequisitionActivity, RequisitionHistoryEntry, ApplicationStageHistory, Candidate, CandidateEvaluation, CandidateEvaluationPayload, CandidatePayload, CandidateScorecard, JobPosting, JobPostingPayload, RecruitmentApplication, RecruitmentApplicationPayload, RecruitmentInterview, RecruitmentInterviewPayload, RecruitmentOffer, RecruitmentOfferPayload, RecruitmentPipelineStage, RecruitmentStage, RecruitmentStagePayload } from "@/types/recruitment";
+import type { ApplicationOverview, ApplicationScorecard, CandidateDocument, HiringTeamMember, RecruitmentPerson, RequisitionActivity, RequisitionHistoryEntry, ApplicationStageHistory, Candidate, CandidateEvaluation, CandidateEvaluationPayload, CandidatePayload, CandidateScorecard, JobPosting, JobPostingPayload, RecruitmentApplication, RecruitmentApplicationPayload, RecruitmentInterview, RecruitmentInterviewPayload, RecruitmentOffer, RecruitmentOfferPayload, RecruitmentPipelineStage, RecruitmentStage, RecruitmentStagePayload } from "@/types/recruitment";
 
 export function listJobPostings(params?: ListParams): Promise<PaginatedData<JobPosting>> {
   return apiGetList<JobPosting>("/recruitment/job-postings/", params);
@@ -66,6 +66,41 @@ export function getCandidate(id: string): Promise<Candidate> {
 
 export function createCandidate(payload: CandidatePayload): Promise<Candidate> {
   return apiPost<Candidate, CandidatePayload>("/recruitment/candidates/", payload);
+}
+
+export function updateCandidate(id: string, payload: Partial<CandidatePayload>): Promise<Candidate> {
+  return apiPatch<Candidate, Partial<CandidatePayload>>(`/recruitment/candidates/${id}/`, payload);
+}
+
+export function listCandidateDocuments(id: string): Promise<CandidateDocument[]> {
+  return apiGet<CandidateDocument[]>(`/recruitment/candidates/${id}/documents/`);
+}
+
+export function uploadCandidateDocument(id: string, file: File, category: string, onProgress?: (progress: number) => void): Promise<CandidateDocument> {
+  const body = new FormData();
+  body.append("uploaded_file", file);
+  body.append("category", category);
+  return apiPostMultipart<CandidateDocument>(`/recruitment/candidates/${id}/documents/`, body, onProgress);
+}
+
+export function downloadCandidateDocument(id: string, documentId: string): Promise<Blob> {
+  return apiDownload(`/recruitment/candidates/${id}/documents/${documentId}/download/`);
+}
+
+export function removeCandidateDocument(id: string, documentId: string): Promise<void> {
+  return apiDelete(`/recruitment/candidates/${id}/documents/${documentId}/`);
+}
+
+export function getApplicationOverview(id: string): Promise<ApplicationOverview> {
+  return apiGet<ApplicationOverview>(`/recruitment/applications/${id}/overview/`);
+}
+
+export function getApplicationScorecard(id: string): Promise<ApplicationScorecard> {
+  return apiGet<ApplicationScorecard>(`/recruitment/applications/${id}/scorecard/`);
+}
+
+export function saveApplicationScorecard(id: string, ratings: Array<{ competency: string; rating: string; comment: string }>, submit: boolean): Promise<ApplicationScorecard> {
+  return apiPost<ApplicationScorecard, { ratings: typeof ratings; submit: boolean }>(`/recruitment/applications/${id}/scorecard/`, { ratings, submit });
 }
 
 export function getCandidateScorecard(id: string): Promise<CandidateScorecard> {

@@ -49,7 +49,7 @@ export default function RecruitmentDashboardPage() {
   }, [data, query, role]);
   const kpi = (count: number | undefined, hint: string) => (count ? hint : "No data available");
   const ratio = (numerator?: number, denominator?: number) => (numerator !== undefined && denominator ? `${Math.round((numerator / denominator) * 100)}%` : EM_DASH);
-  const addHref = can("candidate.create") ? `/recruitment/applications/new${role ? `?job_posting=${role}` : ""}` : null;
+  const addHref = can("candidate.create") ? `/recruitment/candidates/new${role ? `?job_posting=${role}` : ""}` : null;
 
   return (
     <div className="space-y-6">
@@ -231,7 +231,7 @@ function BoardColumn({ column, index, total, addHref }: { column: RecruitmentBoa
       </div>
       <div className="flex min-h-[20rem] flex-1 flex-col gap-2 p-2">
         {column.cards.length ? column.cards.map((card) => (
-          <Link key={card.id} href={`/recruitment/applications/${card.id}`} className="rounded-lg border border-line bg-surface p-3 shadow-elevation-1 transition hover:border-primary/40 focus-visible:outline-2 focus-visible:outline-primary">
+          <Link key={card.id} href={`/recruitment/candidates/${card.candidate_id}?application=${card.id}`} className="rounded-lg border border-line bg-surface p-3 shadow-elevation-1 transition hover:border-primary/40 focus-visible:outline-2 focus-visible:outline-primary">
             <p className="font-semibold text-ink-strong">{card.candidate}</p>
             <p className="mt-0.5 truncate text-caption text-ink-muted">{card.job_title}</p>
             <p className="mt-2 flex items-center justify-between text-caption text-ink-muted"><span>{card.applied_at ? formatDate(card.applied_at) : "Not submitted"}</span>{card.status === "OFFERED" && <span className="font-semibold text-warning-ink">Offer</span>}</p>

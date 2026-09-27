@@ -55,6 +55,14 @@ function routeContext(pathname: string): { section: string; page?: string } {
     const rootOf = (href: string) => `/${href.split("/")[1] ?? ""}`;
     const settingsPage = settingsPageLabels.find(([href]) => pathname === href || pathname.startsWith(`${href}/`));
     if (settingsPage) return { section: "Settings", page: settingsPage[1] };
+    // A module's own menu wins over another menu linking into it (the
+    // Department menu's "Team leave calendar" must not claim every /leave page).
+    const home = navigation.find((item) => item.children?.length && rootOf(item.href) === rootOf(pathname));
+    if (home) {
+      const child = [...(home.children ?? [])].filter((candidate) => matches(candidate.href)).sort((a, b) => b.href.length - a.href.length)[0];
+      if (child) return { section: home.label, page: child.label };
+      if (matches(home.href)) return { section: home.label };
+    }
     for (const item of navigation) {
       for (const child of item.children ?? []) {
         // A child owns its exact route tree, or — when it lives in a different

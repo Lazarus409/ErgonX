@@ -123,6 +123,14 @@ export interface LeaveDashboard {
   approved_days_by_department?: Array<{ department: string; requested_days: string | number; request_count: number }>;
   /** 28 consecutive days from today: approved requests covering each day. */
   leave_calendar?: Array<{ date: string; on_leave: number }>;
+  range_months?: number;
+  range_start?: string;
+  /** Submitted (non-draft) requests starting within the range. */
+  total_requests?: number;
+  approved_requests?: number;
+  /** Approved leave days / (active headcount x working days) in the range, %. */
+  average_absence_rate?: string | number | null;
+  compliance?: Record<"policy_breaches" | "incomplete_leave_records" | "upcoming_long_absences", { count: number; items: Array<{ id: string; employee: string; issue: string }> }>;
 }
 
 export interface AttendanceDashboard {

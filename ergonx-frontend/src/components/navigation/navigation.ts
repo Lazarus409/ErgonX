@@ -112,12 +112,6 @@ export const navigation: NavigationItem[] = [
     ],
     scopes: INSTITUTION_WIDE,
     children: [
-      { label: "HR Dashboard", href: "/hr/dashboard", permission: "dashboard.hr.view", module: "HR" },
-      { label: "Employees", href: "/hr/employees", permission: "employee.view", module: "HR" },
-      { label: "Departments", href: "/hr/departments", permission: "organization.view", module: "HR" },
-      { label: "Positions", href: "/hr/positions", permission: "organization.view", module: "HR" },
-      { label: "Grades", href: "/hr/grades", permission: "organization.view", module: "HR" },
-      { label: "Locations", href: "/hr/locations", permission: "organization.view", module: "HR" },
       { label: "Recruitment", href: "/recruitment", module: "RECRUITMENT", anyPermissions: moduleWorkspacePermissions.RECRUITMENT },
       { label: "Leave", href: "/leave", module: "LEAVE", anyPermissions: moduleWorkspacePermissions.LEAVE },
       { label: "Attendance", href: "/attendance", module: "ATTENDANCE", anyPermissions: moduleWorkspacePermissions.ATTENDANCE },

@@ -57,7 +57,7 @@ export default function Tabs({ items, value, onChange, variant = "underline", la
         const classes = cx(
           "relative inline-flex shrink-0 items-center gap-2 whitespace-nowrap text-sm font-semibold outline-none transition-colors duration-150",
           variant === "underline"
-            ? cx("h-11 px-0.5", selected ? "text-ink-strong" : "text-ink-muted hover:text-ink-strong")
+            ? cx("h-12 px-1 text-[0.9375rem]", selected ? "text-primary-ink" : "text-ink-muted hover:text-ink-strong")
             : cx("h-8 rounded-lg px-3", selected ? "bg-surface text-ink-strong shadow-elevation-1" : "text-ink-muted hover:text-ink-strong"),
           item.disabled && "pointer-events-none opacity-50",
         );

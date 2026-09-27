@@ -37,11 +37,24 @@ interface TopBarProps {
   onOpenSidebar?: () => void;
 }
 
+/** Settings sub-pages that are not in the primary navigation. */
+const settingsPageLabels: Array<[string, string]> = [
+  ["/settings/roles", "Roles & Permissions"],
+  ["/settings/modules", "Modules"],
+  ["/settings/institution", "Institution Settings"],
+  ["/settings/approval-workflows", "Approval Workflows"],
+  ["/settings/audit", "Audit Log"],
+  ["/settings/security", "Security"],
+  ["/settings/profile", "Personal Preferences"],
+];
+
 /** Resolves the most specific navigation label for the current route. */
 function routeContext(pathname: string): { section: string; page?: string } {
   {
     const matches = (href: string) => (href === "/" || href === "/dashboard" || href === "/me" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`));
     const rootOf = (href: string) => `/${href.split("/")[1] ?? ""}`;
+    const settingsPage = settingsPageLabels.find(([href]) => pathname === href || pathname.startsWith(`${href}/`));
+    if (settingsPage) return { section: "Settings", page: settingsPage[1] };
     for (const item of navigation) {
       for (const child of item.children ?? []) {
         // A child owns its exact route tree, or — when it lives in a different

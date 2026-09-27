@@ -83,6 +83,7 @@ ACCOUNTING_PERMISSIONS = {
     "journal.post": "Post approved journals",
     "journal.reverse": "Create journal reversals",
     "financial_report.view": "View accounting reports",
+    "financial_report.manage": "Create, edit and schedule saved financial reports",
     "accounting_period.close": "Close and lock accounting periods",
     "accounting_period.reopen": "Reopen closed accounting periods",
     "budget.view": "View budgets and budget-versus-actual",

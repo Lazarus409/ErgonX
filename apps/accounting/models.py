@@ -1820,3 +1820,74 @@ class BudgetNote(TenantOwnedModel):
 
     class Meta:
         ordering = ("-created_at",)
+
+
+class FinancialReport(AutoCodeMixin, TenantOwnedModel):
+    """A saved financial report definition (concepts "Financial reports" and "Financial report detail")."""
+
+    auto_code_field = "code"
+    auto_code_prefix = "RPT"
+    auto_code_width = 4
+    auto_code_year_from = "today"
+
+    class ReportType(models.TextChoices):
+        BALANCE_SHEET = "BALANCE_SHEET", "Statement of financial position"
+        INCOME_STATEMENT = "INCOME_STATEMENT", "Income statement"
+        TRIAL_BALANCE = "TRIAL_BALANCE", "Trial balance"
+        AR_AGING = "AR_AGING", "Receivables aging"
+        AP_AGING = "AP_AGING", "Payables aging"
+        BUDGET_VS_ACTUAL = "BUDGET_VS_ACTUAL", "Budget vs actual"
+
+    class Category(models.TextChoices):
+        STANDARD = "STANDARD", "Standard reports"
+        MANAGEMENT = "MANAGEMENT", "Management reports"
+        COMPLIANCE = "COMPLIANCE", "Compliance reports"
+        AUDIT = "AUDIT", "Audit reports"
+        END_OF_PERIOD = "END_OF_PERIOD", "End of period"
+        CUSTOM = "CUSTOM", "Custom reports"
+
+    class Frequency(models.TextChoices):
+        NONE = "NONE", "Not scheduled"
+        MONTHLY = "MONTHLY", "Monthly"
+        QUARTERLY = "QUARTERLY", "Quarterly"
+        YEARLY = "YEARLY", "Yearly"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="financial_reports")
+    code = models.CharField(max_length=50, blank=True)
+    name = models.CharField(max_length=150)
+    report_type = models.CharField(max_length=20, choices=ReportType.choices)
+    category = models.CharField(max_length=16, choices=Category.choices, default=Category.CUSTOM)
+    description = models.TextField(blank=True, max_length=2000)
+    parameters = models.JSONField(default=dict, blank=True)
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="financial_reports_owned")
+    allowed_roles = models.JSONField(default=list, blank=True)
+    is_standard = models.BooleanField(default=False)
+    schedule_frequency = models.CharField(max_length=10, choices=Frequency.choices, default=Frequency.NONE)
+    next_run_on = models.DateField(null=True, blank=True)
+    notes = models.TextField(blank=True, max_length=4000)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+
+    class Meta:
+        ordering = ("name",)
+        constraints = [models.UniqueConstraint(fields=("institution", "code"), name="uniq_financial_report_code")]
+
+
+class FinancialReportRun(TenantOwnedModel):
+    class Status(models.TextChoices):
+        COMPLETED = "COMPLETED", "Completed"
+        FAILED = "FAILED", "Failed"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="financial_report_runs")
+    report = models.ForeignKey(FinancialReport, on_delete=models.CASCADE, related_name="runs")
+    version = models.PositiveIntegerField()
+    parameters = models.JSONField(default=dict, blank=True)
+    status = models.CharField(max_length=10, choices=Status.choices)
+    result = models.JSONField(default=dict, blank=True)
+    error = models.TextField(blank=True)
+    run_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    scheduled = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ("-created_at",)
+        constraints = [models.UniqueConstraint(fields=("report", "version"), name="uniq_financial_report_run_version")]

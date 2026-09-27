@@ -1,4 +1,4 @@
-"""Seed rolling, date-relative operational activity for the APEX-DEMO tenant.
+"""Seed rolling, date-relative operational activity for the CSA-DEMO tenant.
 
 ``seed_ergonx_demo`` creates the fixed foundation and a handful of reviewed
 workflow scenarios. Dashboards, however, are about *now*: today's attendance,
@@ -6,7 +6,7 @@ who is on leave this week, interviews coming up, overdue bills. This command
 layers realistic activity around the current date on top of that foundation so
 every dashboard and self-service page has real data.
 
-* Development-only (refuses to run when DEBUG=False) and APEX-DEMO only.
+* Development-only (refuses to run when DEBUG=False) and CSA-DEMO only.
 * Idempotent: every record carries a stable key (number, reference, reason or
   external id) and is skipped when it already exists, so re-running simply
   fills in the days that have passed since the last run.
@@ -72,8 +72,8 @@ from apps.recruitment.models import Application, Candidate, Interview, JobPostin
 from apps.recruitment.services import decide_offer, extend_offer, move_application_stage, reject_application, submit_application
 from apps.scheduling.services import schedule_assignment_for, schedule_expectation
 
-DEMO_INSTITUTION_CODE = "APEX-DEMO"
-DEMO_ADMIN_EMAIL = "kwame.mensah@apexdemo.example"
+DEMO_INSTITUTION_CODE = "CSA-DEMO"
+DEMO_ADMIN_EMAIL = "kwame.mensah@csa.test"
 SERVICE_ERRORS = (DjangoValidationError, ApiValidationError)
 ATTENDANCE_DAYS = 35
 MINIMAL_PDF = (
@@ -109,7 +109,7 @@ def add_weekdays(day, count):
 
 
 class Command(BaseCommand):
-    help = "Seed rolling, date-relative APEX-DEMO activity so every dashboard shows real data (development only)."
+    help = "Seed rolling, date-relative CSA-DEMO activity so every dashboard shows real data (development only)."
 
     def add_arguments(self, parser):
         parser.add_argument("--days", type=int, default=ATTENDANCE_DAYS, help="Days of attendance history to maintain (default 35).")
@@ -119,7 +119,7 @@ class Command(BaseCommand):
             raise CommandError("seed_ergonx_activity is development-only and refuses to run when DEBUG=False.")
         institution = Institution.objects.filter(code=DEMO_INSTITUTION_CODE).first()
         if institution is None:
-            raise CommandError("APEX-DEMO does not exist. Run `python manage.py seed_ergonx_demo` first.")
+            raise CommandError("CSA-DEMO does not exist. Run `python manage.py seed_ergonx_demo` first.")
         self.institution = institution
         self.admin = User.objects.get(email=DEMO_ADMIN_EMAIL)
         self.zone = ZoneInfo(institution.timezone)
@@ -152,7 +152,7 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.ERROR(f"  FAILED  {label}: {exc}"))
         if failures:
             raise CommandError(f"Activity seeding failed for: {', '.join(failures)}")
-        self.stdout.write(self.style.SUCCESS(f"APEX-DEMO activity is current as of {self.today.isoformat()}."))
+        self.stdout.write(self.style.SUCCESS(f"CSA-DEMO activity is current as of {self.today.isoformat()}."))
 
     # ------------------------------------------------------------------ helpers
 
@@ -409,13 +409,13 @@ class Command(BaseCommand):
         institution, admin = self.institution, self.admin
         stages = {stage.name: stage for stage in RecruitmentStage.objects.filter(institution=institution, is_active=True)}
         rng = random.Random("apex-sources")
-        for candidate in Candidate.objects.filter(institution=institution, source__in=("", "APEX-DEMO")).order_by("email"):
+        for candidate in Candidate.objects.filter(institution=institution, source__in=("", "CSA-DEMO")).order_by("email"):
             candidate.source = rng.choice(self.SOURCES)
             candidate.save(update_fields=("source", "updated_at"))
 
         structure = institution.salary_structures.get(code="APEX-MONTHLY")
         for index, (first, last, job_code, days_ago, stage_name, outcome) in enumerate(self.HISTORY_CANDIDATES):
-            email = f"{first}.{last}.candidate@apexdemo.example".lower()
+            email = f"{first}.{last}.candidate@csa.test".lower()
             if Candidate.objects.filter(institution=institution, email=email).exists():
                 continue
             candidate = Candidate.objects.create(institution=institution, email=email, first_name=first, last_name=last, source=self.SOURCES[index % len(self.SOURCES)])
@@ -456,16 +456,16 @@ class Command(BaseCommand):
     # ------------------------------------------------ receivables and payables
 
     VENDORS = (
-        ("VND-APEX-002", "Electricity Company of Ghana", "billing@ecg.example"),
-        ("VND-APEX-003", "Vodafone Business Ghana", "business@vodafone.example"),
-        ("VND-APEX-004", "Kotoka Travel & Tours", "accounts@kotokatravel.example"),
-        ("VND-APEX-005", "Deloitte & Associates GH", "fees@deloitte-gh.example"),
-        ("VND-APEX-006", "Accra Facilities Management", "invoices@accrafm.example"),
+        ("VND-APEX-002", "Electricity Company of Ghana", "billing@ecg.test"),
+        ("VND-APEX-003", "Vodafone Business Ghana", "business@vodafone.test"),
+        ("VND-APEX-004", "Kotoka Travel & Tours", "accounts@kotokatravel.test"),
+        ("VND-APEX-005", "Deloitte & Associates GH", "fees@deloitte-gh.test"),
+        ("VND-APEX-006", "Accra Facilities Management", "invoices@accrafm.test"),
     )
     CUSTOMERS = (
-        ("CUS-APEX-002", "GoldCoast Microfinance", "finance@goldcoastmf.example"),
-        ("CUS-APEX-003", "Tema Port Logistics", "ap@temaport.example"),
-        ("CUS-APEX-004", "Volta Health Services", "accounts@voltahealth.example"),
+        ("CUS-APEX-002", "GoldCoast Microfinance", "finance@goldcoastmf.test"),
+        ("CUS-APEX-003", "Tema Port Logistics", "ap@temaport.test"),
+        ("CUS-APEX-004", "Volta Health Services", "accounts@voltahealth.test"),
     )
 
     def _receivables_and_payables(self):

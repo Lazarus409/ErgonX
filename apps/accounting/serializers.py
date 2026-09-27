@@ -238,15 +238,32 @@ class InvoiceLineSerializer(ValidatedModelSerializer):
 
 class InvoiceSerializer(ValidatedModelSerializer):
     lines = InvoiceLineSerializer(many=True)
+    customer_name = serializers.CharField(source="customer.name", read_only=True)
+    customer_code = serializers.CharField(source="customer.customer_code", read_only=True)
+    amount_received = serializers.SerializerMethodField()
+    amount_due = serializers.SerializerMethodField()
+
+    def get_amount_received(self, obj):
+        from apps.accounting.services import invoice_amount_received
+
+        return str(invoice_amount_received(obj))
+
+    def get_amount_due(self, obj):
+        from apps.accounting.services import invoice_amount_received
+
+        if obj.status in (Invoice.Status.DRAFT, Invoice.Status.VOID):
+            return "0.00"
+        return str((obj.total_amount - invoice_amount_received(obj)).quantize(Decimal("0.01")))
 
     class Meta:
         model = Invoice
         fields = (
-            "id", "customer", "invoice_number", "invoice_date", "due_date", "currency",
-            "subtotal", "tax_total", "total_amount", "status", "accounting_period",
-            "journal_entry", "external_tax_reference", "lines", "created_at", "updated_at",
+            "id", "customer", "customer_name", "customer_code", "invoice_number", "invoice_date", "due_date", "currency",
+            "subtotal", "tax_total", "total_amount", "amount_received", "amount_due", "status", "accounting_period",
+            "journal_entry", "external_tax_reference", "lines", "on_hold", "hold_reason", "sent_at", "sent_to", "notes",
+            "created_at", "updated_at",
         )
-        read_only_fields = ("id", "subtotal", "tax_total", "total_amount", "status", "journal_entry", "created_at", "updated_at")
+        read_only_fields = ("id", "subtotal", "tax_total", "total_amount", "status", "journal_entry", "on_hold", "hold_reason", "sent_at", "sent_to", "created_at", "updated_at")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

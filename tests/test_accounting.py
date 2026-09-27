@@ -529,7 +529,8 @@ def test_accounting_openapi_is_operation_level_and_matches_action_shapes():
                 assert operation["x-error-codes"]
     # +6: account balances/activity, journal context/notes/attachments/attachment download.
     # +9: vendor bill reject/revise/hold/release/schedule-payment/context/summary/attachments/download.
-    assert len(operations) == 108
+    # +10: invoice hold/release/send/reminders (get+post)/reminder update/context/summary/attachments/download.
+    assert len(operations) == 118
 
     for action_name in ("submit", "approve", "post", "void"):
         operation = schema["paths"][

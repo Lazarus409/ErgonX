@@ -580,15 +580,16 @@ class CustomerViewSet(TenantModelViewSet):
         serializer.save(institution=self.request.institution, actor=self.request.user)
 
 
-class InvoiceViewSet(TenantModelViewSet):
+class InvoiceViewSet(RecordAttachmentsMixin, TenantModelViewSet):
     model = Invoice
     serializer_class = InvoiceSerializer
     required_module = "ACCOUNTING"
     http_method_names = ("get", "post", "patch", "head", "options")
-    filterset_fields = ("customer", "status", "currency", "accounting_period", "invoice_date")
-    search_fields = ("invoice_number", "customer__name", "customer__customer_code", "external_tax_reference")
+    filterset_fields = ("customer", "status", "currency", "accounting_period", "invoice_date", "on_hold")
+    search_fields = ("invoice_number", "customer__name", "customer__customer_code", "external_tax_reference", "lines__description")
     ordering_fields = ("invoice_number", "invoice_date", "due_date", "total_amount", "created_at")
     ordering = ("-invoice_date", "-created_at")
+    attachment_entity_type = "accounting.Invoice"
     schema_action_descriptions = {"issue": "Issue a draft invoice and post its controlled AR journal", "void": "Void a draft invoice"}
     schema_action_error_codes = {"issue": ("invalid_state_transition", "policy_not_applicable", "period_closed"), "void": ("record_immutable",)}
 
@@ -596,7 +597,151 @@ class InvoiceViewSet(TenantModelViewSet):
         return super().get_queryset().select_related("customer", "accounting_period", "journal_entry").prefetch_related("lines")
 
     def get_required_permission(self):
-        return {"create": "invoice.create", "partial_update": "invoice.create", "issue": "invoice.issue", "void": "invoice.void"}.get(self.action, "invoice.view")
+        return {
+            "create": "invoice.create", "partial_update": "invoice.create", "issue": "invoice.issue", "void": "invoice.void",
+            "hold": "invoice.issue", "release": "invoice.issue", "send": "invoice.issue", "reminders": "invoice.issue" if self.request.method == "POST" else "invoice.view",
+            "update_reminder": "invoice.issue", "attachments": "invoice.create",
+        }.get(self.action, "invoice.view")
+
+    def _invoice(self, invoice):
+        return Response(InvoiceSerializer(invoice, context=self.get_serializer_context()).data)
+
+    @action(detail=True, methods=("post",), filter_backends=())
+    def hold(self, request, pk=None):
+        from apps.accounting.services import set_invoice_hold
+
+        return self._invoice(call_validated_service(set_invoice_hold, invoice=self.get_object(), actor=request.user, on_hold=True, reason=str(request.data.get("reason", ""))))
+
+    @action(detail=True, methods=("post",), filter_backends=())
+    def release(self, request, pk=None):
+        from apps.accounting.services import set_invoice_hold
+
+        return self._invoice(call_validated_service(set_invoice_hold, invoice=self.get_object(), actor=request.user, on_hold=False))
+
+    @action(detail=True, methods=("post",), filter_backends=())
+    def send(self, request, pk=None):
+        from apps.accounting.services import send_invoice
+
+        invoice, delivery = call_validated_service(send_invoice, invoice=self.get_object(), actor=request.user, email=str(request.data.get("email", "")))
+        payload = InvoiceSerializer(invoice, context=self.get_serializer_context()).data
+        return Response({**payload, "delivery": delivery})
+
+    @action(detail=True, methods=("get", "post"), filter_backends=())
+    def reminders(self, request, pk=None):
+        from datetime import date as date_type
+
+        from apps.accounting.services import add_invoice_reminder
+        from rest_framework.exceptions import ValidationError as DRFValidationError
+
+        invoice = self.get_object()
+        if request.method == "POST":
+            try:
+                remind_on = date_type.fromisoformat(str(request.data.get("remind_on", "")))
+            except ValueError:
+                raise DRFValidationError({"remind_on": "Use a YYYY-MM-DD date."})
+            call_validated_service(add_invoice_reminder, invoice=invoice, actor=request.user, remind_on=remind_on,
+                                   channel=str(request.data.get("channel", "EMAIL")), note=str(request.data.get("note", "")))
+        return Response(_reminders(invoice), status=201 if request.method == "POST" else 200)
+
+    @action(detail=True, methods=("post",), filter_backends=(), url_path=r"reminders/(?P<reminder_id>[0-9a-f-]+)")
+    def update_reminder(self, request, pk=None, reminder_id=None):
+        from apps.accounting.services import update_invoice_reminder
+        from rest_framework.exceptions import NotFound
+
+        invoice = self.get_object()
+        reminder = invoice.reminders.filter(pk=reminder_id).first()
+        if reminder is None:
+            raise NotFound("Reminder not found.")
+        call_validated_service(update_invoice_reminder, reminder=reminder, actor=request.user, status=str(request.data.get("status", "")))
+        return Response(_reminders(invoice))
+
+    @action(detail=True, methods=("get",), filter_backends=())
+    def context(self, request, pk=None):
+        from django.utils import timezone
+
+        invoice = self.get_object()
+        payload = self._record_context(invoice)
+        payload["receipts"] = [
+            {"id": str(item.id), "receipt_number": item.receipt_number, "receipt_date": item.receipt_date, "amount": str(item.amount),
+             "currency": item.currency, "payment_method": item.payment_method, "status": item.status}
+            for item in Receipt.objects.filter(invoice=invoice).order_by("-receipt_date")
+        ]
+        payload["reminders"] = _reminders(invoice)
+        related = []
+        if invoice.journal_entry_id:
+            related.append({"type": "AR journal", "reference": invoice.journal_entry.journal_number, "status": invoice.journal_entry.status, "href": f"/accounting/journals/{invoice.journal_entry_id}"})
+        for receipt in payload["receipts"]:
+            related.append({"type": "Receipt", "reference": receipt["receipt_number"], "status": receipt["status"], "href": None})
+        payload["related"] = related
+        today = timezone.localdate()
+        payload["collection"] = {
+            "days_outstanding": (today - invoice.invoice_date).days if invoice.status in (Invoice.Status.ISSUED, Invoice.Status.PART_PAID) else None,
+            "days_overdue": max((today - invoice.due_date).days, 0) if invoice.status in (Invoice.Status.ISSUED, Invoice.Status.PART_PAID) else 0,
+        }
+        payload["customer"] = {
+            "id": str(invoice.customer_id), "name": invoice.customer.name, "code": invoice.customer.customer_code, "email": invoice.customer.email,
+            "phone": invoice.customer.phone, "address": invoice.customer.address, "tax_identification_number": invoice.customer.tax_identification_number,
+        }
+        payload["institution"] = {"name": request.institution.name}
+        return Response(payload)
+
+    @action(detail=False, methods=("get",), filter_backends=())
+    def summary(self, request):
+        """KPIs, tab counts and upcoming receipts for the AR workspace."""
+        from datetime import timedelta
+
+        from django.db.models import Q, Sum
+        from django.utils import timezone
+
+        from apps.accounting.services import invoice_amount_received
+
+        try:
+            span = int(request.query_params.get("months", 12))
+        except (TypeError, ValueError):
+            span = 12
+        span = span if span in (3, 6, 12) else 12
+        today = timezone.localdate()
+        start = today.replace(day=1)
+        for _ in range(span - 1):
+            start = (start - timedelta(days=1)).replace(day=1)
+        invoices = Invoice.objects.for_institution(request.institution)
+        in_range = invoices.filter(invoice_date__gte=start)
+        open_statuses = (Invoice.Status.ISSUED, Invoice.Status.PART_PAID)
+        outstanding = invoices.filter(status__in=open_statuses)
+        overdue = outstanding.filter(due_date__lt=today)
+        due_week = outstanding.filter(due_date__gte=today, due_date__lte=today + timedelta(days=7))
+        exceptions = outstanding.filter(Q(on_hold=True) | Q(due_date__lt=today - timedelta(days=60)))
+        membership = getattr(request, "membership", None)
+        codes = set(membership.role.permissions.values_list("code", flat=True)) if membership else set()
+        can_see_amounts = "receipt.view" in codes
+
+        def total_due(queryset):
+            return str(sum((invoice.total_amount - invoice_amount_received(invoice) for invoice in queryset), Decimal("0.00")).quantize(Decimal("0.01")))
+
+        upcoming = outstanding.filter(due_date__gte=today, due_date__lte=today + timedelta(days=30)).select_related("customer").order_by("due_date")
+        return Response({
+            "range_months": span,
+            "range_start": start.isoformat(),
+            "outstanding": {"count": outstanding.count(), "amount": total_due(outstanding) if can_see_amounts else None},
+            "due_this_week": {"count": due_week.count(), "amount": total_due(due_week) if can_see_amounts else None},
+            "overdue": {"count": overdue.count(), "amount": total_due(overdue) if can_see_amounts else None},
+            "exceptions": {"count": exceptions.count(), "on_hold": outstanding.filter(on_hold=True).count(), "over_60_days": outstanding.filter(due_date__lt=today - timedelta(days=60)).count()},
+            "counts": {
+                "all": in_range.count(),
+                "outstanding": in_range.filter(status__in=open_statuses).count(),
+                "overdue": in_range.filter(status__in=open_statuses, due_date__lt=today).count(),
+                "paid": in_range.filter(status=Invoice.Status.PAID).count(),
+                "on_hold": in_range.filter(on_hold=True).count(),
+                "drafts": in_range.filter(status=Invoice.Status.DRAFT).count(),
+            },
+            "upcoming_receipts": [
+                {"id": str(item.id), "customer": item.customer.name, "invoice_number": item.invoice_number, "due_date": item.due_date,
+                 "amount_due": str(item.total_amount - invoice_amount_received(item)) if can_see_amounts else None, "currency": item.currency}
+                for item in upcoming[:6]
+            ],
+            "amounts_restricted": not can_see_amounts,
+            "today": today.isoformat(),
+        })
 
     def perform_create(self, serializer):
         serializer.save(institution=self.request.institution, actor=self.request.user)
@@ -613,6 +758,14 @@ class InvoiceViewSet(TenantModelViewSet):
     @action(detail=True, methods=("post",), filter_backends=())
     def void(self, request, pk=None):
         return Response(InvoiceSerializer(call_validated_service(void_invoice, invoice=self.get_object(), actor=request.user), context=self.get_serializer_context()).data)
+
+
+def _reminders(invoice):
+    return [
+        {"id": str(item.id), "remind_on": item.remind_on, "channel": item.channel, "note": item.note, "status": item.status,
+         "created_by": _person(item.created_by), "completed_at": item.completed_at}
+        for item in invoice.reminders.select_related("created_by")
+    ]
 
 
 class BankAccountViewSet(TenantModelViewSet):

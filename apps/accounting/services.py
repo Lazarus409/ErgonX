@@ -1943,3 +1943,91 @@ def schedule_vendor_bill_payment(*, bill, actor, payment_date, payment_method):
     record_audit_event(actor=actor, institution=bill.institution, entity=bill, action="accounting.vendor_bill.payment_scheduled",
                        metadata={"payment_date": payment_date.isoformat(), "payment_method": payment_method})
     return bill
+
+
+# --- Accounts receivable collections (concept "Accounts receivable") ----------
+
+def invoice_amount_received(invoice):
+    from django.db.models import Sum
+
+    return Decimal(Receipt.objects.filter(invoice=invoice, status=Receipt.Status.POSTED).aggregate(total=Sum("amount"))["total"] or 0).quantize(Decimal("0.01"))
+
+
+@transaction.atomic
+def set_invoice_hold(*, invoice, actor, on_hold, reason=""):
+    invoice = Invoice.objects.select_for_update().get(pk=invoice.pk)
+    _require(actor, invoice.institution, "invoice.issue")
+    if invoice.status in (Invoice.Status.PAID, Invoice.Status.VOID):
+        raise CodedValidationError({"status": "Paid or void invoices cannot be held."}, api_code="invalid_state_transition")
+    if on_hold and not (reason or "").strip():
+        raise CodedValidationError({"reason": "Give a reason, such as the customer's dispute."}, api_code="validation_error")
+    invoice.on_hold = on_hold
+    invoice.hold_reason = reason.strip() if on_hold else ""
+    invoice.save(update_fields=("on_hold", "hold_reason", "updated_at"))
+    record_audit_event(actor=actor, institution=invoice.institution, entity=invoice,
+                       action="accounting.invoice.held" if on_hold else "accounting.invoice.released", metadata={"reason": invoice.hold_reason})
+    return invoice
+
+
+@transaction.atomic
+def send_invoice(*, invoice, actor, email=""):
+    """Issue a draft (posting its AR journal) and email it to the customer."""
+    from django.conf import settings as django_settings
+    from django.core.mail import send_mail
+
+    if invoice.status == Invoice.Status.DRAFT:
+        invoice = issue_invoice(invoice=invoice, actor=actor)
+    invoice = Invoice.objects.select_for_update().select_related("customer", "institution").get(pk=invoice.pk)
+    _require(actor, invoice.institution, "invoice.issue")
+    if invoice.status == Invoice.Status.VOID:
+        raise CodedValidationError({"status": "Void invoices cannot be sent."}, api_code="invalid_state_transition")
+    recipient = (email or invoice.customer.email or "").strip()
+    if not recipient:
+        raise CodedValidationError({"email": "Add the customer's email address to send the invoice."}, api_code="validation_error")
+    lines = "\n".join(f"- {line.description}: {invoice.currency} {line.line_total:,.2f}" for line in invoice.lines.all())
+    body = (
+        f"Dear {invoice.customer.name},\n\nPlease find invoice {invoice.invoice_number} from {invoice.institution.name}.\n\n{lines}\n\n"
+        f"Total due: {invoice.currency} {invoice.total_amount:,.2f}\nDue date: {invoice.due_date:%d %B %Y}\n\nThank you."
+    )
+    delivery = "SENT"
+    if not getattr(django_settings, "EMAIL_HOST", "") and "smtp" in getattr(django_settings, "EMAIL_BACKEND", "smtp"):
+        delivery = "NOT_CONFIGURED"
+    else:
+        try:
+            send_mail(f"Invoice {invoice.invoice_number} from {invoice.institution.name}", body, django_settings.DEFAULT_FROM_EMAIL, [recipient], fail_silently=False)
+        except Exception:  # noqa: BLE001 - delivery failure is recorded, not fatal
+            delivery = "FAILED"
+    if delivery == "SENT":
+        invoice.sent_at = timezone.now()
+        invoice.sent_to = recipient
+        invoice.save(update_fields=("sent_at", "sent_to", "updated_at"))
+    record_audit_event(actor=actor, institution=invoice.institution, entity=invoice, action="accounting.invoice.sent", metadata={"to": recipient, "delivery": delivery})
+    return invoice, delivery
+
+
+@transaction.atomic
+def add_invoice_reminder(*, invoice, actor, remind_on, channel, note=""):
+    from apps.accounting.models import InvoiceReminder
+
+    _require(actor, invoice.institution, "invoice.issue")
+    if invoice.status not in (Invoice.Status.ISSUED, Invoice.Status.PART_PAID):
+        raise CodedValidationError({"status": "Reminders apply to issued, unpaid invoices."}, api_code="invalid_state_transition")
+    reminder = InvoiceReminder(institution=invoice.institution, invoice=invoice, remind_on=remind_on, channel=channel, note=(note or "").strip(), created_by=actor)
+    reminder.full_clean()
+    reminder.save()
+    record_audit_event(actor=actor, institution=invoice.institution, entity=invoice, action="accounting.invoice.reminder_added", metadata={"remind_on": remind_on.isoformat(), "channel": channel})
+    return reminder
+
+
+@transaction.atomic
+def update_invoice_reminder(*, reminder, actor, status):
+    from apps.accounting.models import InvoiceReminder
+
+    _require(actor, reminder.institution, "invoice.issue")
+    if status not in (InvoiceReminder.Status.DONE, InvoiceReminder.Status.CANCELLED) or reminder.status != InvoiceReminder.Status.SCHEDULED:
+        raise CodedValidationError({"status": "Only scheduled reminders can be completed or cancelled."}, api_code="invalid_state_transition")
+    reminder.status = status
+    reminder.completed_at = timezone.now()
+    reminder.save(update_fields=("status", "completed_at", "updated_at"))
+    record_audit_event(actor=actor, institution=reminder.institution, entity=reminder.invoice, action=f"accounting.invoice.reminder_{status.lower()}")
+    return reminder

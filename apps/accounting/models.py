@@ -1107,6 +1107,14 @@ class Invoice(AutoCodeMixin, TenantOwnedModel):
         JournalEntry, on_delete=models.PROTECT, null=True, blank=True, related_name="invoices"
     )
     external_tax_reference = models.CharField(max_length=100, null=True, blank=True)
+    # Collections (concept "Accounts receivable"): holds/disputes, delivery and notes.
+    on_hold = models.BooleanField(default=False)
+    hold_reason = models.TextField(blank=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    sent_to = models.EmailField(blank=True)
+    notes = models.TextField(blank=True, max_length=2000)
+
+    OPERATIONAL_FIELDS = {"on_hold", "hold_reason", "sent_at", "sent_to", "updated_at"}
 
     class Meta:
         ordering = ("-invoice_date", "-created_at")
@@ -1144,7 +1152,9 @@ class Invoice(AutoCodeMixin, TenantOwnedModel):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
-        if self.pk and Invoice.objects.filter(
+        update_fields = kwargs.get("update_fields")
+        operational_only = update_fields is not None and set(update_fields) <= self.OPERATIONAL_FIELDS
+        if self.pk and not operational_only and Invoice.objects.filter(
             pk=self.pk, status__in=(self.Status.ISSUED, self.Status.PART_PAID, self.Status.PAID)
         ).exists():
             raise ValidationError({"status": "Issued or settled invoices are immutable."})
@@ -1654,3 +1664,31 @@ class JournalEntryNote(TenantOwnedModel):
     class Meta:
         ordering = ("-created_at",)
         indexes = [models.Index(fields=("institution", "journal_entry"))]
+
+
+class InvoiceReminder(TenantOwnedModel):
+    """A planned or completed collection follow-up on an invoice."""
+
+    class Channel(models.TextChoices):
+        EMAIL = "EMAIL", "Email"
+        PHONE = "PHONE", "Phone call"
+        LETTER = "LETTER", "Letter"
+        VISIT = "VISIT", "Visit"
+
+    class Status(models.TextChoices):
+        SCHEDULED = "SCHEDULED", "Scheduled"
+        DONE = "DONE", "Done"
+        CANCELLED = "CANCELLED", "Cancelled"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="invoice_reminders")
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name="reminders")
+    remind_on = models.DateField()
+    channel = models.CharField(max_length=8, choices=Channel.choices, default=Channel.EMAIL)
+    note = models.TextField(blank=True, max_length=2000)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.SCHEDULED)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="invoice_reminders")
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("remind_on", "created_at")
+        indexes = [models.Index(fields=("institution", "status", "remind_on"))]

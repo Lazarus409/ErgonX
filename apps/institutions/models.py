@@ -538,3 +538,22 @@ class InstitutionSetting(TenantOwnedModel):
 
     def __str__(self):
         return f"{self.institution.code}: {self.key}"
+
+
+class SearchEntry(TenantOwnedModel):
+    """A user's recent or saved global search (concept "Global search results")."""
+
+    class Kind(models.TextChoices):
+        RECENT = "RECENT", "Recent"
+        SAVED = "SAVED", "Saved"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="search_entries")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="search_entries")
+    kind = models.CharField(max_length=6, choices=Kind.choices)
+    query = models.CharField(max_length=200)
+    name = models.CharField(max_length=120, blank=True)
+    filters = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ("-updated_at",)
+        indexes = [models.Index(fields=("institution", "user", "kind", "updated_at"))]

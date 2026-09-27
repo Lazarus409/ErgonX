@@ -1,11 +1,13 @@
 from drf_spectacular.utils import extend_schema
 from rest_framework.decorators import action
+from rest_framework.exceptions import NotFound
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
 from apps.recruitment.models import Application, ApplicationStageHistory, Candidate, CandidateEvaluation, Interview, JobPosting, Offer, RecruitmentStage
 from apps.recruitment.selectors import applications_for_institution, candidate_scorecard, recruitment_pipeline
-from apps.recruitment.serializers import (JobPostingTeamMemberSerializer, RequisitionDecisionSerializer, ApplicationSerializer, ApplicationStageHistorySerializer, CandidateEvaluationSerializer, CandidateSerializer, CommentSerializer, HireCandidateSerializer, InterviewSerializer, InterviewStatusSerializer, JobPostingSerializer, OfferSerializer, RecruitmentStageSerializer, RejectionSerializer, StageMoveSerializer)
-from apps.recruitment.services import (add_hiring_team_member, approve_job_posting, remove_hiring_team_member, return_job_posting, submit_job_posting_for_approval, close_job_posting, decide_offer, extend_offer, hire_candidate, move_application_stage, publish_job_posting, reject_application, submit_application, update_interview_status, withdraw_application, withdraw_offer)
+from apps.recruitment.serializers import (JobPostingTeamMemberSerializer, RequisitionDecisionSerializer, ApplicationSerializer, ApplicationStageHistorySerializer, CandidateEvaluationSerializer, CandidateSerializer, CommentSerializer, HireCandidateSerializer, InterviewSerializer, InterviewStatusSerializer, JobPostingSerializer, OfferSerializer, RecruitmentStageSerializer, RejectionSerializer, ScorecardSerializer, StageMoveSerializer)
+from apps.recruitment.services import (CANDIDATE_DOCUMENT_CATEGORIES, application_scorecard, attach_candidate_document, remove_candidate_document, save_application_scorecard, add_hiring_team_member, approve_job_posting, remove_hiring_team_member, return_job_posting, submit_job_posting_for_approval, close_job_posting, decide_offer, extend_offer, hire_candidate, move_application_stage, publish_job_posting, reject_application, submit_application, update_interview_status, withdraw_application, withdraw_offer)
 from apps.institutions.services import record_user_activity
 from apps.documents.models import Document
 from apps.documents.serializers import DocumentSerializer
@@ -153,17 +155,54 @@ class CandidateViewSet(RecruitmentViewSet):
         candidate = candidate_scorecard(institution=request.institution, candidate=self.get_object())
         return Response({"candidate_id": candidate.id, "average_score": candidate.average_score, "application_count": candidate.application_count})
 
-    @action(detail=True, methods=("get",))
-    def documents(self, request, pk=None):
-        candidate = self.get_object()
-        documents = Document.objects.for_institution(request.institution).filter(
+    def _documents(self, candidate):
+        return Document.objects.for_institution(self.request.institution).filter(
             entity_type="recruitment.Candidate", entity_id=candidate.id, is_active=True
         )
-        return Response(DocumentSerializer(documents, many=True, context={"request": request}).data)
+
+    @action(detail=True, methods=("get", "post"), parser_classes=(MultiPartParser, FormParser, JSONParser))
+    def documents(self, request, pk=None):
+        candidate = self.get_object()
+        if request.method == "POST":
+            document = call_validated_service(
+                attach_candidate_document, candidate=candidate, actor=request.user,
+                uploaded_file=request.FILES.get("uploaded_file"), category=request.data.get("category", ""),
+            )
+            return Response(DocumentSerializer(document, context={"request": request}).data, status=201)
+        return Response(DocumentSerializer(self._documents(candidate), many=True, context={"request": request}).data)
+
+    @action(detail=True, methods=("get",), url_path=r"documents/(?P<document_id>[0-9a-f-]+)/download")
+    def download_document(self, request, pk=None, document_id=None):
+        from django.http import FileResponse
+
+        document = self._documents(self.get_object()).filter(pk=document_id).first()
+        if document is None or not document.stored_file:
+            raise NotFound("Document not found.")
+        response = FileResponse(document.stored_file.open("rb"), as_attachment=True, filename=document.original_filename,
+                                content_type=document.content_type or "application/octet-stream")
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
+
+    @action(detail=True, methods=("delete",), url_path=r"documents/(?P<document_id>[0-9a-f-]+)")
+    def remove_document(self, request, pk=None, document_id=None):
+        candidate = self.get_object()
+        document = self._documents(candidate).filter(pk=document_id).first()
+        if document is None:
+            raise NotFound("Document not found.")
+        call_validated_service(remove_candidate_document, candidate=candidate, document=document, actor=request.user)
+        return Response(status=204)
+
+    @action(detail=False, methods=("get",), url_path="document-categories")
+    def document_categories(self, request):
+        return Response(list(CANDIDATE_DOCUMENT_CATEGORIES))
 
     def get_required_permission(self):
         if self.action == "documents":
-            return "document.view"
+            return "candidate.update" if self.request.method == "POST" else "candidate.view"
+        if self.action in {"download_document", "document_categories"}:
+            return "candidate.view"
+        if self.action == "remove_document":
+            return "candidate.update"
         return super().get_required_permission()
 
 
@@ -191,7 +230,97 @@ class ApplicationViewSet(RecruitmentViewSet):
             return Application.objects.none()
         return applications_for_institution(institution=self.request.institution)
 
+    @action(detail=True, methods=("get", "post"))
+    def scorecard(self, request, pk=None):
+        application = self.get_object()
+        if request.method == "POST":
+            payload = ScorecardSerializer(data=request.data)
+            payload.is_valid(raise_exception=True)
+            return Response(call_validated_service(
+                save_application_scorecard, application=application, actor=request.user,
+                ratings=[{**row, "competency": str(row["competency"])} for row in payload.validated_data["ratings"]],
+                submit=payload.validated_data["submit"],
+            ))
+        return Response(application_scorecard(application=application, user=request.user))
+
+    @action(detail=True, methods=("get",))
+    def overview(self, request, pk=None):
+        """Everything the candidate detail page needs for one application."""
+        from apps.audit.models import AuditLog
+
+        application = self.get_object()
+        candidate = application.candidate
+        posting = application.job_posting
+        stages = list(RecruitmentStage.objects.for_institution(request.institution).filter(is_active=True, is_terminal=False).order_by("sequence"))
+        current_index = next((index for index, stage in enumerate(stages) if stage.id == application.current_stage_id), None)
+        next_stage = stages[current_index + 1] if current_index is not None and current_index + 1 < len(stages) else None
+        interviews = list(application.interviews.select_related("interviewer").order_by("-scheduled_at"))
+        evaluations = list(CandidateEvaluation.objects.filter(application=application).select_related("interviewer"))
+        name = lambda user: (user.get_full_name() or user.email) if user else None  # noqa: E731
+        entity_ids = [application.id, candidate.id, *[item.id for item in interviews]]
+        offer = getattr(application, "offer", None) if hasattr(application, "offer") else None
+        if offer:
+            entity_ids.append(offer.id)
+        activity = AuditLog.objects.filter(institution=request.institution, entity_id__in=entity_ids).select_related("actor").order_by("-created_at")[:40]
+        permissions = request.membership.role.permissions.values_list("code", flat=True) if getattr(request, "membership", None) else []
+        permissions = set(permissions)
+        active = application.status in (Application.Status.ACTIVE, Application.Status.OFFERED)
+        return Response({
+            "application": {
+                "id": str(application.id), "status": application.status, "applied_at": application.applied_at,
+                "created_at": application.created_at, "notes": application.notes, "rejection_reason": application.rejection_reason,
+                "current_stage": str(application.current_stage_id) if application.current_stage_id else None,
+                "current_stage_name": application.current_stage.name if application.current_stage else None,
+            },
+            "candidate": CandidateSerializer(candidate, context={"request": request}).data,
+            "job": {
+                "id": str(posting.id), "code": posting.code, "title": posting.title, "status": posting.status,
+                "department_name": posting.department.name, "location_name": posting.location.name,
+                "employment_type": posting.employment_type,
+            },
+            "stages": [{"id": str(stage.id), "name": stage.name, "sequence": stage.sequence} for stage in stages],
+            "next_stage": {"id": str(next_stage.id), "name": next_stage.name} if next_stage else None,
+            "interviews": [
+                {
+                    "id": str(item.id), "scheduled_at": item.scheduled_at, "duration_minutes": item.duration_minutes,
+                    "interview_type": item.interview_type, "location_or_link": item.location_or_link, "status": item.status,
+                    "interviewer_name": name(item.interviewer),
+                    "feedback": [
+                        {"id": str(row.id), "interviewer_name": name(row.interviewer), "score": row.score, "recommendation": row.recommendation, "comments": row.comments, "created_at": row.created_at}
+                        for row in evaluations if row.interview_id == item.id
+                    ],
+                }
+                for item in interviews
+            ],
+            "general_feedback": [
+                {"id": str(row.id), "interviewer_name": name(row.interviewer), "score": row.score, "recommendation": row.recommendation, "comments": row.comments, "created_at": row.created_at}
+                for row in evaluations if row.interview_id is None
+            ],
+            "documents": DocumentSerializer(
+                Document.objects.for_institution(request.institution).filter(entity_type="recruitment.Candidate", entity_id=candidate.id, is_active=True),
+                many=True, context={"request": request},
+            ).data,
+            "other_applications": [
+                {"id": str(item.id), "job_title": item.job_posting.title, "status": item.status, "stage": item.current_stage.name if item.current_stage else None}
+                for item in candidate.applications.exclude(pk=application.pk).select_related("job_posting", "current_stage")
+            ],
+            "offer": {"id": str(offer.id), "status": offer.status} if offer else None,
+            "activity": [
+                {"id": str(entry.id), "action": entry.action, "actor": name(entry.actor) or "System", "created_at": entry.created_at, "metadata": entry.metadata}
+                for entry in activity
+            ],
+            "actions": {
+                "can_move": active and "candidate.update" in permissions,
+                "can_reject": active and "candidate.update" in permissions,
+                "can_schedule_interview": active and "interview.manage" in permissions,
+                "can_create_offer": active and not offer and "offer.create" in permissions,
+                "can_upload_documents": "candidate.update" in permissions,
+            },
+        })
+
     def get_required_permission(self):
+        if self.action in {"scorecard", "overview"}:
+            return "candidate.view"
         return {"create": "candidate.create", "submit": "candidate.create", "move_stage": "candidate.update", "withdraw": "candidate.update", "reject": "candidate.update", "stage_history": "candidate.view"}.get(self.action, "candidate.view")
 
     @action(detail=True, methods=("post",))

@@ -650,6 +650,19 @@ class Command(BaseCommand):
             if target_status == "REJECTED" and application.status != Application.Status.REJECTED:
                 reject_application(application=application, actor=admin, reason="APEX-DEMO scenario")
             applications[reference] = application
+            if not candidate.location and not candidate.current_title:
+                # Application profile shown on Candidate detail, only while blank.
+                index = len(applications)
+                candidate.location = ("Accra, Ghana", "Kumasi, Ghana", "Tema, Ghana", "Takoradi, Ghana")[index % 4]
+                candidate.employment_status = Candidate.EmploymentStatus.EMPLOYED if index % 3 else Candidate.EmploymentStatus.UNEMPLOYED
+                candidate.current_title = postings[job_code].title if index % 3 else ""
+                candidate.current_employer = "APEX-DEMO previous employer" if index % 3 else ""
+                candidate.years_experience = 2 + index % 7
+                candidate.highest_qualification = (Candidate.Qualification.BACHELORS, Candidate.Qualification.MASTERS, Candidate.Qualification.PROFESSIONAL)[index % 3]
+                candidate.field_of_study = "Business Administration"
+                candidate.education_institution = "University of Ghana"
+                candidate.notice_period_weeks = 4
+                candidate.save()
 
         for reference in ("APP-2026-00123", "APP-2026-00124", "APP-2026-00125", "APP-2026-00127"):
             application = applications[reference]

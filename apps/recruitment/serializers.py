@@ -112,10 +112,28 @@ class RequisitionDecisionSerializer(serializers.Serializer):
 
 
 class CandidateSerializer(TenantRelationSerializer):
+    full_name = serializers.CharField(read_only=True)
+
     class Meta:
         model = Candidate
-        fields = ("id", "first_name", "middle_name", "last_name", "email", "phone", "source", "status", "notes", "created_at", "updated_at")
+        fields = (
+            "id", "first_name", "middle_name", "last_name", "full_name", "email", "phone", "source", "status", "notes",
+            "location", "employment_status", "linkedin_url", "current_employer", "current_title", "years_experience",
+            "highest_qualification", "field_of_study", "education_institution", "skills", "notice_period_weeks",
+            "created_at", "updated_at",
+        )
         read_only_fields = ("id", "status", "created_at", "updated_at")
+
+
+class ScorecardRatingSerializer(serializers.Serializer):
+    competency = serializers.UUIDField()
+    rating = serializers.ChoiceField(choices=("NOT_ASSESSED", "DOES_NOT_MEET", "PARTIALLY_MEETS", "MEETS", "EXCEEDS"))
+    comment = serializers.CharField(required=False, allow_blank=True, max_length=2000)
+
+
+class ScorecardSerializer(serializers.Serializer):
+    ratings = ScorecardRatingSerializer(many=True)
+    submit = serializers.BooleanField(required=False, default=False)
 
 
 class RecruitmentStageSerializer(TenantRelationSerializer):

@@ -141,6 +141,22 @@ class Candidate(TenantOwnedModel):
         WITHDRAWN = "WITHDRAWN", "Withdrawn"
         HIRED = "HIRED", "Hired"
 
+    class EmploymentStatus(models.TextChoices):
+        EMPLOYED = "EMPLOYED", "Employed"
+        SELF_EMPLOYED = "SELF_EMPLOYED", "Self-employed"
+        UNEMPLOYED = "UNEMPLOYED", "Not currently employed"
+        STUDENT = "STUDENT", "Student or graduate"
+        OTHER = "OTHER", "Other"
+
+    class Qualification(models.TextChoices):
+        SECONDARY = "SECONDARY", "Secondary school"
+        DIPLOMA = "DIPLOMA", "Diploma or certificate"
+        BACHELORS = "BACHELORS", "Bachelor's degree"
+        MASTERS = "MASTERS", "Master's degree"
+        DOCTORATE = "DOCTORATE", "Doctorate"
+        PROFESSIONAL = "PROFESSIONAL", "Professional qualification"
+        OTHER = "OTHER", "Other"
+
     institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="candidates")
     first_name = models.CharField(max_length=100)
     middle_name = models.CharField(max_length=100, blank=True)
@@ -150,6 +166,18 @@ class Candidate(TenantOwnedModel):
     source = models.CharField(max_length=100, blank=True)
     status = models.CharField(max_length=12, choices=Status.choices, default=Status.ACTIVE)
     notes = models.TextField(blank=True)
+    # Application profile (concept "Candidate application submission").
+    location = models.CharField(max_length=150, blank=True)
+    employment_status = models.CharField(max_length=16, choices=EmploymentStatus.choices, blank=True)
+    linkedin_url = models.URLField(blank=True)
+    current_employer = models.CharField(max_length=200, blank=True)
+    current_title = models.CharField(max_length=200, blank=True)
+    years_experience = models.PositiveSmallIntegerField(null=True, blank=True)
+    highest_qualification = models.CharField(max_length=16, choices=Qualification.choices, blank=True)
+    field_of_study = models.CharField(max_length=200, blank=True)
+    education_institution = models.CharField(max_length=200, blank=True)
+    skills = models.TextField(blank=True, max_length=2000)
+    notice_period_weeks = models.PositiveSmallIntegerField(null=True, blank=True)
 
     class Meta:
         ordering = ("last_name", "first_name", "created_at")
@@ -336,3 +364,41 @@ class Offer(TenantOwnedModel):
     def save(self, *args, **kwargs):
         self.currency = self.currency.strip().upper()
         super().save(*args, **kwargs)
+
+
+class RecruitmentCompetency(TenantOwnedModel):
+    """Criteria the recruitment panel scores candidates against."""
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="recruitment_competencies")
+    name = models.CharField(max_length=120)
+    description = models.CharField(max_length=255, blank=True)
+    sequence = models.PositiveSmallIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ("sequence", "name")
+        constraints = [models.UniqueConstraint(fields=("institution", "name"), name="uniq_recruitment_competency_name")]
+
+
+class CompetencyRating(TenantOwnedModel):
+    """One evaluator's assessment of one competency for one application."""
+
+    class Rating(models.TextChoices):
+        NOT_ASSESSED = "NOT_ASSESSED", "Not yet assessed"
+        DOES_NOT_MEET = "DOES_NOT_MEET", "Does not meet"
+        PARTIALLY_MEETS = "PARTIALLY_MEETS", "Partially meets"
+        MEETS = "MEETS", "Meets"
+        EXCEEDS = "EXCEEDS", "Exceeds"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="competency_ratings")
+    application = models.ForeignKey(Application, on_delete=models.CASCADE, related_name="competency_ratings")
+    competency = models.ForeignKey(RecruitmentCompetency, on_delete=models.PROTECT, related_name="ratings")
+    evaluator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="competency_ratings")
+    rating = models.CharField(max_length=16, choices=Rating.choices, default=Rating.NOT_ASSESSED)
+    comment = models.TextField(blank=True, max_length=2000)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("competency__sequence",)
+        constraints = [models.UniqueConstraint(fields=("application", "competency", "evaluator"), name="uniq_competency_rating_per_evaluator")]
+        indexes = [models.Index(fields=("institution", "application"))]

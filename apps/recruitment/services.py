@@ -413,3 +413,136 @@ def remove_hiring_team_member(*, member, actor):
     metadata = {"user_id": str(member.user_id), "role": member.role}
     member.delete()
     record_audit_event(actor=actor, institution=posting.institution, entity=posting, action="recruitment.requisition.team_removed", metadata=metadata)
+
+
+DEFAULT_COMPETENCIES = (
+    ("Role expertise", "Depth of knowledge in the role's key discipline"),
+    ("Problem solving", "Analysis, judgement and practical solutions"),
+    ("Communication", "Clarity, written and verbal skills"),
+    ("Collaboration", "Working across teams and communities"),
+    ("Growth potential", "Track record and future potential"),
+    ("Values and behaviours", "Alignment with the institution's values"),
+)
+
+
+def ensure_default_competencies(institution):
+    """Institutions start with a generic competency set they can later edit."""
+    from apps.recruitment.models import RecruitmentCompetency
+
+    if not RecruitmentCompetency.objects.for_institution(institution).exists():
+        RecruitmentCompetency.objects.bulk_create([
+            RecruitmentCompetency(institution=institution, name=name, description=description, sequence=index)
+            for index, (name, description) in enumerate(DEFAULT_COMPETENCIES, start=1)
+        ], ignore_conflicts=True)
+    return RecruitmentCompetency.objects.for_institution(institution).filter(is_active=True).order_by("sequence", "name")
+
+
+def can_evaluate_application(*, application, user):
+    """Recruitment panel: the requisition's hiring manager and hiring team, or
+    anyone whose role records candidate evaluations."""
+    posting = application.job_posting
+    if posting.hiring_manager_id == user.id or posting.team_members.filter(user=user).exists():
+        return True
+    return _can(user, application.institution, "candidate_evaluation.create")
+
+
+def application_scorecard(*, application, user):
+    from apps.recruitment.models import CompetencyRating
+
+    competencies = list(ensure_default_competencies(application.institution))
+    ratings = CompetencyRating.objects.filter(application=application).select_related("evaluator")
+    mine = {str(row.competency_id): row for row in ratings if row.evaluator_id == user.id}
+    submitted_rows = [row for row in ratings if row.submitted_at]
+    evaluators = {row.evaluator_id for row in submitted_rows}
+    my_submitted = any(row.submitted_at for row in mine.values())
+    summary = []
+    for competency in competencies:
+        counts = {}
+        for row in submitted_rows:
+            if row.competency_id == competency.id and row.rating != CompetencyRating.Rating.NOT_ASSESSED:
+                counts[row.rating] = counts.get(row.rating, 0) + 1
+        summary.append({"competency": str(competency.id), "counts": counts})
+    return {
+        "competencies": [{"id": str(item.id), "name": item.name, "description": item.description} for item in competencies],
+        "mine": {key: {"rating": row.rating, "comment": row.comment} for key, row in mine.items()},
+        "my_submitted_at": max((row.submitted_at for row in mine.values() if row.submitted_at), default=None),
+        "can_evaluate": can_evaluate_application(application=application, user=user),
+        "locked": my_submitted,
+        "evaluator_count": len(evaluators),
+        # Individual panel scores stay private; the panel sees aggregates only.
+        "summary": summary if (my_submitted or not can_evaluate_application(application=application, user=user)) else [],
+    }
+
+
+@transaction.atomic
+def save_application_scorecard(*, application, actor, ratings, submit=False):
+    from apps.recruitment.models import CompetencyRating
+
+    if not can_evaluate_application(application=application, user=actor):
+        raise ValidationError({"actor": "Only members of the recruitment panel can evaluate this candidate."})
+    if application.status not in (Application.Status.ACTIVE, Application.Status.OFFERED):
+        raise ValidationError({"status": "Only active applications can be evaluated."})
+    existing = CompetencyRating.objects.select_for_update().filter(application=application, evaluator=actor)
+    if existing.filter(submitted_at__isnull=False).exists():
+        raise ValidationError({"scorecard": "Your evaluation has already been submitted."})
+    competencies = {str(item.id): item for item in ensure_default_competencies(application.institution)}
+    for entry in ratings:
+        competency = competencies.get(str(entry.get("competency")))
+        if competency is None:
+            raise ValidationError({"ratings": "Unknown competency."})
+        row, _ = CompetencyRating.objects.get_or_create(
+            application=application, competency=competency, evaluator=actor,
+            defaults={"institution": application.institution},
+        )
+        row.rating = entry.get("rating") or CompetencyRating.Rating.NOT_ASSESSED
+        row.comment = (entry.get("comment") or "").strip()
+        row.full_clean()
+        row.save()
+    if submit:
+        rows = CompetencyRating.objects.filter(application=application, evaluator=actor)
+        assessed = rows.exclude(rating=CompetencyRating.Rating.NOT_ASSESSED).count()
+        if assessed < len(competencies):
+            raise ValidationError({"ratings": "Assess every competency before submitting your evaluation."})
+        rows.update(submitted_at=timezone.now())
+        record_audit_event(actor=actor, institution=application.institution, entity=application, action="recruitment.application.scorecard_submitted")
+    return application_scorecard(application=application, user=actor)
+
+
+CANDIDATE_DOCUMENT_CATEGORIES = ("CV", "COVER_LETTER", "CERTIFICATE", "PORTFOLIO", "REFERENCE", "OTHER")
+
+
+@transaction.atomic
+def attach_candidate_document(*, candidate, actor, uploaded_file, category):
+    from django.conf import settings as django_settings
+    import mimetypes
+
+    from apps.documents.models import Document
+
+    _active_member(actor, candidate.institution)
+    if category not in CANDIDATE_DOCUMENT_CATEGORIES:
+        raise ValidationError({"category": "Choose a valid document type."})
+    if uploaded_file is None:
+        raise ValidationError({"uploaded_file": "Choose a file to upload."})
+    if uploaded_file.size > django_settings.DOCUMENT_UPLOAD_MAX_BYTES:
+        raise ValidationError({"uploaded_file": f"Documents must be {django_settings.DOCUMENT_UPLOAD_MAX_BYTES // (1024 * 1024)} MB or smaller."})
+    name = (uploaded_file.name or "document").replace("\\", "/").rsplit("/", 1)[-1][:255] or "document"
+    content_type = (uploaded_file.content_type or "").lower().split(";")[0].strip()
+    if not content_type or content_type == "application/octet-stream":
+        content_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
+    document = Document.objects.create(
+        institution=candidate.institution, uploaded_by=actor, stored_file=uploaded_file, original_filename=name,
+        content_type=content_type[:150], size_bytes=uploaded_file.size, category=category,
+        classification=Document.Classification.CONFIDENTIAL, entity_type="recruitment.Candidate", entity_id=candidate.id,
+    )
+    record_audit_event(actor=actor, institution=candidate.institution, entity=candidate, action="recruitment.candidate.document_added",
+                       metadata={"document_id": str(document.id), "category": category, "filename": name})
+    return document
+
+
+@transaction.atomic
+def remove_candidate_document(*, candidate, document, actor):
+    _active_member(actor, candidate.institution)
+    document.is_active = False
+    document.save(update_fields=("is_active", "updated_at"))
+    record_audit_event(actor=actor, institution=candidate.institution, entity=candidate, action="recruitment.candidate.document_removed",
+                       metadata={"document_id": str(document.id), "filename": document.original_filename})

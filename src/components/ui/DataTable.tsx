@@ -22,12 +22,12 @@ export interface DataColumn<Row> {
   /** Enables client-side sorting on the current page using this accessor. */
   sortValue?: (row: Row) => string | number | null | undefined;
   /** Hide below a breakpoint to keep narrow screens readable. */
-  hideBelow?: "sm" | "md" | "lg" | "xl";
+  hideBelow?: "sm" | "md" | "lg" | "xl" | "2xl";
   width?: string;
   className?: string;
 }
 
-const hideClasses = { sm: "hidden sm:table-cell", md: "hidden md:table-cell", lg: "hidden lg:table-cell", xl: "hidden xl:table-cell" };
+const hideClasses = { sm: "hidden sm:table-cell", md: "hidden md:table-cell", lg: "hidden lg:table-cell", xl: "hidden xl:table-cell", "2xl": "hidden 2xl:table-cell" };
 
 export interface DataTableProps<Row> {
   columns: DataColumn<Row>[];
@@ -38,6 +38,8 @@ export interface DataTableProps<Row> {
   onRetry?: () => void;
   empty?: { title: string; description?: ReactNode; action?: ReactNode; icon?: LucideIcon };
   onRowClick?: (row: Row) => void;
+  /** Highlights the row shown in an adjacent preview panel. */
+  isRowSelected?: (row: Row) => boolean;
   /** Accessible table caption (visually hidden). */
   caption: string;
   toolbar?: ReactNode;
@@ -53,7 +55,7 @@ export interface DataTableProps<Row> {
  * numeric alignment, and built-in loading / empty / error states. Horizontal
  * scroll is contained inside the card so the page body never overflows.
  */
-export function DataTable<Row>({ columns, rows, rowKey, loading, error, onRetry, empty, onRowClick, caption, toolbar, footer, density = "comfortable", minWidth = 720, className }: DataTableProps<Row>) {
+export function DataTable<Row>({ columns, rows, rowKey, loading, error, onRetry, empty, onRowClick, isRowSelected, caption, toolbar, footer, density = "comfortable", minWidth = 720, className }: DataTableProps<Row>) {
   const [sort, setSort] = useState<{ key: string; direction: "asc" | "desc" } | null>(null);
 
   const sorted = useMemo(() => {
@@ -137,7 +139,8 @@ export function DataTable<Row>({ columns, rows, rowKey, loading, error, onRetry,
                   <tr
                     key={rowKey(row, rowIndex)}
                     onClick={onRowClick ? () => onRowClick(row) : undefined}
-                    className={cx("group transition-colors duration-100 hover:bg-surface-hover", onRowClick && "cursor-pointer", loading && "opacity-60")}
+                    aria-selected={isRowSelected ? isRowSelected(row) : undefined}
+                    className={cx("group transition-colors duration-100 hover:bg-surface-hover", onRowClick && "cursor-pointer", isRowSelected?.(row) && "bg-primary-soft/60 hover:bg-primary-soft/70", loading && "opacity-60")}
                   >
                     {columns.map((column) => (
                       <td

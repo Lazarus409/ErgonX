@@ -4,26 +4,42 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
+  Building2,
   BriefcaseBusiness,
   CalendarDays,
+  ChevronDown,
+  ChevronRight,
+  Contact,
   FileText,
+  History,
+  Link2,
   Mail,
   MapPin,
+  MoreVertical,
+  Network,
   Pencil,
+  Phone,
+  Printer,
   Save,
-  ShieldCheck,
+  Smartphone,
+  UserCog,
+  UserRound,
   Users,
   Plus,
   Trash2,
   X,
   Download,
   Upload,
+  type LucideIcon,
 } from "lucide-react";
 
 import StatusBadge from "@/components/ui/StatusBadge";
 import ErrorState from "@/components/ui/ErrorState";
 import LoadingState from "@/components/ui/LoadingState";
-import BackNavigation from "@/components/ui/BackNavigation";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import { Menu, MenuItem } from "@/components/ui/Overlay";
+import { EmployeeAttendanceTab, EmployeeLeaveTab, EmployeePayrollTab } from "@/components/hr/EmployeeRecordTabs";
+import { EM_DASH, formatDate, humanizeEnum } from "@/lib/format";
 import { Avatar } from "@/components/ui/Card";
 import { Button, buttonClasses } from "@/components/ui/Button";
 import { employeesApi, getApiErrorMessage, organizationApi } from "@/lib/api";
@@ -36,7 +52,8 @@ import type {
   Employee as ApiEmployee,
   Employment,
 } from "@/types/hr";
-import { PrintButton, PrintFooter, PrintMasthead } from "@/components/brand/PrintDocument";
+import { WEEKDAY_CODES } from "@/types/hr";
+import { PrintFooter, PrintMasthead } from "@/components/brand/PrintDocument";
 
 interface EmployeeView {
   id: string;
@@ -56,6 +73,38 @@ interface EmployeeView {
   grade: string;
   location: string;
   manager: string;
+  preferredName: string;
+  mobilePhone: string;
+  officeLocation: string;
+  linkedinUrl: string;
+  dateOfBirth: string | null;
+  userLinked: boolean;
+}
+
+interface EmploymentTermsForm {
+  workingPattern: string;
+  workArrangement: string;
+  officeDays: string[];
+  timeZone: string;
+  team: string;
+  costCentre: string;
+  probationStatus: string;
+  probationEndDate: string;
+  noticePeriodWeeks: string;
+}
+
+function toTermsForm(employment: Employment | undefined): EmploymentTermsForm {
+  return {
+    workingPattern: employment?.working_pattern ?? "FULL_TIME",
+    workArrangement: employment?.work_arrangement ?? "ON_SITE",
+    officeDays: employment?.office_days ?? [],
+    timeZone: employment?.time_zone ?? "",
+    team: employment?.team ?? "",
+    costCentre: employment?.cost_centre ?? "",
+    probationStatus: employment?.probation_status ?? "NOT_APPLICABLE",
+    probationEndDate: employment?.probation_end_date ?? "",
+    noticePeriodWeeks: employment?.notice_period_weeks != null ? String(employment.notice_period_weeks) : "",
+  };
 }
 
 interface EmploymentChangeForm {
@@ -134,22 +183,75 @@ function toEmployeeView(
     grade: labelFor(lookups.grades, employment?.grade ?? null),
     location: labelFor(lookups.locations, employment?.location ?? null),
     manager: "Not assigned",
+    preferredName: employee.preferred_name ?? "",
+    mobilePhone: employee.mobile_phone ?? "",
+    officeLocation: employee.office_location ?? "",
+    linkedinUrl: employee.linkedin_url ?? "",
+    dateOfBirth: employee.date_of_birth,
+    userLinked: Boolean(employee.user),
   };
 };
 
 
-const tabs = [
-  { label: "Overview", href: "#overview" },
-  { label: "Current Employment", href: "#current-employment" },
-  { label: "Employment History", href: "#employment-history" },
-  { label: "Documents", href: "#documents" },
-  { label: "Emergency Contacts", href: "#emergency-contacts" },
-  { label: "Onboarding / Offboarding", href: "#onboarding-offboarding" },
-  { label: "Leave", href: "#leave" },
-  { label: "Attendance", href: "#attendance" },
-  { label: "Compensation", href: "#compensation" },
-  { label: "Payroll", href: "#payroll" },
+type DetailTab = "overview" | "attendance" | "leave" | "payroll" | "documents";
+
+const DETAIL_TABS: Array<{ value: DetailTab; label: string }> = [
+  { value: "overview", label: "Overview" },
+  { value: "attendance", label: "Attendance" },
+  { value: "leave", label: "Leave" },
+  { value: "payroll", label: "Payroll" },
+  { value: "documents", label: "Documents" },
 ];
+
+/** Direct status changes; termination runs through offboarding instead. */
+const CHANGEABLE_STATUSES = ["ACTIVE", "SUSPENDED", "INACTIVE"] as const;
+
+function yearsOfService(start: string): string {
+  const from = new Date(start);
+  if (Number.isNaN(from.getTime())) return EM_DASH;
+  const now = new Date();
+  let months = (now.getFullYear() - from.getFullYear()) * 12 + (now.getMonth() - from.getMonth());
+  if (now.getDate() < from.getDate()) months -= 1;
+  if (months < 0) return "Starts soon";
+  const years = Math.floor(months / 12);
+  const rest = months % 12;
+  const parts = [years ? `${years} year${years === 1 ? "" : "s"}` : "", rest ? `${rest} month${rest === 1 ? "" : "s"}` : ""].filter(Boolean);
+  return parts.join(", ") || "Less than a month";
+}
+
+function anniversariesFrom(start: string): { first: string; next: string } {
+  const from = new Date(`${start}T00:00:00`);
+  if (Number.isNaN(from.getTime())) return { first: start, next: start };
+  const iso = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  const first = new Date(from); first.setFullYear(from.getFullYear() + 1);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const next = new Date(from); next.setFullYear(today.getFullYear());
+  if (next < today || next <= from) next.setFullYear(next.getFullYear() + 1);
+  return { first: iso(first), next: iso(next) };
+}
+
+/** Concept profile card: blue section icon, bold title, optional edit link. */
+function ProfileCard({ title, icon: Icon, onEdit, badge, children }: { title: string; icon: LucideIcon; onEdit?: () => void; badge?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <section className="rounded-2xl border border-line bg-surface p-5 shadow-elevation-1 sm:p-6">
+      <div className="mb-4 flex items-center justify-between gap-3 border-b border-line-soft pb-4">
+        <h2 className="flex items-center gap-3 text-heading font-bold text-headline"><Icon className="h-6 w-6 text-section-icon" aria-hidden="true" />{title}</h2>
+        {badge}
+        {onEdit && <button type="button" onClick={onEdit} className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary-ink hover:underline print:hidden"><Pencil className="h-4 w-4" aria-hidden="true" />Edit</button>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function ProfileRow({ label, value, icon: Icon }: { label: string; value: React.ReactNode; icon?: LucideIcon }) {
+  return (
+    <div className="grid grid-cols-[minmax(7rem,9rem)_minmax(0,1fr)] items-start gap-3 text-[0.9375rem]">
+      <dt className="flex items-center gap-2 text-ink-muted">{Icon && <Icon className="h-4 w-4 shrink-0 text-section-icon" aria-hidden="true" />}{label}</dt>
+      <dd className="min-w-0 text-ink-strong">{value}</dd>
+    </div>
+  );
+}
 
 function InfoItem({
   label,
@@ -293,13 +395,13 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section id={id} className="scroll-mt-24 rounded-2xl border border-line bg-surface">
-      <div className="flex items-start justify-between gap-4 border-b border-line px-6 py-5">
+    <section id={id} className="scroll-mt-24 rounded-2xl border border-line bg-surface shadow-elevation-1">
+      <div className="flex items-start justify-between gap-4 border-b border-line-soft px-6 py-5">
         <div className="min-w-0">
-          <h2 className="text-base font-bold text-headline">{title}</h2>
+          <h2 className="text-heading font-bold text-headline">{title}</h2>
 
           {description && (
-            <p className="mt-1 text-sm text-ink-muted">{description}</p>
+            <p className="mt-1 text-sm text-heading-support">{description}</p>
           )}
         </div>
 
@@ -353,6 +455,11 @@ export default function EmployeeDetailPage() {
   const [documentUploading, setDocumentUploading] = useState(false);
   const [documentProgress, setDocumentProgress] = useState(0);
   const [documentActionId, setDocumentActionId] = useState<string | null>(null);
+  const [tab, setTab] = useState<DetailTab>("overview");
+  const [pendingStatus, setPendingStatus] = useState<string | null>(null);
+  const [statusSaving, setStatusSaving] = useState(false);
+  const [manager, setManager] = useState<{ id: string; name: string; title: string } | null>(null);
+  const [termsForm, setTermsForm] = useState<EmploymentTermsForm>(() => toTermsForm(undefined));
 
   const updateField = (field: keyof EmployeeView, value: string) => {
     setFormData((current) => ({
@@ -413,6 +520,20 @@ export default function EmployeeDetailPage() {
     };
   }, [params.id]);
 
+  const reportsTo = employmentHistory.find((employment) => employment.is_current)?.reports_to ?? null;
+  useEffect(() => {
+    if (!reportsTo) return;
+    let active = true;
+    employeesApi.getEmployment(reportsTo)
+      .then(async (managerEmployment) => {
+        const record = await employeesApi.getEmployee(managerEmployment.employee);
+        if (!active) return;
+        setManager({ id: record.id, name: employeesApi.employeeDisplayName(record), title: labelFor(lookups.positions, managerEmployment.position) });
+      })
+      .catch(() => { if (active) setManager(null); });
+    return () => { active = false; };
+  }, [reportsTo, lookups.positions]);
+
   const uploadEmployeeDocument = async (file: File | undefined) => {
     if (!file) return;
     if (file.size > operationsApi.MAX_DOCUMENT_BYTES) {
@@ -467,6 +588,7 @@ export default function EmployeeDetailPage() {
   const startEditing = () => {
     if (!employee) return;
     setFormData(employee);
+    setTermsForm(toTermsForm(employmentHistory.find((employment) => employment.is_current)));
     setSavedMessage("");
     setSaveError(null);
     setIsEditing(true);
@@ -497,14 +619,33 @@ export default function EmployeeDetailPage() {
         last_name: formData.lastName.trim(),
         work_email: formData.email.trim(),
         phone: formData.phone.trim(),
+        preferred_name: formData.preferredName.trim(),
+        mobile_phone: formData.mobilePhone.trim(),
+        office_location: formData.officeLocation.trim(),
+        linkedin_url: formData.linkedinUrl.trim(),
         gender: formData.gender
           .toUpperCase()
           .replace(/\s+/g, "_"),
         hire_date: formData.hireDate,
       });
-      const currentEmployment = employmentHistory.find(
+      let currentEmployment = employmentHistory.find(
         (employment) => employment.is_current,
       );
+      if (currentEmployment) {
+        const savedTerms = await employeesApi.updateEmployment(currentEmployment.id, {
+          working_pattern: termsForm.workingPattern,
+          work_arrangement: termsForm.workArrangement,
+          office_days: termsForm.officeDays,
+          time_zone: termsForm.timeZone.trim(),
+          team: termsForm.team.trim(),
+          cost_centre: termsForm.costCentre.trim(),
+          probation_status: termsForm.probationStatus,
+          probation_end_date: termsForm.probationEndDate || null,
+          notice_period_weeks: termsForm.noticePeriodWeeks ? Number(termsForm.noticePeriodWeeks) : null,
+        });
+        currentEmployment = savedTerms;
+        setEmploymentHistory((history) => history.map((employment) => (employment.id === savedTerms.id ? savedTerms : employment)));
+      }
       const view = toEmployeeView(updated, currentEmployment, lookups);
 
       setEmployee(view);
@@ -523,6 +664,24 @@ export default function EmployeeDetailPage() {
   const currentEmployment = employmentHistory.find(
     (employment) => employment.is_current,
   );
+
+  const confirmStatusChange = async () => {
+    if (!employee || !pendingStatus || statusSaving) return;
+    setStatusSaving(true);
+    setSaveError(null);
+    try {
+      const updated = await employeesApi.updateEmployee(employee.id, { status: pendingStatus });
+      const view = toEmployeeView(updated, currentEmployment, lookups);
+      setEmployee(view);
+      setFormData(view);
+      setSavedMessage(`Employee status changed to ${humanizeEnum(pendingStatus)}.`);
+    } catch (caught) {
+      setSaveError(getApiErrorMessage(caught));
+    } finally {
+      setStatusSaving(false);
+      setPendingStatus(null);
+    }
+  };
 
   const openEmploymentChange = () => {
     setSavedMessage("");
@@ -758,10 +917,24 @@ export default function EmployeeDetailPage() {
     return <ErrorState message="The employee record could not be found." />;
   }
 
+  const fullName = [employee.firstName, employee.middleName, employee.lastName].filter(Boolean).join(" ");
+  const serviceStart = employee.hireDate;
+  const anniversaries = anniversariesFrom(serviceStart);
+  const primaryContact = emergencyContacts.find((contact) => contact.primary) ?? emergencyContacts[0] ?? null;
+
   return (
     <div className="space-y-6">
+      <ConfirmDialog
+        open={pendingStatus !== null}
+        title={`Change status to ${humanizeEnum(pendingStatus ?? "")}?`}
+        description={`${fullName}'s employee status will change from ${humanizeEnum(employee.status)} to ${humanizeEnum(pendingStatus ?? "")}. The change is recorded in the audit trail.`}
+        confirmLabel="Change status"
+        destructive={pendingStatus === "SUSPENDED" || pendingStatus === "INACTIVE"}
+        loading={statusSaving}
+        onConfirm={() => void confirmStatusChange()}
+        onCancel={() => setPendingStatus(null)}
+      />
       <PrintMasthead documentTitle="Employee record" reference={employee.employeeNumber} />
-      <div className="print:hidden"><BackNavigation fallback="/hr/employees" label="Back to Employees" /></div>
 
       {savedMessage && (
         <div className="rounded-xl border border-success/25 bg-success-soft px-4 py-3 text-sm text-success-ink">
@@ -886,174 +1059,190 @@ export default function EmployeeDetailPage() {
         </div>
       )}
 
-      <div className="rounded-2xl border border-line bg-surface p-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-4">
-            <Avatar name={`${employee.firstName} ${employee.lastName}`} size="lg" />
+      <nav aria-label="Breadcrumb" className="print:hidden">
+        <ol className="flex flex-wrap items-center gap-1.5 text-support">
+          <li><Link href="/hr" className="font-medium text-primary-ink hover:underline">Employees</Link></li>
+          <li aria-hidden="true" className="text-ink-subtle"><ChevronRight className="h-4 w-4" /></li>
+          <li><Link href="/hr/employees" className="font-medium text-primary-ink hover:underline">Employee Directory</Link></li>
+          <li aria-hidden="true" className="text-ink-subtle"><ChevronRight className="h-4 w-4" /></li>
+          <li aria-current="page" className="font-medium text-ink-strong">{fullName}</li>
+        </ol>
+      </nav>
 
-            <div>
-              <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-title font-semibold tracking-tight text-ink-strong">
-                  {employee.firstName} {employee.middleName}{" "}
-                  {employee.lastName}
-                </h1>
-
-                <StatusBadge status={employee.status} />
-              </div>
-
-              <p className="mt-1 text-sm text-ink-muted">
-                {employee.employeeNumber} · {employee.position}
-              </p>
-
-              <div className="mt-2 flex flex-wrap gap-4 text-sm text-ink-muted">
-                <span className="inline-flex items-center gap-1">
-                  <MapPin className="h-4 w-4" />
-                  {employee.location}
-                </span>
-
-                <span className="inline-flex items-center gap-1">
-                  <CalendarDays className="h-4 w-4" />
-                  Joined{" "}
-                  {new Date(employee.hireDate).toLocaleDateString("en-GB", {
-                    day: "2-digit",
-                    month: "long",
-                    year: "numeric",
-                  })}
-                </span>
-              </div>
+      <header className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+          <Avatar name={fullName} size="lg" className="h-28 w-28 text-title shadow-elevation-2 ring-4 ring-surface sm:h-36 sm:w-36" />
+          <div className="min-w-0">
+            <h1 className="text-[2rem] font-bold leading-tight tracking-tight text-headline sm:text-[2.5rem]">{fullName}</h1>
+            <p className="mt-1 text-heading font-medium text-ink-strong">{employee.position}</p>
+            <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-[0.9375rem] text-ink">
+              <span className="inline-flex items-center gap-2"><Building2 className="h-5 w-5 text-section-icon" aria-hidden="true" />{employee.department}</span>
+              <span className="inline-flex items-center gap-2"><MapPin className="h-5 w-5 text-section-icon" aria-hidden="true" />{employee.location}</span>
+              <span className="inline-flex items-center gap-2"><BriefcaseBusiness className="h-5 w-5 text-section-icon" aria-hidden="true" />{currentEmployment ? humanizeEnum(currentEmployment.working_pattern) : "Not assigned"}</span>
+            </div>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <StatusBadge status={employee.status} />
+              {currentEmployment && <span className="rounded-full bg-primary-soft px-3 py-1 text-support font-semibold text-primary-ink">{humanizeEnum(currentEmployment.employment_type)}</span>}
+              <span className="rounded-full bg-surface-muted px-3 py-1 text-support font-medium text-ink-muted">Employee ID: {employee.employeeNumber}</span>
             </div>
           </div>
-
-          {!isEditing && (
-            <div className="flex flex-wrap items-center gap-2 print:hidden">
-              <PrintButton />
-              <Button onClick={startEditing} leadingIcon={<Pencil className="h-4 w-4" />}>
-                Edit Employee
-              </Button>
-            </div>
-          )}
         </div>
-      </div>
+
+        {!isEditing && (
+          <div className="flex flex-col items-start gap-5 xl:items-end">
+            <div className="flex flex-wrap items-center gap-2.5 print:hidden">
+              <Button size="lg" onClick={startEditing} leadingIcon={<Pencil className="h-4 w-4" />}>Edit</Button>
+              <Menu
+                label="More employee actions"
+                trigger={(props) => <Button {...props} size="lg" variant="secondary" leadingIcon={<MoreVertical className="h-4 w-4" />}>More</Button>}
+              >
+                {(close) => (
+                  <div className="p-1.5">
+                    <MenuItem icon={<BriefcaseBusiness />} onSelect={() => { close(); openEmploymentChange(); }}>Change assignment</MenuItem>
+                    <MenuItem icon={<History />} onSelect={() => { close(); setTab("overview"); window.setTimeout(() => document.getElementById("employment-history")?.scrollIntoView({ behavior: "smooth" }), 0); }}>Employment history</MenuItem>
+                    <MenuItem icon={<UserCog />} onSelect={() => { close(); setTab("overview"); window.setTimeout(() => document.getElementById("onboarding-offboarding")?.scrollIntoView({ behavior: "smooth" }), 0); }}>Onboarding &amp; offboarding</MenuItem>
+                    <MenuItem icon={<Printer />} onSelect={() => { close(); window.print(); }}>Print record</MenuItem>
+                  </div>
+                )}
+              </Menu>
+              <Menu
+                label="Change employee status"
+                trigger={(props) => <Button {...props} size="lg" variant="secondary" leadingIcon={<UserRound className="h-4 w-4" />} trailingIcon={<ChevronDown className="h-4 w-4" />}>Change Status</Button>}
+              >
+                {(close) => (
+                  <div className="p-1.5">
+                    {CHANGEABLE_STATUSES.map((status) => (
+                      <MenuItem key={status} disabled={employee.status === status} onSelect={() => { close(); setPendingStatus(status); }}>
+                        {humanizeEnum(status)}{employee.status === status ? " (current)" : ""}
+                      </MenuItem>
+                    ))}
+                    <p className="px-3 pb-2 pt-1 text-caption text-ink-muted">Termination is completed through offboarding.</p>
+                  </div>
+                )}
+              </Menu>
+            </div>
+            <blockquote className="hidden max-w-xs text-right xl:block">
+              <p className="text-[1.0625rem] italic leading-7 text-ink-muted">&ldquo;Great people make brighter workplaces.&rdquo;</p>
+              <span aria-hidden="true" className="ml-auto mt-3 block h-1 w-14 rounded-full bg-accent-aqua" />
+            </blockquote>
+          </div>
+        )}
+      </header>
 
       {!isEditing && (
         <>
-          <div className="overflow-x-auto rounded-2xl border border-line bg-surface">
-            <div className="flex min-w-max">
-              {tabs.map((tab, index) => (
-                <a
-                  key={tab.label}
-                  href={tab.href}
-                  className={`border-b-2 px-5 py-4 text-sm font-medium ${
-                    index === 0
-                      ? "border-primary text-ink-strong"
-                      : "border-transparent text-ink-muted hover:text-ink-strong"
-                  }`}
-                >
-                  {tab.label}
-                </a>
-              ))}
-            </div>
+          <div role="tablist" aria-label="Employee record sections" className="flex gap-8 overflow-x-auto border-b border-line print:hidden">
+            {DETAIL_TABS.map((item) => (
+              <button
+                key={item.value}
+                type="button"
+                role="tab"
+                aria-selected={tab === item.value}
+                onClick={() => setTab(item.value)}
+                className={`relative h-12 shrink-0 text-[1.0625rem] font-semibold transition-colors ${tab === item.value ? "text-primary-ink" : "text-ink-muted hover:text-ink-strong"}`}
+              >
+                {item.label}
+                <span aria-hidden="true" className={`absolute inset-x-0 -bottom-px h-[3px] rounded-full bg-primary transition-opacity ${tab === item.value ? "opacity-100" : "opacity-0"}`} />
+              </button>
+            ))}
           </div>
 
-          <SectionCard
-            id="overview"
-            title="Personal Information"
-            description="Basic employee profile information."
-          >
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <InfoItem label="First Name" value={employee.firstName} />
-              <InfoItem label="Middle Name" value={employee.middleName} />
-              <InfoItem label="Last Name" value={employee.lastName} />
-              <InfoItem label="Gender" value={employee.gender} />
+          {tab === "overview" && (
+            <>
+              <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
+                <div className="space-y-5">
+                  <ProfileCard title="About" icon={UserRound}>
+                    <div className="grid gap-x-10 gap-y-3 md:grid-cols-2">
+                      <dl className="space-y-3">
+                        <ProfileRow label="Full name" value={fullName} />
+                        <ProfileRow label="Preferred name" value={employee.preferredName || EM_DASH} />
+                        <ProfileRow label="Date of birth" value={employee.dateOfBirth ? formatDate(employee.dateOfBirth) : EM_DASH} />
+                        <ProfileRow label="Gender" value={employee.gender} />
+                        <ProfileRow label="Start date" value={formatDate(serviceStart)} />
+                        <ProfileRow label="Years of service" value={yearsOfService(serviceStart)} />
+                      </dl>
+                      <dl className="space-y-3">
+                        <ProfileRow label="Employment type" value={currentEmployment ? humanizeEnum(currentEmployment.employment_type) : EM_DASH} />
+                        <ProfileRow label="Working pattern" value={currentEmployment ? humanizeEnum(currentEmployment.working_pattern) : EM_DASH} />
+                        <ProfileRow label="Department" value={employee.department} />
+                        <ProfileRow label="Job title" value={employee.position} />
+                        <ProfileRow label="Reports to" value={manager ? <span><Link href={`/hr/employees/${manager.id}`} className="font-medium text-primary-ink hover:underline">{manager.name}</Link><span className="block text-caption text-ink-muted">{manager.title}</span></span> : EM_DASH} />
+                        <ProfileRow label="Location" value={employee.location} />
+                        <ProfileRow label="Cost centre" value={currentEmployment?.cost_centre || EM_DASH} />
+                      </dl>
+                    </div>
+                  </ProfileCard>
 
-              <InfoItem
-                label="Email"
-                value={employee.email}
-                icon={<Mail className="h-3.5 w-3.5" />}
-              />
+                  <ProfileCard title="Contact Details" icon={Phone} onEdit={startEditing}>
+                    <div className="grid gap-x-10 gap-y-3 md:grid-cols-2">
+                      <dl className="space-y-3">
+                        <ProfileRow icon={Mail} label="Work email" value={employee.email ? <a href={`mailto:${employee.email}`} className="break-all text-primary-ink hover:underline">{employee.email}</a> : EM_DASH} />
+                        <ProfileRow icon={Phone} label="Work phone" value={employee.phone || EM_DASH} />
+                        <ProfileRow icon={Smartphone} label="Mobile" value={employee.mobilePhone || EM_DASH} />
+                      </dl>
+                      <dl className="space-y-3">
+                        <ProfileRow icon={MapPin} label="Office location" value={employee.officeLocation || EM_DASH} />
+                        <ProfileRow icon={Link2} label="LinkedIn" value={employee.linkedinUrl ? <a href={employee.linkedinUrl} target="_blank" rel="noreferrer" className="break-all text-primary-ink hover:underline">{employee.linkedinUrl.replace(/^https?:\/\/(www\.)?/, "")}</a> : EM_DASH} />
+                      </dl>
+                    </div>
+                  </ProfileCard>
 
-              <InfoItem label="Phone" value={employee.phone} />
-              <InfoItem
-                label="Employee Number"
-                value={employee.employeeNumber}
-              />
-
-              <InfoItem
-                label="Hire Date"
-                value={new Date(employee.hireDate).toLocaleDateString(
-                  "en-GB",
-                  {
-                    day: "2-digit",
-                    month: "long",
-                    year: "numeric",
-                  }
-                )}
-              />
-            </div>
-          </SectionCard>
-
-          <SectionCard
-            id="current-employment"
-            title="Current Employment"
-            description="The employee's current employment assignment."
-            action={
-              <button
-                type="button"
-                onClick={openEmploymentChange}
-                className={buttonClasses({ variant: "secondary" })}
-              >
-                <BriefcaseBusiness className="h-4 w-4" />
-                Change Assignment
-              </button>
-            }
-          >
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <InfoItem
-                label="Department"
-                value={employee.department}
-                icon={<BriefcaseBusiness className="h-3.5 w-3.5" />}
-              />
-
-              <InfoItem label="Position" value={employee.position} />
-              <InfoItem label="Grade" value={employee.grade} />
-              <InfoItem label="Location" value={employee.location} />
-              <InfoItem
-                label="Employment Type"
-                value={employee.employmentType}
-              />
-
-              <InfoItem
-                label="Manager"
-                value={employee.manager}
-                icon={<Users className="h-3.5 w-3.5" />}
-              />
-            </div>
-          </SectionCard>
-
-          <SectionCard
-            title="Account Access"
-            description="User account and access status for this employee."
-          >
-            <div className="flex items-center justify-between rounded-xl border border-line p-4">
-              <div className="flex items-center gap-3">
-                <div className="rounded-lg bg-surface-sunken p-2">
-                  <ShieldCheck className="h-5 w-5 text-ink-muted" />
+                  <ProfileCard title="Emergency Contact" icon={Contact} onEdit={() => document.getElementById("emergency-contacts")?.scrollIntoView({ behavior: "smooth" })}>
+                    {primaryContact ? (
+                      <div className="grid gap-x-10 gap-y-3 md:grid-cols-2">
+                        <dl className="space-y-3">
+                          <ProfileRow label="Name" value={primaryContact.name} />
+                          <ProfileRow label="Relationship" value={primaryContact.relationship} />
+                        </dl>
+                        <dl className="space-y-3">
+                          <ProfileRow icon={Phone} label="Phone" value={primaryContact.phone} />
+                          <ProfileRow icon={Mail} label="Email" value={primaryContact.email ? <a href={`mailto:${primaryContact.email}`} className="break-all text-primary-ink hover:underline">{primaryContact.email}</a> : EM_DASH} />
+                        </dl>
+                      </div>
+                    ) : (
+                      <p className="text-support text-ink-muted">No emergency contact recorded. Add one in the emergency contacts section below.</p>
+                    )}
+                  </ProfileCard>
                 </div>
 
-                <div>
-                  <p className="font-medium text-ink-strong">
-                    Account Active
-                  </p>
+                <div className="space-y-5">
+                  <ProfileCard title="Employment Status" icon={UserRound} badge={<StatusBadge status={employee.status} size="sm" />}>
+                    <dl className="space-y-3">
+                      <ProfileRow label="Status" value={humanizeEnum(employee.status)} />
+                      <ProfileRow label="Employment type" value={currentEmployment ? humanizeEnum(currentEmployment.employment_type) : EM_DASH} />
+                      <ProfileRow label="Start date" value={formatDate(serviceStart)} />
+                      <ProfileRow label="Probation" value={currentEmployment ? `${humanizeEnum(currentEmployment.probation_status)}${currentEmployment.probation_end_date ? ` · ${formatDate(currentEmployment.probation_end_date)}` : ""}` : EM_DASH} />
+                      <ProfileRow label="Notice period" value={currentEmployment?.notice_period_weeks != null ? `${currentEmployment.notice_period_weeks} week${currentEmployment.notice_period_weeks === 1 ? "" : "s"}` : EM_DASH} />
+                      <ProfileRow label="System account" value={employee.userLinked ? "Linked" : "Not linked"} />
+                    </dl>
+                  </ProfileCard>
 
-                  <p className="text-sm text-ink-muted">
-                    The employee has an active system account.
-                  </p>
+                  <ProfileCard title="Reporting & Team" icon={Network}>
+                    <dl className="space-y-3">
+                      <ProfileRow label="Manager" value={manager ? <span className="flex items-center gap-2.5"><Avatar name={manager.name} size="md" /><span><Link href={`/hr/employees/${manager.id}`} className="font-medium text-primary-ink hover:underline">{manager.name}</Link><span className="block text-caption text-ink-muted">{manager.title}</span></span></span> : EM_DASH} />
+                      <ProfileRow label="Department" value={employee.department} />
+                      <ProfileRow label="Team" value={currentEmployment?.team || EM_DASH} />
+                    </dl>
+                  </ProfileCard>
+
+                  <ProfileCard title="Work Location" icon={MapPin}>
+                    <dl className="space-y-3">
+                      <ProfileRow label="Primary location" value={employee.location} />
+                      <ProfileRow label="Work arrangement" value={currentEmployment ? humanizeEnum(currentEmployment.work_arrangement) : EM_DASH} />
+                      <ProfileRow label="Office days" value={currentEmployment?.office_days.length ? currentEmployment.office_days.map((day) => day.charAt(0) + day.slice(1).toLowerCase()).join(" · ") : EM_DASH} />
+                      <ProfileRow label="Time zone" value={currentEmployment?.time_zone || EM_DASH} />
+                    </dl>
+                  </ProfileCard>
+
+                  <ProfileCard title="Important Dates" icon={CalendarDays}>
+                    <dl className="space-y-3">
+                      <ProfileRow label="Start date" value={formatDate(serviceStart)} />
+                      <ProfileRow label="Work anniversary" value={formatDate(anniversaries.first)} />
+                      <ProfileRow label="Next anniversary" value={formatDate(anniversaries.next)} />
+                    </dl>
+                  </ProfileCard>
                 </div>
               </div>
-
-              <StatusBadge status="ACTIVE" />
-            </div>
-          </SectionCard>
 
           <SectionCard
             id="employment-history"
@@ -1111,56 +1300,6 @@ export default function EmployeeDetailPage() {
                 </tbody>
               </table>
             </div>
-          </SectionCard>
-
-          <SectionCard
-            id="documents"
-            title="Documents"
-            description="Upload and review protected documents associated with this employee."
-            action={
-              <label className={buttonClasses({ variant: "primary" })}>
-                <Upload className="h-4 w-4" />
-                {documentUploading ? `Uploading… ${documentProgress}%` : "Add Document"}
-                <input
-                  type="file"
-                  className="sr-only"
-                  disabled={documentUploading}
-                  onChange={(event) => {
-                    void uploadEmployeeDocument(event.target.files?.[0]);
-                    event.currentTarget.value = "";
-                  }}
-                />
-              </label>
-            }
-          >
-            {documentsError && <p className="mb-4 rounded-lg border border-danger/25 bg-danger-soft p-3 text-sm text-danger-ink">{documentsError}</p>}
-            {documents.length === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-line-strong py-10 text-center">
-                <FileText className="h-10 w-10 text-ink-subtle" />
-                <h3 className="mt-3 font-medium text-ink-strong">No documents available</h3>
-                <p className="mt-1 text-sm text-ink-muted">Add an employee document to make it available to authorized users.</p>
-              </div>
-            ) : (
-              <div className="divide-y divide-line-soft rounded-xl border border-line">
-                {documents.map((document) => (
-                  <div key={document.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="min-w-0">
-                      <p className="truncate font-medium text-ink-strong">{document.original_filename}</p>
-                      <p className="mt-1 text-xs text-ink-muted">{document.category || "Employee document"} · {(document.size_bytes / 1024).toFixed(0)} KB · {new Date(document.created_at).toLocaleDateString("en-GB")}</p>
-                    </div>
-                    <div className="flex shrink-0 gap-2 self-start sm:self-auto">
-                      <button type="button" onClick={() => void downloadEmployeeDocument(document)} className={buttonClasses({ variant: "secondary" })} title="Download document">
-                        <Download className="h-4 w-4" />
-                        Download
-                      </button>
-                      <button type="button" onClick={() => void deactivateEmployeeDocument(document)} disabled={documentActionId === document.id} className="rounded-lg border border-danger/25 px-3 py-2 text-sm font-medium text-danger-ink hover:bg-danger-soft disabled:cursor-not-allowed disabled:opacity-60">
-                        {documentActionId === document.id ? "Deactivating…" : "Deactivate"}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
           </SectionCard>
 
           <SectionCard
@@ -1475,92 +1614,64 @@ export default function EmployeeDetailPage() {
             </div>
           </SectionCard>
 
-          <div className="grid gap-6 lg:grid-cols-3">
-            <SectionCard
-              id="leave"
-              title="Leave"
-              description="Leave information for this employee."
-            >
-              <div className="space-y-4">
-                <div className="rounded-xl border border-line bg-surface p-5">
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <h3 className="font-semibold text-ink-strong">
-                        Employee Leave
-                      </h3>
+            </>
+          )}
 
-                      <p className="mt-1 text-sm text-ink-muted">
-                        Leave records and requests for this employee will be
-                        displayed here when available.
-                      </p>
-                    </div>
-
-                    <Link
-                      href="/leave/requests"
-                      className={buttonClasses({ variant: "secondary" })}
-                    >
-                      View Leave Requests
-                    </Link>
-                  </div>
-                </div>
-
-                <div className="rounded-xl border border-dashed border-line-strong bg-surface-muted p-5">
-                  <p className="text-sm text-ink-muted">
-                    Employee leave data will be populated when the Leave
-                    module API integration is available.
-                  </p>
-                </div>
-              </div>
-            </SectionCard>
-
-            <SectionCard id="attendance" title="Attendance">
-              <p className="text-sm text-ink-muted">
-                Attendance information will be displayed when available.
-              </p>
-            </SectionCard>
-
-            <SectionCard id="compensation" title="Compensation">
-              <p className="text-sm text-ink-muted">
-                Compensation information is permission-protected.
-              </p>
-            </SectionCard>
-          </div>
-
+          {tab === "attendance" && <EmployeeAttendanceTab employeeId={employee.id} />}
+          {tab === "leave" && <EmployeeLeaveTab employeeId={employee.id} />}
+          {tab === "payroll" && <EmployeePayrollTab employeeId={employee.id} />}
+          {tab === "documents" && (
           <SectionCard
-            id="payroll"
-            title="Payroll"
-            description="Employee payroll information."
+            id="documents"
+            title="Documents"
+            description="Upload and review protected documents associated with this employee."
+            action={
+              <label className={buttonClasses({ variant: "primary" })}>
+                <Upload className="h-4 w-4" />
+                {documentUploading ? `Uploading… ${documentProgress}%` : "Add Document"}
+                <input
+                  type="file"
+                  className="sr-only"
+                  disabled={documentUploading}
+                  onChange={(event) => {
+                    void uploadEmployeeDocument(event.target.files?.[0]);
+                    event.currentTarget.value = "";
+                  }}
+                />
+              </label>
+            }
           >
-            <div className="rounded-xl border border-line bg-surface p-5">
-              <div className="flex items-start gap-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-surface-sunken">
-                  <ShieldCheck className="h-5 w-5 text-ink-muted" />
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <h3 className="font-semibold text-ink-strong">
-                    Permission-Protected Payroll
-                  </h3>
-
-                  <p className="mt-1 text-sm leading-6 text-ink-muted">
-                    Payroll information is restricted to authorised users.
-                    Payroll records and related information will be displayed
-                    here when the Payroll module integration is available.
-                  </p>
-
-                  <div className="mt-4 rounded-lg bg-surface-muted px-4 py-3">
-                    <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
-                      Integration Status
-                    </p>
-
-                    <p className="mt-1 text-sm font-medium text-ink">
-                      Pending backend integration
-                    </p>
-                  </div>
-                </div>
+            {documentsError && <p className="mb-4 rounded-lg border border-danger/25 bg-danger-soft p-3 text-sm text-danger-ink">{documentsError}</p>}
+            {documents.length === 0 ? (
+              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-line-strong py-10 text-center">
+                <FileText className="h-10 w-10 text-ink-subtle" />
+                <h3 className="mt-3 font-medium text-ink-strong">No documents available</h3>
+                <p className="mt-1 text-sm text-ink-muted">Add an employee document to make it available to authorized users.</p>
               </div>
-            </div>
+            ) : (
+              <div className="divide-y divide-line-soft rounded-xl border border-line">
+                {documents.map((document) => (
+                  <div key={document.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-ink-strong">{document.original_filename}</p>
+                      <p className="mt-1 text-xs text-ink-muted">{document.category || "Employee document"} · {(document.size_bytes / 1024).toFixed(0)} KB · {new Date(document.created_at).toLocaleDateString("en-GB")}</p>
+                    </div>
+                    <div className="flex shrink-0 gap-2 self-start sm:self-auto">
+                      <button type="button" onClick={() => void downloadEmployeeDocument(document)} className={buttonClasses({ variant: "secondary" })} title="Download document">
+                        <Download className="h-4 w-4" />
+                        Download
+                      </button>
+                      <button type="button" onClick={() => void deactivateEmployeeDocument(document)} disabled={documentActionId === document.id} className="rounded-lg border border-danger/25 px-3 py-2 text-sm font-medium text-danger-ink hover:bg-danger-soft disabled:cursor-not-allowed disabled:opacity-60">
+                        {documentActionId === document.id ? "Deactivating…" : "Deactivate"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </SectionCard>
+
+          )}
         </>
       )}
 
@@ -1615,13 +1726,70 @@ export default function EmployeeDetailPage() {
               />
 
               <Field
-                label="Phone"
+                label="Work phone"
                 value={formData.phone}
                 required
                 onChange={(value) => updateField("phone", value)}
               />
+
+              <Field
+                label="Mobile"
+                value={formData.mobilePhone}
+                onChange={(value) => updateField("mobilePhone", value)}
+              />
+
+              <Field
+                label="Preferred name"
+                value={formData.preferredName}
+                onChange={(value) => updateField("preferredName", value)}
+              />
+
+              <Field
+                label="Office location"
+                value={formData.officeLocation}
+                onChange={(value) => updateField("officeLocation", value)}
+              />
+
+              <Field
+                label="LinkedIn URL"
+                type="url"
+                value={formData.linkedinUrl}
+                onChange={(value) => updateField("linkedinUrl", value)}
+              />
             </div>
           </SectionCard>
+
+          {currentEmployment && (
+            <SectionCard
+              title="Employment Terms"
+              description="Working pattern, location and probation details for the current employment."
+            >
+              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                <LookupSelect label="Working pattern" value={termsForm.workingPattern} required options={[{ value: "FULL_TIME", label: "Full-time" }, { value: "PART_TIME", label: "Part-time" }, { value: "SHIFT", label: "Shift-based" }]} onChange={(value) => setTermsForm((current) => ({ ...current, workingPattern: value }))} />
+                <LookupSelect label="Work arrangement" value={termsForm.workArrangement} required options={[{ value: "ON_SITE", label: "On-site" }, { value: "HYBRID", label: "Hybrid" }, { value: "REMOTE", label: "Remote" }]} onChange={(value) => setTermsForm((current) => ({ ...current, workArrangement: value }))} />
+                <Field label="Time zone" value={termsForm.timeZone} onChange={(value) => setTermsForm((current) => ({ ...current, timeZone: value }))} />
+                <Field label="Team" value={termsForm.team} onChange={(value) => setTermsForm((current) => ({ ...current, team: value }))} />
+                <Field label="Cost centre" value={termsForm.costCentre} onChange={(value) => setTermsForm((current) => ({ ...current, costCentre: value }))} />
+                <Field label="Notice period (weeks)" type="number" value={termsForm.noticePeriodWeeks} onChange={(value) => setTermsForm((current) => ({ ...current, noticePeriodWeeks: value }))} />
+                <LookupSelect label="Probation" value={termsForm.probationStatus} required options={[{ value: "NOT_APPLICABLE", label: "Not applicable" }, { value: "IN_PROGRESS", label: "In progress" }, { value: "EXTENDED", label: "Extended" }, { value: "COMPLETED", label: "Completed" }]} onChange={(value) => setTermsForm((current) => ({ ...current, probationStatus: value }))} />
+                <Field label="Probation end date" type="date" value={termsForm.probationEndDate} onChange={(value) => setTermsForm((current) => ({ ...current, probationEndDate: value }))} />
+                <fieldset className="sm:col-span-2 lg:col-span-3">
+                  <legend className="mb-1.5 block text-sm font-medium text-ink">Office days</legend>
+                  <div className="flex flex-wrap gap-2">
+                    {WEEKDAY_CODES.map((day) => {
+                      const checked = termsForm.officeDays.includes(day);
+                      return (
+                        <label key={day} className={`inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm font-medium ${checked ? "border-primary bg-primary-soft text-primary-ink" : "border-line-strong text-ink"}`}>
+                          <input type="checkbox" className="sr-only" checked={checked} onChange={() => setTermsForm((current) => ({ ...current, officeDays: checked ? current.officeDays.filter((item) => item !== day) : WEEKDAY_CODES.filter((item) => item === day || current.officeDays.includes(item)) }))} />
+                          {day.charAt(0) + day.slice(1).toLowerCase()}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+              </div>
+            </SectionCard>
+          )}
 
           <SectionCard
             title="Edit Employee Details"

@@ -84,16 +84,6 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
         )}
       </div>
 
-      {/* Concept: the active institution sits directly under the ErgonX brand. */}
-      <div className={cx("shrink-0 pb-3", compact ? "px-3" : "px-4")}>
-        <InstitutionPanel
-          compact={compact}
-          name={institution?.name ?? "No active institution"}
-          code={institution?.code}
-          logoSrc={institution?.logoImageId ? imageContentUrl(institution.logoImageId) : null}
-        />
-      </div>
-
       <nav aria-label="Primary navigation" className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-3 [scrollbar-color:rgb(255_255_255/0.18)_transparent]">
         <ul className="space-y-1">
           {visibleNavigation.map((item) => {
@@ -217,8 +207,17 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
         )}
       </nav>
 
+      <div className={cx("shrink-0 border-t border-white/[0.08]", compact ? "p-3" : "px-4 pt-3 pb-2")}>
+        <InstitutionPanel
+          compact={compact}
+          name={institution?.name ?? "No active institution"}
+          code={institution?.code}
+          logoSrc={institution?.logoImageId ? imageContentUrl(institution.logoImageId) : null}
+        />
+      </div>
+
       {!mobile && (
-        <div className="shrink-0 border-t border-white/[0.08] p-3">
+        <div className="shrink-0 px-3 pb-3">
           <button
             type="button"
             onClick={() => onCollapsedChange(!compact)}
@@ -300,21 +299,21 @@ function NavRow({ item, active, groupActive, compact, onNavigate, expander }: { 
 function InstitutionPanel({ compact, name, code, logoSrc }: { compact: boolean; name: string; code?: string | null; logoSrc: string | null }) {
   const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "E";
   return (
-    <div className={cx("flex items-center rounded-xl border border-white/[0.12] bg-white/[0.04]", compact ? "justify-center p-1.5" : "gap-3 px-3 py-2.5")} title={compact ? name : undefined}>
+    <div className={cx("flex items-center border border-white/[0.12] bg-white/[0.04] shadow-[0_8px_24px_rgb(0_0_0/0.12)]", compact ? "justify-center rounded-xl p-2" : "gap-3.5 rounded-[22px] px-4 py-3.5")} title={compact ? name : undefined}>
       {logoSrc ? (
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white p-0.5" aria-hidden="true">
+        <span className={cx("flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white p-0.5", compact ? "h-9 w-9" : "h-[52px] w-[52px]")} aria-hidden="true">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={logoSrc} alt="" className="h-full w-full object-contain" />
         </span>
       ) : (
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-caption font-bold text-white" aria-hidden="true">
+        <span className={cx("flex shrink-0 items-center justify-center rounded-xl bg-primary font-bold text-white", compact ? "h-9 w-9 text-caption" : "h-[52px] w-[52px] text-base")} aria-hidden="true">
           {initials}
         </span>
       )}
       {!compact && (
         <div className="min-w-0 flex-1 leading-tight">
-          <p className="text-[0.6875rem] font-medium text-white/55">Active institution</p>
-          <p className="mt-0.5 truncate text-support font-semibold text-white">{name}</p>
+          <p className="text-xs font-medium text-white/55">Active institution</p>
+          <p className="mt-1 truncate text-[0.9375rem] font-semibold text-white">{name}</p>
           {logoSrc ? (
             <p className="flex items-center gap-1 text-caption text-white/50">
               {code && <span className="truncate">{code} ·</span>}

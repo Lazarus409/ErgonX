@@ -59,6 +59,8 @@ const statusConfig: Record<string, { label: string; tone: BadgeTone; icon?: Luci
   CLOSED: { label: "Closed", tone: "neutral", icon: Lock },
   OPEN: { label: "Open", tone: "info" },
   SENT: { label: "Sent", tone: "info" },
+  ON_HOLD: { label: "On hold", tone: "violet" },
+  NOT_SCHEDULED: { label: "Not scheduled", tone: "neutral", icon: CircleDashed },
   EXTENDED: { label: "Sent", tone: "info" },
   PAID: { label: "Paid", tone: "success" },
   PARTIALLY_PAID: { label: "Partially paid", tone: "info" },

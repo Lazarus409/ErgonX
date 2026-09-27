@@ -86,7 +86,38 @@ export interface VendorBillLine {
   updated_at: string;
 }
 
-export interface VendorBill { id: string; vendor: string; bill_number: string; bill_date: string; due_date: string | null; currency: string; subtotal: string; tax_total: string; withholding_total: string; total_amount: string; amount_payable: string; status: string; accounting_period: string; journal_entry: string | null; lines: VendorBillLine[]; created_at: string; updated_at: string; }
+export interface VendorBill {
+  id: string; vendor: string; bill_number: string; bill_date: string; due_date: string | null; currency: string; subtotal: string; tax_total: string; withholding_total: string; total_amount: string; amount_payable: string; status: string; accounting_period: string; journal_entry: string | null; lines: VendorBillLine[]; created_at: string; updated_at: string;
+  vendor_name?: string; vendor_code?: string; amount_paid?: string;
+  submitted_by_name?: string | null; submitted_at?: string | null; approved_by_name?: string | null; approved_at?: string | null;
+  rejected_by_name?: string | null; rejected_at?: string | null; rejection_reason?: string;
+  on_hold?: boolean; hold_reason?: string; scheduled_payment_date?: string | null; scheduled_payment_method?: string;
+}
+
+export interface PayablesSummary {
+  range_months: number;
+  range_start: string;
+  counts: Record<"all" | "pending" | "approved" | "rejected" | "paid" | "on_hold", number>;
+  approval_queue: Array<{ id: string; vendor: string; bill_number: string; amount: string; currency: string; submitted_at: string | null; submitted_by: string | null; on_hold: boolean }>;
+  approval_queue_total: number;
+  active_vendors: number;
+  total_bills: number;
+  payments_made: number | null;
+  payments_amount: string | null;
+  amounts_restricted: boolean;
+}
+
+export interface RecordAttachment { id: string; original_filename: string; content_type: string; size_bytes: number; created_at: string }
+export interface RecordAuditEntry { id: string; action: string; actor: string; created_at: string; metadata: Record<string, unknown> }
+
+export interface VendorBillContext {
+  attachments: RecordAttachment[];
+  audit: RecordAuditEntry[];
+  payments: Array<{ id: string; payment_number: string; payment_date: string; amount: string; currency: string; payment_method: string; status: string }>;
+  related: Array<{ type: string; reference: string; status: string; href: string | null }>;
+  vendor: { id: string; name: string; code: string; email: string; phone: string; address: string; tax_identification_number: string };
+  institution: { name: string };
+}
 export interface Customer { id: string; customer_code: string; name: string; email: string; phone: string; address: string; country_code: string; tax_identification_number: string; tax_residency: string; taxpayer_type: string; vat_registered: boolean; withholding_category: string; statutory_profile_metadata: Record<string, unknown>; is_active: boolean; created_at: string; updated_at: string; }
 export interface InvoiceLine {
   id: string;

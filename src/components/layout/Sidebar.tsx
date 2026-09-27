@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronDown, ChevronsLeft, PanelLeftOpen, X } from "lucide-react";
+import { ChevronDown, ChevronsLeft, X } from "lucide-react";
 import { useState } from "react";
 
 import Logo from "@/components/brand/Logo";
@@ -73,25 +73,38 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
   // In the mobile drawer the sidebar is always rendered expanded.
   const renderPanel = (compact: boolean, mobile: boolean) => (
     <div className="flex h-full flex-col">
-      <div className={cx("flex h-[5.25rem] shrink-0 items-center justify-between gap-2 overflow-hidden", compact ? "px-[18px]" : "pl-7 pr-3")}>
-        <Link href="/" onClick={closeMobile} className="min-w-0 rounded-lg focus-visible:outline-offset-4" aria-label="ErgonX home">
+      <div className={cx("flex h-[5.25rem] shrink-0 items-center justify-between gap-2 overflow-hidden", compact ? "justify-center px-0" : "pl-7 pr-3")}>
+        <Link
+          href="/"
+          onClick={(event) => {
+            if (compact && !mobile) {
+              event.preventDefault();
+              onCollapsedChange(false);
+              return;
+            }
+            closeMobile();
+          }}
+          className={cx("rounded-lg focus-visible:outline-offset-4", compact && !mobile ? "h-12 w-9 shrink-0 overflow-hidden" : "min-w-0")}
+          aria-label={compact && !mobile ? "Expand sidebar" : "ErgonX home"}
+          title={compact && !mobile ? "Expand sidebar" : undefined}
+        >
           <SidebarLogo collapsed={compact} />
         </Link>
-        {mobile && (
+        {mobile ? (
           <button type="button" onClick={closeMobile} className="rounded-xl p-2 text-white/70 transition-colors hover:bg-white/10 hover:text-white" aria-label="Close navigation">
             <X className="h-5 w-5" />
           </button>
-        )}
-      </div>
-
-      {/* Concept: the active institution sits directly under the ErgonX brand. */}
-      <div className={cx("shrink-0 pb-3", compact ? "px-3" : "px-4")}>
-        <InstitutionPanel
-          compact={compact}
-          name={institution?.name ?? "No active institution"}
-          code={institution?.code}
-          logoSrc={institution?.logoImageId ? imageContentUrl(institution.logoImageId) : null}
-        />
+        ) : !compact ? (
+          <button
+            type="button"
+            onClick={() => onCollapsedChange(!compact)}
+            className="shrink-0 rounded-xl p-2 text-white/65 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-sky"
+            aria-label="Collapse sidebar"
+            title="Collapse sidebar"
+          >
+            <ChevronsLeft className="h-5 w-5" />
+          </button>
+        ) : null}
       </div>
 
       <nav aria-label="Primary navigation" className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-3 [scrollbar-color:rgb(255_255_255/0.18)_transparent]">
@@ -217,20 +230,15 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
         )}
       </nav>
 
-      {!mobile && (
-        <div className="shrink-0 border-t border-white/[0.08] p-3">
-          <button
-            type="button"
-            onClick={() => onCollapsedChange(!compact)}
-            className={cx("flex h-10 w-full items-center gap-3 rounded-lg text-support font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white", compact ? "justify-center" : "px-3")}
-            aria-label={compact ? "Expand sidebar" : "Collapse sidebar"}
-            title={compact ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            {compact ? <PanelLeftOpen className="h-[18px] w-[18px]" /> : <ChevronsLeft className="h-5 w-5" />}
-            {!compact && <span>Collapse sidebar</span>}
-          </button>
-        </div>
-      )}
+      <div className={cx("shrink-0 border-t border-white/[0.08]", compact ? "p-3" : "px-4 pt-3 pb-2")}>
+        <InstitutionPanel
+          compact={compact}
+          name={institution?.name ?? "No active institution"}
+          code={institution?.code}
+          logoSrc={institution?.logoImageId ? imageContentUrl(institution.logoImageId) : null}
+        />
+      </div>
+
     </div>
   );
 
@@ -300,21 +308,21 @@ function NavRow({ item, active, groupActive, compact, onNavigate, expander }: { 
 function InstitutionPanel({ compact, name, code, logoSrc }: { compact: boolean; name: string; code?: string | null; logoSrc: string | null }) {
   const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "E";
   return (
-    <div className={cx("flex items-center rounded-xl border border-white/[0.12] bg-white/[0.04]", compact ? "justify-center p-1.5" : "gap-3 px-3 py-2.5")} title={compact ? name : undefined}>
+    <div className={cx("flex items-center border border-white/[0.12] bg-white/[0.04] shadow-[0_8px_24px_rgb(0_0_0/0.12)]", compact ? "justify-center rounded-xl p-2" : "gap-3.5 rounded-[22px] px-4 py-3.5")} title={compact ? name : undefined}>
       {logoSrc ? (
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white p-0.5" aria-hidden="true">
+        <span className={cx("flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white p-0.5", compact ? "h-9 w-9" : "h-[52px] w-[52px]")} aria-hidden="true">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={logoSrc} alt="" className="h-full w-full object-contain" />
         </span>
       ) : (
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-caption font-bold text-white" aria-hidden="true">
+        <span className={cx("flex shrink-0 items-center justify-center rounded-xl bg-primary font-bold text-white", compact ? "h-9 w-9 text-caption" : "h-[52px] w-[52px] text-base")} aria-hidden="true">
           {initials}
         </span>
       )}
       {!compact && (
         <div className="min-w-0 flex-1 leading-tight">
-          <p className="text-[0.6875rem] font-medium text-white/55">Active institution</p>
-          <p className="mt-0.5 truncate text-support font-semibold text-white">{name}</p>
+          <p className="text-xs font-medium text-white/55">Active institution</p>
+          <p className="mt-1 truncate text-[0.9375rem] font-semibold text-white">{name}</p>
           {logoSrc ? (
             <p className="flex items-center gap-1 text-caption text-white/50">
               {code && <span className="truncate">{code} ·</span>}

@@ -1,6 +1,6 @@
 import { apiAction, apiDownload, apiGet, apiGetList, apiPatch, apiPost, apiPostMultipart } from "./client";
 import type { ListParams, PaginatedData } from "@/types/api";
-import type { AccountActivity, JournalContext, Account, AccountingConfiguration, AccountingConfigurationPayload, AccountingPeriod, AccountingPresetApplicationResult, AccountingSetupChoices, BalanceSheet, BankAccount, BankStatementLine, Customer, Expense, GhanaComplianceReminder, IncomeStatement, Invoice, InvoiceLine, JournalEntry, PayComponentAccountMapping, PayComponentAccountMappingPayload, PayrollAccountMappingTemplate, Payment, Receipt, TaxCode, TaxComponent, TrialBalance, Vendor, VendorBill, VendorBillLine, WithholdingRule } from "@/types/accounting";
+import type { PayablesSummary, VendorBillContext, RecordAttachment, AccountActivity, JournalContext, Account, AccountingConfiguration, AccountingConfigurationPayload, AccountingPeriod, AccountingPresetApplicationResult, AccountingSetupChoices, BalanceSheet, BankAccount, BankStatementLine, Customer, Expense, GhanaComplianceReminder, IncomeStatement, Invoice, InvoiceLine, JournalEntry, PayComponentAccountMapping, PayComponentAccountMappingPayload, PayrollAccountMappingTemplate, Payment, Receipt, TaxCode, TaxComponent, TrialBalance, Vendor, VendorBill, VendorBillLine, WithholdingRule } from "@/types/accounting";
 
 export type AccountPayload = Pick<Account, "code" | "name" | "account_type" | "parent" | "normal_balance" | "is_postable" | "is_active">;
 
@@ -115,3 +115,18 @@ export function uploadJournalAttachment(id: string, file: File, onProgress?: (pr
   return apiPostMultipart(`/journal-entries/${id}/attachments/`, body, onProgress);
 }
 export function downloadJournalAttachment(id: string, documentId: string): Promise<Blob> { return apiDownload(`/journal-entries/${id}/attachments/${documentId}/download/`); }
+
+export function getVendorBill(id: string): Promise<VendorBill> { return apiGet<VendorBill>(`/vendor-bills/${id}/`); }
+export function getPayablesSummary(months: 3 | 6 | 12): Promise<PayablesSummary> { return apiGet<PayablesSummary>(`/vendor-bills/summary/?months=${months}`); }
+export function getVendorBillContext(id: string): Promise<VendorBillContext> { return apiGet<VendorBillContext>(`/vendor-bills/${id}/context/`); }
+export function rejectVendorBill(id: string, reason: string): Promise<VendorBill> { return apiPost<VendorBill, { reason: string }>(`/vendor-bills/${id}/reject/`, { reason }); }
+export function reviseVendorBill(id: string): Promise<VendorBill> { return apiAction<VendorBill>(`/vendor-bills/${id}/revise/`); }
+export function holdVendorBill(id: string, reason: string): Promise<VendorBill> { return apiPost<VendorBill, { reason: string }>(`/vendor-bills/${id}/hold/`, { reason }); }
+export function releaseVendorBill(id: string): Promise<VendorBill> { return apiAction<VendorBill>(`/vendor-bills/${id}/release/`); }
+export function scheduleVendorBillPayment(id: string, payment_date: string, payment_method: string): Promise<VendorBill> { return apiPost<VendorBill, { payment_date: string; payment_method: string }>(`/vendor-bills/${id}/schedule-payment/`, { payment_date, payment_method }); }
+export function uploadRecordAttachment(resource: "vendor-bills" | "invoices", id: string, file: File, onProgress?: (progress: number) => void): Promise<RecordAttachment> {
+  const body = new FormData();
+  body.append("uploaded_file", file);
+  return apiPostMultipart(`/${resource}/${id}/attachments/`, body, onProgress);
+}
+export function downloadRecordAttachment(resource: "vendor-bills" | "invoices", id: string, documentId: string): Promise<Blob> { return apiDownload(`/${resource}/${id}/attachments/${documentId}/download/`); }

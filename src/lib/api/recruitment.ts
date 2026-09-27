@@ -1,6 +1,6 @@
 import { apiAction, apiDelete, apiDownload, apiGetList, apiGet, apiPatch, apiPost, apiPostMultipart } from "./client";
 import type { ListParams, PaginatedData } from "@/types/api";
-import type { ApplicationOverview, ApplicationScorecard, CandidateDocument, HiringTeamMember, RecruitmentPerson, RequisitionActivity, RequisitionHistoryEntry, ApplicationStageHistory, Candidate, CandidateEvaluation, CandidateEvaluationPayload, CandidatePayload, CandidateScorecard, JobPosting, JobPostingPayload, RecruitmentApplication, RecruitmentApplicationPayload, RecruitmentInterview, RecruitmentInterviewPayload, RecruitmentOffer, RecruitmentOfferPayload, RecruitmentPipelineStage, RecruitmentStage, RecruitmentStagePayload } from "@/types/recruitment";
+import type { InterviewSchedulePayload, InterviewSlot, ApplicationOverview, ApplicationScorecard, CandidateDocument, HiringTeamMember, RecruitmentPerson, RequisitionActivity, RequisitionHistoryEntry, ApplicationStageHistory, Candidate, CandidateEvaluation, CandidateEvaluationPayload, CandidatePayload, CandidateScorecard, JobPosting, JobPostingPayload, RecruitmentApplication, RecruitmentApplicationPayload, RecruitmentInterview, RecruitmentInterviewPayload, RecruitmentOffer, RecruitmentOfferPayload, RecruitmentPipelineStage, RecruitmentStage, RecruitmentStagePayload } from "@/types/recruitment";
 
 export function listJobPostings(params?: ListParams): Promise<PaginatedData<JobPosting>> {
   return apiGetList<JobPosting>("/recruitment/job-postings/", params);
@@ -159,12 +159,54 @@ export function createInterview(payload: RecruitmentInterviewPayload): Promise<R
   return apiPost<RecruitmentInterview, RecruitmentInterviewPayload>("/recruitment/interviews/", payload);
 }
 
+export function getInterview(id: string): Promise<RecruitmentInterview> {
+  return apiGet<RecruitmentInterview>(`/recruitment/interviews/${id}/`);
+}
+
+export function getInterviewAvailability(params: { date: string; interviewers: string[]; duration: number; time_zone: string; exclude?: string }): Promise<{ date: string; time_zone: string; slots: InterviewSlot[] }> {
+  const query = new URLSearchParams({ date: params.date, interviewers: params.interviewers.join(","), duration: String(params.duration), time_zone: params.time_zone });
+  if (params.exclude) query.set("exclude", params.exclude);
+  return apiGet(`/recruitment/interviews/availability/?${query.toString()}`);
+}
+
+export function scheduleInterview(payload: InterviewSchedulePayload, interviewId?: string): Promise<RecruitmentInterview> {
+  return apiPost<RecruitmentInterview, InterviewSchedulePayload>(interviewId ? `/recruitment/interviews/${interviewId}/reschedule/` : "/recruitment/interviews/schedule/", payload);
+}
+
 export function setInterviewStatus(id: string, status: "COMPLETED" | "CANCELLED" | "NO_SHOW"): Promise<RecruitmentInterview> {
   return apiAction<RecruitmentInterview, { status: string }>(`/recruitment/interviews/${id}/set-status/`, { status });
 }
 
 export function listOffers(params?: ListParams): Promise<PaginatedData<RecruitmentOffer>> {
   return apiGetList<RecruitmentOffer>("/recruitment/offers/", params);
+}
+
+export function updateOffer(id: string, payload: Partial<RecruitmentOfferPayload>): Promise<RecruitmentOffer> {
+  return apiPatch<RecruitmentOffer, Partial<RecruitmentOfferPayload>>(`/recruitment/offers/${id}/`, payload);
+}
+
+export function submitOfferForApproval(id: string): Promise<RecruitmentOffer> {
+  return apiPost<RecruitmentOffer, Record<string, never>>(`/recruitment/offers/${id}/submit-approval/`, {});
+}
+
+export function approveOffer(id: string, comment = ""): Promise<RecruitmentOffer> {
+  return apiPost<RecruitmentOffer, { comment: string }>(`/recruitment/offers/${id}/approve/`, { comment });
+}
+
+export function returnOffer(id: string, comment: string): Promise<RecruitmentOffer> {
+  return apiPost<RecruitmentOffer, { comment: string }>(`/recruitment/offers/${id}/return/`, { comment });
+}
+
+export function generateOfferLetter(id: string): Promise<RecruitmentOffer> {
+  return apiPost<RecruitmentOffer, Record<string, never>>(`/recruitment/offers/${id}/generate-letter/`, {});
+}
+
+export function recordOfferResponse(id: string, accepted: boolean, note: string): Promise<RecruitmentOffer> {
+  return apiPost<RecruitmentOffer, { note: string }>(`/recruitment/offers/${id}/${accepted ? "accept" : "decline"}/`, { note });
+}
+
+export function getOfferActivity(id: string): Promise<RequisitionHistoryEntry[]> {
+  return apiGet<RequisitionHistoryEntry[]>(`/recruitment/offers/${id}/activity/`);
 }
 
 export function getOffer(id: string): Promise<RecruitmentOffer> {

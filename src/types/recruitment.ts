@@ -223,11 +223,23 @@ export interface ApplicationStageHistory {
 export interface RecruitmentInterview {
   id: string;
   application: string;
+  candidate_id?: string;
+  candidate_name?: string;
+  job_title?: string;
   scheduled_at: string;
   duration_minutes: number;
   interview_type: string;
+  interview_stage?: string;
+  mode?: string;
+  time_zone?: string;
+  agenda?: string;
   location_or_link: string;
   interviewer: string | null;
+  interviewer_name?: string | null;
+  panel_members?: Array<{ id: string; name: string }>;
+  candidate_message?: string;
+  invitation_sent_at?: string | null;
+  invitation_status?: string;
   status: string;
   notes: string;
   created_at: string;
@@ -246,6 +258,33 @@ export interface RecruitmentInterviewPayload {
 export interface RecruitmentOffer {
   id: string;
   application: string;
+  candidate_id?: string;
+  candidate_name?: string;
+  job_posting_id?: string;
+  job_title?: string;
+  job_code?: string;
+  department_name?: string;
+  position_title?: string;
+  grade_name?: string;
+  location_name?: string;
+  reports_to?: string | null;
+  reports_to_title?: string | null;
+  salary_structure_name?: string | null;
+  contract_length_months?: number | null;
+  working_pattern?: string;
+  letter_body?: string;
+  letter_generated_at?: string | null;
+  submitted_by?: string | null;
+  submitted_by_name?: string | null;
+  submitted_at?: string | null;
+  approved_by_name?: string | null;
+  approved_at?: string | null;
+  approval_note?: string;
+  response_note?: string;
+  response_recorded_by_name?: string | null;
+  extended_at?: string | null;
+  accepted_at?: string | null;
+  declined_at?: string | null;
   status: string;
   proposed_start_date: string;
   expires_on: string | null;
@@ -264,7 +303,40 @@ export interface RecruitmentOffer {
   updated_at: string;
 }
 
+export const INTERVIEW_STAGES: Array<[string, string]> = [["SCREENING", "Screening call"], ["FIRST_ROUND", "First round interview"], ["SECOND_ROUND", "Second round interview"], ["TECHNICAL", "Technical assessment"], ["FINAL", "Final interview"]];
+export const INTERVIEW_MODES: Array<[string, string]> = [["VIDEO", "Video call"], ["PHONE", "Phone call"], ["IN_PERSON", "In person"], ["OTHER", "Other"]];
+export const WORKING_PATTERNS: Array<[string, string]> = [["FULL_TIME", "Full-time"], ["PART_TIME", "Part-time"], ["SHIFT", "Shift-based"]];
+
+export interface InterviewSlot {
+  time: string;
+  start: string;
+  state: "available" | "conflict" | "unavailable";
+  reason: string;
+}
+
+export interface InterviewSchedulePayload {
+  application: string;
+  scheduled_at: string;
+  duration_minutes: number;
+  interview_stage: string;
+  mode: string;
+  time_zone: string;
+  location_or_link?: string;
+  agenda?: string;
+  panel: string[];
+  candidate_message?: string;
+  draft?: boolean;
+  send_invitation?: boolean;
+}
+
 export interface RecruitmentOfferPayload {
+  contract_length_months?: number | null;
+  working_pattern?: string;
+  reports_to?: string | null;
+  salary_structure?: string | null;
+  base_salary?: string | null;
+  currency?: string;
+  letter_body?: string;
   application: string;
   proposed_start_date: string;
   employment_type: string;

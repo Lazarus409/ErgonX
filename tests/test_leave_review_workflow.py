@@ -114,6 +114,7 @@ def test_comments_api_and_review_context(api_client, flow):
     body = review.json()["data"]
     assert body["reference"].startswith("LR-")
     assert body["can_decide"] is True
+    assert body["is_requester"] is False
     codes = {check["code"]: check["status"] for check in body["policy_checks"]}
     assert codes["policy"] == "pass"
     assert codes["balance"] in {"pass", "warn"}

@@ -830,6 +830,9 @@ def leave_review_context(*, leave_request, user):
     current = leave_request.approvals.filter(status=LeaveApproval.Status.PENDING).order_by("sequence").first()
     return {
         "reference": leave_request.reference,
+        "is_requester": employee.user_id == user.id,
+        "employee_name": employee.full_name,
+        "employee_number": employee.employee_number,
         "department": employment.department.name if employment and employment.department_id else None,
         "position": employment.position.title if employment and employment.position_id else None,
         "employment_type": employment.employment_type if employment else None,

@@ -816,7 +816,13 @@ class AccountViewSet(TenantModelViewSet):
 
             raise DRFValidationError({"date_from": "Use YYYY-MM-DD dates."})
         posted = (JournalEntry.Status.POSTED, JournalEntry.Status.REVERSED)
-        base = JournalLine.objects.filter(journal_entry__institution=request.institution, account=account)
+        # A header (non-postable) account reports the lines of all its descendants.
+        scope_ids, frontier = {account.id}, [account.id]
+        while frontier:
+            frontier = list(Account.objects.filter(institution=request.institution, parent_id__in=frontier).values_list("id", flat=True))
+            frontier = [value for value in frontier if value not in scope_ids]
+            scope_ids.update(frontier)
+        base = JournalLine.objects.filter(journal_entry__institution=request.institution, account_id__in=scope_ids)
         opening = D("0.00")
         if date_from:
             before = base.filter(journal_entry__status__in=posted, journal_entry__entry_date__lt=date_from).aggregate(debit=Sum("debit"), credit=Sum("credit"))
@@ -868,6 +874,7 @@ class AccountViewSet(TenantModelViewSet):
             "period_debits": money(totals["debit"]),
             "period_credits": money(totals["credit"]),
             "unposted_lines": sum(1 for row in rows if row["running_balance"] is None),
+            "includes_descendants": len(scope_ids) > 1,
             "monthly": monthly,
             "lines": rows,
         })

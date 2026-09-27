@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, Copy, Inbox, MailCheck, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import Alert from "@/components/ui/Alert";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
@@ -12,7 +12,7 @@ import { Field, Input, Select, Textarea } from "@/components/ui/Field";
 import { Dialog } from "@/components/ui/Overlay";
 import { SectionTitle, platformTable } from "@/components/platform/ui";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
-import { authApi, getApiErrorMessage } from "@/lib/api";
+import { authApi, getApiErrorMessage, platformApi } from "@/lib/api";
 import type { CreatedPlatformInstitutionAdminInvitation, InstitutionAccessRequest } from "@/lib/api/auth";
 
 const statusTone: Record<InstitutionAccessRequest["status"], BadgeTone> = {
@@ -58,6 +58,13 @@ export default function AccessRequestsCard({ requests, onChanged }: { requests: 
   const [copied, setCopied] = useState(false);
 
   const pending = useMemo(() => requests.filter((item) => item.status === "PENDING"), [requests]);
+  // null until known: whether approving emails the link or leaves it to copy.
+  const [emailEnabled, setEmailEnabled] = useState<boolean | null>(null);
+  useEffect(() => {
+    let active = true;
+    platformApi.getOverview().then((overview) => { if (active) setEmailEnabled(overview.email_delivery_enabled); }).catch(() => undefined);
+    return () => { active = false; };
+  }, []);
   const rows = filter === "PENDING" ? pending : requests;
 
   const close = () => {
@@ -193,11 +200,12 @@ export default function AccessRequestsCard({ requests, onChanged }: { requests: 
         footer={
           <>
             <Button variant="secondary" onClick={close} disabled={busy}>Cancel</Button>
-            <Button onClick={() => void approve()} loading={busy} loadingLabel="Sending…" data-autofocus>Send invitation</Button>
+            <Button onClick={() => void approve()} loading={busy} loadingLabel={emailEnabled === false ? "Approving…" : "Sending…"} data-autofocus>{emailEnabled === false ? "Approve and get link" : "Send invitation"}</Button>
           </>
         }
       >
         {dialogError && <Alert tone="danger" title="Could not approve" className="mb-4">{dialogError}</Alert>}
+        {emailEnabled === false && <Alert tone="warning" title="Email is not set up on this server" className="mb-4">The invitation will not be emailed. After approving you get the setup link to copy and send to {approving?.email ?? "the requester"} yourself.</Alert>}
         <Field label="Link validity">
           <Select value={hours} onChange={(event) => setHours(event.target.value)}>
             <option value="24">24 hours</option>

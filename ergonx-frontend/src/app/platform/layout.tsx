@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
 import { Building2, History, LogOut, MailPlus, Moon, ShieldAlert, Sun, UserRoundCog, type LucideIcon } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 
@@ -30,7 +31,12 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
   const { isPlatformAdmin, loading, logout, user } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
-  if (loading) return <LoadingState variant="splash" />;
+  // Signed out: the Super Admin entrance is /admin.
+  useEffect(() => {
+    if (!loading && !user) router.replace("/admin");
+  }, [loading, user, router]);
+
+  if (loading || !user) return <LoadingState variant="splash" />;
   if (!isPlatformAdmin) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-brand-navy-deep p-6">
@@ -66,7 +72,7 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
             </button>
             <span className="hidden h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-brand-navy-deep p-2 shadow-md dark:ring-1 dark:ring-line-strong sm:flex" aria-hidden="true"><Logo variant="mark" height={20} alt="" /></span>
             <button type="button" onClick={() => router.push("/platform/profile")} className={cx(headerButton, "hidden md:inline-flex")}><UserRoundCog className="h-4 w-4" />My profile</button>
-            <button type="button" onClick={() => { logout(); router.replace("/login"); }} className={headerButton}><LogOut className="h-4 w-4" /><span className="hidden sm:inline">Sign out</span></button>
+            <button type="button" onClick={() => { logout(); router.replace("/admin"); }} className={headerButton}><LogOut className="h-4 w-4" /><span className="hidden sm:inline">Sign out</span></button>
           </div>
         </header>
 

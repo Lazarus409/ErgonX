@@ -107,6 +107,14 @@ class AttendanceAdjustment(TenantOwnedModel):
         PENDING = "PENDING", "Pending"
         APPROVED = "APPROVED", "Approved"
         REJECTED = "REJECTED", "Rejected"
+        RETURNED = "RETURNED", "Changes requested"
+
+    class AdjustmentType(models.TextChoices):
+        MISSED_CLOCK_IN = "MISSED_CLOCK_IN", "Missed clock-in"
+        MISSED_CLOCK_OUT = "MISSED_CLOCK_OUT", "Missed clock-out"
+        ADD_MISSED_HOURS = "ADD_MISSED_HOURS", "Add missed hours"
+        TIME_CORRECTION = "TIME_CORRECTION", "Time correction"
+        NOTE_ONLY = "NOTE_ONLY", "Note correction"
 
     institution = models.ForeignKey(
         Institution, on_delete=models.CASCADE, related_name="attendance_adjustments"
@@ -133,6 +141,31 @@ class AttendanceAdjustment(TenantOwnedModel):
         related_name="attendance_adjustments_decided",
     )
     acted_at = models.DateTimeField(null=True, blank=True)
+    adjustment_type = models.CharField(
+        max_length=20, choices=AdjustmentType.choices, default=AdjustmentType.TIME_CORRECTION
+    )
+    evidence = models.ForeignKey(
+        "documents.Document",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="attendance_adjustments",
+    )
+    decision_note = models.TextField(blank=True)
+    # Reviewer the adjustment was delegated to (any attendance approver may still decide).
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="attendance_adjustments_assigned",
+    )
+    changes_requested_at = models.DateTimeField(null=True, blank=True)
+    resubmitted_at = models.DateTimeField(null=True, blank=True)
+
+    @property
+    def reference(self):
+        return f"ADJ-{str(self.pk)[:8].upper()}" if self.pk else ""
 
     class Meta:
         ordering = ("-created_at",)
@@ -142,7 +175,9 @@ class AttendanceAdjustment(TenantOwnedModel):
         errors = {}
         if self.attendance_record_id and self.attendance_record.institution_id != self.institution_id:
             errors["attendance_record"] = "Attendance record belongs to another institution."
-        for field_name in ("requested_by", "approved_by"):
+        if self.evidence_id and self.evidence.institution_id != self.institution_id:
+            errors["evidence"] = "Evidence must belong to the same institution."
+        for field_name in ("requested_by", "approved_by", "assigned_to"):
             user = getattr(self, field_name, None)
             if user and self.institution_id and not user.memberships.filter(
                 institution_id=self.institution_id, status="ACTIVE"

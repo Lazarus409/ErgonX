@@ -24,6 +24,10 @@ class EmployeeSerializer(ValidatedModelSerializer):
             "personal_email",
             "work_email",
             "phone",
+            "preferred_name",
+            "mobile_phone",
+            "office_location",
+            "linkedin_url",
             "avatar_key",
             "date_of_birth",
             "gender",
@@ -43,7 +47,7 @@ class EmployeeSerializer(ValidatedModelSerializer):
                 memberships__institution=institution
             ).distinct()
 
-    PERSONAL_FIELDS = ("personal_email", "date_of_birth")
+    PERSONAL_FIELDS = ("personal_email", "date_of_birth", "mobile_phone")
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -80,6 +84,15 @@ class EmploymentSerializer(ValidatedModelSerializer):
             "end_date",
             "status",
             "is_current",
+            "working_pattern",
+            "work_arrangement",
+            "office_days",
+            "time_zone",
+            "team",
+            "cost_centre",
+            "probation_status",
+            "probation_end_date",
+            "notice_period_weeks",
             "created_at",
             "updated_at",
         )
@@ -219,5 +232,5 @@ class SelfServiceProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Employee
-        fields = ("id", "employee_number", "first_name", "middle_name", "last_name", "full_name", "personal_email", "work_email", "phone", "avatar_key", "date_of_birth", "gender", "hire_date", "status")
+        fields = ("id", "employee_number", "first_name", "middle_name", "last_name", "full_name", "preferred_name", "personal_email", "work_email", "phone", "mobile_phone", "linkedin_url", "avatar_key", "date_of_birth", "gender", "hire_date", "status")
         read_only_fields = ("id", "employee_number", "first_name", "middle_name", "last_name", "full_name", "work_email", "hire_date", "status")

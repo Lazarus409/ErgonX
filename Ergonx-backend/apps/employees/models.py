@@ -42,6 +42,10 @@ class Employee(AutoCodeMixin, TenantOwnedModel):
     personal_email = models.EmailField(blank=True)
     work_email = models.EmailField(blank=True)
     phone = models.CharField(max_length=30, blank=True)
+    preferred_name = models.CharField(max_length=100, blank=True)
+    mobile_phone = models.CharField(max_length=30, blank=True)
+    office_location = models.CharField(max_length=200, blank=True)
+    linkedin_url = models.URLField(max_length=300, blank=True)
     avatar_key = models.CharField(max_length=40, blank=True, default="")
     date_of_birth = models.DateField(null=True, blank=True)
     gender = models.CharField(
@@ -107,6 +111,24 @@ class Employment(TenantOwnedModel):
         ENDED = "ENDED", "Ended"
         SUSPENDED = "SUSPENDED", "Suspended"
 
+    class WorkingPattern(models.TextChoices):
+        FULL_TIME = "FULL_TIME", "Full-time"
+        PART_TIME = "PART_TIME", "Part-time"
+        SHIFT = "SHIFT", "Shift-based"
+
+    class WorkArrangement(models.TextChoices):
+        ON_SITE = "ON_SITE", "On-site"
+        HYBRID = "HYBRID", "Hybrid"
+        REMOTE = "REMOTE", "Remote"
+
+    class ProbationStatus(models.TextChoices):
+        NOT_APPLICABLE = "NOT_APPLICABLE", "Not applicable"
+        IN_PROGRESS = "IN_PROGRESS", "In progress"
+        EXTENDED = "EXTENDED", "Extended"
+        COMPLETED = "COMPLETED", "Completed"
+
+    WEEKDAYS = ("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
+
     institution = models.ForeignKey(
         Institution, on_delete=models.CASCADE, related_name="employments"
     )
@@ -144,6 +166,21 @@ class Employment(TenantOwnedModel):
     end_date = models.DateField(null=True, blank=True)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.ACTIVE)
     is_current = models.BooleanField(default=True)
+    working_pattern = models.CharField(
+        max_length=12, choices=WorkingPattern.choices, default=WorkingPattern.FULL_TIME
+    )
+    work_arrangement = models.CharField(
+        max_length=10, choices=WorkArrangement.choices, default=WorkArrangement.ON_SITE
+    )
+    office_days = models.JSONField(default=list, blank=True)
+    time_zone = models.CharField(max_length=64, blank=True)
+    team = models.CharField(max_length=120, blank=True)
+    cost_centre = models.CharField(max_length=40, blank=True)
+    probation_status = models.CharField(
+        max_length=16, choices=ProbationStatus.choices, default=ProbationStatus.NOT_APPLICABLE
+    )
+    probation_end_date = models.DateField(null=True, blank=True)
+    notice_period_weeks = models.PositiveSmallIntegerField(null=True, blank=True)
 
     class Meta:
         ordering = ("-start_date", "-created_at")
@@ -188,6 +225,16 @@ class Employment(TenantOwnedModel):
             errors["end_date"] = "A current employment cannot have an end date."
         if self.is_current and self.status == self.Status.ENDED:
             errors["status"] = "An ended employment cannot be current."
+        if not isinstance(self.office_days, list) or any(day not in self.WEEKDAYS for day in self.office_days):
+            errors["office_days"] = "Office days must be a list of weekday codes (MON to SUN)."
+        elif len(set(self.office_days)) != len(self.office_days):
+            errors["office_days"] = "Office days cannot repeat."
+        if self.probation_end_date and self.probation_end_date < self.start_date:
+            errors["probation_end_date"] = "Probation cannot end before employment starts."
+        if self.time_zone:
+            from zoneinfo import available_timezones
+            if self.time_zone not in available_timezones():
+                errors["time_zone"] = "Use an IANA time zone such as Africa/Accra."
         if errors:
             raise ValidationError(errors)
 

@@ -9,7 +9,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
 from apps.accounting.models import Account, BankAccount, BankStatementLine, Expense, Invoice, JournalEntry, JournalLine, VendorBill
-from apps.attendance.models import AttendanceRecord
+from apps.attendance.models import AttendanceAdjustment, AttendanceRecord
 from apps.employees.models import Employee, Employment
 from apps.leave.models import LeaveBalance, LeaveRequest
 from apps.payroll.models import PayrollRecord, PayrollRun
@@ -337,8 +337,14 @@ class DashboardViewSet(ViewSet):
             + (balance_totals["adjusted"] or Decimal("0"))
         )
         used_days = balance_totals["used"] or Decimal("0")
+        # "Last N months" selector: 3, 6 or 12 months including the current one.
+        try:
+            span = int(request.query_params.get("months", 6))
+        except (TypeError, ValueError):
+            span = 6
+        span = span if span in (3, 6, 12) else 6
         first_month = today.replace(day=1)
-        for _ in range(5):
+        for _ in range(span - 1):
             first_month = (first_month - timedelta(days=1)).replace(day=1)
         month_rollups = {
             item["month"].date() if hasattr(item["month"], "date") else item["month"]: item
@@ -350,7 +356,7 @@ class DashboardViewSet(ViewSet):
         }
         months = []
         month = first_month
-        for _ in range(6):
+        for _ in range(span):
             item = month_rollups.get(month, {})
             months.append({
                 "month": month.isoformat(),
@@ -371,8 +377,64 @@ class DashboardViewSet(ViewSet):
         for offset in range(28):
             day = today + timedelta(days=offset)
             leave_calendar.append({"date": day.isoformat(), "on_leave": sum(1 for start, end in upcoming_spans if start <= day <= end)})
+        # Range KPIs.
+        submitted = records.exclude(status=LeaveRequest.Status.DRAFT).filter(start_date__gte=first_month, start_date__lte=today)
+        in_range = approved.filter(end_date__gte=first_month, start_date__lte=today)
+        absence_days = Decimal("0")
+        for start, end, days in in_range.values_list("start_date", "end_date", "requested_days"):
+            total_span = (end - start).days + 1
+            overlap = (min(end, today) - max(start, first_month)).days + 1
+            absence_days += (days or Decimal("0")) * Decimal(overlap) / Decimal(total_span)
+        active_headcount = Employee.objects.filter(institution=institution, status=Employee.Status.ACTIVE).count()
+        working_days = sum(
+            1 for offset in range((today - first_month).days + 1) if (first_month + timedelta(days=offset)).weekday() < 5
+        )
+        absence_rate = (
+            (absence_days / (Decimal(active_headcount) * Decimal(working_days)) * Decimal("100")).quantize(Decimal("0.01"))
+            if active_headcount and working_days
+            else None
+        )
+
+        # Policy compliance & alerts.
+        from apps.leave.services import matching_policy
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        breaches = []
+        for item in records.filter(status__in=(LeaveRequest.Status.PENDING, LeaveRequest.Status.APPROVED), start_date__gte=first_month).select_related("employee", "leave_type"):
+            try:
+                policy = matching_policy(item)
+            except DjangoValidationError:
+                breaches.append({"id": str(item.id), "employee": item.employee.full_name, "issue": "No applicable leave policy"})
+                continue
+            if policy.max_consecutive_days is not None and item.requested_days > policy.max_consecutive_days:
+                breaches.append({"id": str(item.id), "employee": item.employee.full_name, "issue": "Exceeds maximum consecutive days"})
+            elif (item.leave_type.requires_attachment or policy.requires_document) and not item.attachment_id:
+                breaches.append({"id": str(item.id), "employee": item.employee.full_name, "issue": "Missing required document"})
+        with_balances = LeaveBalance.objects.filter(institution=institution, year=today.year).values("employee_id")
+        incomplete = Employee.objects.filter(institution=institution, status=Employee.Status.ACTIVE).exclude(id__in=with_balances)
+        long_absences = approved.filter(start_date__gt=today, start_date__lte=today + timedelta(days=30), requested_days__gte=5).select_related("employee", "leave_type").order_by("start_date")
+
         return Response({
             "currency": institution.default_currency,
+            "range_months": span,
+            "range_start": first_month.isoformat(),
+            "total_requests": submitted.count(),
+            "approved_requests": submitted.filter(status=LeaveRequest.Status.APPROVED).count(),
+            "average_absence_rate": absence_rate,
+            "compliance": {
+                "policy_breaches": {"count": len(breaches), "items": breaches[:10]},
+                "incomplete_leave_records": {
+                    "count": incomplete.count(),
+                    "items": [{"id": str(emp.id), "employee": emp.full_name, "issue": f"No {today.year} leave balance"} for emp in incomplete.order_by("last_name")[:10]],
+                },
+                "upcoming_long_absences": {
+                    "count": long_absences.count(),
+                    "items": [
+                        {"id": str(item.id), "employee": item.employee.full_name, "issue": f"{item.leave_type.name}: {item.requested_days} day(s) from {item.start_date.isoformat()}"}
+                        for item in long_absences[:10]
+                    ],
+                },
+            },
             "pending": records.filter(status=LeaveRequest.Status.PENDING).count(),
             "currently_on_leave": approved.filter(start_date__lte=today, end_date__gte=today).count(),
             "upcoming": approved.filter(start_date__gt=today).count(),
@@ -463,7 +525,104 @@ class DashboardViewSet(ViewSet):
             .annotate(late_occurrences=Count("id"), total_minutes_late=Sum("late_minutes"))
             .order_by("-late_occurrences", "employee__employments__department__name")
         )
+        # Concept "HR Attendance": Last N months range, rates, exceptions and adjustments.
+        try:
+            span = int(request.query_params.get("months", 12))
+        except (TypeError, ValueError):
+            span = 12
+        span = span if span in (3, 6, 12) else 12
+        range_start = today.replace(day=1)
+        for _ in range(span - 1):
+            range_start = (range_start - timedelta(days=1)).replace(day=1)
+        in_range = AttendanceRecord.objects.filter(institution=institution, attendance_date__range=(range_start, today))
+        attended_statuses = (AttendanceRecord.Status.PRESENT, AttendanceRecord.Status.LATE, AttendanceRecord.Status.REMOTE)
+        counted = in_range.filter(status__in=(*attended_statuses, AttendanceRecord.Status.ABSENT))
+
+        def rate(queryset):
+            totals = queryset.aggregate(
+                attended=Count("id", filter=Q(status__in=attended_statuses)),
+                total=Count("id"),
+            )
+            return round(totals["attended"] / totals["total"] * 100, 1) if totals["total"] else None
+
+        trend = []
+        month = range_start
+        for _ in range(span):
+            month_end = (month + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+            trend.append({"month": month.isoformat(), "attendance_rate": rate(counted.filter(attendance_date__range=(month, month_end)))})
+            month = month_end + timedelta(days=1)
+
+        department_rates = [
+            {
+                "department": row["employee__employments__department__name"] or "Unassigned",
+                "attendance_rate": round(row["attended"] / row["total"] * 100, 1) if row["total"] else None,
+                "records": row["total"],
+            }
+            for row in counted.filter(employee__employments__is_current=True)
+            .values("employee__employments__department__name")
+            .annotate(attended=Count("id", filter=Q(status__in=attended_statuses)), total=Count("id"))
+            .order_by("employee__employments__department__name")
+        ]
+
+        missing = in_range.filter(check_in__isnull=False, check_out__isnull=True, attendance_date__lt=today)
+        pending_by_record = set(
+            AttendanceAdjustment.objects.filter(institution=institution, status=AttendanceAdjustment.Status.PENDING)
+            .values_list("attendance_record_id", flat=True)
+        )
+        exceptions = []
+        for record in (
+            in_range.filter(
+                Q(check_in__isnull=False, check_out__isnull=True, attendance_date__lt=today)
+                | Q(status=AttendanceRecord.Status.ABSENT)
+                | Q(late_minutes__gte=30)
+            )
+            .select_related("employee")
+            .order_by("-attendance_date")[:10]
+        ):
+            if record.check_in and not record.check_out and record.attendance_date < today:
+                issue = "Missing clock-out"
+            elif record.status == AttendanceRecord.Status.ABSENT:
+                issue = "Absent"
+            else:
+                issue = f"Late by {record.late_minutes} min"
+            exceptions.append({
+                "record_id": str(record.id),
+                "employee_id": str(record.employee_id),
+                "employee": record.employee.full_name,
+                "issue": issue,
+                "date": record.attendance_date.isoformat(),
+                "status": "ADJUSTMENT_PENDING" if record.id in pending_by_record else "OPEN",
+            })
+
+        recent_adjustments = [
+            {
+                "id": str(item.id),
+                "employee": item.attendance_record.employee.full_name,
+                "adjustment_type": item.get_adjustment_type_display(),
+                "adjusted_by": (item.approved_by or item.requested_by).get_full_name() or (item.approved_by or item.requested_by).email,
+                "date": (item.acted_at or item.created_at).date().isoformat(),
+                "status": item.status,
+            }
+            for item in AttendanceAdjustment.objects.filter(institution=institution)
+            .select_related("attendance_record__employee", "approved_by", "requested_by")
+            .order_by("-updated_at")[:8]
+        ]
+        concept = {
+            "range_months": span,
+            "range_start": range_start.isoformat(),
+            "attendance_rate": rate(counted),
+            "late_arrivals": in_range.filter(status=AttendanceRecord.Status.LATE).count(),
+            "missing_punches": missing.count(),
+            "pending_adjustments": AttendanceAdjustment.objects.filter(
+                institution=institution, status=AttendanceAdjustment.Status.PENDING
+            ).count(),
+            "attendance_trend": trend,
+            "department_rates": department_rates,
+            "priority_exceptions": exceptions,
+            "recent_adjustments": recent_adjustments,
+        }
         return Response({
+            **concept,
             "present": records.filter(status=AttendanceRecord.Status.PRESENT).count(),
             "late": records.filter(status=AttendanceRecord.Status.LATE).count(),
             "absent": records.filter(status=AttendanceRecord.Status.ABSENT).count(),

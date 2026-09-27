@@ -2,13 +2,14 @@ from rest_framework import serializers
 
 from apps.employees.models import Employee, Employment
 from apps.leave.models import (
+    LeaveRequestComment,
     LeaveApproval,
     LeaveBalance,
     LeavePolicy,
     LeaveRequest,
     LeaveType,
 )
-from apps.leave.services import configure_policy, create_leave_request
+from apps.leave.services import configure_policy, create_leave_request, update_leave_request
 from apps.organization.models import Department, Grade, Location
 from common.serializers import ValidatedModelSerializer, call_validated_service
 
@@ -151,10 +152,13 @@ class LeaveBalanceSerializer(ValidatedModelSerializer):
 
 
 class LeaveRequestSerializer(ValidatedModelSerializer):
+    reference = serializers.CharField(read_only=True)
+
     class Meta:
         model = LeaveRequest
         fields = (
             "id",
+            "reference",
             "employee",
             "leave_type",
             "start_date",
@@ -165,6 +169,8 @@ class LeaveRequestSerializer(ValidatedModelSerializer):
             "status",
             "submitted_at",
             "cancelled_at",
+            "changes_requested_at",
+            "changes_requested_note",
             "created_at",
             "updated_at",
         )
@@ -173,6 +179,8 @@ class LeaveRequestSerializer(ValidatedModelSerializer):
             "status",
             "submitted_at",
             "cancelled_at",
+            "changes_requested_at",
+            "changes_requested_note",
             "created_at",
             "updated_at",
         )
@@ -206,14 +214,30 @@ class LeaveRequestSerializer(ValidatedModelSerializer):
             **validated_data,
         )
 
+    def update(self, instance, validated_data):
+        validated_data.pop("employee", None)
+        return call_validated_service(
+            update_leave_request,
+            leave_request=instance,
+            actor=self.context["request"].user,
+            **validated_data,
+        )
+
 
 class LeaveApprovalSerializer(serializers.ModelSerializer):
+    approver_name = serializers.SerializerMethodField()
+
+    def get_approver_name(self, obj):
+        return obj.approver.get_full_name() or obj.approver.email
+
     class Meta:
         model = LeaveApproval
         fields = (
             "id",
             "leave_request",
             "approver",
+            "approver_name",
+            "delegated_from",
             "sequence",
             "status",
             "comment",
@@ -237,3 +261,24 @@ class AccrualSerializer(serializers.Serializer):
 
 class CarryForwardSerializer(serializers.Serializer):
     target_year = serializers.IntegerField(required=False, min_value=1, max_value=9999)
+
+
+class LeaveRequestCommentSerializer(serializers.ModelSerializer):
+    author_name = serializers.SerializerMethodField()
+
+    def get_author_name(self, obj):
+        return obj.author.get_full_name() or obj.author.email
+
+    class Meta:
+        model = LeaveRequestComment
+        fields = ("id", "leave_request", "author", "author_name", "body", "created_at")
+        read_only_fields = fields
+
+
+class LeaveCommentCreateSerializer(serializers.Serializer):
+    body = serializers.CharField(max_length=2000, trim_whitespace=True)
+
+
+class LeaveDelegateSerializer(serializers.Serializer):
+    delegate = serializers.UUIDField()
+    comment = serializers.CharField(required=False, allow_blank=True, max_length=2000)

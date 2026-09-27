@@ -11,6 +11,9 @@ from apps.leave.serializers import (
     CarryForwardSerializer,
     LeaveApprovalSerializer,
     LeaveBalanceSerializer,
+    LeaveCommentCreateSerializer,
+    LeaveDelegateSerializer,
+    LeaveRequestCommentSerializer,
     LeavePolicySerializer,
     LeaveRequestSerializer,
     LeaveTypeSerializer,
@@ -19,8 +22,12 @@ from apps.leave.services import (
     approve_leave_request,
     accrue_leave_balance,
     carry_forward_leave_balance,
+    add_leave_comment,
     cancel_leave_request,
+    delegate_leave_approval,
+    leave_review_context,
     reject_leave_request,
+    request_leave_changes,
     submit_leave_request,
 )
 from common.scoping import LEAVE_BROAD, scope_to_employees, sees_everyone
@@ -99,7 +106,7 @@ class LeaveRequestViewSet(TenantModelViewSet):
     model = LeaveRequest
     serializer_class = LeaveRequestSerializer
     required_module = "LEAVE"
-    http_method_names = ("get", "post", "head", "options")
+    http_method_names = ("get", "post", "patch", "head", "options")
     filterset_fields = ("employee", "leave_type", "status", "start_date", "end_date")
     search_fields = ("employee__employee_number", "employee__first_name", "employee__last_name")
     ordering_fields = ("start_date", "end_date", "created_at", "updated_at")
@@ -111,6 +118,10 @@ class LeaveRequestViewSet(TenantModelViewSet):
             "cancel": "leave.request",
             "approve": "leave.approve",
             "reject": "leave.reject",
+            "partial_update": "leave.request",
+            "request_changes": "leave.approve",
+            "delegate": "leave.approve",
+            "delegates": "leave.approve",
         }.get(self.action, "leave.view")
 
     def get_queryset(self):
@@ -175,6 +186,68 @@ class LeaveRequestViewSet(TenantModelViewSet):
     @action(detail=True, methods=("post",))
     def reject(self, request, pk=None):
         return self._decision(request, reject_leave_request)
+
+    @action(detail=True, methods=("post",), url_path="request-changes")
+    def request_changes(self, request, pk=None):
+        return self._decision(request, request_leave_changes)
+
+    @action(detail=True, methods=("post",))
+    def delegate(self, request, pk=None):
+        payload = LeaveDelegateSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        from django.contrib.auth import get_user_model
+
+        delegate_user = get_user_model().objects.filter(pk=payload.validated_data["delegate"]).first()
+        instance = call_validated_service(
+            delegate_leave_approval,
+            leave_request=self.get_object(),
+            actor=request.user,
+            delegate=delegate_user,
+            comment=payload.validated_data.get("comment", ""),
+        )
+        return Response(self.get_serializer(instance).data)
+
+    @action(detail=True, methods=("get",))
+    def delegates(self, request, pk=None):
+        """Active members who may take over the current approval step."""
+        from apps.institutions.models import InstitutionMembership
+
+        leave_request = self.get_object()
+        current = leave_request.approvals.filter(status=LeaveApproval.Status.PENDING).order_by("sequence").first()
+        members = (
+            InstitutionMembership.objects.filter(
+                institution=request.institution,
+                status=InstitutionMembership.Status.ACTIVE,
+                role__permissions__code="leave.approve",
+            )
+            .exclude(user_id=leave_request.employee.user_id)
+            .select_related("user", "role")
+            .distinct()
+            .order_by("user__first_name", "user__last_name")
+        )
+        if current:
+            members = members.exclude(user_id=current.approver_id)
+        return Response([
+            {"id": str(item.user_id), "name": item.user.get_full_name() or item.user.email, "role": item.role.name}
+            for item in members
+        ])
+
+    @action(detail=True, methods=("get", "post"))
+    def comments(self, request, pk=None):
+        leave_request = self.get_object()
+        if request.method == "POST":
+            payload = LeaveCommentCreateSerializer(data=request.data)
+            payload.is_valid(raise_exception=True)
+            comment = call_validated_service(
+                add_leave_comment, leave_request=leave_request, actor=request.user, body=payload.validated_data["body"]
+            )
+            return Response(LeaveRequestCommentSerializer(comment).data, status=201)
+        comments = leave_request.comments.select_related("author").order_by("created_at")
+        return Response(LeaveRequestCommentSerializer(comments, many=True).data)
+
+    @action(detail=True, methods=("get",))
+    def review(self, request, pk=None):
+        return Response(leave_review_context(leave_request=self.get_object(), user=request.user))
 
 
 class LeaveApprovalViewSet(TenantModelViewSet):

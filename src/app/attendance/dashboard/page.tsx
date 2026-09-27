@@ -218,7 +218,7 @@ export default function AttendanceDashboardPage() {
           minWidth={620}
           toolbar={
             <div>
-              <h2 className="text-card-title font-semibold text-ink-strong">Repeated lateness</h2>
+              <h2 className="text-card-title font-bold text-ink-strong">Repeated lateness</h2>
               <p className="text-support text-ink-muted">Employees with repeated late arrivals in the last 90 days.</p>
             </div>
           }

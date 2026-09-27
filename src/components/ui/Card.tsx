@@ -56,14 +56,15 @@ export function Card({ title, description, actions, icon, accent, accentLine, ch
   );
 }
 
-export function CardHeader({ title, description, actions, icon: Icon, accent = "brand", className }: { title?: ReactNode; description?: ReactNode; actions?: ReactNode; icon?: LucideIcon; accent?: ModuleAccent; className?: string }) {
+export function CardHeader({ title, description, actions, icon: Icon, className }: { title?: ReactNode; description?: ReactNode; actions?: ReactNode; icon?: LucideIcon; accent?: ModuleAccent; className?: string }) {
+  // Concept card header: plain navy section icon, bold navy title, blue supporting line.
   return (
     <div className={cx("mb-4 flex items-start justify-between gap-4", className)}>
       <div className="flex min-w-0 items-start gap-3">
-        {Icon && <IconTile icon={Icon} accent={accent} size="sm" />}
+        {Icon && <Icon className="mt-0.5 h-6 w-6 shrink-0 text-ink-strong" strokeWidth={1.9} aria-hidden="true" />}
         <div className="min-w-0">
-          {title && <h2 className="text-card-title font-semibold text-ink-strong">{title}</h2>}
-          {description && <p className="mt-0.5 text-support text-ink-muted">{description}</p>}
+          {title && <h2 className="text-card-title font-bold text-ink-strong">{title}</h2>}
+          {description && <p className="mt-0.5 text-support text-heading-support">{description}</p>}
         </div>
       </div>
       {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
@@ -103,20 +104,27 @@ export interface MetricCardProps {
 export function MetricCard({ label, value, description, icon, accent = "brand", trend, loading, href, size = "md", footer, chart, className }: MetricCardProps) {
   const good = trend ? (trend.direction === "flat" ? null : (trend.direction === "up") === (trend.positiveIsGood ?? true)) : null;
   const TrendIcon = trend?.direction === "up" ? ArrowUpRight : trend?.direction === "down" ? ArrowDownRight : Minus;
+  const Icon = icon;
+  // Concept KPI tile: soft circular icon on the left, bold label, large value.
   const body = (
     <>
-      <span aria-hidden="true" className={cx("pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full opacity-50 blur-2xl", moduleAccents[accent].soft)} />
-      <div className="relative flex items-start justify-between gap-3">
-        <p className="text-support font-medium text-ink-muted">{label}</p>
-        {icon && <IconTile icon={icon} accent={accent} size="sm" />}
-      </div>
-      <div className="relative mt-3">
-        {loading ? (
-          <span className="skeleton block h-8 w-28 rounded-lg" aria-label="Loading" />
-        ) : (
-          <p className={cx("font-semibold tracking-tight text-ink-strong tabular-nums", size === "md" ? "text-kpi" : "text-kpi-sm")}>{value}</p>
+      <div className="relative flex items-start gap-4">
+        {Icon && (
+          <span className={cx("inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full", moduleAccents[accent].tile)} aria-hidden="true">
+            <Icon className="h-6 w-6" />
+          </span>
         )}
-        {description && <p className="mt-1 text-support text-ink-muted">{description}</p>}
+        <div className="min-w-0 flex-1">
+          <p className="text-[0.9375rem] font-bold leading-5 text-ink-strong">{label}</p>
+          <div className="mt-2">
+            {loading ? (
+              <span className="skeleton block h-8 w-28 rounded-lg" aria-label="Loading" />
+            ) : (
+              <p className={cx("font-bold tracking-tight text-ink-strong tabular-nums", size === "md" ? "text-kpi" : "text-kpi-sm")}>{value}</p>
+            )}
+            {description && <p className="mt-1 text-support text-ink-muted">{description}</p>}
+          </div>
+        </div>
       </div>
       {chart && !loading && <div className="relative -mx-1 mt-3">{chart}</div>}
       {trend && !loading && (
@@ -143,7 +151,7 @@ export function InsightCard({ title, children, icon: Icon, accent = "brand", cla
       <div className="flex items-start gap-3">
         {Icon && <span className={cx("mt-0.5 inline-flex", moduleAccents[accent].text)}><Icon className="h-5 w-5" aria-hidden="true" /></span>}
         <div className="min-w-0">
-          <h3 className="text-card-title font-semibold text-ink-strong">{title}</h3>
+          <h3 className="text-card-title font-bold text-ink-strong">{title}</h3>
           <div className="mt-1 text-support text-ink">{children}</div>
         </div>
       </div>
@@ -159,7 +167,7 @@ export function ActionCard({ href, title, description, icon, accent = "brand", c
         {icon ? <IconTile icon={icon} accent={accent} /> : <span />}
         <ArrowRight className="h-5 w-5 text-ink-subtle transition-transform duration-200 group-hover:translate-x-1 group-hover:text-ink-strong" aria-hidden="true" />
       </div>
-      <h3 className="mt-4 text-card-title font-semibold text-ink-strong">{title}</h3>
+      <h3 className="mt-4 text-card-title font-bold text-ink-strong">{title}</h3>
       {description && <p className="mt-1 text-support text-ink-muted">{description}</p>}
       <span className={cx("mt-auto pt-4 text-support font-semibold", moduleAccents[accent].text)}>{cta}</span>
     </Link>
@@ -225,12 +233,12 @@ export function SummaryCard({ title, description, items, icon, accent, actions, 
   );
 }
 
-export function Avatar({ name, src, size = "md", className }: { name: string; src?: string | null; size?: "sm" | "md" | "lg"; className?: string }) {
+export function Avatar({ name, src, size = "md", solid = false, className }: { name: string; src?: string | null; size?: "sm" | "md" | "lg"; /** Solid brand-blue initials disc (top bar identity). */ solid?: boolean; className?: string }) {
   const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "?";
   const dims = { sm: "h-8 w-8 text-caption", md: "h-10 w-10 text-support", lg: "h-14 w-14 text-body" }[size];
   // Deterministic hue from the name keeps avatars stable between renders.
   const palette = ["bg-mod-hr-soft text-mod-hr", "bg-mod-leave-soft text-mod-leave", "bg-mod-recruitment-soft text-mod-recruitment", "bg-mod-attendance-soft text-mod-attendance", "bg-mod-payroll-soft text-mod-payroll", "bg-mod-accounting-soft text-mod-accounting"];
-  const tone = palette[[...name].reduce((sum, char) => sum + char.charCodeAt(0), 0) % palette.length];
+  const tone = solid ? "bg-primary text-white" : palette[[...name].reduce((sum, char) => sum + char.charCodeAt(0), 0) % palette.length];
   return (
     <span className={cx("inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full font-semibold", dims, !src && tone, className)} aria-hidden="true">
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -258,8 +266,8 @@ export function SectionHeading({ title, description, actions, className }: { tit
   return (
     <div className={cx("flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between", className)}>
       <div>
-        <h2 className="text-heading font-semibold text-ink-strong">{title}</h2>
-        {description && <p className="mt-0.5 text-support text-ink-muted">{description}</p>}
+        <h2 className="text-heading font-bold text-ink-strong">{title}</h2>
+        {description && <p className="mt-0.5 text-support text-heading-support">{description}</p>}
       </div>
       {actions && <div className="flex items-center gap-2">{actions}</div>}
     </div>

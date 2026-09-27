@@ -5,7 +5,7 @@ import { BarChart3, type LucideIcon } from "lucide-react";
 
 import { ChartSkeleton } from "@/components/ui/Skeleton";
 import { cx } from "@/lib/cx";
-import { moduleAccents, type ModuleAccent } from "@/lib/moduleTheme";
+import type { ModuleAccent } from "@/lib/moduleTheme";
 import { formatValue, type ValueFormat } from "@/components/charts/format";
 
 /* -------------------------------------------------------------------------- */
@@ -86,9 +86,9 @@ export function ChartTooltip({ active, payload, label, format = "number", curren
 
 export function EmptyChartState({ title = "No data yet", description, height = 220, icon: Icon = BarChart3 }: { title?: string; description?: ReactNode; height?: number; icon?: LucideIcon }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-line bg-surface-muted/40 px-6 text-center" style={{ minHeight: height }}>
-      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface text-ink-subtle shadow-elevation-1" aria-hidden="true"><Icon className="h-5 w-5" /></span>
-      <p className="mt-3 text-sm font-semibold text-ink-strong">{title}</p>
+    <div className="flex flex-col items-center justify-center px-6 text-center" style={{ minHeight: height }}>
+      <span className="flex h-20 w-20 items-center justify-center rounded-full bg-primary-soft text-primary-ink ring-8 ring-primary-soft/40" aria-hidden="true"><Icon className="h-8 w-8" /></span>
+      <p className="mt-5 text-[0.9375rem] font-bold text-ink-strong">{title}</p>
       {description && <p className="mt-1 max-w-xs text-caption text-ink-muted">{description}</p>}
     </div>
   );
@@ -130,16 +130,15 @@ export interface ChartCardProps {
  * The single frame every visualization lives in: heading, legend, loading /
  * empty / error states and an accessible description plus data table.
  */
-export default function ChartCard({ title, description, summary, data, actions, legend, loading, error, empty, emptyTitle, emptyDescription, height = 240, accent, icon: Icon, footer, className, children }: ChartCardProps) {
+export default function ChartCard({ title, description, summary, data, actions, legend, loading, error, empty, emptyTitle, emptyDescription, height = 240, icon: Icon, footer, className, children }: ChartCardProps) {
   return (
     <figure className={cx("relative m-0 flex min-w-0 flex-col overflow-hidden rounded-2xl border border-line bg-surface p-5 shadow-elevation-1", className)} aria-label={title}>
-      {accent && <span aria-hidden="true" className={cx("absolute inset-x-0 top-0 h-[3px]", moduleAccents[accent].solid)} />}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
-          {Icon && accent && <span className={cx("flex h-9 w-9 shrink-0 items-center justify-center rounded-lg", moduleAccents[accent].tile)} aria-hidden="true"><Icon className="h-[18px] w-[18px]" /></span>}
+          {Icon && <Icon className="mt-0.5 h-6 w-6 shrink-0 text-ink-strong" strokeWidth={1.9} aria-hidden="true" />}
           <div className="min-w-0">
-            <figcaption className="text-card-title font-semibold text-ink-strong">{title}</figcaption>
-            {description && <p className="mt-0.5 text-support text-ink-muted">{description}</p>}
+            <figcaption className="text-card-title font-bold text-ink-strong">{title}</figcaption>
+            {description && <p className="mt-0.5 text-support text-heading-support">{description}</p>}
           </div>
         </div>
         {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}

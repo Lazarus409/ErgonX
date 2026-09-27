@@ -239,7 +239,7 @@ export default function WorkspaceHome({ areaLabel, continueHref, continueTitle, 
             <div className="relative flex items-start gap-3">
               <IconTile icon={UserRound} accent="brand" />
               <div>
-                <h2 className="text-card-title font-semibold text-ink-strong">Your personal workspace</h2>
+                <h2 className="text-card-title font-bold text-ink-strong">Your personal workspace</h2>
                 <p className="mt-0.5 text-support text-ink-muted">Your attendance, leave balances, payslips and documents in one place.</p>
               </div>
             </div>

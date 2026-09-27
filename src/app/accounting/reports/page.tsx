@@ -85,7 +85,7 @@ function ReportFilters({ dateFrom, dateTo, setDateFrom, setDateTo, apply, report
   return (
     <section className="flex flex-col gap-4 rounded-2xl border border-line bg-surface p-5 shadow-elevation-1 lg:flex-row lg:items-end lg:justify-between" aria-label="Report filters">
       <div>
-        <p className="text-card-title font-semibold text-ink-strong">Report filters</p>
+        <p className="text-card-title font-bold text-ink-strong">Report filters</p>
         <p className="mt-0.5 text-support text-ink-muted">{report === "balance" ? "Balance Sheet uses the end date as its as-of date." : "Choose a period for posted ledger activity."}{currency && ` Reporting currency: ${currency}.`}</p>
       </div>
       <div className="flex flex-wrap items-end gap-3">

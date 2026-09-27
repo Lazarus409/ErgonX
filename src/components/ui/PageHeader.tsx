@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 
 import { IconTile } from "@/components/ui/Card";
 import { cx } from "@/lib/cx";
-import { moduleAccents, moduleLabelForPath, accentForPath, type ModuleAccent } from "@/lib/moduleTheme";
+import { moduleAccents, accentForPath, type ModuleAccent } from "@/lib/moduleTheme";
 
 export interface Breadcrumb {
   label: string;
@@ -33,9 +33,11 @@ export default function PageHeader({ title, description, actions, eyebrow, bread
   const pathname = usePathname() ?? "/";
   // Pages that do not declare module context inherit it from their route.
   const resolvedAccent = accent ?? accentForPath(pathname);
-  const resolvedEyebrow = eyebrow ?? moduleLabelForPath(pathname);
+  // The top bar already carries the route breadcrumb, so the module eyebrow
+  // only renders when a page asks for one explicitly.
+  const resolvedEyebrow = eyebrow;
   return (
-    <header className={cx("flex flex-col gap-4 pb-1 sm:flex-row sm:items-end sm:justify-between", className)}>
+    <header className={cx("flex flex-col gap-4 pb-2 sm:flex-row sm:items-start sm:justify-between", className)}>
       <div className="min-w-0">
         {back && <div className="mb-3">{back}</div>}
         {breadcrumbs && breadcrumbs.length > 0 && (
@@ -59,13 +61,13 @@ export default function PageHeader({ title, description, actions, eyebrow, bread
                 {resolvedEyebrow}
               </p>
             )}
-            <h1 className="text-balance text-title font-semibold tracking-tight text-ink-strong">{title}</h1>
-            {description && <p className="mt-1.5 max-w-2xl text-body text-ink-muted">{description}</p>}
+            <h1 className="text-balance text-[1.75rem] font-bold leading-9 tracking-tight text-ink-strong sm:text-title">{title}</h1>
+            {description && <p className="mt-1.5 max-w-3xl text-[0.9375rem] leading-6 text-heading-support sm:text-[1.0625rem]">{description}</p>}
             {meta && <div className="mt-3 flex flex-wrap items-center gap-2">{meta}</div>}
           </div>
         </div>
       </div>
-      {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
+      {actions && <div className="flex shrink-0 flex-wrap items-center gap-2.5 sm:pt-1.5">{actions}</div>}
     </header>
   );
 }

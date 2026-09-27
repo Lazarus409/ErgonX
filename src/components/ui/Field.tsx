@@ -252,7 +252,7 @@ export function FormSection({ title, description, children, className }: { title
   return (
     <section role="group" aria-labelledby={headingId} className={cx("grid gap-5 border-t border-line-soft pt-6 first:border-t-0 first:pt-0 lg:grid-cols-[minmax(0,16rem)_1fr] lg:gap-10", className)}>
       <div>
-        <h3 id={headingId} className="text-card-title font-semibold text-ink-strong">{title}</h3>
+        <h3 id={headingId} className="text-card-title font-bold text-ink-strong">{title}</h3>
         {description && <p className="mt-1 text-support text-ink-muted">{description}</p>}
       </div>
       <div className="grid min-w-0 gap-4 sm:grid-cols-2">{children}</div>

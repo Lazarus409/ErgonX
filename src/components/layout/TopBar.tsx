@@ -8,7 +8,6 @@ import {
   Building2,
   CheckCheck,
   ChevronDown,
-  CircleHelp,
   LogOut,
   Menu,
   Monitor,
@@ -73,7 +72,6 @@ export default function TopBar({ onOpenSidebar }: TopBarProps) {
   const { institution, logout, switchInstitution, user } = useAuth();
   const { theme, preference, setTheme, toggleTheme } = useTheme();
   const context = routeContext(pathname);
-  const accent = moduleAccents[accentForPath(pathname)];
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -224,41 +222,38 @@ export default function TopBar({ onOpenSidebar }: TopBarProps) {
     }
   };
 
-  const iconButton = "relative inline-flex h-9 w-9 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-surface-hover hover:text-ink-strong";
+  const iconButton = "relative inline-flex h-10 w-10 items-center justify-center rounded-lg text-ink-muted transition-colors duration-150 hover:bg-surface-hover hover:text-ink-strong";
+  const pageTitle = context.page ?? context.section;
+  const crumb = context.page ? context.section : "Home";
 
   return (
-    <header data-shell-chrome className="sticky top-0 z-30 h-14 border-b border-line/80 bg-surface/85 backdrop-blur-xl supports-[backdrop-filter]:bg-surface/75">
+    <header data-shell-chrome className="sticky top-0 z-30 h-[var(--shell-topbar)] border-b border-line-soft bg-surface/95 shadow-[0_2px_12px_-6px_rgb(15_35_69/0.12)] backdrop-blur-xl supports-[backdrop-filter]:bg-surface/85">
       <div className="relative flex h-full items-center gap-2 px-4 sm:gap-3 sm:px-6 xl:px-8">
         <button type="button" onClick={onOpenSidebar} className={cx(iconButton, "lg:hidden")} aria-label="Open navigation">
           <Menu className="h-[18px] w-[18px]" />
         </button>
 
         {/* Context identity: tenant + current area */}
-        <div className="flex min-w-0 items-center gap-2.5">
-          <span aria-hidden="true" className={cx("hidden h-2 w-2 shrink-0 rounded-full sm:block", accent.solid)} />
-          <div className="min-w-0 leading-tight">
-            <p className="truncate text-sm font-semibold text-ink-strong">
-              {context.section}
-              {context.page && <span className="font-medium text-ink-muted"> <span className="text-ink-subtle">/</span> {context.page}</span>}
-            </p>
-            <p className="hidden truncate text-caption text-ink-muted sm:block">{institution?.name ?? "No active institution"}</p>
-          </div>
+        <div className="min-w-0 shrink leading-tight lg:w-56 xl:w-72">
+          <p className="truncate text-caption font-medium text-primary-ink" title={institution?.name ?? undefined}>{crumb}</p>
+          <p className="truncate text-[1.375rem] font-bold leading-7 tracking-tight text-ink-strong">{pageTitle}</p>
         </div>
 
-        <div className="flex-1" />
+        <div className="flex flex-1 justify-center">
 
         {/* Universal search trigger */}
         <button
           type="button"
           data-search-trigger
           onClick={(event) => { event.stopPropagation(); openSearch(); }}
-          className="hidden h-9 w-64 items-center gap-2.5 rounded-lg border border-line bg-surface-muted/70 px-3 text-left text-sm text-ink-subtle transition-colors hover:border-line-strong hover:bg-surface md:flex xl:w-80"
+          className="hidden h-11 w-full max-w-sm items-center gap-3 rounded-xl border border-line bg-surface px-4 text-left text-sm text-ink-subtle shadow-elevation-1 transition-colors hover:border-primary/50 md:flex xl:max-w-md"
           aria-label="Search (Ctrl+K)"
         >
-          <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
-          <span className="flex-1 truncate">Search people, payroll, leave…</span>
-          <kbd className="rounded-md border border-line bg-surface px-1.5 py-0.5 font-sans text-[0.6875rem] font-semibold text-ink-muted">Ctrl K</kbd>
+          <Search className="h-[18px] w-[18px] shrink-0 text-ink-strong" aria-hidden="true" />
+          <span className="flex-1 truncate">Search</span>
+          <kbd className="rounded-md border border-line bg-surface-muted px-1.5 py-0.5 font-sans text-[0.6875rem] font-semibold text-ink-muted">Ctrl K</kbd>
         </button>
+        </div>
         <button type="button" data-search-trigger onClick={(event) => { event.stopPropagation(); openSearch(); }} className={cx(iconButton, "md:hidden")} aria-label="Search">
           <Search className="h-[18px] w-[18px]" />
         </button>
@@ -269,12 +264,20 @@ export default function TopBar({ onOpenSidebar }: TopBarProps) {
           </span>
         )}
 
-        <span className={cx(iconButton, "hidden cursor-help sm:inline-flex")} title="Help and support is not configured for this release." aria-label="Help and support is not configured for this release" role="img">
-          <CircleHelp className="h-[18px] w-[18px]" />
-        </span>
-
-        <button type="button" onClick={toggleTheme} className={cx(iconButton, "hidden sm:inline-flex")} title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}>
-          {theme === "dark" ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
+        <button
+          type="button"
+          role="switch"
+          aria-checked={theme === "dark"}
+          onClick={toggleTheme}
+          className="hidden items-center gap-2 rounded-lg px-2 py-2 text-ink-muted transition-colors hover:bg-surface-hover sm:inline-flex"
+          title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+          aria-label="Dark mode"
+        >
+          <Sun className={cx("h-[18px] w-[18px]", theme !== "dark" && "text-ink-strong")} aria-hidden="true" />
+          <span className={cx("relative h-5 w-9 rounded-full transition-colors", theme === "dark" ? "bg-primary" : "bg-line-strong")} aria-hidden="true">
+            <span className={cx("absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-elevation-1 transition-transform", theme === "dark" ? "translate-x-[18px]" : "translate-x-0.5")} />
+          </span>
+          <Moon className={cx("h-[18px] w-[18px]", theme === "dark" && "text-ink-strong")} aria-hidden="true" />
         </button>
 
         {/* Notifications */}
@@ -290,22 +293,23 @@ export default function TopBar({ onOpenSidebar }: TopBarProps) {
               setNotificationsOpen(opening);
               setProfileOpen(false);
             }}
-            className={cx(iconButton, notificationsOpen && "bg-surface-hover text-ink-strong")}
+            className={cx("relative inline-flex h-12 min-w-10 flex-col items-center justify-center rounded-lg px-2 text-ink-strong transition-colors duration-150 hover:bg-surface-hover", notificationsOpen && "bg-surface-hover")}
             title="Notifications"
             aria-label={unreadNotificationCount ? `Notifications, ${unreadNotificationCount} unread` : "Notifications"}
             aria-expanded={notificationsOpen}
             aria-haspopup="dialog"
           >
-            <Bell className="h-[18px] w-[18px]" />
+            <Bell className="h-5 w-5" />
+            <span className="hidden text-caption font-medium text-primary-ink xl:block">Notifications</span>
             {unreadNotificationCount > 0 && (
-              <span className="absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[0.625rem] font-bold leading-none text-white ring-2 ring-surface">
+              <span className="absolute right-1.5 top-1 flex h-4 min-w-4 xl:right-6 items-center justify-center rounded-full bg-danger px-1 text-[0.625rem] font-bold leading-none text-white ring-2 ring-surface">
                 {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
               </span>
             )}
           </button>
 
           {notificationsOpen && (
-            <div role="dialog" aria-label="Notifications" className="absolute right-0 top-11 w-[min(calc(100vw-2rem),22rem)] origin-top-right animate-pop-in overflow-hidden rounded-2xl border border-line bg-surface shadow-overlay">
+            <div role="dialog" aria-label="Notifications" className="absolute right-0 top-14 w-[min(calc(100vw-2rem),22rem)] origin-top-right animate-pop-in overflow-hidden rounded-2xl border border-line bg-surface shadow-overlay">
               <div className="flex items-center justify-between gap-3 border-b border-line-soft px-4 py-3.5">
                 <div>
                   <p className="text-sm font-semibold text-ink-strong">Notifications</p>
@@ -370,21 +374,21 @@ export default function TopBar({ onOpenSidebar }: TopBarProps) {
               setProfileOpen((current) => !current);
               setNotificationsOpen(false);
             }}
-            className={cx("flex items-center gap-2.5 rounded-xl p-1 pr-1.5 transition-colors hover:bg-surface-hover xl:pr-2.5", profileOpen && "bg-surface-hover")}
+            className={cx("flex items-center gap-3 rounded-xl p-1 pr-1.5 transition-colors hover:bg-surface-hover xl:pr-2.5", profileOpen && "bg-surface-hover")}
             aria-label="Open profile menu"
             aria-haspopup="menu"
             aria-expanded={profileOpen}
           >
-            <Avatar name={fullName} size="sm" />
+            <Avatar name={fullName} size="md" solid />
             <span className="hidden min-w-0 text-left leading-tight xl:block">
-              <span className="block max-w-36 truncate text-support font-semibold text-ink-strong">{fullName}</span>
-              <span className="block max-w-36 truncate text-caption text-ink-muted">{user?.role ? user.role.replaceAll("_", " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase()) : ""}</span>
+              <span className="block max-w-40 truncate text-sm font-bold text-ink-strong">{fullName}</span>
+              <span className="block max-w-40 truncate text-caption text-heading-support">{user?.role ? user.role.replaceAll("_", " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase()) : ""}</span>
             </span>
             <ChevronDown className={cx("hidden h-4 w-4 text-ink-subtle transition-transform xl:block", profileOpen && "rotate-180")} aria-hidden="true" />
           </button>
 
           {profileOpen && (
-            <div role="menu" aria-label="Profile menu" className="absolute right-0 top-11 z-50 w-[min(calc(100vw-2rem),20rem)] origin-top-right animate-pop-in overflow-hidden rounded-2xl border border-line bg-surface shadow-overlay">
+            <div role="menu" aria-label="Profile menu" className="absolute right-0 top-14 z-50 w-[min(calc(100vw-2rem),20rem)] origin-top-right animate-pop-in overflow-hidden rounded-2xl border border-line bg-surface shadow-overlay">
               <div className="flex items-center gap-3 border-b border-line-soft p-4">
                 <Avatar name={fullName} size="md" />
                 <div className="min-w-0">

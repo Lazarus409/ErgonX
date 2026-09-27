@@ -108,7 +108,7 @@ export default function GetStartedPage() {
         {submittedTo ? (
           <div className="flex flex-col items-center py-6 text-center" role="status">
             <span className="flex h-12 w-12 items-center justify-center rounded-full bg-success-soft text-success" aria-hidden="true"><CheckCircle2 className="h-6 w-6" /></span>
-            <h2 id="request-heading" className="mt-4 text-card-title font-semibold text-ink-strong">Request received</h2>
+            <h2 id="request-heading" className="mt-4 text-card-title font-bold text-ink-strong">Request received</h2>
             <p className="mt-1 max-w-md text-support text-ink-muted">Thank you. Once a Super Admin approves it, an invitation will be sent to <span className="font-semibold text-ink-strong">{submittedTo}</span>.</p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <ButtonLink href="/login" trailingIcon={<ArrowRight className="h-4 w-4" />}>Go to sign in</ButtonLink>
@@ -120,7 +120,7 @@ export default function GetStartedPage() {
             <div className="mb-5 flex items-start gap-3">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-ink" aria-hidden="true"><Building2 className="h-5 w-5" /></span>
               <div>
-                <h2 id="request-heading" className="text-card-title font-semibold text-ink-strong">Request an invitation</h2>
+                <h2 id="request-heading" className="text-card-title font-bold text-ink-strong">Request an invitation</h2>
                 <p className="text-support text-ink-muted">The invitation goes to the email below, and that person becomes your organization&apos;s first administrator.</p>
               </div>
             </div>

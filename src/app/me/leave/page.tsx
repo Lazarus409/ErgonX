@@ -127,7 +127,7 @@ export default function MyLeavePage() {
         rowKey={(request) => request.id}
         loading={initial}
         minWidth={620}
-        toolbar={<div><h2 className="text-card-title font-semibold text-ink-strong">My leave requests</h2><p className="text-support text-ink-muted">Your submitted leave requests and their current status.</p></div>}
+        toolbar={<div><h2 className="text-card-title font-bold text-ink-strong">My leave requests</h2><p className="text-support text-ink-muted">Your submitted leave requests and their current status.</p></div>}
         empty={{ title: "No leave requests yet", description: "Requests you submit will appear here with their approval status.", icon: CalendarDays, action: <ButtonLink href="/me/leave/request" size="sm" leadingIcon={<Plus className="h-4 w-4" />}>Request leave</ButtonLink> }}
         columns={[
           { key: "requested", header: "Requested", sortValue: (request) => request.created_at, cell: (request) => <Link href={`/leave/requests/${request.id}`} className="font-semibold text-ink-strong hover:text-primary-ink">{formatDate(request.created_at)}</Link> },

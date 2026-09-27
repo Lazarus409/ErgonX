@@ -185,7 +185,7 @@ function SetupStepCard({ index, step, validating, canValidate, onValidate }: { i
         <StatusBadge status={step.status} size="sm" />
       </div>
       <p className="mt-4 text-caption font-semibold text-ink-subtle">Step {index}</p>
-      <h3 className="text-card-title font-semibold text-ink-strong">{presentation.title}</h3>
+      <h3 className="text-card-title font-bold text-ink-strong">{presentation.title}</h3>
       <p className="mt-1 text-support text-ink-muted">{presentation.description}</p>
       {step.blocker_message && <p className="mt-2 text-support font-medium text-danger-ink">{step.blocker_message}</p>}
       {step.required_module && <p className="mt-2 text-caption text-ink-subtle">Required for {formatStep(step.required_module)}</p>}

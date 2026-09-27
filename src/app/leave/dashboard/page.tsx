@@ -207,7 +207,7 @@ export default function LeaveDashboardPage() {
         toolbar={
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-card-title font-semibold text-ink-strong">Upcoming leave</h2>
+              <h2 className="text-card-title font-bold text-ink-strong">Upcoming leave</h2>
               <p className="text-support text-ink-muted">Pending and approved leave from today onwards.</p>
             </div>
             <Link href="/leave/calendar" className="shrink-0 text-support font-semibold text-primary-ink hover:underline">View calendar</Link>

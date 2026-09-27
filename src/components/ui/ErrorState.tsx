@@ -32,7 +32,7 @@ export default function ErrorState({ title = "Unable to load data", message, onR
       <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-danger-soft" aria-hidden="true">
         <AlertTriangle className="h-6 w-6 text-danger" />
       </span>
-      <h2 className="mt-4 text-card-title font-semibold text-ink-strong">{title}</h2>
+      <h2 className="mt-4 text-card-title font-bold text-ink-strong">{title}</h2>
       <p className="mt-1.5 max-w-md text-support text-ink-muted">{message}</p>
       {(onRetry || action) && (
         <div className="mt-5 flex flex-wrap justify-center gap-2">

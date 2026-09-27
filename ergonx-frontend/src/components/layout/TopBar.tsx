@@ -287,18 +287,12 @@ export default function TopBar({ onOpenSidebar }: TopBarProps) {
 
         <button
           type="button"
-          role="switch"
-          aria-checked={theme === "dark"}
           onClick={toggleTheme}
-          className="hidden items-center gap-2 rounded-lg px-2 py-2 text-ink-muted transition-colors hover:bg-surface-hover sm:inline-flex"
+          className={cx("hidden sm:inline-flex", iconButton, theme === "dark" && "bg-surface-hover text-ink-strong")}
           title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-          aria-label="Dark mode"
+          aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
         >
-          <Sun className={cx("h-[18px] w-[18px]", theme !== "dark" && "text-ink-strong")} aria-hidden="true" />
-          <span className={cx("relative h-5 w-9 rounded-full transition-colors", theme === "dark" ? "bg-primary" : "bg-line-strong")} aria-hidden="true">
-            <span className={cx("absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-elevation-1 transition-transform", theme === "dark" ? "translate-x-[18px]" : "translate-x-0.5")} />
-          </span>
-          <Moon className={cx("h-[18px] w-[18px]", theme === "dark" && "text-ink-strong")} aria-hidden="true" />
+          <Moon className="h-5 w-5" aria-hidden="true" />
         </button>
 
         {/* Notifications */}

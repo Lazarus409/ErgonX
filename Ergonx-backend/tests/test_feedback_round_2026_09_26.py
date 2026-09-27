@@ -252,3 +252,14 @@ def test_system_roles_are_resynced_to_the_code_on_migrate(api_client, institutio
     assert changes["DEPARTMENT_HEAD"] == {"added": ["dashboard.department.view"], "removed": []}
     assert api_client.get("/api/v1/dashboards/department/").status_code == 200
     assert sync_system_role_permissions() == {}
+
+
+def test_platform_overview_says_whether_invitations_are_emailed(api_client, settings):
+    from apps.accounts.models import User
+
+    admin = User.objects.create_superuser(email="root@example.com", password="StrongPass123!")
+    api_client.force_authenticate(admin)
+    settings.EMAIL_DELIVERY_ENABLED = False
+    assert api_client.get("/api/v1/platform/overview/").data["email_delivery_enabled"] is False
+    settings.EMAIL_DELIVERY_ENABLED = True
+    assert api_client.get("/api/v1/platform/overview/").data["email_delivery_enabled"] is True

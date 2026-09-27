@@ -6,6 +6,7 @@ serve these users, because a platform administrator has no institution membershi
 
 from datetime import timedelta
 
+from django.conf import settings
 from django.db import transaction
 from django.db.models import Count, IntegerField, Max, OuterRef, Q, Subquery, Value
 from django.db.models.functions import Coalesce, TruncMonth
@@ -307,6 +308,8 @@ class PlatformOverviewView(APIView):
         )
         pending_invitations = InstitutionAdminInvitation.objects.filter(status=InstitutionAdminInvitation.Status.PENDING)
         return Response({
+            # Whether approving an access request emails the invitation link.
+            "email_delivery_enabled": settings.EMAIL_DELIVERY_ENABLED,
             "institutions": {
                 "total": institutions.count(),
                 "active": institutions.filter(is_active=True).count(),

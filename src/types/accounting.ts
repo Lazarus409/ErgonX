@@ -241,3 +241,42 @@ export interface ReconciliationDetail {
 }
 
 export interface ReconciliationSuggestion { id: string; journal_number: string; entry_date: string; description: string; source: string }
+
+export const BUDGET_CATEGORIES: Array<[string, string]> = [["PERSONNEL", "Personnel"], ["OPERATING", "Operating expenses"], ["SUPPLIES", "Supplies & materials"], ["TRAVEL", "Travel"], ["CAPITAL", "Capital equipment"], ["TRANSFERS", "Transfers"], ["OTHER", "Other"]];
+export const BUDGET_TYPES: Array<[string, string]> = [["OPERATING", "Operating"], ["CAPITAL", "Capital"], ["PROJECT", "Project"]];
+
+export interface BudgetLineRecord { id?: string; category: string; account: string | null; account_code?: string | null; account_name?: string | null; description: string; initiative: string; allocated: string }
+export interface BudgetTotals { allocated: string; committed: string; actual: string; remaining: string; variance: string; health?: string }
+
+export interface BudgetRecord {
+  id: string; code: string; name: string; fiscal_year: string; fiscal_year_name: string; period_start: string; period_end: string;
+  department: string | null; department_name: string | null; budget_type: string; owner: string | null; owner_name: string | null;
+  description: string; status: string; version: number; lines: BudgetLineRecord[]; totals: BudgetTotals; approval_note: string;
+  submitted_at: string | null; approved_at: string | null; created_at: string; updated_at: string;
+}
+
+export type BudgetPayload = Pick<BudgetRecord, "name" | "fiscal_year" | "department" | "budget_type" | "owner" | "description"> & { lines: Array<Omit<BudgetLineRecord, "id" | "account_code" | "account_name">> };
+
+export interface BudgetOverview {
+  fiscal_years: Array<{ id: string; name: string; start_date: string; end_date: string }>;
+  fiscal_year: string | null;
+  folders: Array<{ id: string | null; name: string; count: number }>;
+  total_budgets: number;
+  categories: Array<{ category: string; label: string; allocated: string; committed: string; actual: string; variance: string; status: string }>;
+  initiatives: Array<{ initiative: string; allocated: string; actual: string; committed: string; budgets: string[] }>;
+  comparisons: Array<{ department: string; department_id: string | null; allocated: string; actual: string; committed: string; budgets: number }>;
+  budgets: Array<{ id: string; code: string; name: string; department: string; status: string; budget_type: string } & BudgetTotals>;
+  pending_approvals: Array<{ id: string; name: string; submitted_at: string | null }>;
+}
+
+export interface BudgetDetail {
+  budget: BudgetRecord;
+  totals: BudgetTotals;
+  health: string;
+  categories: Array<{ category: string; label: string; allocated: string; committed: string; actual: string; remaining: string; variance: string; percent_of_budget: string; lines: Array<{ id: string; description: string; initiative: string; account: string | null; allocated: string; committed: string; actual: string; remaining: string; variance: string }> }>;
+  initiatives: Array<{ initiative: string; allocated: string; actual: string; committed: string }>;
+  notes: Array<{ id: string; author: string; body: string; created_at: string }>;
+  attachments: RecordAttachment[];
+  people: { created_by: string | null; submitted_by: string | null; submitted_by_id: string | null; approved_by: string | null };
+  audit: RecordAuditEntry[];
+}

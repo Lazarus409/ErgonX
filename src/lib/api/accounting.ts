@@ -1,6 +1,6 @@
 import { apiAction, apiDownload, apiGet, apiGetList, apiPatch, apiPost, apiPostMultipart } from "./client";
 import type { ListParams, PaginatedData } from "@/types/api";
-import type { ReconciliationAccount, ReconciliationDetail, ReconciliationSuggestion, InvoiceContext, InvoiceReminder, ReceivablesSummary, PayablesSummary, VendorBillContext, RecordAttachment, AccountActivity, JournalContext, Account, AccountingConfiguration, AccountingConfigurationPayload, AccountingPeriod, AccountingPresetApplicationResult, AccountingSetupChoices, BalanceSheet, BankAccount, BankStatementLine, Customer, Expense, GhanaComplianceReminder, IncomeStatement, Invoice, InvoiceLine, JournalEntry, PayComponentAccountMapping, PayComponentAccountMappingPayload, PayrollAccountMappingTemplate, Payment, Receipt, TaxCode, TaxComponent, TrialBalance, Vendor, VendorBill, VendorBillLine, WithholdingRule } from "@/types/accounting";
+import type { BudgetDetail, BudgetOverview, BudgetPayload, BudgetRecord, ReconciliationAccount, ReconciliationDetail, ReconciliationSuggestion, InvoiceContext, InvoiceReminder, ReceivablesSummary, PayablesSummary, VendorBillContext, RecordAttachment, AccountActivity, JournalContext, Account, AccountingConfiguration, AccountingConfigurationPayload, AccountingPeriod, AccountingPresetApplicationResult, AccountingSetupChoices, BalanceSheet, BankAccount, BankStatementLine, Customer, Expense, GhanaComplianceReminder, IncomeStatement, Invoice, InvoiceLine, JournalEntry, PayComponentAccountMapping, PayComponentAccountMappingPayload, PayrollAccountMappingTemplate, Payment, Receipt, TaxCode, TaxComponent, TrialBalance, Vendor, VendorBill, VendorBillLine, WithholdingRule } from "@/types/accounting";
 
 export type AccountPayload = Pick<Account, "code" | "name" | "account_type" | "parent" | "normal_balance" | "is_postable" | "is_active">;
 
@@ -124,12 +124,12 @@ export function reviseVendorBill(id: string): Promise<VendorBill> { return apiAc
 export function holdVendorBill(id: string, reason: string): Promise<VendorBill> { return apiPost<VendorBill, { reason: string }>(`/vendor-bills/${id}/hold/`, { reason }); }
 export function releaseVendorBill(id: string): Promise<VendorBill> { return apiAction<VendorBill>(`/vendor-bills/${id}/release/`); }
 export function scheduleVendorBillPayment(id: string, payment_date: string, payment_method: string): Promise<VendorBill> { return apiPost<VendorBill, { payment_date: string; payment_method: string }>(`/vendor-bills/${id}/schedule-payment/`, { payment_date, payment_method }); }
-export function uploadRecordAttachment(resource: "vendor-bills" | "invoices", id: string, file: File, onProgress?: (progress: number) => void): Promise<RecordAttachment> {
+export function uploadRecordAttachment(resource: "vendor-bills" | "invoices" | "budgets", id: string, file: File, onProgress?: (progress: number) => void): Promise<RecordAttachment> {
   const body = new FormData();
   body.append("uploaded_file", file);
   return apiPostMultipart(`/${resource}/${id}/attachments/`, body, onProgress);
 }
-export function downloadRecordAttachment(resource: "vendor-bills" | "invoices", id: string, documentId: string): Promise<Blob> { return apiDownload(`/${resource}/${id}/attachments/${documentId}/download/`); }
+export function downloadRecordAttachment(resource: "vendor-bills" | "invoices" | "budgets", id: string, documentId: string): Promise<Blob> { return apiDownload(`/${resource}/${id}/attachments/${documentId}/download/`); }
 
 export function getInvoice(id: string): Promise<Invoice> { return apiGet<Invoice>(`/invoices/${id}/`); }
 export function getReceivablesSummary(months: 3 | 6 | 12): Promise<ReceivablesSummary> { return apiGet<ReceivablesSummary>(`/invoices/summary/?months=${months}`); }
@@ -153,3 +153,18 @@ export function importReconciliationStatement(id: string, file: File): Promise<R
 export function getReconciliationSuggestions(id: string, lineId: string): Promise<ReconciliationSuggestion[]> { return apiGet<ReconciliationSuggestion[]>(`/bank-reconciliations/${id}/lines/${lineId}/suggestions/`); }
 export function reconciliationLineAction(id: string, lineId: string, operation: "match" | "unmatch" | "flag" | "unflag", payload: { journal_entry?: string; note?: string } = {}): Promise<ReconciliationDetail> { return apiPost<ReconciliationDetail, typeof payload>(`/bank-reconciliations/${id}/lines/${lineId}/${operation}/`, payload); }
 export function downloadReconciliationReport(id: string): Promise<Blob> { return apiDownload(`/bank-reconciliations/${id}/report/`); }
+
+export function getBudgetOverview(params: { fiscal_year?: string; department?: string }): Promise<BudgetOverview> {
+  const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value) as Array<[string, string]>);
+  return apiGet<BudgetOverview>(`/budgets/overview/${query.toString() ? `?${query.toString()}` : ""}`);
+}
+export function getBudget(id: string): Promise<BudgetRecord> { return apiGet<BudgetRecord>(`/budgets/${id}/`); }
+export function getBudgetDetail(id: string): Promise<BudgetDetail> { return apiGet<BudgetDetail>(`/budgets/${id}/detail_view/`); }
+export function createBudget(payload: BudgetPayload): Promise<BudgetRecord> { return apiPost<BudgetRecord, BudgetPayload>("/budgets/", payload); }
+export function updateBudget(id: string, payload: Partial<BudgetPayload>): Promise<BudgetRecord> { return apiPatch<BudgetRecord, Partial<BudgetPayload>>(`/budgets/${id}/`, payload); }
+export function submitBudget(id: string): Promise<BudgetRecord> { return apiAction<BudgetRecord>(`/budgets/${id}/submit/`); }
+export function approveBudget(id: string, note: string): Promise<BudgetRecord> { return apiPost<BudgetRecord, { note: string }>(`/budgets/${id}/approve/`, { note }); }
+export function returnBudget(id: string, note: string): Promise<BudgetRecord> { return apiPost<BudgetRecord, { note: string }>(`/budgets/${id}/return/`, { note }); }
+export function addBudgetNote(id: string, body: string): Promise<BudgetDetail["notes"][number]> { return apiPost<BudgetDetail["notes"][number], { body: string }>(`/budgets/${id}/notes/`, { body }); }
+export function listFiscalYears(): Promise<PaginatedData<{ id: string; name: string; start_date: string; end_date: string; status: string }>> { return apiGetList("/fiscal-years/", { page_size: 100, ordering: "-start_date" } as ListParams); }
+export function getBudgetOptions(): Promise<{ fiscal_years: Array<{ id: string; name: string; start_date: string; end_date: string }>; departments: Array<{ id: string; name: string }>; accounts: Array<{ id: string; code: string; name: string; account_type: string }> }> { return apiGet("/budgets/options/"); }

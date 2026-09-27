@@ -32,7 +32,7 @@ export function Empty({ icon: Icon, title, text }: { icon: typeof FileText; titl
   );
 }
 
-export function AttachmentsPanel({ resource, recordId, attachments, canUpload, onChanged }: { resource: "vendor-bills" | "invoices"; recordId: string; attachments: RecordAttachment[]; canUpload: boolean; onChanged: () => void }) {
+export function AttachmentsPanel({ resource, recordId, attachments, canUpload, onChanged }: { resource: "vendor-bills" | "invoices" | "budgets"; recordId: string; attachments: RecordAttachment[]; canUpload: boolean; onChanged: () => void }) {
   const ref = useRef<HTMLInputElement>(null);
   const [progress, setProgress] = useState<number | null>(null);
   const [problem, setProblem] = useState<string | null>(null);

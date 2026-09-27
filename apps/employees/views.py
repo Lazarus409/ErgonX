@@ -9,7 +9,10 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
+from django.http import FileResponse
 from django.shortcuts import get_object_or_404
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 
 from apps.employees.filters import EmergencyContactFilter, EmployeeFilter
 from apps.employees.models import EmergencyContact, Employee, EmployeeOffboarding, EmployeeOnboarding, Employment
@@ -22,6 +25,7 @@ from apps.institutions.services import create_invitation, record_user_activity
 from apps.organization.models import Department, Grade, Location, Position
 from apps.documents.models import Document
 from apps.documents.serializers import DocumentSerializer
+from apps.audit.services import record_audit_event
 from common.scoping import scope_to_employees
 from common.serializers import call_validated_service
 from common.viewsets import TenantModelViewSet
@@ -91,14 +95,100 @@ class SelfServiceEmergencyContactDetailView(SelfServiceBaseView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+# Categories an employee can file their own documents under. HR-shared
+# documents keep whatever category HR gave them.
+SELF_SERVICE_DOCUMENT_CATEGORIES = (
+    "Identification",
+    "Certificate",
+    "Qualification",
+    "Medical",
+    "Bank details",
+    "Contract",
+    "Other",
+)
+
+
+def _own_documents(request, employee):
+    return Document.objects.for_institution(request.institution).filter(
+        entity_type="EMPLOYEE", entity_id=employee.id, is_active=True
+    )
+
+
 @extend_schema(responses=DocumentSerializer(many=True))
 class SelfServiceDocumentsView(SelfServiceBaseView):
+    """The signed-in employee's documents: shared by HR, or uploaded by themselves."""
+
     serializer_class = DocumentSerializer
+    parser_classes = (MultiPartParser, FormParser, JSONParser)
+
     def get(self, request):
-        documents = Document.objects.for_institution(request.institution).filter(
-            entity_type="EMPLOYEE", entity_id=self.employee(request).id, is_active=True
+        return Response(DocumentSerializer(_own_documents(request, self.employee(request)), many=True).data)
+
+    def post(self, request):
+        employee = self.employee(request)
+        category = str(request.data.get("category") or "Other").strip()
+        if category not in SELF_SERVICE_DOCUMENT_CATEGORIES:
+            raise ValidationError({"category": f"Choose one of: {', '.join(SELF_SERVICE_DOCUMENT_CATEGORIES)}."})
+        if request.data.get("uploaded_file") is None:
+            raise ValidationError({"uploaded_file": "Choose a file to upload."})
+        # Ownership and classification come from the server, never the browser.
+        serializer = DocumentSerializer(data={
+            "uploaded_file": request.data.get("uploaded_file"),
+            "category": category,
+            "classification": Document.Classification.CONFIDENTIAL,
+        })
+        serializer.is_valid(raise_exception=True)
+        document = serializer.save(
+            institution=request.institution,
+            uploaded_by=request.user,
+            entity_type="EMPLOYEE",
+            entity_id=employee.id,
         )
-        return Response(DocumentSerializer(documents, many=True).data)
+        record_audit_event(
+            actor=request.user,
+            institution=request.institution,
+            entity=document,
+            action="employee.document.uploaded",
+            metadata={"category": category, "employee_id": str(employee.id)},
+        )
+        return Response(DocumentSerializer(document).data, status=status.HTTP_201_CREATED)
+
+
+@extend_schema(responses=DocumentSerializer)
+class SelfServiceDocumentDetailView(SelfServiceBaseView):
+    serializer_class = DocumentSerializer
+
+    def _document(self, request, pk):
+        return get_object_or_404(_own_documents(request, self.employee(request)), pk=pk)
+
+    def get(self, request, pk):
+        document = self._document(request, pk)
+        if not document.stored_file:
+            raise NotFound("This document has no managed file content.")
+        response = FileResponse(
+            document.stored_file.open("rb"),
+            as_attachment=True,
+            filename=document.original_filename,
+            content_type=document.content_type or "application/octet-stream",
+        )
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
+
+    def delete(self, request, pk):
+        document = self._document(request, pk)
+        # Employees may withdraw what they uploaded; documents HR shared stay.
+        if document.uploaded_by_id != request.user.id:
+            raise PermissionDenied("Only documents you uploaded can be removed.")
+        document.is_active = False
+        document.save(update_fields=("is_active", "updated_at"))
+        record_audit_event(
+            actor=request.user,
+            institution=request.institution,
+            entity=document,
+            action="employee.document.removed",
+            metadata={"category": document.category},
+        )
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class EmployeeViewSet(TenantModelViewSet):

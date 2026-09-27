@@ -67,7 +67,7 @@ def _leave_configuration(institution, **type_values):
     leave_type = LeaveType.objects.create(
         institution=institution,
         name="Annual Leave",
-        code="annual",
+        code="test-annual",
         **type_values,
     )
     policy = LeavePolicy.objects.create(

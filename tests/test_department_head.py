@@ -41,7 +41,7 @@ def org(institution_factory, user_factory, membership_factory, employee_factory,
     outsider_user, outsider_employee, _ = person("outsider@example.com", "EMPLOYEE", sales, reports_to=hr_employment)
     engineering.head = head_employee
     engineering.save(update_fields=("head", "updated_at"))
-    leave_type = LeaveType.objects.create(institution=institution, name="Annual Leave", code="annual")
+    leave_type = LeaveType.objects.create(institution=institution, name="Annual Leave", code="test-annual")
     return {
         "institution": institution, "engineering": engineering, "sales": sales, "leave_type": leave_type,
         "hr": hr_user, "head": head_user, "member": member_user, "outsider": outsider_user,

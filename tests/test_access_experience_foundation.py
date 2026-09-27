@@ -75,7 +75,7 @@ def test_disabled_leave_is_removed_from_home_search_and_reports(
     membership_factory(user=user, institution=institution, role_code="HR_ADMIN", is_primary=True)
     employee = employee_factory(institution, employee_number="EMP-LEAVE-GATED")
     leave_type = LeaveType.objects.create(
-        institution=institution, name="Annual Leave", code="ANNUAL", requires_approval=True
+        institution=institution, name="Annual Leave", code="TEST-ANNUAL", requires_approval=True
     )
     request = LeaveRequest.objects.create(
         institution=institution, employee=employee, leave_type=leave_type,

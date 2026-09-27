@@ -260,6 +260,9 @@ ROLE_PERMISSION_CODES = {
             "settings.notifications.manage",
             "settings.security.manage",
             "onboarding.manage",
+            # The audit trail is an oversight record for administrators, directors
+            # and auditors; HR's own actions are recorded there.
+            "audit.view",
         }
     ),
     "DIRECTOR": (
@@ -969,6 +972,9 @@ def bootstrap_institution(institution):
             },
         )
     InstitutionOnboarding.objects.get_or_create(institution=institution)
+    from apps.leave.defaults import ensure_standard_leave_types
+
+    ensure_standard_leave_types(institution)
     reconcile_institution_onboarding(institution)
 
 

@@ -351,11 +351,51 @@ class PayrollPeriodSerializer(TenantRelationSerializer):
 class PayrollRunSerializer(TenantRelationSerializer):
     tenant_relations = {"payroll_period": PayrollPeriod}
     idempotency_key = serializers.CharField(write_only=True, max_length=100)
+    reference = serializers.SerializerMethodField()
+    period_name = serializers.CharField(source="payroll_period.name", read_only=True)
+    started_by_name = serializers.SerializerMethodField()
+    approved_by_name = serializers.SerializerMethodField()
+    finalized_by_name = serializers.SerializerMethodField()
+    exception_counts = serializers.SerializerMethodField()
+
+    @staticmethod
+    def _name(user):
+        return (user.get_full_name() or user.email) if user else None
+
+    def get_reference(self, obj):
+        return f"PR-{obj.payroll_period.start_date:%Y%m}-{obj.run_number:02d}"
+
+    def get_started_by_name(self, obj):
+        return self._name(obj.started_by)
+
+    def get_approved_by_name(self, obj):
+        return self._name(obj.approved_by)
+
+    def get_finalized_by_name(self, obj):
+        return self._name(obj.finalized_by)
+
+    def get_exception_counts(self, obj):
+        from django.db.models import Count, Q
+
+        from apps.payroll.models import PayrollRunException
+
+        counts = obj.exceptions.aggregate(
+            total=Count("id"),
+            open=Count("id", filter=Q(status=PayrollRunException.Status.OPEN)),
+            high_open=Count("id", filter=Q(status=PayrollRunException.Status.OPEN, severity=PayrollRunException.Severity.HIGH)),
+        )
+        return counts
 
     class Meta:
         model = PayrollRun
         fields = (
             "id",
+            "reference",
+            "period_name",
+            "started_by_name",
+            "approved_by_name",
+            "finalized_by_name",
+            "exception_counts",
             "payroll_period",
             "preset_version",
             "run_number",
@@ -573,3 +613,27 @@ class PayrollComplianceDeadlineSerializer(serializers.Serializer):
     authority = serializers.CharField()
     event_type = serializers.CharField()
     due_date = serializers.DateField()
+
+
+class PayrollRunExceptionSerializer(serializers.ModelSerializer):
+    employee_name = serializers.CharField(source="employee.full_name", read_only=True, default=None)
+    employee_number = serializers.CharField(source="employee.employee_number", read_only=True, default=None)
+    resolved_by_name = serializers.SerializerMethodField()
+
+    def get_resolved_by_name(self, obj):
+        return (obj.resolved_by.get_full_name() or obj.resolved_by.email) if obj.resolved_by else None
+
+    class Meta:
+        from apps.payroll.models import PayrollRunException
+
+        model = PayrollRunException
+        fields = (
+            "id", "payroll_run", "employee", "employee_name", "employee_number", "code", "severity", "message",
+            "details", "status", "resolution_note", "resolved_by", "resolved_by_name", "resolved_at", "created_at", "updated_at",
+        )
+        read_only_fields = fields
+
+
+class PayrollExceptionUpdateSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(choices=("OPEN", "ACKNOWLEDGED", "RESOLVED"))
+    note = serializers.CharField(required=False, allow_blank=True, max_length=2000)

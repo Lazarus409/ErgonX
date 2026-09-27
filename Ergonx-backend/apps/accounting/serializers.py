@@ -1,3 +1,4 @@
+from decimal import Decimal
 from rest_framework import serializers
 
 from apps.accounting.models import (
@@ -591,11 +592,18 @@ class AccountingPeriodSerializer(ValidatedModelSerializer):
 
 
 class JournalLineSerializer(ValidatedModelSerializer):
+    account_code = serializers.CharField(source="account.code", read_only=True)
+    account_name = serializers.CharField(source="account.name", read_only=True)
+    department_name = serializers.CharField(source="department.name", read_only=True, default=None)
+
     class Meta:
         model = JournalLine
         fields = (
             "id",
             "account",
+            "account_code",
+            "account_name",
+            "department_name",
             "description",
             "debit",
             "credit",
@@ -623,6 +631,31 @@ class JournalLineSerializer(ValidatedModelSerializer):
 
 class JournalEntrySerializer(ValidatedModelSerializer):
     lines = JournalLineSerializer(many=True)
+    period_name = serializers.CharField(source="accounting_period.name", read_only=True)
+    created_by_name = serializers.SerializerMethodField()
+    approved_by_name = serializers.SerializerMethodField()
+    posted_by_name = serializers.SerializerMethodField()
+    total_debit = serializers.SerializerMethodField()
+    total_credit = serializers.SerializerMethodField()
+
+    @staticmethod
+    def _name(user):
+        return (user.get_full_name() or user.email) if user else None
+
+    def get_created_by_name(self, obj):
+        return self._name(obj.created_by)
+
+    def get_approved_by_name(self, obj):
+        return self._name(obj.approved_by)
+
+    def get_posted_by_name(self, obj):
+        return self._name(obj.posted_by)
+
+    def get_total_debit(self, obj):
+        return str(sum((line.debit for line in obj.lines.all()), Decimal("0.00")).quantize(Decimal("0.01")))
+
+    def get_total_credit(self, obj):
+        return str(sum((line.credit for line in obj.lines.all()), Decimal("0.00")).quantize(Decimal("0.01")))
 
     class Meta:
         model = JournalEntry
@@ -630,6 +663,12 @@ class JournalEntrySerializer(ValidatedModelSerializer):
             "id",
             "journal_number",
             "accounting_period",
+            "period_name",
+            "created_by_name",
+            "approved_by_name",
+            "posted_by_name",
+            "total_debit",
+            "total_credit",
             "entry_date",
             "description",
             "source",

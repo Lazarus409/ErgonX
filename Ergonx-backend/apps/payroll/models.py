@@ -1092,3 +1092,57 @@ class Payslip(TenantOwnedModel):
 
     def delete(self, *args, **kwargs):
         raise ValidationError({"payroll_record": "Generated payslips cannot be deleted."})
+
+
+class PayrollRunException(TenantOwnedModel):
+    """An issue detected on a calculated run that must be handled before review."""
+
+    class Code(models.TextChoices):
+        CALCULATION_ERROR = "CALCULATION_ERROR", "Calculation error"
+        NON_POSITIVE_NET_PAY = "NON_POSITIVE_NET_PAY", "Non-positive net pay"
+        RECONCILIATION_DISCREPANCY = "RECONCILIATION_DISCREPANCY", "Reconciliation discrepancy"
+        LARGE_NET_PAY_CHANGE = "LARGE_NET_PAY_CHANGE", "Large net pay change"
+        NOT_IN_RUN = "NOT_IN_RUN", "Active employee not in run"
+        MISSING_PAYROLL_PROFILE = "MISSING_PAYROLL_PROFILE", "Payroll profile not configured"
+
+    class Severity(models.TextChoices):
+        HIGH = "HIGH", "High"
+        MEDIUM = "MEDIUM", "Medium"
+        LOW = "LOW", "Low"
+
+    class Status(models.TextChoices):
+        OPEN = "OPEN", "Open"
+        ACKNOWLEDGED = "ACKNOWLEDGED", "Acknowledged"
+        RESOLVED = "RESOLVED", "Resolved"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="payroll_run_exceptions")
+    payroll_run = models.ForeignKey(PayrollRun, on_delete=models.CASCADE, related_name="exceptions")
+    employee = models.ForeignKey(Employee, on_delete=models.PROTECT, null=True, blank=True, related_name="payroll_run_exceptions")
+    code = models.CharField(max_length=32, choices=Code.choices)
+    severity = models.CharField(max_length=8, choices=Severity.choices)
+    message = models.CharField(max_length=300)
+    details = models.JSONField(default=dict, blank=True)
+    status = models.CharField(max_length=14, choices=Status.choices, default=Status.OPEN)
+    resolution_note = models.TextField(blank=True)
+    resolved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="payroll_exceptions_resolved"
+    )
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("payroll_run", "status", "severity", "created_at")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("payroll_run", "code", "employee"), name="uniq_payroll_exception_per_run_code_employee"
+            ),
+        ]
+        indexes = [models.Index(fields=("institution", "payroll_run", "status"))]
+
+    def clean(self):
+        errors = {}
+        if self.payroll_run_id and self.payroll_run.institution_id != self.institution_id:
+            errors["payroll_run"] = "Payroll run belongs to another institution."
+        if self.employee_id and self.employee.institution_id != self.institution_id:
+            errors["employee"] = "Employee belongs to another institution."
+        if errors:
+            raise ValidationError(errors)

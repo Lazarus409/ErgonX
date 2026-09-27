@@ -117,7 +117,7 @@ export const navigation: NavigationItem[] = [
     scopes: INSTITUTION_WIDE,
     children: [
       { label: "Dashboard", href: "/recruitment/dashboard", permission: "candidate.view" },
-      { label: "Job postings", href: "/recruitment/job-postings", permission: "job_posting.view" },
+      { label: "Requisitions", href: "/recruitment/job-postings", permission: "job_posting.view" },
       { label: "Candidates", href: "/recruitment/candidates", permission: "candidate.view" },
       { label: "Pipeline", href: "/recruitment/pipeline", permission: "candidate.view" },
       { label: "Applications", href: "/recruitment/applications", permission: "candidate.view" },
@@ -180,13 +180,13 @@ export const navigation: NavigationItem[] = [
     anyPermissions: moduleWorkspacePermissions.ACCOUNTING,
     scopes: INSTITUTION_WIDE,
     children: [
-      { label: "Dashboard", href: "/accounting/dashboard", permission: "dashboard.finance.view" },
-      { label: "Journals", href: "/accounting/journals", permission: "journal.view" },
-      { label: "Payables", href: "/accounting/payables", permission: "vendor_bill.view" },
-      { label: "Receivables", href: "/accounting/receivables", permission: "invoice.view" },
-      { label: "Banking", href: "/accounting/banking", permission: "bank_account.view" },
+      { label: "Accounting Dashboard", href: "/accounting/dashboard", permission: "dashboard.finance.view" },
+      { label: "General Ledger", href: "/accounting/journals", permission: "journal.view" },
+      { label: "Accounts Payable", href: "/accounting/payables", permission: "vendor_bill.view" },
+      { label: "Accounts Receivable", href: "/accounting/receivables", permission: "invoice.view" },
+      { label: "Bank Reconciliation", href: "/accounting/banking", permission: "bank_account.view" },
       { label: "Expenses", href: "/accounting/expenses", permission: "expense.view" },
-      { label: "Reports", href: "/accounting/reports", permission: "financial_report.view" },
+      { label: "Financial Reports", href: "/accounting/reports", permission: "financial_report.view" },
     ],
   },
   {

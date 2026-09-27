@@ -1,7 +1,9 @@
+from decimal import Decimal
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets
 from rest_framework.decorators import action
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 
 from apps.accounting.models import (
@@ -777,7 +779,105 @@ class AccountViewSet(TenantModelViewSet):
         return {
             "create": "account.create",
             "partial_update": "account.update",
+            "activity": "journal.view",
+            "balances": "account.view",
         }.get(self.action, "account.view")
+
+    @action(detail=False, methods=("get",), filter_backends=())
+    def balances(self, request):
+        """Posted balance per account (debit minus credit) for the chart of accounts."""
+        from django.db.models import Sum
+
+        rows = JournalLine.objects.filter(
+            journal_entry__institution=request.institution,
+            journal_entry__status__in=(JournalEntry.Status.POSTED, JournalEntry.Status.REVERSED),
+        ).values("account_id").annotate(debit=Sum("debit"), credit=Sum("credit"))
+        cents = Decimal("0.01")
+        return Response({str(row["account_id"]): str((Decimal(row["debit"] or 0) - Decimal(row["credit"] or 0)).quantize(cents)) for row in rows})
+
+    @action(detail=True, methods=("get",), filter_backends=())
+    def activity(self, request, pk=None):
+        """Every journal line on this account in the range, posted or not, with a
+        running balance over posted lines and a monthly movement summary."""
+        from datetime import date as date_type
+        from decimal import Decimal as D
+
+        from django.db.models import Sum
+        from django.db.models.functions import TruncMonth
+
+        account = self.get_object()
+        params = request.query_params
+        money = lambda value: str(D(value or 0).quantize(D("0.01")))  # noqa: E731
+        try:
+            date_from = date_type.fromisoformat(params["date_from"]) if params.get("date_from") else None
+            date_to = date_type.fromisoformat(params["date_to"]) if params.get("date_to") else None
+        except ValueError:
+            from rest_framework.exceptions import ValidationError as DRFValidationError
+
+            raise DRFValidationError({"date_from": "Use YYYY-MM-DD dates."})
+        posted = (JournalEntry.Status.POSTED, JournalEntry.Status.REVERSED)
+        # A header (non-postable) account reports the lines of all its descendants.
+        scope_ids, frontier = {account.id}, [account.id]
+        while frontier:
+            frontier = list(Account.objects.filter(institution=request.institution, parent_id__in=frontier).values_list("id", flat=True))
+            frontier = [value for value in frontier if value not in scope_ids]
+            scope_ids.update(frontier)
+        base = JournalLine.objects.filter(journal_entry__institution=request.institution, account_id__in=scope_ids)
+        opening = D("0.00")
+        if date_from:
+            before = base.filter(journal_entry__status__in=posted, journal_entry__entry_date__lt=date_from).aggregate(debit=Sum("debit"), credit=Sum("credit"))
+            opening = D(before["debit"] or 0) - D(before["credit"] or 0)
+        lines = base.select_related("journal_entry")
+        if date_from:
+            lines = lines.filter(journal_entry__entry_date__gte=date_from)
+        if date_to:
+            lines = lines.filter(journal_entry__entry_date__lte=date_to)
+        if params.get("status"):
+            lines = lines.filter(journal_entry__status=params["status"])
+        if params.get("source"):
+            lines = lines.filter(journal_entry__source=params["source"])
+        if params.get("search"):
+            from django.db.models import Q
+
+            term = params["search"]
+            lines = lines.filter(Q(description__icontains=term) | Q(journal_entry__description__icontains=term) | Q(journal_entry__journal_number__icontains=term) | Q(journal_entry__reference__icontains=term))
+        running = opening
+        rows = []
+        for line in lines.order_by("journal_entry__entry_date", "journal_entry__journal_number", "created_at")[:500]:
+            is_posted = line.journal_entry.status in posted
+            if is_posted:
+                running += line.debit - line.credit
+            rows.append({
+                "id": str(line.id), "journal_entry_id": str(line.journal_entry_id), "journal_number": line.journal_entry.journal_number,
+                "entry_date": line.journal_entry.entry_date, "reference": line.journal_entry.reference or "",
+                "description": line.description or line.journal_entry.description, "debit": money(line.debit), "credit": money(line.credit),
+                "running_balance": money(running) if is_posted else None, "status": line.journal_entry.status, "source": line.journal_entry.source,
+            })
+        posted_range = base.filter(journal_entry__status__in=posted)
+        if date_from:
+            posted_range = posted_range.filter(journal_entry__entry_date__gte=date_from)
+        if date_to:
+            posted_range = posted_range.filter(journal_entry__entry_date__lte=date_to)
+        totals = posted_range.aggregate(debit=Sum("debit"), credit=Sum("credit"))
+        monthly = [
+            {"month": (row["month"].date() if hasattr(row["month"], "date") else row["month"]).isoformat(), "debit": money(row["debit"]), "credit": money(row["credit"])}
+            for row in posted_range.annotate(month=TruncMonth("journal_entry__entry_date")).values("month").annotate(debit=Sum("debit"), credit=Sum("credit")).order_by("month")
+        ]
+        all_time = base.filter(journal_entry__status__in=posted).aggregate(debit=Sum("debit"), credit=Sum("credit"))
+        return Response({
+            "account": {"id": str(account.id), "code": account.code, "name": account.name, "account_type": account.account_type,
+                        "normal_balance": account.normal_balance, "is_postable": account.is_postable, "is_active": account.is_active,
+                        "parent": str(account.parent_id) if account.parent_id else None, "parent_name": account.parent.name if account.parent_id else None},
+            "balance": money(D(all_time["debit"] or 0) - D(all_time["credit"] or 0)),
+            "opening_balance": money(opening),
+            "closing_balance": money(running),
+            "period_debits": money(totals["debit"]),
+            "period_credits": money(totals["credit"]),
+            "unposted_lines": sum(1 for row in rows if row["running_balance"] is None),
+            "includes_descendants": len(scope_ids) > 1,
+            "monthly": monthly,
+            "lines": rows,
+        })
 
     def perform_create(self, serializer):
         serializer.save(institution=self.request.institution, actor=self.request.user)
@@ -902,12 +1002,119 @@ class JournalEntryViewSet(TenantModelViewSet):
             "post": "journal.post",
             "reverse": "journal.reverse",
             "void": "journal.create",
+            "attachments": "journal.create",
+            "notes": "journal.view",
         }.get(self.action, "journal.view")
 
     def get_queryset(self):
-        return super().get_queryset().select_related(
+        queryset = super().get_queryset().select_related(
             "accounting_period", "created_by", "approved_by", "posted_by", "reversal_of"
-        ).prefetch_related("lines__account")
+        ).prefetch_related("lines__account", "lines__department")
+        params = self.request.query_params
+        if params.get("account"):
+            queryset = queryset.filter(lines__account_id=params["account"]).distinct()
+        if params.get("date_from"):
+            queryset = queryset.filter(entry_date__gte=params["date_from"])
+        if params.get("date_to"):
+            queryset = queryset.filter(entry_date__lte=params["date_to"])
+        return queryset
+
+    def _journal_documents(self, journal):
+        from apps.documents.models import Document
+
+        return Document.objects.for_institution(self.request.institution).filter(
+            entity_type="accounting.JournalEntry", entity_id=journal.id, is_active=True
+        )
+
+    @action(detail=True, methods=("get",), filter_backends=())
+    def context(self, request, pk=None):
+        """Related records, notes, attachments and audit events for the detail page."""
+        from apps.accounting.models import Expense, Invoice, Payment, Receipt, VendorBill
+        from apps.audit.models import AuditLog
+        from apps.documents.serializers import DocumentSerializer
+
+        journal = self.get_object()
+        related = []
+        for label, rows, route in (
+            ("Vendor bill", VendorBill.objects.filter(journal_entry=journal), "/accounting/payables/bills/"),
+            ("Customer invoice", Invoice.objects.filter(journal_entry=journal), "/accounting/receivables/invoices/"),
+            ("Payment", Payment.objects.filter(journal_entry=journal), None),
+            ("Receipt", Receipt.objects.filter(journal_entry=journal), None),
+            ("Expense", Expense.objects.filter(journal_entry=journal), None),
+        ):
+            for row in rows[:20]:
+                number = next((getattr(row, field) for field in ("bill_number", "invoice_number", "payment_number", "receipt_number", "reference") if getattr(row, field, None)), str(row.pk)[:8])
+                related.append({"type": label, "id": str(row.pk), "reference": number, "status": getattr(row, "status", ""), "href": f"{route}{row.pk}" if route else None})
+        for run in journal.payroll_runs.all()[:5]:
+            related.append({"type": "Payroll run", "id": str(run.pk), "reference": str(run), "status": run.status, "href": f"/payroll/runs/{run.pk}"})
+        if journal.reversal_of_id:
+            related.append({"type": "Reverses journal", "id": str(journal.reversal_of_id), "reference": journal.reversal_of.journal_number, "status": journal.reversal_of.status, "href": f"/accounting/journals/{journal.reversal_of_id}"})
+        for reversal in journal.reversals.all():
+            related.append({"type": "Reversed by", "id": str(reversal.pk), "reference": reversal.journal_number, "status": reversal.status, "href": f"/accounting/journals/{reversal.pk}"})
+        audit = AuditLog.objects.filter(institution=request.institution, entity_id=journal.id).select_related("actor").order_by("-created_at")[:50]
+        name = lambda user: (user.get_full_name() or user.email) if user else "System"  # noqa: E731
+        return Response({
+            "related": related,
+            "notes": [{"id": str(note.id), "author": name(note.author), "body": note.body, "created_at": note.created_at} for note in journal.notes.select_related("author")],
+            "attachments": DocumentSerializer(self._journal_documents(journal), many=True, context={"request": request}).data,
+            "audit": [{"id": str(entry.id), "action": entry.action, "actor": name(entry.actor), "created_at": entry.created_at, "metadata": entry.metadata} for entry in audit],
+            "requires_approval": journal.source == JournalEntry.Source.MANUAL,
+        })
+
+    @action(detail=True, methods=("post",), filter_backends=())
+    def notes(self, request, pk=None):
+        from apps.accounting.models import JournalEntryNote
+        from apps.audit.services import record_audit_event
+        from rest_framework.exceptions import ValidationError as DRFValidationError
+
+        journal = self.get_object()
+        body = (request.data.get("body") or "").strip()
+        if not body:
+            raise DRFValidationError({"body": "Write a note first."})
+        note = JournalEntryNote.objects.create(institution=request.institution, journal_entry=journal, author=request.user, body=body[:4000])
+        record_audit_event(actor=request.user, institution=request.institution, entity=journal, action="accounting.journal.note_added")
+        return Response({"id": str(note.id), "author": request.user.get_full_name() or request.user.email, "body": note.body, "created_at": note.created_at}, status=201)
+
+    @action(detail=True, methods=("post",), filter_backends=(), parser_classes=(MultiPartParser, FormParser))
+    def attachments(self, request, pk=None):
+        import mimetypes
+
+        from django.conf import settings as django_settings
+        from apps.audit.services import record_audit_event
+        from apps.documents.models import Document
+        from apps.documents.serializers import DocumentSerializer
+        from rest_framework.exceptions import ValidationError as DRFValidationError
+
+        journal = self.get_object()
+        upload = request.FILES.get("uploaded_file")
+        if upload is None:
+            raise DRFValidationError({"uploaded_file": "Choose a file to upload."})
+        if upload.size > django_settings.DOCUMENT_UPLOAD_MAX_BYTES:
+            raise DRFValidationError({"uploaded_file": f"Files must be {django_settings.DOCUMENT_UPLOAD_MAX_BYTES // (1024 * 1024)} MB or smaller."})
+        name = (upload.name or "attachment").replace("\\", "/").rsplit("/", 1)[-1][:255]
+        content_type = (upload.content_type or "").split(";")[0].strip().lower()
+        if not content_type or content_type == "application/octet-stream":
+            content_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
+        document = Document.objects.create(
+            institution=request.institution, uploaded_by=request.user, stored_file=upload, original_filename=name,
+            content_type=content_type[:150], size_bytes=upload.size, category="JOURNAL_SUPPORT",
+            classification=Document.Classification.CONFIDENTIAL, entity_type="accounting.JournalEntry", entity_id=journal.id,
+        )
+        record_audit_event(actor=request.user, institution=request.institution, entity=journal, action="accounting.journal.attachment_added", metadata={"filename": name})
+        return Response(DocumentSerializer(document, context={"request": request}).data, status=201)
+
+    @action(detail=True, methods=("get",), filter_backends=(), url_path=r"attachments/(?P<document_id>[0-9a-f-]+)/download")
+    def download_attachment(self, request, pk=None, document_id=None):
+        from django.http import FileResponse
+        from rest_framework.exceptions import NotFound
+
+        document = self._journal_documents(self.get_object()).filter(pk=document_id).first()
+        if document is None or not document.stored_file:
+            raise NotFound("Attachment not found.")
+        response = FileResponse(document.stored_file.open("rb"), as_attachment=True, filename=document.original_filename,
+                                content_type=document.content_type or "application/octet-stream")
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
 
     def perform_create(self, serializer):
         serializer.save(institution=self.request.institution, actor=self.request.user)

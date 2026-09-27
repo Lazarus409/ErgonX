@@ -1,6 +1,6 @@
-import { apiAction, apiGet, apiGetList, apiPatch, apiPost } from "./client";
+import { apiAction, apiDownload, apiGet, apiGetList, apiPatch, apiPost, apiPostMultipart } from "./client";
 import type { ListParams, PaginatedData } from "@/types/api";
-import type { Account, AccountingConfiguration, AccountingConfigurationPayload, AccountingPeriod, AccountingPresetApplicationResult, AccountingSetupChoices, BalanceSheet, BankAccount, BankStatementLine, Customer, Expense, GhanaComplianceReminder, IncomeStatement, Invoice, InvoiceLine, JournalEntry, PayComponentAccountMapping, PayComponentAccountMappingPayload, PayrollAccountMappingTemplate, Payment, Receipt, TaxCode, TaxComponent, TrialBalance, Vendor, VendorBill, VendorBillLine, WithholdingRule } from "@/types/accounting";
+import type { AccountActivity, JournalContext, Account, AccountingConfiguration, AccountingConfigurationPayload, AccountingPeriod, AccountingPresetApplicationResult, AccountingSetupChoices, BalanceSheet, BankAccount, BankStatementLine, Customer, Expense, GhanaComplianceReminder, IncomeStatement, Invoice, InvoiceLine, JournalEntry, PayComponentAccountMapping, PayComponentAccountMappingPayload, PayrollAccountMappingTemplate, Payment, Receipt, TaxCode, TaxComponent, TrialBalance, Vendor, VendorBill, VendorBillLine, WithholdingRule } from "@/types/accounting";
 
 export type AccountPayload = Pick<Account, "code" | "name" | "account_type" | "parent" | "normal_balance" | "is_postable" | "is_active">;
 
@@ -101,3 +101,17 @@ export function listPayComponentAccountMappings(params?: ListParams & { pay_comp
 export function createPayComponentAccountMapping(payload: PayComponentAccountMappingPayload): Promise<PayComponentAccountMapping> { return apiPost<PayComponentAccountMapping, PayComponentAccountMappingPayload>("/pay-component-account-mappings/", payload); }
 export function updatePayComponentAccountMapping(id: string, payload: Partial<PayComponentAccountMappingPayload>): Promise<PayComponentAccountMapping> { return apiPatch<PayComponentAccountMapping, Partial<PayComponentAccountMappingPayload>>(`/pay-component-account-mappings/${id}/`, payload); }
 export function applyPayrollAccountMappingTemplates(effective_from: string): Promise<PayComponentAccountMapping[]> { return apiPost<PayComponentAccountMapping[], { effective_from: string }>("/pay-component-account-mappings/apply-templates/", { effective_from }); }
+
+export function getAccountBalances(): Promise<Record<string, string>> { return apiGet<Record<string, string>>("/accounts/balances/"); }
+export function getAccountActivity(id: string, params: { date_from?: string; date_to?: string; status?: string; source?: string; search?: string }): Promise<AccountActivity> {
+  const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value) as Array<[string, string]>);
+  return apiGet<AccountActivity>(`/accounts/${id}/activity/${query.toString() ? `?${query.toString()}` : ""}`);
+}
+export function getJournalContext(id: string): Promise<JournalContext> { return apiGet<JournalContext>(`/journal-entries/${id}/context/`); }
+export function addJournalNote(id: string, body: string): Promise<JournalContext["notes"][number]> { return apiPost<JournalContext["notes"][number], { body: string }>(`/journal-entries/${id}/notes/`, { body }); }
+export function uploadJournalAttachment(id: string, file: File, onProgress?: (progress: number) => void): Promise<JournalContext["attachments"][number]> {
+  const body = new FormData();
+  body.append("uploaded_file", file);
+  return apiPostMultipart(`/journal-entries/${id}/attachments/`, body, onProgress);
+}
+export function downloadJournalAttachment(id: string, documentId: string): Promise<Blob> { return apiDownload(`/journal-entries/${id}/attachments/${documentId}/download/`); }

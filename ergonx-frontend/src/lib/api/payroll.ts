@@ -3,6 +3,9 @@
 import { apiAction, apiDelete, apiGet, apiGetList, apiPatch, apiPost } from "./client";
 import type { ListParams, PaginatedData } from "@/types/api";
 import type {
+  PayrollComplianceDeadline,
+  PayrollRunActivity,
+  PayrollRunException,
   EmployeePayrollProfile,
   PayrollPeriod,
   Payslip,
@@ -87,6 +90,28 @@ export async function listPayslips(params?: ListParams & { payroll_record?: stri
 
 export async function getPayslip(id: string): Promise<Payslip> {
   return apiGet<Payslip>(`/payslips/${id}/`);
+}
+
+/** Re-runs exception detection on a calculated or in-review run. */
+export async function validatePayrollRun(id: string): Promise<PayrollRun> {
+  return apiPost<PayrollRun, Record<string, never>>(`/payroll-runs/${id}/validate/`, {});
+}
+
+export async function listPayrollRunExceptions(id: string): Promise<PayrollRunException[]> {
+  return apiGet<PayrollRunException[]>(`/payroll-runs/${id}/exceptions/`);
+}
+
+/** Acknowledge (medium/low), resolve or reopen an exception; a note is required unless reopening. */
+export async function updatePayrollRunException(runId: string, exceptionId: string, status: "OPEN" | "ACKNOWLEDGED" | "RESOLVED", note = ""): Promise<PayrollRunException> {
+  return apiPost<PayrollRunException, { status: string; note: string }>(`/payroll-runs/${runId}/exceptions/${exceptionId}/`, { status, note });
+}
+
+export async function listPayrollRunActivity(id: string): Promise<PayrollRunActivity[]> {
+  return apiGet<PayrollRunActivity[]>(`/payroll-runs/${id}/activity/`);
+}
+
+export async function getPayrollPeriodComplianceDeadlines(periodId: string): Promise<PayrollComplianceDeadline[]> {
+  return apiGet<PayrollComplianceDeadline[]>(`/payroll-periods/${periodId}/compliance-deadlines/`);
 }
 
 export async function getPayrollRunReconciliation(

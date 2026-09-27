@@ -58,6 +58,8 @@ const statusConfig: Record<string, { label: string; tone: BadgeTone; icon?: Luci
   POSTED: { label: "Posted", tone: "brand" },
   CLOSED: { label: "Closed", tone: "neutral", icon: Lock },
   OPEN: { label: "Open", tone: "info" },
+  SENT: { label: "Sent", tone: "info" },
+  EXTENDED: { label: "Sent", tone: "info" },
   PAID: { label: "Paid", tone: "success" },
   PARTIALLY_PAID: { label: "Partially paid", tone: "info" },
   PART_PAID: { label: "Part paid", tone: "info" },

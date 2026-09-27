@@ -17,6 +17,9 @@ export interface Account {
 export interface JournalLine {
   id: string;
   account: string;
+  account_code?: string;
+  account_name?: string;
+  department_name?: string | null;
   description: string;
   debit: string;
   credit: string;
@@ -35,6 +38,12 @@ export interface JournalEntry {
   id: string;
   journal_number: string;
   accounting_period: string;
+  period_name?: string;
+  created_by_name?: string | null;
+  approved_by_name?: string | null;
+  posted_by_name?: string | null;
+  total_debit?: string;
+  total_credit?: string;
   entry_date: string;
   description: string;
   source: string;
@@ -114,3 +123,37 @@ export interface GhanaComplianceReminder { id: string; institution: string; code
 export interface PayrollAccountMappingTemplate { id: string; accounting_preset_version: string; payroll_component_code: string; debit_account_mapping_code: string | null; credit_account_mapping_code: string | null; description: string; }
 export interface PayComponentAccountMapping { id: string; institution: string; pay_component: string; debit_account: string | null; credit_account: string | null; effective_from: string; effective_to: string | null; is_active: boolean; }
 export type PayComponentAccountMappingPayload = Pick<PayComponentAccountMapping, "pay_component" | "debit_account" | "credit_account" | "effective_from" | "effective_to" | "is_active">;
+
+export interface AccountActivityLine {
+  id: string;
+  journal_entry_id: string;
+  journal_number: string;
+  entry_date: string;
+  reference: string;
+  description: string;
+  debit: string;
+  credit: string;
+  running_balance: string | null;
+  status: string;
+  source: string;
+}
+
+export interface AccountActivity {
+  account: { id: string; code: string; name: string; account_type: string; normal_balance: string; is_postable: boolean; is_active: boolean; parent: string | null; parent_name: string | null };
+  balance: string;
+  opening_balance: string;
+  closing_balance: string;
+  period_debits: string;
+  period_credits: string;
+  unposted_lines: number;
+  monthly: Array<{ month: string; debit: string; credit: string }>;
+  lines: AccountActivityLine[];
+}
+
+export interface JournalContext {
+  related: Array<{ type: string; id: string; reference: string; status: string; href: string | null }>;
+  notes: Array<{ id: string; author: string; body: string; created_at: string }>;
+  attachments: Array<{ id: string; original_filename: string; content_type: string; size_bytes: number; created_at: string }>;
+  audit: Array<{ id: string; action: string; actor: string; created_at: string; metadata: Record<string, unknown> }>;
+  requires_approval: boolean;
+}

@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ErgonX Concept Review</title>
+<style>
+:root{
+  --bg:#f4f6fa; --surface:#fff; --ink:#0f1b33; --muted:#5b6780; --line:#dde3ee;
+  --navy:#0e1f40; --blue:#1f5eff; --blue-soft:#e8efff;
+  --keep:#1a7f4b; --keep-soft:#e3f5ec; --tweak:#b86a00; --tweak-soft:#fff2dc; --redo:#c0322b; --redo-soft:#fde8e7;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 "Segoe UI",system-ui,sans-serif}
+header{position:sticky;top:0;z-index:5;background:var(--navy);color:#fff;padding:12px 20px;display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+header h1{font-size:17px;margin:0 12px 0 0;font-weight:600}
+header .stats{font-size:12px;opacity:.85}
+header .spacer{flex:1}
+header input,header select{padding:6px 10px;border-radius:6px;border:0;font:inherit}
+button{font:inherit;cursor:pointer;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:6px 12px}
+button.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+main{max-width:1500px;margin:0 auto;padding:16px 20px 60px}
+.rules{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 16px;margin-bottom:18px}
+.rules summary{cursor:pointer;font-weight:600}
+.rules li{margin:3px 0;color:var(--muted)}
+h2{font-size:15px;margin:26px 0 10px;color:var(--navy);text-transform:uppercase;letter-spacing:.06em}
+h2 small{color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+.card.keep{border-color:var(--keep)} .card.tweak{border-color:var(--tweak)} .card.redo{border-color:var(--redo)}
+.thumb{aspect-ratio:1484/1060;background:#e9edf4;display:block;width:100%;border:0;padding:0;border-radius:0;position:relative}
+.thumb img{width:100%;height:100%;object-fit:cover;object-position:top;display:block}
+.thumb .noimg{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:13px;text-align:center;padding:20px}
+.thumb .pins{position:absolute;top:8px;right:8px;background:var(--blue);color:#fff;border-radius:99px;padding:1px 8px;font-size:12px}
+.body{padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px}
+.title{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.title b{font-size:14px}
+.dir{font-size:12px;color:var(--muted);white-space:nowrap}
+.status{display:flex;gap:6px}
+.status button{flex:1;padding:4px 0;font-size:12px}
+.status button.on[data-s=keep]{background:var(--keep-soft);border-color:var(--keep);color:var(--keep)}
+.status button.on[data-s=tweak]{background:var(--tweak-soft);border-color:var(--tweak);color:var(--tweak)}
+.status button.on[data-s=redo]{background:var(--redo-soft);border-color:var(--redo);color:var(--redo)}
+textarea{width:100%;min-height:56px;resize:vertical;border:1px solid var(--line);border-radius:6px;padding:6px 8px;font:inherit}
+/* viewer */
+#viewer{position:fixed;inset:0;z-index:20;background:rgba(8,14,28,.92);display:none;grid-template-columns:1fr 340px}
+#viewer.open{display:grid}
+#stage{overflow:auto;position:relative;padding:20px}
+#frame{position:relative;margin:0 auto;width:100%;cursor:crosshair}
+#frame img{width:100%;display:block;border-radius:4px}
+.pin{position:absolute;transform:translate(-50%,-50%);width:26px;height:26px;border-radius:50%;background:var(--blue);color:#fff;border:2px solid #fff;font-size:12px;font-weight:700;display:grid;place-items:center;box-shadow:0 2px 6px rgba(0,0,0,.4);cursor:pointer}
+.pin.sel{background:var(--tweak)}
+#side{background:var(--surface);display:flex;flex-direction:column;overflow:hidden}
+#side .head{padding:14px 16px;border-bottom:1px solid var(--line)}
+#side .head b{font-size:16px;display:block}
+#side .scroll{overflow:auto;padding:12px 16px;flex:1;display:flex;flex-direction:column;gap:10px}
+#side .foot{padding:10px 16px;border-top:1px solid var(--line);display:flex;gap:6px;flex-wrap:wrap}
+.hint{font-size:12px;color:var(--muted)}
+.pinnote{display:flex;gap:8px;align-items:flex-start}
+.pinnote span{flex:none;width:22px;height:22px;border-radius:50%;background:var(--blue);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center;margin-top:4px}
+.pinnote textarea{min-height:40px}
+.pinnote button{padding:2px 7px;margin-top:4px}
+.zoom{display:flex;gap:6px;align-items:center}
+@media (max-width:900px){#viewer{grid-template-columns:1fr;grid-template-rows:1fr 45vh}}
+@media (max-width:600px){main{padding:12px 16px 40px}.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1>ErgonX Concept Review</h1>
+  <span class="stats" id="stats"></span>
+  <span class="spacer"></span>
+  <input id="q" type="search" placeholder="Filter concepts…">
+  <select id="filter">
+    <option value="all">All</option>
+    <option value="img">With image</option>
+    <option value="noimg">No image</option>
+    <option value="tweak">Marked tweak</option>
+    <option value="redo">Marked redo</option>
+    <option value="unset">Not reviewed</option>
+  </select>
+  <button class="primary" id="export">Export tweaks (.md)</button>
+  <button id="import">Import</button>
+  <input type="file" id="importFile" accept=".json,.md" hidden>
+</header>
+<main>
+  <details class="rules">
+    <summary>Governing product rules (from README)</summary>
+    <ul>
+      <li>Preserve the approved shell: navy structural sidebar, light top bar, role-aware navigation, tenant-aware identity areas.</li>
+      <li>Use the original supplied raster logo assets; no invented substitute logo artwork.</li>
+      <li>Standard Employees land on Self-Service Home; managers, HR, Finance, Directors and admins land on the general workspace.</li>
+      <li>Insights is permission/module scoped; Executive Dashboard is organization-wide for Institution Admin and Director.</li>
+      <li>Never fabricate production KPI/chart data — governed empty states when data is unavailable.</li>
+      <li>Max two uses of the same visualization type per dashboard (hard acceptance criterion).</li>
+      <li>Only draft/unreferenced config records may be hard-deleted; referenced master data is archived; finalized/posted/paid/approved/audit/security records are never hard-deleted.</li>
+      <li>Corrections use linked adjustment, reversal, void, cancellation or replacement records, keeping the original.</li>
+    </ul>
+    <p class="hint">Every brief shares the same template (page header + one primary action, shared primitives, desktop/tablet/mobile rules, permission-driven actions, audit on mutations). The only per-concept difference is one backend rule, shown under each group heading below.</p>
+  </details>
+  <div id="groups"></div>
+</main>
+
+<div id="viewer" role="dialog" aria-modal="true">
+  <div id="stage"><div id="frame"><img id="vimg" alt=""></div></div>
+  <aside id="side">
+    <div class="head">
+      <b id="vtitle"></b>
+      <span class="hint" id="vdir"></span>
+    </div>
+    <div class="scroll">
+      <div class="status" id="vstatus"></div>
+      <div class="zoom"><span class="hint">Zoom</span><button data-z="-1">−</button><button data-z="0">Fit</button><button data-z="1">+</button></div>
+      <label class="hint">General notes</label>
+      <textarea id="vnote" placeholder="What should change on this screen?"></textarea>
+      <label class="hint" id="pinhint">Click anywhere on the image to drop a numbered pin, then describe the tweak.</label>
+      <div id="pinlist"></div>
+      <label class="hint">Brief rule for this group</label>
+      <div class="hint" id="vrule"></div>
+    </div>
+    <div class="foot">
+      <button id="prev">← Prev</button><button id="next">Next →</button>
+      <span class="spacer" style="flex:1"></span><button id="close">Close (Esc)</button>
+    </div>
+  </aside>
+</div>
+
+<script>
+const RULES = {
+  dash: "Use authoritative API aggregates only; governed empty/loading/error states; never fabricate chart data; max two of the same visualization per dashboard.",
+  master: "Role- and permission-scoped APIs. Referenced master data is deactivated/archived, not hard-deleted.",
+  ledger: "Posted/finalized/paid records are immutable; corrections create linked adjustments, reversals or voids, preserving source and audit trail.",
+  general: "Visibility and actions driven by effective role, permissions, institution membership, module enablement and record state."
+};
+// [slug, name, approved direction, has image, rule]
+const GROUPS = [
+ ["Entry", [
+  ["login","Login","Option 2",1,"general"],
+  ["get_started","Get Started","Option 3",1,"general"],
+  ["splash_screen","Splash Screen","Option 2 revised",1,"general"]]],
+ ["Shell & home", [
+  ["global_application_shell","Global Application Shell","Option 3 revised",1,"general"],
+  ["general_home_workspace","General Home Workspace","Option 3 revised",0,"general"],
+  ["employee_self_service_home","Employee Self-Service Home","Option 3 revised",0,"master"],
+  ["global_search_results","Global Search Results","Option 1",1,"general"],
+  ["notifications_center","Notifications Center","Option 2",1,"general"]]],
+ ["Dashboards & analytics", [
+  ["insights","Insights","Approved merged direction",1,"dash"],
+  ["executive_dashboard","Executive Dashboard","Approved direction",1,"dash"],
+  ["self_service_dashboard","Self-Service Dashboard","Option 3",0,"dash"],
+  ["hr_dashboard","HR Dashboard","Option 2",0,"dash"],
+  ["accounting_dashboard","Accounting Dashboard","Option 3 revised",1,"dash"],
+  ["reports_and_analytics","Reports and Analytics","Option 2",1,"dash"],
+  ["financial_reports","Financial Reports","Option 2",1,"dash"],
+  ["financial_report_detail","Financial Report Detail","Option 1",1,"ledger"]]],
+ ["Employee self-service", [
+  ["my_profile","My Profile","Option 2 revised",0,"general"],
+  ["my_documents","My Documents","Option 1",0,"general"],
+  ["my_leave","My Leave","Option 2",0,"master"],
+  ["request_leave","Request Leave","Option 3",0,"master"],
+  ["my_attendance","My Attendance","Option 3",0,"master"],
+  ["my_payslips","My Payslips","Option 1",0,"general"],
+  ["emergency_contacts","Emergency Contacts","Option 3",0,"general"],
+  ["security","Security","Option 2",0,"general"],
+  ["personal_preferences","Personal Preferences","Option 2 revised",0,"general"]]],
+ ["Administration", [
+  ["institution_settings","Institution Settings","Option 3",0,"general"],
+  ["modules","Modules","Option 2",0,"general"],
+  ["users_and_access","Users and Access","Option 2 revised",1,"general"],
+  ["roles_and_permissions","Roles and Permissions","Option 2 revised",1,"general"],
+  ["approval_workflows","Approval Workflows","Option 3",0,"general"],
+  ["audit_log","Audit Log","Option 2",0,"general"]]],
+ ["HR", [
+  ["employees_directory","Employees Directory","Option 2",1,"master"],
+  ["employee_detail","Employee Detail","Option 1 revised",1,"master"],
+  ["hr_leave","HR Leave","Option 3 with calendar",1,"master"],
+  ["leave_request_review","Leave Request Review","Option 2",1,"master"],
+  ["hr_attendance","HR Attendance","Option 3",1,"master"],
+  ["attendance_adjustment_review","Attendance Adjustment Review","Option 3",1,"master"],
+  ["hr_payroll_workspace","HR Payroll Workspace","Option 2",1,"ledger"],
+  ["payroll_run_detail","Payroll Run Detail","Option 2 revised",1,"ledger"]]],
+ ["Recruitment", [
+  ["recruitment","Recruitment","Option 1",1,"master"],
+  ["create_requisition","Create Requisition","Option 3",1,"master"],
+  ["requisition_detail","Requisition Detail","Option 3 revised",1,"master"],
+  ["candidate_application_submission","Candidate Application Submission","Option 1",1,"master"],
+  ["candidate_detail","Candidate Detail","Option 3",1,"master"],
+  ["interview_scheduling","Interview Scheduling","Option 1",1,"general"],
+  ["offer_management","Offer Management","Option 3",1,"master"]]],
+ ["Finance", [
+  ["general_ledger","General Ledger","Option 2",1,"ledger"],
+  ["journal_entry_detail","Journal Entry Detail","Option 2",1,"general"],
+  ["accounts_payable","Accounts Payable","Option 2",1,"general"],
+  ["vendor_bill_detail","Vendor Bill Detail","Option 2",1,"ledger"],
+  ["accounts_receivable","Accounts Receivable","Option 1",1,"general"],
+  ["customer_invoice_detail","Customer Invoice Detail","Option 2",1,"ledger"],
+  ["bank_reconciliation","Bank Reconciliation","Option 2",1,"ledger"],
+  ["bank_reconciliation_session_detail","Bank Reconciliation Session Detail","Option 1",1,"ledger"],
+  ["budgets","Budgets","Option 2",1,"ledger"],
+  ["budget_detail","Budget Detail","Option 1",1,"ledger"]]],
+ ["Cross-cutting patterns", [
+  ["governed_empty_error_loading_states","Governed Empty / Error / Loading States","Combined approved direction",1,"general"],
+  ["confirmation_dialogs","Confirmation Dialogs","Option 1",1,"general"],
+  ["record_actions_and_lifecycle_states","Record Actions and Lifecycle States","Option 1",1,"general"],
+  ["workflow_transitions_and_correction_handoffs","Workflow Transitions and Correction Handoffs","Option 2",0,"general"],
+  ["record_history_and_lineage","Record History and Lineage","Option 3",1,"general"],
+  ["bulk_actions_and_batch_governance","Bulk Actions and Batch Governance","Option 2",1,"general"]]]
+];
+
+const ALL = GROUPS.flatMap(([g,items])=>items.map(([slug,name,dir,img,rule])=>({slug,name,dir,img:!!img,rule,group:g})));
+const KEY="ergonx-concept-review-v1";
+let state={};
+try{state=JSON.parse(localStorage.getItem(KEY)||"{}")}catch(e){}
+const get=s=>state[s]||(state[s]={status:"",note:"",pins:[]});
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){} renderStats();};
+const esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function renderStats(){
+  const c={keep:0,tweak:0,redo:0};
+  ALL.forEach(a=>{const s=state[a.slug]?.status; if(c[s]!==undefined)c[s]++;});
+  document.getElementById("stats").textContent=
+    `${ALL.length} concepts · ${ALL.filter(a=>a.img).length} images · ${c.keep} keep · ${c.tweak} tweak · ${c.redo} redo`;
+}
+
+function statusButtons(slug){
+  const s=get(slug).status;
+  return ["keep","tweak","redo"].map(k=>`<button data-s="${k}" data-slug="${slug}" class="${s===k?"on":""}">${k[0].toUpperCase()+k.slice(1)}</button>`).join("");
+}
+
+function render(){
+  const q=document.getElementById("q").value.toLowerCase();
+  const f=document.getElementById("filter").value;
+  const match=a=>{
+    if(q && !a.name.toLowerCase().includes(q)) return false;
+    const st=state[a.slug]?.status||"";
+    if(f==="img")return a.img; if(f==="noimg")return !a.img;
+    if(f==="tweak"||f==="redo")return st===f; if(f==="unset")return !st;
+    return true;
+  };
+  let html="";
+  GROUPS.forEach(([g])=>{
+    const items=ALL.filter(a=>a.group===g&&match(a));
+    if(!items.length)return;
+    html+=`<h2>${g} <small>(${items.length})</small></h2><div class="grid">`;
+    items.forEach(a=>{
+      const st=get(a.slug);
+      html+=`<div class="card ${st.status}" id="c-${a.slug}">
+        <button class="thumb" data-open="${a.slug}" aria-label="Open ${esc(a.name)}">
+          ${a.img?`<img loading="lazy" src="images/${a.slug}.png" alt="${esc(a.name)} concept">`:`<span class="noimg">No image in package<br>(brief only — click to add notes)</span>`}
+          ${st.pins.length?`<span class="pins">${st.pins.length} pin${st.pins.length>1?"s":""}</span>`:""}
+        </button>
+        <div class="body">
+          <div class="title"><b>${esc(a.name)}</b><span class="dir">${esc(a.dir)}</span></div>
+          <div class="status">${statusButtons(a.slug)}</div>
+          <textarea data-note="${a.slug}" placeholder="Tweaks for this screen…">${esc(st.note)}</textarea>
+        </div></div>`;
+    });
+    html+="</div>";
+  });
+  document.getElementById("groups").innerHTML=html||`<p class="hint">No concepts match.</p>`;
+  renderStats();
+}
+
+document.addEventListener("click",e=>{
+  const sb=e.target.closest(".status button");
+  if(sb){const st=get(sb.dataset.slug); st.status=st.status===sb.dataset.s?"":sb.dataset.s; save();
+    if(viewerSlug===sb.dataset.slug)renderViewer(); render(); return;}
+  const op=e.target.closest("[data-open]"); if(op)openViewer(op.dataset.open);
+});
+document.addEventListener("input",e=>{
+  if(e.target.dataset.note){get(e.target.dataset.note).note=e.target.value; save();}
+});
+document.getElementById("q").addEventListener("input",render);
+document.getElementById("filter").addEventListener("change",render);
+
+/* viewer */
+let viewerSlug=null, zoom=1, selPin=-1;
+const V=id=>document.getElementById(id);
+function openViewer(slug){viewerSlug=slug;zoom=1;selPin=-1;V("viewer").classList.add("open");renderViewer();}
+function closeViewer(){viewerSlug=null;V("viewer").classList.remove("open");render();}
+function renderViewer(){
+  const a=ALL.find(x=>x.slug===viewerSlug), st=get(a.slug);
+  V("vtitle").textContent=a.name; V("vdir").textContent=`${a.group} · Approved: ${a.dir}`;
+  V("vrule").textContent=RULES[a.rule];
+  V("vstatus").innerHTML=statusButtons(a.slug);
+  V("vnote").value=st.note;
+  V("frame").style.width=(zoom*100)+"%";
+  V("frame").style.display=a.img?"block":"none";
+  V("pinhint").style.display=a.img?"block":"none";
+  if(a.img)V("vimg").src=`images/${a.slug}.png`;
+  V("frame").querySelectorAll(".pin").forEach(p=>p.remove());
+  st.pins.forEach((p,i)=>{
+    const d=document.createElement("div");
+    d.className="pin"+(i===selPin?" sel":""); d.textContent=i+1;
+    d.style.left=p.x+"%"; d.style.top=p.y+"%"; d.dataset.i=i;
+    V("frame").appendChild(d);
+  });
+  V("pinlist").innerHTML=st.pins.map((p,i)=>`<div class="pinnote"><span>${i+1}</span>
+    <textarea data-pin="${i}" placeholder="Tweak at pin ${i+1}…">${esc(p.note)}</textarea>
+    <button data-delpin="${i}" title="Remove pin">✕</button></div>`).join("");
+}
+V("frame").addEventListener("click",e=>{
+  const st=get(viewerSlug);
+  if(e.target.classList.contains("pin")){selPin=+e.target.dataset.i;renderViewer();
+    V("pinlist").querySelector(`[data-pin="${selPin}"]`)?.focus();return;}
+  const r=V("vimg").getBoundingClientRect();
+  st.pins.push({x:+((e.clientX-r.left)/r.width*100).toFixed(1),y:+((e.clientY-r.top)/r.height*100).toFixed(1),note:""});
+  selPin=st.pins.length-1; save(); renderViewer();
+  V("pinlist").querySelector(`[data-pin="${selPin}"]`)?.focus();
+});
+V("pinlist").addEventListener("input",e=>{const i=e.target.dataset.pin;if(i!==undefined){get(viewerSlug).pins[i].note=e.target.value;save();}});
+V("pinlist").addEventListener("focusin",e=>{const i=e.target.dataset.pin;if(i!==undefined&&+i!==selPin){selPin=+i;
+  V("frame").querySelectorAll(".pin").forEach(p=>p.classList.toggle("sel",+p.dataset.i===selPin));}});
+V("pinlist").addEventListener("click",e=>{const i=e.target.dataset.delpin;if(i!==undefined){get(viewerSlug).pins.splice(i,1);selPin=-1;save();renderViewer();}});
+V("vnote").addEventListener("input",e=>{get(viewerSlug).note=e.target.value;save();});
+document.querySelectorAll("[data-z]").forEach(b=>b.addEventListener("click",()=>{
+  const z=+b.dataset.z; zoom=z===0?1:Math.min(4,Math.max(.5,zoom+z*.5)); renderViewer();}));
+function step(d){const i=ALL.findIndex(a=>a.slug===viewerSlug);openViewer(ALL[(i+d+ALL.length)%ALL.length].slug);}
+V("prev").onclick=()=>step(-1); V("next").onclick=()=>step(1); V("close").onclick=closeViewer;
+document.addEventListener("keydown",e=>{
+  if(!viewerSlug||e.target.tagName==="TEXTAREA")return;
+  if(e.key==="Escape")closeViewer(); if(e.key==="ArrowRight")step(1); if(e.key==="ArrowLeft")step(-1);
+});
+
+/* export / import */
+V("export").onclick=()=>{
+  let md=`# ErgonX concept tweaks\n\nExported ${new Date().toISOString().slice(0,16).replace("T"," ")}\n\n`;
+  md+="Pin coordinates are percentages of the image width/height from the top-left corner.\n\n";
+  GROUPS.forEach(([g])=>{
+    const items=ALL.filter(a=>{const s=state[a.slug];return a.group===g&&s&&(s.status||s.note.trim()||s.pins.length);});
+    if(!items.length)return;
+    md+=`## ${g}\n\n`;
+    items.forEach(a=>{
+      const s=state[a.slug];
+      md+=`### ${a.name} — ${s.status?s.status.toUpperCase():"UNREVIEWED"}\n`;
+      md+=`Image: images/${a.img?a.slug+".png":"(none)"} · Approved: ${a.dir}\n\n`;
+      if(s.note.trim())md+=s.note.trim()+"\n\n";
+      s.pins.forEach((p,i)=>md+=`- Pin ${i+1} (x ${p.x}%, y ${p.y}%): ${p.note.trim()||"(no note)"}\n`);
+      if(s.pins.length)md+="\n";
+    });
+  });
+  md+=`<!-- review-state ${JSON.stringify(state)} -->\n`;
+  const url=URL.createObjectURL(new Blob([md],{type:"text/markdown"}));
+  const l=document.createElement("a");l.href=url;l.download="design_tweaks.md";l.click();URL.revokeObjectURL(url);
+};
+V("import").onclick=()=>V("importFile").click();
+V("importFile").onchange=async e=>{
+  const t=await e.target.files[0].text();
+  const m=t.match(/<!-- review-state (.*) -->/s);
+  try{state=JSON.parse(m?m[1]:t);save();render();}catch(err){alert("Could not read review state from that file.");}
+};
+render();
+</script>
+</body>
+</html>

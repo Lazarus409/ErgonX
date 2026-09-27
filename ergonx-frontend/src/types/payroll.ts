@@ -37,6 +37,13 @@ export interface StatutoryThreshold { id: string; preset_version: string; code: 
 
 export interface PayrollRun {
   id: string;
+  /** PR-YYYYMM-NN */
+  reference?: string;
+  period_name?: string;
+  started_by_name?: string | null;
+  approved_by_name?: string | null;
+  finalized_by_name?: string | null;
+  exception_counts?: { total: number; open: number; high_open: number };
   payroll_period: string;
   preset_version: string | null;
   run_number: number;
@@ -176,3 +183,38 @@ export interface SalaryStructureComponent {
   updated_at: string;
 }
 export interface PayrollAdjustment { id: string; employee: string; payroll_period: string; pay_component: string; amount: string; reason: string; status: string; created_by: string; approved_by: string | null; applied_run: string | null; created_at: string; updated_at: string; }
+
+export interface PayrollRunException {
+  id: string;
+  payroll_run: string;
+  employee: string | null;
+  employee_name: string | null;
+  employee_number: string | null;
+  code: string;
+  severity: "HIGH" | "MEDIUM" | "LOW" | string;
+  message: string;
+  details: Record<string, unknown>;
+  status: "OPEN" | "ACKNOWLEDGED" | "RESOLVED" | string;
+  resolution_note: string;
+  resolved_by: string | null;
+  resolved_by_name: string | null;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PayrollRunActivity {
+  id: string;
+  action: string;
+  actor: string;
+  created_at: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface PayrollComplianceDeadline {
+  compliance_deadline_id: string;
+  code: string;
+  authority: string;
+  event_type: string;
+  due_date: string;
+}

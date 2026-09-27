@@ -75,7 +75,8 @@ def test_review_context_compares_scheduled_recorded_requested(flow):
 def test_request_changes_then_resubmit_then_approve_with_note(flow):
     adjustment = return_adjustment(adjustment=flow["adjustment"], actor=flow["hr"], comment="Attach the outage notice")
     assert adjustment.status == AttendanceAdjustment.Status.RETURNED
-    assert Notification.objects.filter(user=flow["staff"], notification_type="ATTENDANCE_ADJUSTMENT_RETURNED").exists()
+    returned_note = Notification.objects.get(user=flow["staff"], notification_type="ATTENDANCE_ADJUSTMENT_RETURNED")
+    assert returned_note.metadata["route_hint"] == f"/me/attendance/adjustments/{adjustment.id}"
     with pytest.raises(ValidationError):
         resubmit_adjustment(adjustment=adjustment, actor=flow["hr"], reason="not mine")
     adjustment = resubmit_adjustment(adjustment=adjustment, actor=flow["staff"], reason="Outage, notice attached")

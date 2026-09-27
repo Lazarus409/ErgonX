@@ -579,7 +579,7 @@ class DashboardViewSet(ViewSet):
             .select_related("employee")
             .order_by("-attendance_date")[:10]
         ):
-            if record.check_in and not record.check_out:
+            if record.check_in and not record.check_out and record.attendance_date < today:
                 issue = "Missing clock-out"
             elif record.status == AttendanceRecord.Status.ABSENT:
                 issue = "Absent"

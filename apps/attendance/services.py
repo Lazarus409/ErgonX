@@ -424,7 +424,15 @@ def _notify_adjustment(user, adjustment, notification_type, title, message):
         title=title,
         message=message,
         channel=Notification.Channel.IN_APP,
-        metadata={"attendance_adjustment_id": str(adjustment.id), "route_hint": f"/attendance/adjustments/{adjustment.id}"},
+        metadata={
+            "attendance_adjustment_id": str(adjustment.id),
+            # Requesters open their self-service copy; reviewers the attendance workspace.
+            "route_hint": (
+                f"/me/attendance/adjustments/{adjustment.id}"
+                if user.id == adjustment.requested_by_id
+                else f"/attendance/adjustments/{adjustment.id}"
+            ),
+        },
     )
 
 

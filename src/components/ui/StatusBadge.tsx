@@ -60,6 +60,7 @@ const statusConfig: Record<string, { label: string; tone: BadgeTone; icon?: Luci
   OPEN: { label: "Open", tone: "info" },
   SENT: { label: "Sent", tone: "info" },
   ON_HOLD: { label: "On hold", tone: "violet" },
+  NOT_SENT: { label: "Not sent", tone: "neutral", icon: CircleDashed },
   NOT_SCHEDULED: { label: "Not scheduled", tone: "neutral", icon: CircleDashed },
   EXTENDED: { label: "Sent", tone: "info" },
   PAID: { label: "Paid", tone: "success" },

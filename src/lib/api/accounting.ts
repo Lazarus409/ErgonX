@@ -1,6 +1,6 @@
 import { apiAction, apiDownload, apiGet, apiGetList, apiPatch, apiPost, apiPostMultipart } from "./client";
 import type { ListParams, PaginatedData } from "@/types/api";
-import type { PayablesSummary, VendorBillContext, RecordAttachment, AccountActivity, JournalContext, Account, AccountingConfiguration, AccountingConfigurationPayload, AccountingPeriod, AccountingPresetApplicationResult, AccountingSetupChoices, BalanceSheet, BankAccount, BankStatementLine, Customer, Expense, GhanaComplianceReminder, IncomeStatement, Invoice, InvoiceLine, JournalEntry, PayComponentAccountMapping, PayComponentAccountMappingPayload, PayrollAccountMappingTemplate, Payment, Receipt, TaxCode, TaxComponent, TrialBalance, Vendor, VendorBill, VendorBillLine, WithholdingRule } from "@/types/accounting";
+import type { InvoiceContext, InvoiceReminder, ReceivablesSummary, PayablesSummary, VendorBillContext, RecordAttachment, AccountActivity, JournalContext, Account, AccountingConfiguration, AccountingConfigurationPayload, AccountingPeriod, AccountingPresetApplicationResult, AccountingSetupChoices, BalanceSheet, BankAccount, BankStatementLine, Customer, Expense, GhanaComplianceReminder, IncomeStatement, Invoice, InvoiceLine, JournalEntry, PayComponentAccountMapping, PayComponentAccountMappingPayload, PayrollAccountMappingTemplate, Payment, Receipt, TaxCode, TaxComponent, TrialBalance, Vendor, VendorBill, VendorBillLine, WithholdingRule } from "@/types/accounting";
 
 export type AccountPayload = Pick<Account, "code" | "name" | "account_type" | "parent" | "normal_balance" | "is_postable" | "is_active">;
 
@@ -130,3 +130,15 @@ export function uploadRecordAttachment(resource: "vendor-bills" | "invoices", id
   return apiPostMultipart(`/${resource}/${id}/attachments/`, body, onProgress);
 }
 export function downloadRecordAttachment(resource: "vendor-bills" | "invoices", id: string, documentId: string): Promise<Blob> { return apiDownload(`/${resource}/${id}/attachments/${documentId}/download/`); }
+
+export function getInvoice(id: string): Promise<Invoice> { return apiGet<Invoice>(`/invoices/${id}/`); }
+export function getReceivablesSummary(months: 3 | 6 | 12): Promise<ReceivablesSummary> { return apiGet<ReceivablesSummary>(`/invoices/summary/?months=${months}`); }
+export function getInvoiceContext(id: string): Promise<InvoiceContext> { return apiGet<InvoiceContext>(`/invoices/${id}/context/`); }
+export function holdInvoice(id: string, reason: string): Promise<Invoice> { return apiPost<Invoice, { reason: string }>(`/invoices/${id}/hold/`, { reason }); }
+export function releaseInvoice(id: string): Promise<Invoice> { return apiAction<Invoice>(`/invoices/${id}/release/`); }
+export function sendInvoice(id: string, email: string): Promise<Invoice & { delivery: string }> { return apiPost<Invoice & { delivery: string }, { email: string }>(`/invoices/${id}/send/`, { email }); }
+export function addInvoiceReminder(id: string, payload: { remind_on: string; channel: string; note: string }): Promise<InvoiceReminder[]> { return apiPost<InvoiceReminder[], typeof payload>(`/invoices/${id}/reminders/`, payload); }
+export function updateInvoiceReminder(id: string, reminderId: string, status: "DONE" | "CANCELLED"): Promise<InvoiceReminder[]> { return apiPost<InvoiceReminder[], { status: string }>(`/invoices/${id}/reminders/${reminderId}/`, { status }); }
+export type CustomerPayload = Pick<Customer, "name" | "email" | "phone" | "address" | "country_code" | "tax_identification_number" | "is_active">;
+export function createCustomer(payload: CustomerPayload): Promise<Customer> { return apiPost<Customer, CustomerPayload>("/customers/", payload); }
+export function updateCustomer(id: string, payload: Partial<CustomerPayload>): Promise<Customer> { return apiPatch<Customer, Partial<CustomerPayload>>(`/customers/${id}/`, payload); }

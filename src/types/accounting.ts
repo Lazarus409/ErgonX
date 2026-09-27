@@ -131,7 +131,36 @@ export interface InvoiceLine {
   updated_at: string;
 }
 
-export interface Invoice { id: string; customer: string; invoice_number: string; invoice_date: string; due_date: string | null; currency: string; subtotal: string; tax_total: string; total_amount: string; status: string; accounting_period: string; journal_entry: string | null; external_tax_reference: string | null; lines: InvoiceLine[]; created_at: string; updated_at: string; }
+export interface Invoice {
+  id: string; customer: string; invoice_number: string; invoice_date: string; due_date: string | null; currency: string; subtotal: string; tax_total: string; total_amount: string; status: string; accounting_period: string; journal_entry: string | null; external_tax_reference: string | null; lines: InvoiceLine[]; created_at: string; updated_at: string;
+  customer_name?: string; customer_code?: string; amount_received?: string; amount_due?: string; on_hold?: boolean; hold_reason?: string; sent_at?: string | null; sent_to?: string; notes?: string;
+}
+
+export interface InvoiceReminder { id: string; remind_on: string; channel: string; note: string; status: string; created_by: string; completed_at: string | null }
+
+export interface ReceivablesSummary {
+  range_months: number;
+  range_start: string;
+  outstanding: { count: number; amount: string | null };
+  due_this_week: { count: number; amount: string | null };
+  overdue: { count: number; amount: string | null };
+  exceptions: { count: number; on_hold: number; over_60_days: number };
+  counts: Record<"all" | "outstanding" | "overdue" | "paid" | "on_hold" | "drafts", number>;
+  upcoming_receipts: Array<{ id: string; customer: string; invoice_number: string; due_date: string; amount_due: string | null; currency: string }>;
+  amounts_restricted: boolean;
+  today: string;
+}
+
+export interface InvoiceContext {
+  attachments: RecordAttachment[];
+  audit: RecordAuditEntry[];
+  receipts: Array<{ id: string; receipt_number: string; receipt_date: string; amount: string; currency: string; payment_method: string; status: string }>;
+  reminders: InvoiceReminder[];
+  related: Array<{ type: string; reference: string; status: string; href: string | null }>;
+  collection: { days_outstanding: number | null; days_overdue: number };
+  customer: { id: string; name: string; code: string; email: string; phone: string; address: string; tax_identification_number: string };
+  institution: { name: string };
+}
 export interface BankAccount { id: string; name: string; bank_name: string; masked_account_number: string; currency: string; ledger_account: string; is_active: boolean; created_at: string; updated_at: string; }
 export interface Expense { id: string; expense_date: string; account: string; amount: string; currency: string; description: string; attachment: string | null; status: string; created_by: string; approved_by: string | null; journal_entry: string | null; created_at: string; updated_at: string; }
 export interface Payment { id: string; payment_number: string; payment_date: string; amount: string; currency: string; payment_method: string; bank_account: string | null; vendor_bill: string; journal_entry: string | null; status: string; created_at: string; updated_at: string; }

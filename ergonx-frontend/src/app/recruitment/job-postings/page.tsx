@@ -38,7 +38,7 @@ export default function JobPostingsPage() {
         columns={[
           { key: "posting", header: "Requisition", sortValue: (posting) => posting.title, cell: (posting) => <Link href={`/recruitment/job-postings/${posting.id}`} className="group block"><span className="block font-semibold text-ink-strong group-hover:text-primary-ink">{posting.title}</span><span className="block text-caption text-ink-muted">{posting.code}</span></Link> },
           { key: "openings", header: "Openings", numeric: true, sortValue: (posting) => posting.openings, cell: (posting) => posting.openings },
-          { key: "department", header: "Department", cell: (posting) => posting.department_name ?? "" },
+          { key: "department", header: "Department / Functional Area", cell: (posting) => posting.department_name ?? "" },
           { key: "employment", header: "Employment", cell: (posting) => humanizeEnum(posting.employment_type) },
           { key: "applications", header: "Applications", numeric: true, sortValue: (posting) => posting.application_counts?.total ?? 0, cell: (posting) => posting.application_counts?.total ?? 0 },
           { key: "closes", header: "Closes", sortValue: (posting) => posting.closes_on ?? "", cell: (posting) => (posting.closes_on ? formatDate(posting.closes_on) : <span className="text-ink-subtle">Not set</span>) },

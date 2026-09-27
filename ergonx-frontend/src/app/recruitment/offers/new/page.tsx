@@ -56,7 +56,7 @@ export default function NewOfferPage() {
       reports_to: value("reports_to", posting?.reports_to) || null,
     };
     if (!payload.application || !payload.proposed_start_date || !payload.department || !payload.position || !payload.grade || !payload.location || !payload.employment_type) {
-      setProblem("Application, start date, department, position, grade, location and employment type are required.");
+      setProblem("Application, start date, department / functional area, position, grade, location and employment type are required.");
       return;
     }
     setSaving(true);
@@ -88,7 +88,7 @@ export default function NewOfferPage() {
         </label>
         <label><span className="mb-1.5 block text-sm font-semibold text-ink-strong">Proposed start date <span className="text-danger-ink">*</span></span><input type="date" value={form.proposed_start_date} onChange={(event) => update("proposed_start_date", event.target.value)} className={inputClass} /></label>
         <label><span className="mb-1.5 block text-sm font-semibold text-ink-strong">Offer expires on</span><input type="date" value={form.expires_on} onChange={(event) => update("expires_on", event.target.value)} className={inputClass} /></label>
-        <label><span className="mb-1.5 block text-sm font-semibold text-ink-strong">Department <span className="text-danger-ink">*</span></span><select value={department} onChange={(event) => { update("department", event.target.value); update("position", ""); }} className={inputClass}><option value="">Select department</option>{lookups.departments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+        <label><span className="mb-1.5 block text-sm font-semibold text-ink-strong">Department / Functional Area <span className="text-danger-ink">*</span></span><select value={department} onChange={(event) => { update("department", event.target.value); update("position", ""); }} className={inputClass}><option value="">Select department / functional area</option>{lookups.departments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
         <label><span className="mb-1.5 block text-sm font-semibold text-ink-strong">Position <span className="text-danger-ink">*</span></span><select value={value("position", posting?.position)} onChange={(event) => update("position", event.target.value)} className={inputClass}><option value="">Select position</option>{positions.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label>
         <label><span className="mb-1.5 block text-sm font-semibold text-ink-strong">Grade <span className="text-danger-ink">*</span></span><select value={value("grade", posting?.grade)} onChange={(event) => update("grade", event.target.value)} className={inputClass}><option value="">Select grade</option>{lookups.grades.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
         <label><span className="mb-1.5 block text-sm font-semibold text-ink-strong">Location <span className="text-danger-ink">*</span></span><select value={value("location", posting?.location)} onChange={(event) => update("location", event.target.value)} className={inputClass}><option value="">Select location</option>{lookups.locations.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>

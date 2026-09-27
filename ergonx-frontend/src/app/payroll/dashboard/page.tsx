@@ -94,15 +94,15 @@ export default function PayrollDashboardPage() {
         </ChartCard>
         <ChartCard
           className="xl:col-span-2"
-          title="Cost by department"
-          description={costByDepartment.period ? `Gross pay by current department, ${costByDepartment.period}.` : "Gross pay by current department for the latest finalized run."}
+          title="Cost by department / functional area"
+          description={costByDepartment.period ? `Gross pay by current department, ${costByDepartment.period}.` : "Gross pay by current department / functional area for the latest finalized run."}
           accent="payroll"
           icon={Building2}
           loading={initial}
           error={!data && error ? "This data is unavailable right now." : null}
           empty={!costByDepartment.departments.length}
-          emptyDescription="Department costs appear after a payroll run is finalized."
-          data={{ columns: ["Department", "Gross pay"], rows: costByDepartment.departments.map((item) => [item.department, formatAmount(item.gross_pay)]) }}
+          emptyDescription="Department / Functional Area costs appear after a payroll run is finalized."
+          data={{ columns: ["Department / Functional Area", "Gross pay"], rows: costByDepartment.departments.map((item) => [item.department, formatAmount(item.gross_pay)]) }}
         >
           <RankingBars items={costByDepartment.departments.map((item) => ({ label: item.department, value: item.gross_pay }))} format="currency" color="var(--mod-payroll)" limit={8} />
         </ChartCard>

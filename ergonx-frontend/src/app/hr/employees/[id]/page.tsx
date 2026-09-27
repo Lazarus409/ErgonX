@@ -720,7 +720,7 @@ export default function EmployeeDetailPage() {
       || (isRehire && (!employmentChange.department || !employmentChange.position))
     ) {
       setSaveError(
-        "Effective date, department, position, grade, location, and employment type are required for rehire.",
+        "Effective date, department / functional area, position, grade, location, and employment type are required for rehire.",
       );
       return;
     }
@@ -982,7 +982,7 @@ export default function EmployeeDetailPage() {
               />
 
               <LookupSelect
-                label="Department"
+                label="Department / Functional Area"
                 value={employmentChange.department}
                 options={lookups.departments.map((department) => ({
                   value: department.id,
@@ -1164,7 +1164,7 @@ export default function EmployeeDetailPage() {
                       <dl className="space-y-3">
                         <ProfileRow label="Employment type" value={currentEmployment ? humanizeEnum(currentEmployment.employment_type) : EM_DASH} />
                         <ProfileRow label="Working pattern" value={currentEmployment ? humanizeEnum(currentEmployment.working_pattern) : EM_DASH} />
-                        <ProfileRow label="Department" value={employee.department} />
+                        <ProfileRow label="Department / Functional Area" value={employee.department} />
                         <ProfileRow label="Job title" value={employee.position} />
                         <ProfileRow label="Reports to" value={manager ? <span><Link href={`/hr/employees/${manager.id}`} className="font-medium text-primary-ink hover:underline">{manager.name}</Link><span className="block text-caption text-ink-muted">{manager.title}</span></span> : EM_DASH} />
                         <ProfileRow label="Location" value={employee.location} />
@@ -1220,7 +1220,7 @@ export default function EmployeeDetailPage() {
                   <ProfileCard title="Reporting & Team" icon={Network}>
                     <dl className="space-y-3">
                       <ProfileRow label="Manager" value={manager ? <span className="flex items-center gap-2.5"><Avatar name={manager.name} size="md" /><span><Link href={`/hr/employees/${manager.id}`} className="font-medium text-primary-ink hover:underline">{manager.name}</Link><span className="block text-caption text-ink-muted">{manager.title}</span></span></span> : EM_DASH} />
-                      <ProfileRow label="Department" value={employee.department} />
+                      <ProfileRow label="Department / Functional Area" value={employee.department} />
                       <ProfileRow label="Team" value={currentEmployment?.team || EM_DASH} />
                     </dl>
                   </ProfileCard>
@@ -1253,7 +1253,7 @@ export default function EmployeeDetailPage() {
               <table className="w-full min-w-[700px] text-left text-sm">
                 <thead>
                   <tr className="border-b border-line text-ink-muted">
-                    <th className="px-4 py-3 font-medium">Department</th>
+                    <th className="px-4 py-3 font-medium">Department / Functional Area</th>
                     <th className="px-4 py-3 font-medium">Position</th>
                     <th className="px-4 py-3 font-medium">Grade</th>
                     <th className="px-4 py-3 font-medium">Location</th>

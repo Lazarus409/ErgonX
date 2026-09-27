@@ -44,7 +44,7 @@ export default function HRDashboardPage() {
   const can = (permission: string) => hasModule(institution?.enabledModules, "HR") && (user?.permissions.includes("*") || user?.permissions.includes(permission));
   const quickActions = [
     { href: "/hr/employees", label: "Employees", description: "Records, employment and lifecycle", icon: Users, permission: "employee.view" },
-    { href: "/hr/departments", label: "Departments", description: "Organization structure", icon: Building2, permission: "organization.view" },
+    { href: "/hr/departments", label: "Departments / Functional Areas", description: "Organization structure", icon: Building2, permission: "organization.view" },
     { href: "/hr/positions", label: "Positions", description: "Roles and reporting lines", icon: BriefcaseBusiness, permission: "organization.view" },
     { href: "/hr/locations", label: "Locations", description: "Work sites", icon: MapPin, permission: "organization.view" },
   ].filter((action) => can(action.permission));
@@ -112,7 +112,7 @@ export default function HRDashboardPage() {
       </div>
 
       <div className="grid gap-5 xl:grid-cols-2">
-        <Card title="Department distribution" description="Active employees with a current department." icon={Building2} accent="hr">
+        <Card title="Department / Functional Area distribution" description="Active employees with a current department / functional area." icon={Building2} accent="hr">
           {initial ? <div className="skeleton h-48 rounded-xl" /> : data?.by_department.length ? <RankingBars items={named(data.by_department, "department__name")} color="var(--mod-hr)" /> : <p className="text-support text-ink-muted">No current employment records are available.</p>}
         </Card>
         <Card title="Location distribution" description="Active employees by current location." icon={MapPin} accent="attendance">
@@ -167,7 +167,7 @@ export default function HRDashboardPage() {
             },
           },
           { key: "position", header: "Position", cell: (employee) => employee.employments__position__title || EM_DASH },
-          { key: "department", header: "Department", cell: (employee) => employee.employments__department__name || EM_DASH, hideBelow: "md" },
+          { key: "department", header: "Department / Functional Area", cell: (employee) => employee.employments__department__name || EM_DASH, hideBelow: "md" },
           { key: "hired", header: "Hire date", cell: (employee) => formatDate(employee.hire_date), sortValue: (employee) => employee.hire_date },
         ]}
       />

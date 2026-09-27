@@ -19,7 +19,7 @@ const modules = [
   {
     id: "HR",
     name: "Human Resources",
-    description: "Employees, departments, positions and HR records.",
+    description: "Employees, departments / functional areas, positions and HR records.",
     icon: Users,
     required: true,
   },

@@ -62,7 +62,7 @@ export const moduleWorkspacePermissions = {
   LEAVE: ["dashboard.leave.view", "leave.approve", "leave.reject", "leave.configure", "leave.balance.manage"],
   ATTENDANCE: ["dashboard.attendance.view", "attendance.manage", "attendance.approve", "schedule.manage"],
   PAYROLL: ["dashboard.payroll.view", "payroll.view", "payroll.configure", "payroll.prepare", "payroll.approve", "payroll.finalize", "compensation.configure", "compensation.manage", "tax_relief.approve"],
-  ACCOUNTING: ["dashboard.finance.view", "accounting.configure", "account.view", "account.create", "account.update", "journal.view", "journal.create", "journal.approve", "journal.post", "journal.reverse", "financial_report.view", "accounting_period.close", "accounting_period.reopen", "vendor.view", "vendor.create", "vendor.update", "vendor_bill.view", "vendor_bill.create", "vendor_bill.approve", "vendor_bill.post", "vendor_bill.void", "customer.view", "customer.create", "customer.update", "invoice.view", "invoice.create", "invoice.issue", "invoice.void", "bank_account.view", "bank_account.create", "bank_account.update", "payment.view", "payment.create", "payment.void", "receipt.view", "receipt.create", "receipt.void", "expense.view", "expense.create", "expense.approve", "expense.post", "payroll_accounting.view", "payroll_accounting.configure", "bank_reconciliation.view", "bank_reconciliation.manage", "vat_withholding_certificate.view", "vat_withholding_certificate.issue"],
+  ACCOUNTING: ["dashboard.finance.view", "budget.view", "accounting.configure", "account.view", "account.create", "account.update", "journal.view", "journal.create", "journal.approve", "journal.post", "journal.reverse", "financial_report.view", "accounting_period.close", "accounting_period.reopen", "vendor.view", "vendor.create", "vendor.update", "vendor_bill.view", "vendor_bill.create", "vendor_bill.approve", "vendor_bill.post", "vendor_bill.void", "customer.view", "customer.create", "customer.update", "invoice.view", "invoice.create", "invoice.issue", "invoice.void", "bank_account.view", "bank_account.create", "bank_account.update", "payment.view", "payment.create", "payment.void", "receipt.view", "receipt.create", "receipt.void", "expense.view", "expense.create", "expense.approve", "expense.post", "payroll_accounting.view", "payroll_accounting.configure", "bank_reconciliation.view", "bank_reconciliation.manage", "vat_withholding_certificate.view", "vat_withholding_certificate.issue"],
   RECRUITMENT: ["job_posting.view", "job_posting.create", "job_posting.update", "candidate.view", "candidate.create", "candidate.update", "recruitment_stage.view", "recruitment_stage.manage", "interview.view", "interview.manage", "candidate_evaluation.create", "offer.view", "offer.create", "offer.manage"],
   REPORTS: ["report.view"],
 } as const;
@@ -86,7 +86,7 @@ export const navigation: NavigationItem[] = [
   { label: "Home", href: "/", icon: House, permission: "home.view" },
   { label: "Executive Dashboard", href: "/dashboard", icon: LayoutDashboard, permission: "dashboard.executive.view" },
   {
-    label: "My Department",
+    label: "My Department / Functional Area",
     href: "/department",
     icon: Network,
     permission: "dashboard.department.view",
@@ -131,6 +131,8 @@ export const navigation: NavigationItem[] = [
       { label: "Accounts Payable", href: "/accounting/payables", permission: "vendor_bill.view" },
       { label: "Accounts Receivable", href: "/accounting/receivables", permission: "invoice.view" },
       { label: "Bank Reconciliation", href: "/accounting/banking", permission: "bank_account.view" },
+      { label: "Payments & Receipts", href: "/accounting/banking/cash", permission: "payment.view" },
+      { label: "Budgets", href: "/accounting/budgets", permission: "budget.view" },
       { label: "Expenses", href: "/accounting/expenses", permission: "expense.view" },
       { label: "Financial Reports", href: "/accounting/reports", permission: "financial_report.view" },
     ],

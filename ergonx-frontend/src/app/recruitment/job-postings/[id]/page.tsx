@@ -118,7 +118,7 @@ export default function RequisitionDetailPage() {
     : null;
   const brief: Array<[typeof UserRound, string, string]> = [
     [BriefcaseBusiness, "Job title", posting.title],
-    [Building2, "Department", posting.department_name ?? EM_DASH],
+    [Building2, "Department / Functional Area", posting.department_name ?? EM_DASH],
     [ClipboardList, "Position", posting.position_title ?? EM_DASH],
     [BadgeCheck, "Employment type", humanizeEnum(posting.employment_type)],
     [FileText, "Grade / Salary range", [posting.grade_name, salary].filter(Boolean).join(" · ") || EM_DASH],

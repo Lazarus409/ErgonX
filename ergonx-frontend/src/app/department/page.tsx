@@ -54,8 +54,8 @@ export default function DepartmentOverviewPage() {
   if (data && data.departments.length === 0) {
     return (
       <div className="space-y-6">
-        <PageHeader eyebrow="My department" title="Department overview" description="Your team's attendance, leave and approvals." icon={Network} accent="hr" />
-        <EmptyState icon={Network} accent="hr" title="You are not set as head of a department" description="HR assigns department heads on the Departments page. Once you are assigned, your team appears here." />
+        <PageHeader eyebrow="My department / functional area" title="Department / Functional Area overview" description="Your team's attendance, leave and approvals." icon={Network} accent="hr" />
+        <EmptyState icon={Network} accent="hr" title="You are not set as head of a department / functional area" description="HR assigns department / functional area heads on the Departments / Functional Areas page. Once you are assigned, your team appears here." />
       </div>
     );
   }
@@ -67,8 +67,8 @@ export default function DepartmentOverviewPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="My department"
-        title={names || "Department overview"}
+        eyebrow="My department / functional area"
+        title={names || "Department / Functional Area overview"}
         description={data ? `Team of ${formatNumber(data.headcount)} as of ${formatDate(data.as_of)}. Pay and personal details stay with HR.` : "Your team's attendance, leave and approvals."}
         icon={Network}
         accent="hr"
@@ -80,7 +80,7 @@ export default function DepartmentOverviewPage() {
         }
       />
 
-      {error && <ErrorState variant="inline" title="Unable to load your department" message={error} onRetry={reload} />}
+      {error && <ErrorState variant="inline" title="Unable to load your department / functional area" message={error} onRetry={reload} />}
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Team indicators">
         <MetricCard label="Team size" value={data ? formatNumber(data.headcount) : EM_DASH} description={data && data.departments.length > 1 ? `Across ${data.departments.length} departments` : "Current employees, excluding you"} icon={Users} accent="hr" loading={initial} />

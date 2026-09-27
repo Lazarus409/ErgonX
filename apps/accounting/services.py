@@ -2031,3 +2031,185 @@ def update_invoice_reminder(*, reminder, actor, status):
     reminder.save(update_fields=("status", "completed_at", "updated_at"))
     record_audit_event(actor=actor, institution=reminder.institution, entity=reminder.invoice, action=f"accounting.invoice.reminder_{status.lower()}")
     return reminder
+
+
+# --- Bank reconciliation sessions (concept "Bank reconciliation") ------------
+
+def _session_lines(session):
+    return BankStatementLine.objects.filter(
+        bank_account=session.bank_account, statement_date__gte=session.period_start, statement_date__lte=session.period_end,
+    )
+
+
+def bank_book_balance(*, bank_account, as_of):
+    totals = JournalLine.objects.filter(
+        account=bank_account.ledger_account, journal_entry__status__in=(JournalEntry.Status.POSTED, JournalEntry.Status.REVERSED),
+        journal_entry__entry_date__lte=as_of,
+    ).aggregate(debit=Sum("debit"), credit=Sum("credit"))
+    return _money(Decimal(totals["debit"] or 0) - Decimal(totals["credit"] or 0))
+
+
+def suggested_journals(*, statement_line, window_days=7, limit=5):
+    """Posted journals whose bank-ledger movement equals the statement amount,
+    dated near the statement date and not already matched."""
+    from datetime import timedelta
+
+    bank_account = statement_line.bank_account
+    candidates = JournalEntry.objects.filter(
+        institution=statement_line.institution, status=JournalEntry.Status.POSTED,
+        entry_date__gte=statement_line.statement_date - timedelta(days=window_days),
+        entry_date__lte=statement_line.statement_date + timedelta(days=window_days),
+        lines__account=bank_account.ledger_account, bank_statement_match__isnull=True,
+    ).distinct().order_by("entry_date")
+    matches = []
+    for journal in candidates[:50]:
+        if _bank_journal_movement(journal=journal, bank_account=bank_account) == statement_line.amount:
+            matches.append(journal)
+            if len(matches) >= limit:
+                break
+    return matches
+
+
+@transaction.atomic
+def start_reconciliation_session(*, institution, actor, bank_account, period_start, period_end, statement_opening_balance=None, statement_closing_balance=None):
+    from apps.accounting.models import BankReconciliationSession
+
+    _require(actor, institution, "bank_reconciliation.manage")
+    session = BankReconciliationSession.objects.filter(bank_account=bank_account, period_start=period_start, period_end=period_end).first()
+    if session:
+        return session
+    session = BankReconciliationSession(
+        institution=institution, bank_account=bank_account, period_start=period_start, period_end=period_end,
+        statement_opening_balance=statement_opening_balance, statement_closing_balance=statement_closing_balance, started_by=actor,
+    )
+    session.full_clean()
+    session.save()
+    record_audit_event(actor=actor, institution=institution, entity=session, action="accounting.reconciliation.started",
+                       metadata={"bank_account_id": str(bank_account.id), "period_start": period_start.isoformat(), "period_end": period_end.isoformat()})
+    return session
+
+
+@transaction.atomic
+def update_reconciliation_balances(*, session, actor, statement_opening_balance=None, statement_closing_balance=None):
+    from apps.accounting.models import BankReconciliationSession
+
+    session = BankReconciliationSession.objects.select_for_update().get(pk=session.pk)
+    _require(actor, session.institution, "bank_reconciliation.manage")
+    if session.status == BankReconciliationSession.Status.COMPLETED:
+        raise CodedValidationError({"status": "Reopen is not supported; completed reconciliations are final."}, api_code="record_immutable")
+    session.statement_opening_balance = statement_opening_balance
+    session.statement_closing_balance = statement_closing_balance
+    session.save(update_fields=("statement_opening_balance", "statement_closing_balance", "updated_at"))
+    return session
+
+
+def reconciliation_overview(session):
+    lines = list(_session_lines(session).order_by("statement_date", "created_at"))
+    matched = [line for line in lines if line.status == BankStatementLine.Status.MATCHED]
+    unmatched = [line for line in lines if line.status == BankStatementLine.Status.UNMATCHED]
+    exceptions = [line for line in lines if line.status == BankStatementLine.Status.EXCEPTION]
+    book = bank_book_balance(bank_account=session.bank_account, as_of=session.period_end)
+    difference = None
+    if session.statement_closing_balance is not None:
+        # Reconciled when the statement closing balance equals the posted bank-ledger balance.
+        difference = _money(session.statement_closing_balance - book)
+    total = len(lines)
+    return {
+        "lines": lines,
+        "counts": {"all": total, "matched": len(matched), "unmatched": len(unmatched), "exceptions": len(exceptions)},
+        "matched_amount": _money(sum((abs(line.amount) for line in matched), Decimal("0"))),
+        "unmatched_amount": _money(sum((abs(line.amount) for line in unmatched + exceptions), Decimal("0"))),
+        "progress": round(len(matched) * 100 / total) if total else 0,
+        "book_balance": book,
+        "difference": difference,
+        "can_complete": session.status != "COMPLETED" and total > 0 and not unmatched and difference == Decimal("0.00"),
+    }
+
+
+@transaction.atomic
+def complete_reconciliation_session(*, session, actor):
+    from apps.accounting.models import BankReconciliationSession
+
+    session = BankReconciliationSession.objects.select_for_update().get(pk=session.pk)
+    _require(actor, session.institution, "bank_reconciliation.manage")
+    if session.status == BankReconciliationSession.Status.COMPLETED:
+        return session
+    overview = reconciliation_overview(session)
+    if not overview["counts"]["all"]:
+        raise CodedValidationError({"lines": "Import the statement before completing the reconciliation."}, api_code="validation_error")
+    if overview["counts"]["unmatched"]:
+        raise CodedValidationError({"lines": "Match every statement line or flag it as an exception first."}, api_code="validation_error")
+    if overview["difference"] is None:
+        raise CodedValidationError({"statement_closing_balance": "Enter the statement closing balance."}, api_code="validation_error")
+    if overview["difference"] != Decimal("0.00"):
+        raise CodedValidationError({"difference": f"The statement and books differ by {overview['difference']}."}, api_code="validation_error")
+    session.status = BankReconciliationSession.Status.COMPLETED
+    session.completed_by = actor
+    session.completed_at = timezone.now()
+    session.save(update_fields=("status", "completed_by", "completed_at", "updated_at"))
+    record_audit_event(actor=actor, institution=session.institution, entity=session, action="accounting.reconciliation.completed",
+                       metadata={"matched": overview["counts"]["matched"], "exceptions": overview["counts"]["exceptions"]})
+    return session
+
+
+@transaction.atomic
+def import_statement_csv(*, session, actor, content):
+    """Import statement lines from CSV with headers date, description, reference, amount[, external_id]."""
+    import csv
+    import io
+    from datetime import date as date_type
+
+    _require(actor, session.institution, "bank_reconciliation.manage")
+    reader = csv.DictReader(io.StringIO(content))
+    headers = {(name or "").strip().lower() for name in (reader.fieldnames or [])}
+    if not {"date", "amount"} <= headers:
+        raise CodedValidationError({"file": "The CSV needs at least 'date' and 'amount' columns."}, api_code="validation_error")
+    created, skipped, errors = 0, 0, []
+    for index, raw in enumerate(reader, start=2):
+        row = {(key or "").strip().lower(): (value or "").strip() for key, value in raw.items()}
+        try:
+            statement_date = date_type.fromisoformat(row["date"])
+            amount = Decimal(row["amount"].replace(",", ""))
+        except Exception:  # noqa: BLE001 - reported per row
+            errors.append(f"Row {index}: use YYYY-MM-DD dates and numeric amounts.")
+            continue
+        if amount == 0:
+            errors.append(f"Row {index}: amount cannot be zero.")
+            continue
+        external_id = row.get("external_id") or f"{statement_date:%Y%m%d}-{row.get('reference') or index}-{amount}"
+        before = BankStatementLine.objects.filter(bank_account=session.bank_account, external_id=external_id.strip().upper()).exists()
+        try:
+            create_bank_statement_line(
+                institution=session.institution, actor=actor, bank_account=session.bank_account, statement_date=statement_date,
+                external_id=external_id, reference=row.get("reference", "")[:150], description=row.get("description", ""),
+                amount=amount, currency=session.bank_account.currency,
+            )
+        except ValidationError as exc:
+            errors.append(f"Row {index}: {'; '.join(exc.messages)}")
+            continue
+        if before:
+            skipped += 1
+        else:
+            created += 1
+    from apps.accounting.models import BankReconciliationSession
+
+    BankReconciliationSession.objects.filter(pk=session.pk).update(last_imported_at=timezone.now(), last_imported_by=actor, updated_at=timezone.now())
+    record_audit_event(actor=actor, institution=session.institution, entity=session, action="accounting.reconciliation.statement_imported",
+                       metadata={"created": created, "skipped": skipped, "errors": len(errors)})
+    return {"created": created, "skipped": skipped, "errors": errors[:20]}
+
+
+@transaction.atomic
+def flag_statement_line(*, statement_line, actor, exception, note=""):
+    line = BankStatementLine.objects.select_for_update().get(pk=statement_line.pk)
+    _require(actor, line.institution, "bank_reconciliation.manage")
+    if line.status == BankStatementLine.Status.MATCHED:
+        raise CodedValidationError({"status": "Unmatch the line before flagging it."}, api_code="invalid_state_transition")
+    if exception and not (note or "").strip():
+        raise CodedValidationError({"note": "Explain the exception (for example, bank charge not yet journalled)."}, api_code="validation_error")
+    line.status = BankStatementLine.Status.EXCEPTION if exception else BankStatementLine.Status.UNMATCHED
+    line.exception_note = note.strip() if exception else ""
+    line.save()
+    record_audit_event(actor=actor, institution=line.institution, entity=line,
+                       action="accounting.bank_statement_line.flagged" if exception else "accounting.bank_statement_line.unflagged", metadata={"note": line.exception_note})
+    return line

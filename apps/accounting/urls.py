@@ -12,6 +12,7 @@ from apps.accounting.views import (
     GhanaLocalizationVersionViewSet,
     InstitutionAccountingConfigurationViewSet,
     JournalEntryViewSet,
+    BankReconciliationSessionViewSet,
     JournalLineViewSet,
     TaxCodeViewSet,
     TaxComponentViewSet,
@@ -77,6 +78,7 @@ router.register("accounts", AccountViewSet, basename="account")
 router.register("fiscal-years", FiscalYearViewSet, basename="fiscal-year")
 router.register("accounting-periods", AccountingPeriodViewSet, basename="accounting-period")
 router.register("journal-entries", JournalEntryViewSet, basename="journal-entry")
+router.register("bank-reconciliations", BankReconciliationSessionViewSet, basename="bank-reconciliation")
 router.register("journal-lines", JournalLineViewSet, basename="journal-line")
 router.register("accounting-reports", AccountingReportViewSet, basename="accounting-report")
 

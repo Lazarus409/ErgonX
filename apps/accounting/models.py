@@ -1485,6 +1485,7 @@ class BankStatementLine(TenantOwnedModel):
         related_name="bank_statement_lines_reconciled",
     )
     reconciled_at = models.DateTimeField(null=True, blank=True)
+    exception_note = models.TextField(blank=True)
 
     class Meta:
         ordering = ("-statement_date", "-created_at")
@@ -1692,3 +1693,37 @@ class InvoiceReminder(TenantOwnedModel):
     class Meta:
         ordering = ("remind_on", "created_at")
         indexes = [models.Index(fields=("institution", "status", "remind_on"))]
+
+
+class BankReconciliationSession(TenantOwnedModel):
+    """One bank account reconciled against its statement for a period (concept "Bank reconciliation")."""
+
+    class Status(models.TextChoices):
+        IN_PROGRESS = "IN_PROGRESS", "In progress"
+        COMPLETED = "COMPLETED", "Reconciled"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="bank_reconciliation_sessions")
+    bank_account = models.ForeignKey(BankAccount, on_delete=models.PROTECT, related_name="reconciliation_sessions")
+    period_start = models.DateField()
+    period_end = models.DateField()
+    statement_opening_balance = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True)
+    statement_closing_balance = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True)
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.IN_PROGRESS)
+    started_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="reconciliations_started")
+    completed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="reconciliations_completed")
+    completed_at = models.DateTimeField(null=True, blank=True)
+    last_imported_at = models.DateTimeField(null=True, blank=True)
+    last_imported_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+
+    class Meta:
+        ordering = ("-period_end", "-created_at")
+        constraints = [
+            models.UniqueConstraint(fields=("bank_account", "period_start", "period_end"), name="uniq_reconciliation_session_period"),
+            models.CheckConstraint(condition=Q(period_end__gte=models.F("period_start")), name="reconciliation_session_period_valid"),
+        ]
+
+    def clean(self):
+        if self.bank_account_id and self.bank_account.institution_id != self.institution_id:
+            raise ValidationError({"bank_account": "Bank account belongs to another institution."})
+        if self.period_end and self.period_start and self.period_end < self.period_start:
+            raise ValidationError({"period_end": "Period end cannot precede its start."})

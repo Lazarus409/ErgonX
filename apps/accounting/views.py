@@ -1616,3 +1616,211 @@ class AccountingReportViewSet(viewsets.ViewSet):
             as_of=query.validated_data.get("as_of"),
         )
         return Response(BalanceSheetSerializer(result).data)
+
+
+class BankReconciliationSessionViewSet(TenantModelViewSet):
+    """Reconciliation sessions per bank account and statement period (concept "Bank reconciliation")."""
+
+    required_module = "ACCOUNTING"
+    http_method_names = ("get", "post", "patch", "head", "options")
+    filterset_fields = ("bank_account", "status")
+    ordering = ("-period_end",)
+
+    @property
+    def model(self):
+        from apps.accounting.models import BankReconciliationSession
+
+        return BankReconciliationSession
+
+    def get_serializer_class(self):
+        from rest_framework import serializers
+
+        from apps.accounting.models import BankReconciliationSession
+
+        class SessionSerializer(serializers.ModelSerializer):
+            bank_account_name = serializers.CharField(source="bank_account.name", read_only=True)
+
+            class Meta:
+                model = BankReconciliationSession
+                fields = ("id", "bank_account", "bank_account_name", "period_start", "period_end", "statement_opening_balance",
+                          "statement_closing_balance", "status", "completed_at", "last_imported_at", "created_at", "updated_at")
+                read_only_fields = ("id", "status", "completed_at", "last_imported_at", "created_at", "updated_at")
+
+        return SessionSerializer
+
+    def get_queryset(self):
+        return super().get_queryset().select_related("bank_account", "started_by", "completed_by", "last_imported_by")
+
+    def get_required_permission(self):
+        if self.action in {"list", "retrieve", "accounts", "report", "suggestions"}:
+            return "bank_reconciliation.view"
+        return "bank_reconciliation.manage"
+
+    def create(self, request, *args, **kwargs):
+        from datetime import date as date_type
+
+        from apps.accounting.services import start_reconciliation_session
+        from rest_framework.exceptions import ValidationError as DRFValidationError
+
+        bank_account = BankAccount.objects.for_institution(request.institution).filter(pk=request.data.get("bank_account")).first()
+        if bank_account is None:
+            raise DRFValidationError({"bank_account": "Choose a bank account."})
+        try:
+            period_start = date_type.fromisoformat(str(request.data.get("period_start")))
+            period_end = date_type.fromisoformat(str(request.data.get("period_end")))
+        except ValueError:
+            raise DRFValidationError({"period_start": "Use YYYY-MM-DD dates."})
+        money = lambda key: Decimal(str(request.data[key])) if request.data.get(key) not in (None, "") else None  # noqa: E731
+        session = call_validated_service(
+            start_reconciliation_session, institution=request.institution, actor=request.user, bank_account=bank_account,
+            period_start=period_start, period_end=period_end,
+            statement_opening_balance=money("statement_opening_balance"), statement_closing_balance=money("statement_closing_balance"),
+        )
+        return Response(self._detail(session), status=201)
+
+    def retrieve(self, request, *args, **kwargs):
+        return Response(self._detail(self.get_object()))
+
+    def partial_update(self, request, *args, **kwargs):
+        from apps.accounting.services import update_reconciliation_balances
+
+        money = lambda key: Decimal(str(request.data[key])) if request.data.get(key) not in (None, "") else None  # noqa: E731
+        session = call_validated_service(update_reconciliation_balances, session=self.get_object(), actor=request.user,
+                                         statement_opening_balance=money("statement_opening_balance"), statement_closing_balance=money("statement_closing_balance"))
+        return Response(self._detail(session))
+
+    def _detail(self, session):
+        from apps.accounting.services import reconciliation_overview, suggested_journals
+
+        overview = reconciliation_overview(session)
+        rows = []
+        for line in overview["lines"]:
+            suggestions = suggested_journals(statement_line=line, limit=3) if line.status == BankStatementLine.Status.UNMATCHED else []
+            rows.append({
+                "id": str(line.id), "statement_date": line.statement_date, "description": line.description, "reference": line.reference,
+                "amount": str(line.amount), "currency": line.currency, "type": "Credit" if line.amount > 0 else "Debit", "status": line.status,
+                "journal_entry": str(line.journal_entry_id) if line.journal_entry_id else None,
+                "journal_number": line.journal_entry.journal_number if line.journal_entry_id else None,
+                "suggestion_count": len(suggestions), "exception_note": line.exception_note,
+            })
+        account = session.bank_account
+        return {
+            "session": self.get_serializer(session).data,
+            "bank_account": {"id": str(account.id), "name": account.name, "bank_name": account.bank_name, "masked_account_number": account.masked_account_number, "currency": account.currency},
+            "institution": {"name": self.request.institution.name},
+            "started_by": _person(session.started_by),
+            "completed_by": _person(session.completed_by) if session.completed_by_id else None,
+            "last_imported_by": _person(session.last_imported_by) if session.last_imported_by_id else None,
+            "counts": overview["counts"],
+            "progress": overview["progress"],
+            "matched_amount": str(overview["matched_amount"]),
+            "unmatched_amount": str(overview["unmatched_amount"]),
+            "book_balance": str(overview["book_balance"]),
+            "difference": str(overview["difference"]) if overview["difference"] is not None else None,
+            "can_complete": overview["can_complete"],
+            "lines": rows,
+        }
+
+    @action(detail=False, methods=("get",), filter_backends=())
+    def accounts(self, request):
+        """Bank accounts with their latest reconciliation status for the account picker."""
+        from django.utils import timezone
+
+        from apps.accounting.models import BankReconciliationSession
+
+        today = timezone.localdate()
+        rows = []
+        for account in BankAccount.objects.for_institution(request.institution).filter(is_active=True).order_by("name"):
+            latest = BankReconciliationSession.objects.filter(bank_account=account).order_by("-period_end").first()
+            unmatched = BankStatementLine.objects.filter(bank_account=account, status=BankStatementLine.Status.UNMATCHED).count()
+            if latest is None:
+                state = "NOT_STARTED"
+            elif latest.status == BankReconciliationSession.Status.COMPLETED:
+                state = "RECONCILED" if (today - latest.period_end).days <= 45 else "OVERDUE"
+            else:
+                state = "IN_PROGRESS"
+            rows.append({"id": str(account.id), "name": account.name, "bank_name": account.bank_name, "masked_account_number": account.masked_account_number,
+                         "currency": account.currency, "state": state, "unmatched_lines": unmatched,
+                         "latest_session": {"id": str(latest.id), "period_start": latest.period_start, "period_end": latest.period_end, "status": latest.status} if latest else None})
+        return Response(rows)
+
+    @action(detail=True, methods=("post",), filter_backends=())
+    def complete(self, request, pk=None):
+        from apps.accounting.services import complete_reconciliation_session
+
+        return Response(self._detail(call_validated_service(complete_reconciliation_session, session=self.get_object(), actor=request.user)))
+
+    @action(detail=True, methods=("post",), filter_backends=(), parser_classes=(MultiPartParser, FormParser), url_path="import")
+    def import_statement(self, request, pk=None):
+        from apps.accounting.services import import_statement_csv
+        from rest_framework.exceptions import ValidationError as DRFValidationError
+
+        upload = request.FILES.get("file")
+        if upload is None:
+            raise DRFValidationError({"file": "Choose a CSV statement file."})
+        try:
+            content = upload.read().decode("utf-8-sig")
+        except UnicodeDecodeError:
+            raise DRFValidationError({"file": "The statement must be a UTF-8 CSV file."})
+        session = self.get_object()
+        result = call_validated_service(import_statement_csv, session=session, actor=request.user, content=content)
+        session.refresh_from_db()
+        return Response({**self._detail(session), "import_result": result})
+
+    @action(detail=True, methods=("get",), filter_backends=(), url_path=r"lines/(?P<line_id>[0-9a-f-]+)/suggestions")
+    def suggestions(self, request, pk=None, line_id=None):
+        from apps.accounting.services import suggested_journals
+        from rest_framework.exceptions import NotFound
+
+        session = self.get_object()
+        line = BankStatementLine.objects.filter(bank_account=session.bank_account, pk=line_id).first()
+        if line is None:
+            raise NotFound("Statement line not found.")
+        return Response([
+            {"id": str(journal.id), "journal_number": journal.journal_number, "entry_date": journal.entry_date, "description": journal.description, "source": journal.source}
+            for journal in suggested_journals(statement_line=line)
+        ])
+
+    @action(detail=True, methods=("post",), filter_backends=(), url_path=r"lines/(?P<line_id>[0-9a-f-]+)/(?P<operation>match|unmatch|flag|unflag)")
+    def line_action(self, request, pk=None, line_id=None, operation=None):
+        from apps.accounting.services import flag_statement_line
+        from rest_framework.exceptions import NotFound
+
+        session = self.get_object()
+        line = BankStatementLine.objects.filter(bank_account=session.bank_account, pk=line_id).first()
+        if line is None:
+            raise NotFound("Statement line not found.")
+        if operation == "match":
+            journal = JournalEntry.objects.for_institution(request.institution).filter(pk=request.data.get("journal_entry")).first()
+            if journal is None:
+                raise NotFound("Journal not found.")
+            call_validated_service(match_bank_statement_line, statement_line=line, journal=journal, actor=request.user)
+        elif operation == "unmatch":
+            call_validated_service(unmatch_bank_statement_line, statement_line=line, actor=request.user)
+        else:
+            call_validated_service(flag_statement_line, statement_line=line, actor=request.user, exception=operation == "flag", note=str(request.data.get("note", "")))
+        return Response(self._detail(session))
+
+    @action(detail=True, methods=("get",), filter_backends=())
+    def report(self, request, pk=None):
+        """CSV reconciliation report for the session."""
+        import csv
+        import io
+
+        from django.http import HttpResponse
+
+        detail = self._detail(self.get_object())
+        session = detail["session"]
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow(["Bank reconciliation", detail["bank_account"]["name"], f"{session['period_start']} to {session['period_end']}"])
+        writer.writerow(["Statement closing balance", session["statement_closing_balance"] or ""])
+        writer.writerow(["Book balance", detail["book_balance"]])
+        writer.writerow(["Difference", detail["difference"] or ""])
+        writer.writerow([])
+        writer.writerow(["Date", "Description", "Reference", "Amount", "Status", "Matched journal", "Exception note"])
+        for line in detail["lines"]:
+            writer.writerow([line["statement_date"], line["description"], line["reference"], line["amount"], line["status"], line["journal_number"] or "", line["exception_note"]])
+        response = HttpResponse(buffer.getvalue(), content_type="text/csv")
+        response["Content-Disposition"] = f'attachment; filename="reconciliation-{session["period_end"]}.csv"'
+        return response

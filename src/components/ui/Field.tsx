@@ -45,7 +45,7 @@ export function Field({ label, children, helper, error, required, optional, clas
 
   return (
     <div className={cx("flex min-w-0 flex-col gap-1.5", className)}>
-      <label htmlFor={controlId} className={cx("text-support font-medium text-ink-strong", hideLabel && "sr-only")}>
+      <label htmlFor={controlId} className={cx("text-support font-semibold text-ink-strong", hideLabel && "sr-only")}>
         {label}
         {required && <span className="ml-0.5 text-danger" aria-hidden="true">*</span>}
         {optional && <span className="ml-1.5 font-normal text-ink-subtle">(optional)</span>}
@@ -75,8 +75,8 @@ const controlBase =
 
 const controlSizes: Record<ControlSize, string> = {
   sm: "h-8 px-2.5 text-support",
-  md: "h-9 px-3 text-sm",
-  lg: "h-11 px-3.5 text-sm",
+  md: "h-10 px-3 text-sm",
+  lg: "h-14 rounded-xl px-4 text-[0.9375rem]",
 };
 
 export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "size"> {
@@ -91,9 +91,9 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input({ s
   }
   return (
     <div className="relative flex w-full items-center">
-      {leadingIcon && <span className="pointer-events-none absolute left-3 flex text-ink-subtle [&_svg]:h-4 [&_svg]:w-4" aria-hidden="true">{leadingIcon}</span>}
-      <input ref={ref} data-ui="input" className={cx(controlBase, controlSizes[size], leadingIcon && "pl-9", trailingSlot && "pr-10", className)} {...rest} />
-      {trailingSlot && <span className="absolute right-1.5 flex items-center">{trailingSlot}</span>}
+      {leadingIcon && <span className={cx("pointer-events-none absolute flex text-ink-subtle", size === "lg" ? "left-4 [&_svg]:h-5 [&_svg]:w-5" : "left-3 [&_svg]:h-4 [&_svg]:w-4")} aria-hidden="true">{leadingIcon}</span>}
+      <input ref={ref} data-ui="input" className={cx(controlBase, controlSizes[size], leadingIcon && (size === "lg" ? "pl-12" : "pl-9"), trailingSlot && (size === "lg" ? "pr-12" : "pr-10"), className)} {...rest} />
+      {trailingSlot && <span className={cx("absolute flex items-center", size === "lg" ? "right-2.5" : "right-1.5")}>{trailingSlot}</span>}
     </div>
   );
 });

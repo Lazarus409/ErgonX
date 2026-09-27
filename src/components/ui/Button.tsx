@@ -6,7 +6,7 @@ import { Loader2 } from "lucide-react";
 
 import { cx } from "@/lib/cx";
 
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "link" | "inverse";
+export type ButtonVariant = "primary" | "strong" | "secondary" | "ghost" | "danger" | "link" | "inverse";
 export type ButtonSize = "sm" | "md" | "lg";
 
 const base =
@@ -14,6 +14,8 @@ const base =
 
 const variants: Record<ButtonVariant, string> = {
   primary: "bg-primary text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.16),0_1px_2px_rgb(15_35_69/0.18),var(--glow-primary)] hover:bg-primary-hover active:bg-primary-active",
+  // Concept entry-screen call to action: deep navy.
+  strong: "bg-cta-strong text-white shadow-[0_10px_24px_-12px_rgb(11_27_61/0.6)] hover:bg-cta-strong-hover",
   // Concept secondary action: blue outline on white.
   secondary: "border border-primary/70 bg-surface text-primary-ink shadow-elevation-1 hover:border-primary hover:bg-primary-soft",
   ghost: "text-ink hover:bg-surface-hover hover:text-ink-strong",

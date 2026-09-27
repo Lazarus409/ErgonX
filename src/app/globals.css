@@ -67,6 +67,10 @@
   --focus-ring: rgb(20 99 255 / 0.45);
   /* Concept heading hierarchy: navy titles, blue supporting lines. */
   --heading-support: #2a5bd7;
+  /* Entry screens: airy canvas and the navy call to action. */
+  --auth-canvas: #f7faff;
+  --cta-strong: #0b1b3d;
+  --cta-strong-hover: #142a58;
 
   /* Feedback */
   --success: #0e9f6e;
@@ -165,6 +169,9 @@
   --primary-ink: #a9c2ff;
   --focus-ring: rgb(122 161 255 / 0.55);
   --heading-support: #8fb0ff;
+  --auth-canvas: #07101f;
+  --cta-strong: #5687ff;
+  --cta-strong-hover: #7aa1ff;
   --sidebar: #060f22;
   --sidebar-deep: #040b19;
 
@@ -234,6 +241,9 @@
   --color-sidebar: var(--sidebar);
   --color-sidebar-deep: var(--sidebar-deep);
   --color-heading-support: var(--heading-support);
+  --color-auth-canvas: var(--auth-canvas);
+  --color-cta-strong: var(--cta-strong);
+  --color-cta-strong-hover: var(--cta-strong-hover);
   --color-brand-ink: var(--brand-ink);
   --color-brand-primary: var(--brand-primary);
   --color-accent-teal: var(--accent-teal);

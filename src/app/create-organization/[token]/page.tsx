@@ -53,7 +53,7 @@ export default function CreateOrganizationPage() {
             <Field label="Work email" className="sm:col-span-2"><Input value={data.email} disabled /></Field>
             <Field label="Create password" required helper="At least 8 characters." className="sm:col-span-2"><Input type="password" minLength={8} value={form.password} onChange={(event) => update("password", event.target.value)} autoComplete="new-password" /></Field>
           </div>
-          <Button type="submit" size="lg" block className="mt-7" loading={saving} loadingLabel="Creating organization…">Create organization and continue</Button>
+          <Button type="submit" variant="strong" size="lg" block className="mt-7" loading={saving} loadingLabel="Creating organization…">Create organization and continue</Button>
         </form>
       )}
     </AuthShell>

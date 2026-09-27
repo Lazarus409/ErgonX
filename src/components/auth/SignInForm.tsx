@@ -115,12 +115,12 @@ export default function SignInForm({ variant = "workspace" }: { variant?: "works
     <AuthShell>
       {platform
         ? <AuthHeading eyebrow="Platform administration" title="Super Admin sign in" description="Sign in to the ErgonX platform console to manage organizations, access requests and invitations." />
-        : <AuthHeading eyebrow="Secure sign in" title="Welcome back" description="Sign in to continue to your ErgonX workspace." />}
+        : <AuthHeading title="Welcome back" description="Sign in to continue to your ErgonX workspace." />}
       <form onSubmit={handleSubmit} className="space-y-5">
         {notice && !error && <Alert tone="info">{notice}</Alert>}
         {error && <Alert tone={error.startsWith("Enter the six-digit") ? "info" : "danger"}>{error}{platform && error.startsWith("This sign-in is only") && <> Staff and organization users <Link href="/login" className="font-semibold underline">sign in here</Link>.</>}</Alert>}
         <Field label="Email address">
-          <Input id="email" required type="email" size="lg" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@organization.com" autoComplete="email" leadingIcon={<Mail />} />
+          <Input id="email" required type="email" size="lg" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@company.com" autoComplete="email" leadingIcon={<Mail />} />
         </Field>
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
@@ -160,7 +160,7 @@ export default function SignInForm({ variant = "workspace" }: { variant?: "works
           label="Keep me signed in"
           description={`For 7 days on this device. Leave unticked on a shared computer: you'll be signed out when the browser closes or after ${IDLE_MINUTES} minutes of inactivity.`}
         />
-        <Button type="submit" size="lg" block loading={loading} loadingLabel="Signing in…" trailingIcon={<ArrowRight className="h-4 w-4" />}>{platform ? "Sign in to the console" : "Sign in"}</Button>
+        <Button type="submit" variant="strong" size="lg" block loading={loading} loadingLabel="Signing in…" trailingIcon={<ArrowRight className="h-4 w-4" />}>{platform ? "Sign in to the console" : "Sign in"}</Button>
       </form>
       {footer(platform)}
     </AuthShell>

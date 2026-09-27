@@ -41,7 +41,7 @@ export default function ForgotPasswordPage() {
         <form onSubmit={submit} className="space-y-5">
           {error && <Alert tone="danger">{error}</Alert>}
           <Field label="Sign-in email"><Input required autoFocus type="email" size="lg" value={email} onChange={(event) => setEmail(event.target.value)} leadingIcon={<Mail />} autoComplete="email" /></Field>
-          <Button type="submit" size="lg" block loading={saving} loadingLabel="Sending…">Send reset link</Button>
+          <Button type="submit" variant="strong" size="lg" block loading={saving} loadingLabel="Sending…">Send reset link</Button>
         </form>
       )}
     </AuthShell>

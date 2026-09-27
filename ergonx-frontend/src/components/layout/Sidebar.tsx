@@ -73,12 +73,15 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
   // In the mobile drawer the sidebar is always rendered expanded.
   const renderPanel = (compact: boolean, mobile: boolean) => (
     <div className="flex h-full flex-col">
-      <div className={cx("flex h-[5.25rem] shrink-0 items-center justify-between gap-2 overflow-hidden", compact ? "justify-center px-3" : "pl-7 pr-3")}>
-        {(!compact || mobile) && (
-          <Link href="/" onClick={closeMobile} className="min-w-0 rounded-lg focus-visible:outline-offset-4" aria-label="ErgonX home">
-            <SidebarLogo collapsed={compact} />
-          </Link>
-        )}
+      <div className={cx("flex h-[5.25rem] shrink-0 items-center justify-between gap-2 overflow-hidden", compact ? "gap-0 px-0" : "pl-7 pr-3")}>
+        <Link
+          href="/"
+          onClick={closeMobile}
+          className={cx("rounded-lg focus-visible:outline-offset-4", compact && !mobile ? "h-12 w-9 shrink-0 overflow-hidden" : "min-w-0")}
+          aria-label="ErgonX home"
+        >
+          <SidebarLogo collapsed={compact} />
+        </Link>
         {mobile ? (
           <button type="button" onClick={closeMobile} className="rounded-xl p-2 text-white/70 transition-colors hover:bg-white/10 hover:text-white" aria-label="Close navigation">
             <X className="h-5 w-5" />
@@ -87,7 +90,7 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
           <button
             type="button"
             onClick={() => onCollapsedChange(!compact)}
-            className={cx("shrink-0 rounded-xl p-2 text-white/65 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-sky", compact && "flex h-10 w-10 items-center justify-center")}
+            className={cx("shrink-0 rounded-xl p-2 text-white/65 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-sky", compact && "flex h-9 w-9 items-center justify-center p-1.5")}
             aria-label={compact ? "Expand sidebar" : "Collapse sidebar"}
             title={compact ? "Expand sidebar" : "Collapse sidebar"}
           >

@@ -66,7 +66,11 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
   const selfServiceExpanded = toggled[SELF_SERVICE_GROUP] ?? selfServiceActive;
 
   const childrenFor = (item: NavigationItem) =>
-    item.children?.filter((child) => (!child.module || hasModule(institution?.enabledModules, child.module)) && (!child.permission || hasPermission(child.permission))) ?? [];
+    item.children?.filter((child) =>
+      (!child.module || hasModule(institution?.enabledModules, child.module)) &&
+      (!child.permission || hasPermission(child.permission)) &&
+      (!child.anyPermissions?.length || child.anyPermissions.some(hasPermission)),
+    ) ?? [];
 
   const closeMobile = () => onMobileClose?.();
 

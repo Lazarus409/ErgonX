@@ -1,9 +1,7 @@
 import {
-  BriefcaseBusiness,
   CalendarDays,
   CircleDollarSign,
   ClipboardCheck,
-  Clock3,
   Contact,
   FileText,
   GitPullRequest,
@@ -29,7 +27,14 @@ export type ModuleCode =
 /** Whose records the member works with; mirrors `common/scoping.py`. */
 export type DataScope = "INSTITUTION" | "DEPARTMENT" | "SELF";
 
-export type NavigationChild = { label: string; href: string; permission?: string; module?: ModuleCode };
+export type NavigationChild = {
+  label: string;
+  href: string;
+  permission?: string;
+  module?: ModuleCode;
+  /** Exposes a linked workspace when the member has any listed capability. */
+  anyPermissions?: readonly string[];
+};
 
 export type NavigationItem = {
   label: string;
@@ -96,80 +101,27 @@ export const navigation: NavigationItem[] = [
     label: "HR",
     href: "/hr",
     icon: Users,
-    module: "HR",
-    anyPermissions: moduleWorkspacePermissions.HR,
-    scopes: INSTITUTION_WIDE,
-    children: [
-      { label: "HR Dashboard", href: "/hr/dashboard", permission: "dashboard.hr.view" },
-      { label: "Employees", href: "/hr/employees", permission: "employee.view" },
-      { label: "Departments", href: "/hr/departments", permission: "organization.view" },
-      { label: "Positions", href: "/hr/positions", permission: "organization.view" },
-      { label: "Grades", href: "/hr/grades", permission: "organization.view" },
-      { label: "Locations", href: "/hr/locations", permission: "organization.view" },
+    // HR is the people workspace umbrella. Its own setup pages and each
+    // people-related module remain individually gated below.
+    anyPermissions: [
+      ...moduleWorkspacePermissions.HR,
+      ...moduleWorkspacePermissions.RECRUITMENT,
+      ...moduleWorkspacePermissions.LEAVE,
+      ...moduleWorkspacePermissions.ATTENDANCE,
+      ...moduleWorkspacePermissions.PAYROLL,
     ],
-  },
-  {
-    label: "Recruitment",
-    href: "/recruitment",
-    icon: BriefcaseBusiness,
-    module: "RECRUITMENT",
-    anyPermissions: moduleWorkspacePermissions.RECRUITMENT,
     scopes: INSTITUTION_WIDE,
     children: [
-      { label: "Dashboard", href: "/recruitment/dashboard", permission: "candidate.view" },
-      { label: "Requisitions", href: "/recruitment/job-postings", permission: "job_posting.view" },
-      { label: "Candidates", href: "/recruitment/candidates", permission: "candidate.view" },
-      { label: "Pipeline", href: "/recruitment/pipeline", permission: "candidate.view" },
-      { label: "Applications", href: "/recruitment/applications", permission: "candidate.view" },
-      { label: "Interviews", href: "/recruitment/interviews", permission: "interview.view" },
-      { label: "Offers", href: "/recruitment/offers", permission: "offer.view" },
-    ],
-  },
-  {
-    label: "Leave",
-    href: "/leave",
-    icon: CalendarDays,
-    module: "LEAVE",
-    anyPermissions: moduleWorkspacePermissions.LEAVE,
-    scopes: INSTITUTION_WIDE,
-    children: [
-      { label: "Dashboard", href: "/leave/dashboard", permission: "dashboard.leave.view" },
-      { label: "Requests", href: "/leave/requests", permission: "leave.view" },
-      { label: "Calendar", href: "/leave/calendar", permission: "leave.view" },
-      { label: "Types & policies", href: "/leave/policies", permission: "leave.configure" },
-    ],
-  },
-  {
-    label: "Attendance",
-    href: "/attendance",
-    icon: Clock3,
-    module: "ATTENDANCE",
-    anyPermissions: moduleWorkspacePermissions.ATTENDANCE,
-    scopes: INSTITUTION_WIDE,
-    children: [
-      { label: "Dashboard", href: "/attendance/dashboard", permission: "dashboard.attendance.view" },
-      { label: "Live attendance", href: "/attendance/live", permission: "attendance.view" },
-      { label: "Adjustments", href: "/attendance/adjustments", permission: "attendance.approve" },
-      { label: "Overtime", href: "/attendance/overtime", permission: "attendance.approve" },
-      { label: "Schedules", href: "/attendance/schedules", permission: "schedule.view" },
-      { label: "Shifts", href: "/attendance/shifts", permission: "schedule.manage" },
-    ],
-  },
-  {
-    label: "Payroll",
-    href: "/payroll",
-    icon: CircleDollarSign,
-    module: "PAYROLL",
-    anyPermissions: moduleWorkspacePermissions.PAYROLL,
-    scopes: INSTITUTION_WIDE,
-    children: [
-      { label: "Dashboard", href: "/payroll/dashboard", permission: "dashboard.payroll.view" },
-      { label: "Payroll runs", href: "/payroll/runs", permission: "payroll.view" },
-      { label: "Periods", href: "/payroll/periods", permission: "payroll.view" },
-      { label: "Adjustments", href: "/payroll/adjustments", permission: "payroll.view" },
-      { label: "Payslips", href: "/payroll/payslips", permission: "payroll.view" },
-      { label: "Employee profiles", href: "/payroll/employee-profiles", permission: "payroll.view" },
-      { label: "Configuration", href: "/payroll/configuration", permission: "payroll.configure" },
+      { label: "HR Dashboard", href: "/hr/dashboard", permission: "dashboard.hr.view", module: "HR" },
+      { label: "Employees", href: "/hr/employees", permission: "employee.view", module: "HR" },
+      { label: "Departments", href: "/hr/departments", permission: "organization.view", module: "HR" },
+      { label: "Positions", href: "/hr/positions", permission: "organization.view", module: "HR" },
+      { label: "Grades", href: "/hr/grades", permission: "organization.view", module: "HR" },
+      { label: "Locations", href: "/hr/locations", permission: "organization.view", module: "HR" },
+      { label: "Recruitment", href: "/recruitment", module: "RECRUITMENT", anyPermissions: moduleWorkspacePermissions.RECRUITMENT },
+      { label: "Leave", href: "/leave", module: "LEAVE", anyPermissions: moduleWorkspacePermissions.LEAVE },
+      { label: "Attendance", href: "/attendance", module: "ATTENDANCE", anyPermissions: moduleWorkspacePermissions.ATTENDANCE },
+      { label: "Payroll", href: "/payroll", module: "PAYROLL", anyPermissions: moduleWorkspacePermissions.PAYROLL },
     ],
   },
   {

@@ -258,8 +258,25 @@ def classify_attendance_date(*, employee, attendance_date, actor):
 
 
 @transaction.atomic
-def request_adjustment(*, institution, attendance_record, actor, reason, proposed_values):
+def _derive_type(attendance_record, proposed_values):
+    Type = AttendanceAdjustment.AdjustmentType
+    if set(proposed_values) <= {"notes"}:
+        return Type.NOTE_ONLY
+    if "check_in" in proposed_values and not attendance_record.check_in:
+        return Type.MISSED_CLOCK_IN
+    if "check_out" in proposed_values and not attendance_record.check_out:
+        return Type.MISSED_CLOCK_OUT
+    return Type.TIME_CORRECTION
+
+
+def _validate_evidence(evidence, institution):
+    if evidence is not None and evidence.institution_id != institution.id:
+        raise ValidationError({"evidence": "Evidence must belong to the same institution."})
+
+
+def request_adjustment(*, institution, attendance_record, actor, reason, proposed_values, evidence=None, adjustment_type=None):
     _can_manage(actor, attendance_record.employee)
+    _validate_evidence(evidence, institution)
     if attendance_record.institution_id != institution.id:
         raise ValidationError(
             {"attendance_record": "Attendance record belongs to another institution."}
@@ -283,7 +300,10 @@ def request_adjustment(*, institution, attendance_record, actor, reason, propose
         old_values=old_values,
         proposed_values=proposed_values,
         status=AttendanceAdjustment.Status.PENDING,
+        evidence=evidence,
+        adjustment_type=adjustment_type or _derive_type(attendance_record, proposed_values),
     )
+    adjustment.full_clean()
     adjustment.save()
     record_audit_event(
         actor=actor,
@@ -312,7 +332,7 @@ def _coerce_datetime(value, field_name):
 
 
 @transaction.atomic
-def decide_adjustment(*, adjustment, actor, approve):
+def decide_adjustment(*, adjustment, actor, approve, comment=""):
     adjustment = AttendanceAdjustment.objects.select_for_update().select_related(
         "attendance_record__employee"
     ).get(pk=adjustment.pk)
@@ -335,9 +355,19 @@ def decide_adjustment(*, adjustment, actor, approve):
         adjustment.status = AttendanceAdjustment.Status.APPROVED
     else:
         adjustment.status = AttendanceAdjustment.Status.REJECTED
+    if adjustment.attendance_record.employee.user_id == actor.id:
+        raise ValidationError({"actor": "You cannot decide an adjustment to your own attendance."})
     adjustment.approved_by = actor
     adjustment.acted_at = timezone.now()
-    adjustment.save(update_fields=("status", "approved_by", "acted_at", "updated_at"))
+    adjustment.decision_note = comment or ""
+    adjustment.save(update_fields=("status", "approved_by", "acted_at", "decision_note", "updated_at"))
+    _notify_adjustment(
+        adjustment.requested_by,
+        adjustment,
+        "ATTENDANCE_ADJUSTMENT_DECIDED",
+        f"Attendance adjustment {adjustment.get_status_display().lower()}",
+        comment or f"Your attendance adjustment was {adjustment.get_status_display().lower()}.",
+    )
     record_audit_event(
         actor=actor,
         institution=adjustment.institution,
@@ -380,3 +410,234 @@ def decide_overtime(*, overtime_record, actor, approve, approved_minutes=None):
         },
     )
     return overtime_record
+
+
+def _notify_adjustment(user, adjustment, notification_type, title, message):
+    from apps.notifications.models import Notification
+
+    if user is None:
+        return
+    Notification.objects.create(
+        institution=adjustment.institution,
+        user=user,
+        notification_type=notification_type,
+        title=title,
+        message=message,
+        channel=Notification.Channel.IN_APP,
+        metadata={"attendance_adjustment_id": str(adjustment.id), "route_hint": f"/attendance/adjustments/{adjustment.id}"},
+    )
+
+
+def _has_permission(user, institution, code):
+    return user.memberships.filter(
+        institution=institution, status=InstitutionMembership.Status.ACTIVE, role__permissions__code=code
+    ).exists()
+
+
+@transaction.atomic
+def return_adjustment(*, adjustment, actor, comment=""):
+    """Send a pending adjustment back to the requester for changes."""
+    adjustment = AttendanceAdjustment.objects.select_for_update().select_related("attendance_record__employee").get(pk=adjustment.pk)
+    if not _has_permission(actor, adjustment.institution, "attendance.approve"):
+        raise ValidationError({"actor": "Actor cannot review attendance adjustments."})
+    if adjustment.status != AttendanceAdjustment.Status.PENDING:
+        raise ValidationError({"status": "Only pending adjustments can be returned for changes."})
+    if not (comment or "").strip():
+        raise ValidationError({"comment": "Explain what needs to change."})
+    if adjustment.attendance_record.employee.user_id == actor.id:
+        raise ValidationError({"actor": "You cannot review an adjustment to your own attendance."})
+    adjustment.status = AttendanceAdjustment.Status.RETURNED
+    adjustment.decision_note = comment.strip()
+    adjustment.changes_requested_at = timezone.now()
+    adjustment.approved_by = actor
+    adjustment.save(update_fields=("status", "decision_note", "changes_requested_at", "approved_by", "updated_at"))
+    _notify_adjustment(adjustment.requested_by, adjustment, "ATTENDANCE_ADJUSTMENT_RETURNED", "Changes requested on your attendance adjustment", comment.strip())
+    record_audit_event(actor=actor, institution=adjustment.institution, entity=adjustment, action="attendance.adjustment.returned")
+    return adjustment
+
+
+EDITABLE_ADJUSTMENT_FIELDS = ("reason", "proposed_values", "evidence", "adjustment_type")
+
+
+@transaction.atomic
+def resubmit_adjustment(*, adjustment, actor, **values):
+    """The requester edits a returned adjustment and sends it back for review."""
+    adjustment = AttendanceAdjustment.objects.select_for_update().select_related("attendance_record__employee").get(pk=adjustment.pk)
+    if adjustment.status != AttendanceAdjustment.Status.RETURNED:
+        raise ValidationError({"status": "Only adjustments returned for changes can be resubmitted."})
+    if adjustment.requested_by_id != actor.id:
+        raise ValidationError({"actor": "Only the requester can resubmit this adjustment."})
+    unknown = set(values) - set(EDITABLE_ADJUSTMENT_FIELDS)
+    if unknown:
+        raise ValidationError({field: "This field cannot be changed." for field in unknown})
+    if "proposed_values" in values:
+        unexpected = set(values["proposed_values"]) - {"check_in", "check_out", "notes"}
+        if unexpected:
+            raise ValidationError({"proposed_values": f"Unsupported attendance fields: {', '.join(sorted(unexpected))}."})
+    _validate_evidence(values.get("evidence"), adjustment.institution)
+    for field, value in values.items():
+        setattr(adjustment, field, value)
+    adjustment.status = AttendanceAdjustment.Status.PENDING
+    adjustment.resubmitted_at = timezone.now()
+    adjustment.approved_by = None
+    adjustment.full_clean()
+    adjustment.save()
+    if adjustment.assigned_to_id:
+        _notify_adjustment(adjustment.assigned_to, adjustment, "ATTENDANCE_ADJUSTMENT_RESUBMITTED", "Attendance adjustment resubmitted", "An adjustment you returned has been resubmitted for review.")
+    record_audit_event(actor=actor, institution=adjustment.institution, entity=adjustment, action="attendance.adjustment.resubmitted")
+    return adjustment
+
+
+@transaction.atomic
+def delegate_adjustment(*, adjustment, actor, delegate, comment=""):
+    """Assign a pending adjustment to a specific attendance approver."""
+    adjustment = AttendanceAdjustment.objects.select_for_update().select_related("attendance_record__employee").get(pk=adjustment.pk)
+    institution = adjustment.institution
+    if not _has_permission(actor, institution, "attendance.approve"):
+        raise ValidationError({"actor": "Actor cannot delegate attendance adjustments."})
+    if adjustment.status != AttendanceAdjustment.Status.PENDING:
+        raise ValidationError({"status": "Only pending adjustments can be delegated."})
+    if delegate is None or delegate.id == adjustment.assigned_to_id:
+        raise ValidationError({"delegate": "Choose a different reviewer."})
+    if delegate.id == adjustment.attendance_record.employee.user_id:
+        raise ValidationError({"delegate": "Employees cannot review their own attendance."})
+    if not _has_permission(delegate, institution, "attendance.approve"):
+        raise ValidationError({"delegate": "The delegate must be an active member who can approve attendance."})
+    previous = adjustment.assigned_to
+    adjustment.assigned_to = delegate
+    adjustment.full_clean()
+    adjustment.save(update_fields=("assigned_to", "updated_at"))
+    _notify_adjustment(delegate, adjustment, "ATTENDANCE_ADJUSTMENT_ASSIGNED", "Attendance adjustment assigned to you", comment or "An attendance adjustment was delegated to you for review.")
+    record_audit_event(
+        actor=actor, institution=institution, entity=adjustment, action="attendance.adjustment.delegated",
+        metadata={"from": str(previous.id) if previous else None, "to": str(delegate.id), "comment": comment},
+    )
+    return adjustment
+
+
+DAILY_HOURS_LIMIT_MINUTES = 12 * 60
+EVIDENCE_THRESHOLD_MINUTES = 60
+
+
+def _window(check_in, check_out, zone):
+    if not check_in:
+        return None
+    start = check_in.astimezone(zone)
+    end = check_out.astimezone(zone) if check_out else None
+    return {"start": start.strftime("%H:%M"), "end": end.strftime("%H:%M") if end else None}
+
+
+def adjustment_review_context(*, adjustment, user):
+    """Scheduled vs recorded vs requested hours, policy checks and queue neighbours."""
+    from apps.leave.models import LeaveRequest
+
+    record = adjustment.attendance_record
+    employee = record.employee
+    institution = adjustment.institution
+    try:
+        zone = ZoneInfo(institution.timezone)
+    except ZoneInfoNotFoundError:
+        zone = ZoneInfo("UTC")
+
+    expectation = None
+    if record.schedule_assignment_id:
+        try:
+            expectation = schedule_expectation(record.schedule_assignment, record.attendance_date)
+        except ValidationError:
+            expectation = None
+    scheduled = None
+    if expectation and not expectation.get("off_day") and expectation.get("start"):
+        scheduled = {
+            "start": expectation["start"].strftime("%H:%M"),
+            "end": expectation["end"].strftime("%H:%M") if expectation.get("end") else None,
+            "minutes": expectation.get("required_minutes"),
+        }
+    elif expectation and expectation.get("off_day"):
+        scheduled = {"start": None, "end": None, "minutes": 0, "off_day": True}
+
+    recorded = _window(record.check_in, record.check_out, zone)
+    if recorded is not None:
+        recorded["minutes"] = record.worked_minutes
+
+    # Project the requested values through the same calculation used on approval.
+    projected = AttendanceRecord(
+        institution=record.institution, employee=employee, schedule_assignment=record.schedule_assignment,
+        attendance_date=record.attendance_date, check_in=record.check_in, check_out=record.check_out, notes=record.notes,
+    )
+    for field_name, value in adjustment.proposed_values.items():
+        if field_name in {"check_in", "check_out"}:
+            try:
+                value = _coerce_datetime(value, field_name)
+            except ValidationError:
+                continue
+        setattr(projected, field_name, value)
+    try:
+        _recalculate(projected)
+        requested = _window(projected.check_in, projected.check_out, zone)
+        if requested is not None:
+            requested["minutes"] = projected.worked_minutes
+    except ValidationError:
+        requested = None
+    difference = (requested or {}).get("minutes", 0) - (recorded or {}).get("minutes", 0) if requested else None
+
+    added = max(difference or 0, 0)
+    evidence_required = added > EVIDENCE_THRESHOLD_MINUTES or adjustment.adjustment_type in {
+        AttendanceAdjustment.AdjustmentType.MISSED_CLOCK_IN, AttendanceAdjustment.AdjustmentType.ADD_MISSED_HOURS,
+    }
+    on_leave = LeaveRequest.objects.filter(
+        employee=employee, status=LeaveRequest.Status.APPROVED,
+        start_date__lte=record.attendance_date, end_date__gte=record.attendance_date,
+    ).exists()
+    requested_minutes = (requested or {}).get("minutes") or 0
+    checks = [
+        {"code": "daily_limit", "label": "Daily hours limit", "status": "pass" if requested_minutes <= DAILY_HOURS_LIMIT_MINUTES else "fail",
+         "detail": "Within limit" if requested_minutes <= DAILY_HOURS_LIMIT_MINUTES else f"Exceeds {DAILY_HOURS_LIMIT_MINUTES // 60}h"},
+        {"code": "evidence", "label": "Required evidence",
+         "status": "pass" if adjustment.evidence_id else ("fail" if evidence_required else "pass"),
+         "detail": "Provided" if adjustment.evidence_id else ("Missing" if evidence_required else "Not required")},
+        {"code": "leave_overlap", "label": "Overlap with leave", "status": "fail" if on_leave else "pass",
+         "detail": "Approved leave on this date" if on_leave else "No conflicts"},
+    ]
+
+    employment = Employment.objects.filter(employee=employee, is_current=True).select_related("department", "position").first()
+    queue = list(
+        AttendanceAdjustment.objects.filter(institution=institution, status=AttendanceAdjustment.Status.PENDING)
+        .order_by("created_at").values_list("id", flat=True)
+    )
+    position = queue.index(adjustment.pk) if adjustment.pk in queue else None
+    same_employee = list(
+        AttendanceAdjustment.objects.filter(institution=institution, attendance_record__employee=employee)
+        .order_by("attendance_record__attendance_date", "created_at").values_list("id", flat=True)
+    )
+    own_index = same_employee.index(adjustment.pk)
+    can_review = (
+        _has_permission(user, institution, "attendance.approve") and employee.user_id != user.id
+    )
+    return {
+        "reference": adjustment.reference,
+        "employee_id": str(employee.id),
+        "employee_name": employee.full_name,
+        "employee_number": employee.employee_number,
+        "department": employment.department.name if employment else None,
+        "position": employment.position.title if employment and employment.position_id else None,
+        "attendance_date": record.attendance_date,
+        "scheduled": scheduled,
+        "recorded": recorded,
+        "requested": requested,
+        "difference_minutes": difference,
+        "compliant": all(check["status"] == "pass" for check in checks),
+        "policy_checks": checks,
+        "queue": {
+            "previous_id": queue[position - 1] if position else None,
+            "next_id": queue[position + 1] if position is not None and position + 1 < len(queue) else None,
+            "position": position + 1 if position is not None else None,
+            "total": len(queue),
+        },
+        "employee_dates": {
+            "previous_id": same_employee[own_index - 1] if own_index > 0 else None,
+            "next_id": same_employee[own_index + 1] if own_index + 1 < len(same_employee) else None,
+        },
+        "is_requester": adjustment.requested_by_id == user.id,
+        "can_decide": can_review and adjustment.status == AttendanceAdjustment.Status.PENDING,
+        "can_delegate": can_review and adjustment.status == AttendanceAdjustment.Status.PENDING,
+    }

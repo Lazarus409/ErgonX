@@ -5,6 +5,9 @@ from rest_framework.response import Response
 
 from apps.attendance.models import AttendanceAdjustment, AttendanceRecord, OvertimeRecord
 from apps.attendance.serializers import (
+    AdjustmentDecisionSerializer,
+    AdjustmentDelegateSerializer,
+    AdjustmentResubmitSerializer,
     AttendanceAdjustmentSerializer,
     AttendanceClassificationSerializer,
     AttendanceRecordSerializer,
@@ -17,7 +20,11 @@ from apps.attendance.services import (
     classify_attendance_date,
     clock_in,
     clock_out,
+    adjustment_review_context,
     decide_adjustment,
+    delegate_adjustment,
+    resubmit_adjustment,
+    return_adjustment,
     decide_overtime,
 )
 from common.scoping import ATTENDANCE_BROAD, scope_to_employees
@@ -114,35 +121,116 @@ class AttendanceAdjustmentViewSet(EmployeeScopedQuerysetMixin, TenantModelViewSe
     serializer_class = AttendanceAdjustmentSerializer
     required_module = "ATTENDANCE"
     http_method_names = ("get", "post", "head", "options")
-    filterset_fields = ("attendance_record", "requested_by", "status")
+    filterset_fields = ("attendance_record", "requested_by", "status", "adjustment_type", "assigned_to")
     ordering_fields = ("created_at", "acted_at")
 
     def get_required_permission(self):
-        if self.action in {"approve", "reject"}:
+        if self.action in {"approve", "reject", "request_changes", "delegate", "delegates"}:
             return "attendance.approve"
-        if self.action == "create":
+        if self.action in {"create", "resubmit"}:
             return "attendance.adjust"
         return "attendance.view"
 
     def get_queryset(self):
         queryset = super().get_queryset().select_related(
-            "attendance_record__employee", "requested_by", "approved_by"
+            "attendance_record__employee", "requested_by", "approved_by", "assigned_to"
         )
         return self.scope_to_employee(queryset, "attendance_record__employee")
 
-    @action(detail=True, methods=("post",))
-    def approve(self, request, pk=None):
+    def _decide(self, request, approve):
+        payload = AdjustmentDecisionSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
         adjustment = call_validated_service(
-            decide_adjustment, adjustment=self.get_object(), actor=request.user, approve=True
+            decide_adjustment,
+            adjustment=self.get_object(),
+            actor=request.user,
+            approve=approve,
+            comment=payload.validated_data.get("comment", ""),
         )
         return Response(self.get_serializer(adjustment).data)
 
     @action(detail=True, methods=("post",))
+    def approve(self, request, pk=None):
+        return self._decide(request, True)
+
+    @action(detail=True, methods=("post",))
     def reject(self, request, pk=None):
+        return self._decide(request, False)
+
+    @action(detail=True, methods=("post",), url_path="request-changes")
+    def request_changes(self, request, pk=None):
+        payload = AdjustmentDecisionSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
         adjustment = call_validated_service(
-            decide_adjustment, adjustment=self.get_object(), actor=request.user, approve=False
+            return_adjustment,
+            adjustment=self.get_object(),
+            actor=request.user,
+            comment=payload.validated_data.get("comment", ""),
         )
         return Response(self.get_serializer(adjustment).data)
+
+    @action(detail=True, methods=("post",))
+    def resubmit(self, request, pk=None):
+        payload = AdjustmentResubmitSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        values = dict(payload.validated_data)
+        if "evidence" in values:
+            from apps.documents.models import Document
+
+            evidence_id = values["evidence"]
+            values["evidence"] = (
+                Document.objects.for_institution(request.institution).filter(pk=evidence_id).first()
+                if evidence_id
+                else None
+            )
+            if evidence_id and values["evidence"] is None:
+                raise ValidationError({"evidence": "Document not found."})
+        adjustment = call_validated_service(
+            resubmit_adjustment, adjustment=self.get_object(), actor=request.user, **values
+        )
+        return Response(self.get_serializer(adjustment).data)
+
+    @action(detail=True, methods=("post",))
+    def delegate(self, request, pk=None):
+        payload = AdjustmentDelegateSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        from django.contrib.auth import get_user_model
+
+        delegate_user = get_user_model().objects.filter(pk=payload.validated_data["delegate"]).first()
+        adjustment = call_validated_service(
+            delegate_adjustment,
+            adjustment=self.get_object(),
+            actor=request.user,
+            delegate=delegate_user,
+            comment=payload.validated_data.get("comment", ""),
+        )
+        return Response(self.get_serializer(adjustment).data)
+
+    @action(detail=True, methods=("get",))
+    def delegates(self, request, pk=None):
+        from apps.institutions.models import InstitutionMembership
+
+        adjustment = self.get_object()
+        members = (
+            InstitutionMembership.objects.filter(
+                institution=request.institution,
+                status=InstitutionMembership.Status.ACTIVE,
+                role__permissions__code="attendance.approve",
+            )
+            .exclude(user_id=adjustment.attendance_record.employee.user_id)
+            .exclude(user_id=request.user.id)
+            .select_related("user", "role")
+            .distinct()
+            .order_by("user__first_name", "user__last_name")
+        )
+        return Response([
+            {"id": str(item.user_id), "name": item.user.get_full_name() or item.user.email, "role": item.role.name}
+            for item in members
+        ])
+
+    @action(detail=True, methods=("get",))
+    def review(self, request, pk=None):
+        return Response(adjustment_review_context(adjustment=self.get_object(), user=request.user))
 
 
 class OvertimeRecordViewSet(EmployeeScopedQuerysetMixin, TenantModelViewSet):

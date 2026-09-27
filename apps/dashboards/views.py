@@ -9,7 +9,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
 from apps.accounting.models import Account, BankAccount, BankStatementLine, Expense, Invoice, JournalEntry, JournalLine, VendorBill
-from apps.attendance.models import AttendanceRecord
+from apps.attendance.models import AttendanceAdjustment, AttendanceRecord
 from apps.employees.models import Employee, Employment
 from apps.leave.models import LeaveBalance, LeaveRequest
 from apps.payroll.models import PayrollRecord, PayrollRun
@@ -525,7 +525,104 @@ class DashboardViewSet(ViewSet):
             .annotate(late_occurrences=Count("id"), total_minutes_late=Sum("late_minutes"))
             .order_by("-late_occurrences", "employee__employments__department__name")
         )
+        # Concept "HR Attendance": Last N months range, rates, exceptions and adjustments.
+        try:
+            span = int(request.query_params.get("months", 12))
+        except (TypeError, ValueError):
+            span = 12
+        span = span if span in (3, 6, 12) else 12
+        range_start = today.replace(day=1)
+        for _ in range(span - 1):
+            range_start = (range_start - timedelta(days=1)).replace(day=1)
+        in_range = AttendanceRecord.objects.filter(institution=institution, attendance_date__range=(range_start, today))
+        attended_statuses = (AttendanceRecord.Status.PRESENT, AttendanceRecord.Status.LATE, AttendanceRecord.Status.REMOTE)
+        counted = in_range.filter(status__in=(*attended_statuses, AttendanceRecord.Status.ABSENT))
+
+        def rate(queryset):
+            totals = queryset.aggregate(
+                attended=Count("id", filter=Q(status__in=attended_statuses)),
+                total=Count("id"),
+            )
+            return round(totals["attended"] / totals["total"] * 100, 1) if totals["total"] else None
+
+        trend = []
+        month = range_start
+        for _ in range(span):
+            month_end = (month + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+            trend.append({"month": month.isoformat(), "attendance_rate": rate(counted.filter(attendance_date__range=(month, month_end)))})
+            month = month_end + timedelta(days=1)
+
+        department_rates = [
+            {
+                "department": row["employee__employments__department__name"] or "Unassigned",
+                "attendance_rate": round(row["attended"] / row["total"] * 100, 1) if row["total"] else None,
+                "records": row["total"],
+            }
+            for row in counted.filter(employee__employments__is_current=True)
+            .values("employee__employments__department__name")
+            .annotate(attended=Count("id", filter=Q(status__in=attended_statuses)), total=Count("id"))
+            .order_by("employee__employments__department__name")
+        ]
+
+        missing = in_range.filter(check_in__isnull=False, check_out__isnull=True, attendance_date__lt=today)
+        pending_by_record = set(
+            AttendanceAdjustment.objects.filter(institution=institution, status=AttendanceAdjustment.Status.PENDING)
+            .values_list("attendance_record_id", flat=True)
+        )
+        exceptions = []
+        for record in (
+            in_range.filter(
+                Q(check_in__isnull=False, check_out__isnull=True, attendance_date__lt=today)
+                | Q(status=AttendanceRecord.Status.ABSENT)
+                | Q(late_minutes__gte=30)
+            )
+            .select_related("employee")
+            .order_by("-attendance_date")[:10]
+        ):
+            if record.check_in and not record.check_out:
+                issue = "Missing clock-out"
+            elif record.status == AttendanceRecord.Status.ABSENT:
+                issue = "Absent"
+            else:
+                issue = f"Late by {record.late_minutes} min"
+            exceptions.append({
+                "record_id": str(record.id),
+                "employee_id": str(record.employee_id),
+                "employee": record.employee.full_name,
+                "issue": issue,
+                "date": record.attendance_date.isoformat(),
+                "status": "ADJUSTMENT_PENDING" if record.id in pending_by_record else "OPEN",
+            })
+
+        recent_adjustments = [
+            {
+                "id": str(item.id),
+                "employee": item.attendance_record.employee.full_name,
+                "adjustment_type": item.get_adjustment_type_display(),
+                "adjusted_by": (item.approved_by or item.requested_by).get_full_name() or (item.approved_by or item.requested_by).email,
+                "date": (item.acted_at or item.created_at).date().isoformat(),
+                "status": item.status,
+            }
+            for item in AttendanceAdjustment.objects.filter(institution=institution)
+            .select_related("attendance_record__employee", "approved_by", "requested_by")
+            .order_by("-updated_at")[:8]
+        ]
+        concept = {
+            "range_months": span,
+            "range_start": range_start.isoformat(),
+            "attendance_rate": rate(counted),
+            "late_arrivals": in_range.filter(status=AttendanceRecord.Status.LATE).count(),
+            "missing_punches": missing.count(),
+            "pending_adjustments": AttendanceAdjustment.objects.filter(
+                institution=institution, status=AttendanceAdjustment.Status.PENDING
+            ).count(),
+            "attendance_trend": trend,
+            "department_rates": department_rates,
+            "priority_exceptions": exceptions,
+            "recent_adjustments": recent_adjustments,
+        }
         return Response({
+            **concept,
             "present": records.filter(status=AttendanceRecord.Status.PRESENT).count(),
             "late": records.filter(status=AttendanceRecord.Status.LATE).count(),
             "absent": records.filter(status=AttendanceRecord.Status.ABSENT).count(),

@@ -1,17 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback } from "react";
-import { ArrowRight, Building2, Clock3, HandCoins, ListChecks, MinusCircle, WalletCards } from "lucide-react";
+import { Building2, HandCoins, MinusCircle, WalletCards } from "lucide-react";
 
 import ChartCard from "@/components/charts/ChartCard";
 import { BarsChart, TrendChart } from "@/components/charts/Charts";
-import PayrollWorkflow from "@/components/payroll/PayrollWorkflow";
-import { ButtonLink } from "@/components/ui/Button";
+import PayrollWorkspace from "@/components/payroll/PayrollWorkspace";
 import { RankingBars, Sparkline } from "@/components/charts/Visuals";
 import { Card, InsightCard, MetricCard } from "@/components/ui/Card";
-import ErrorState from "@/components/ui/ErrorState";
-import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { dashboardsApi } from "@/lib/api";
 import { EM_DASH, formatAmount, formatNumber } from "@/lib/format";
@@ -19,9 +15,8 @@ import { useApiResource } from "@/lib/useApiResource";
 
 export default function PayrollDashboardPage() {
   const load = useCallback(() => dashboardsApi.getPayrollDashboard(), []);
-  const { data, loading, error, reload } = useApiResource(load);
+  const { data, loading, error } = useApiResource(load);
   const initial = loading && !data;
-  const latestStatus = data?.latest_run_status ?? null;
   const periods = data?.payroll_by_period ?? [];
   const costByDepartment = data?.cost_by_department ?? { period: null, departments: [] };
   const latest = periods.at(-1);
@@ -31,15 +26,11 @@ export default function PayrollDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        eyebrow="Payroll"
-        title="Payroll Dashboard"
-        description="Monitor payroll runs, approvals and finalisation."
-        icon={WalletCards}
-        accent="payroll"
-        actions={<ButtonLink href="/payroll/runs" leadingIcon={<ListChecks className="h-4 w-4" />}>Payroll runs</ButtonLink>}
-      />
-      {error && <ErrorState variant="inline" title="Unable to load payroll dashboard" message={error} onRetry={reload} />}
+      <PayrollWorkspace />
+
+      {/* Analytics need the payroll dashboard permission; roles without it just see the workspace. */}
+      {!(error && !data) && <>
+      <h2 className="pt-4 text-heading font-bold text-headline">Payroll analytics</h2>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Finalized payroll totals">
         <MetricCard size="sm" label="Finalized gross pay" value={data ? formatAmount(data.finalized_gross_pay) : EM_DASH} description="Across finalized runs" icon={WalletCards} accent="payroll" loading={initial} chart={<Sparkline values={periods.map((point) => point.gross_pay)} color="var(--mod-payroll)" height={32} label="Gross pay by period" />} />
@@ -47,25 +38,6 @@ export default function PayrollDashboardPage() {
         <MetricCard size="sm" label="Deductions" value={data ? formatAmount(data.finalized_deductions) : EM_DASH} description="Statutory and voluntary" icon={MinusCircle} accent="audit" loading={initial} />
         <MetricCard size="sm" label="Employer contributions" value={data ? formatAmount(data.employer_contributions) : EM_DASH} description="Employer-side cost" icon={Building2} accent="hr" loading={initial} />
       </section>
-
-      <Card
-        title="Latest payroll run"
-        description="Backend-reported workflow state of the most recent run."
-        icon={Clock3}
-        accent="payroll"
-        accentLine
-        actions={latestStatus ? <StatusBadge status={latestStatus} /> : undefined}
-      >
-        {initial ? <div className="skeleton h-16 rounded-xl" /> : data?.latest_run_id ? (
-          <div className="space-y-4">
-            <PayrollWorkflow current={latestStatus} />
-            <div className="flex flex-wrap items-center justify-between gap-3 text-support">
-              <span className="text-ink-muted">{formatNumber(data.pending_runs)} run{data.pending_runs === 1 ? "" : "s"} awaiting action · Reference <span className="font-mono text-ink">{data.latest_run_id.slice(0, 8)}</span></span>
-              <Link href={`/payroll/runs/${data.latest_run_id}`} className="inline-flex items-center gap-1.5 font-semibold text-primary-ink hover:underline">Open payroll run<ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
-            </div>
-          </div>
-        ) : <p className="text-support text-ink-muted">No payroll run is available for this institution yet.</p>}
-      </Card>
 
       <div className="grid gap-5 xl:grid-cols-5">
         <ChartCard
@@ -135,6 +107,7 @@ export default function PayrollDashboardPage() {
           <RankingBars items={costByDepartment.departments.map((item) => ({ label: item.department, value: item.gross_pay }))} format="currency" color="var(--mod-payroll)" limit={8} />
         </ChartCard>
       </div>
+      </>}
     </div>
   );
 }

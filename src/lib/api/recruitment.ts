@@ -1,6 +1,6 @@
-import { apiAction, apiGetList, apiGet, apiPatch, apiPost } from "./client";
+import { apiAction, apiDelete, apiGetList, apiGet, apiPatch, apiPost } from "./client";
 import type { ListParams, PaginatedData } from "@/types/api";
-import type { ApplicationStageHistory, Candidate, CandidateEvaluation, CandidateEvaluationPayload, CandidatePayload, CandidateScorecard, JobPosting, JobPostingPayload, RecruitmentApplication, RecruitmentApplicationPayload, RecruitmentInterview, RecruitmentInterviewPayload, RecruitmentOffer, RecruitmentOfferPayload, RecruitmentPipelineStage, RecruitmentStage, RecruitmentStagePayload } from "@/types/recruitment";
+import type { HiringTeamMember, RecruitmentPerson, RequisitionActivity, RequisitionHistoryEntry, ApplicationStageHistory, Candidate, CandidateEvaluation, CandidateEvaluationPayload, CandidatePayload, CandidateScorecard, JobPosting, JobPostingPayload, RecruitmentApplication, RecruitmentApplicationPayload, RecruitmentInterview, RecruitmentInterviewPayload, RecruitmentOffer, RecruitmentOfferPayload, RecruitmentPipelineStage, RecruitmentStage, RecruitmentStagePayload } from "@/types/recruitment";
 
 export function listJobPostings(params?: ListParams): Promise<PaginatedData<JobPosting>> {
   return apiGetList<JobPosting>("/recruitment/job-postings/", params);
@@ -20,6 +20,40 @@ export function publishJobPosting(id: string): Promise<JobPosting> {
 
 export function closeJobPosting(id: string, cancelled = false): Promise<JobPosting> {
   return apiAction<JobPosting>(`/recruitment/job-postings/${id}/${cancelled ? "cancel" : "close"}/`);
+}
+
+export function updateJobPosting(id: string, payload: Partial<JobPostingPayload>): Promise<JobPosting> {
+  return apiPatch<JobPosting, Partial<JobPostingPayload>>(`/recruitment/job-postings/${id}/`, payload);
+}
+
+/** Requisition approval workflow. */
+export function submitJobPostingForApproval(id: string): Promise<JobPosting> {
+  return apiAction<JobPosting>(`/recruitment/job-postings/${id}/submit-approval/`);
+}
+export function approveJobPosting(id: string, comment = ""): Promise<JobPosting> {
+  return apiAction<JobPosting>(`/recruitment/job-postings/${id}/approve/`, { comment });
+}
+export function returnJobPosting(id: string, comment: string): Promise<JobPosting> {
+  return apiAction<JobPosting>(`/recruitment/job-postings/${id}/return/`, { comment });
+}
+
+export function listHiringTeam(id: string): Promise<HiringTeamMember[]> {
+  return apiGet<HiringTeamMember[]>(`/recruitment/job-postings/${id}/team/`);
+}
+export function addHiringTeamMember(id: string, user: string, role: string): Promise<HiringTeamMember> {
+  return apiPost<HiringTeamMember, { user: string; role: string }>(`/recruitment/job-postings/${id}/team/`, { user, role });
+}
+export function removeHiringTeamMember(id: string, memberId: string): Promise<void> {
+  return apiDelete(`/recruitment/job-postings/${id}/team/${memberId}/`);
+}
+export function listRecruitmentPeople(): Promise<RecruitmentPerson[]> {
+  return apiGet<RecruitmentPerson[]>("/recruitment/job-postings/people/");
+}
+export function getRequisitionHistory(id: string): Promise<RequisitionHistoryEntry[]> {
+  return apiGet<RequisitionHistoryEntry[]>(`/recruitment/job-postings/${id}/history/`);
+}
+export function getRequisitionActivity(id: string): Promise<RequisitionActivity> {
+  return apiGet<RequisitionActivity>(`/recruitment/job-postings/${id}/activity/`);
 }
 
 export function listCandidates(params?: ListParams): Promise<PaginatedData<Candidate>> {

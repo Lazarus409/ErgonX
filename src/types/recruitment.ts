@@ -12,6 +12,30 @@ export interface JobPosting {
   status: string;
   opens_on: string | null;
   closes_on: string | null;
+  department_name?: string;
+  position_title?: string;
+  location_name?: string;
+  grade?: string | null;
+  grade_name?: string | null;
+  reports_to?: string | null;
+  reports_to_title?: string | null;
+  hiring_manager_name?: string | null;
+  hiring_reason?: string;
+  target_start_date?: string | null;
+  salary_currency?: string;
+  salary_min?: string | null;
+  salary_max?: string | null;
+  interview_plan?: string;
+  responsibilities?: string;
+  qualifications_essential?: string;
+  qualifications_desirable?: string;
+  submitted_by?: string | null;
+  submitted_by_name?: string | null;
+  submitted_at?: string | null;
+  approved_by_name?: string | null;
+  approved_at?: string | null;
+  approval_note?: string;
+  application_counts?: Record<string, number>;
   created_at: string;
   updated_at: string;
 }
@@ -28,6 +52,51 @@ export interface JobPostingPayload {
   employment_type: string;
   openings?: number;
   closes_on?: string | null;
+  hiring_reason?: string;
+  grade?: string | null;
+  reports_to?: string | null;
+  target_start_date?: string | null;
+  salary_currency?: string;
+  salary_min?: string | null;
+  salary_max?: string | null;
+  interview_plan?: string;
+  responsibilities?: string;
+  qualifications_essential?: string;
+  qualifications_desirable?: string;
+}
+
+export const HIRING_REASONS: Array<[string, string]> = [["NEW_ROLE", "New role"], ["REPLACEMENT", "Replacement"], ["EXPANSION", "Team expansion"], ["TEMPORARY_COVER", "Temporary cover"]];
+export const INTERVIEW_PLANS: Array<[string, string]> = [["SINGLE_PANEL", "Single panel interview"], ["TWO_STAGE", "Screening + panel interview"], ["TECHNICAL_PANEL", "Technical assessment + panel"], ["PRESENTATION_PANEL", "Presentation + panel"]];
+export const HIRING_TEAM_ROLES: Array<[string, string]> = [["HIRING_MANAGER", "Hiring manager"], ["INTERVIEW_PANEL", "Interview panel"], ["HR_PARTNER", "HR business partner"], ["COORDINATOR", "Recruitment coordinator"]];
+
+export interface HiringTeamMember {
+  id: string;
+  job_posting: string;
+  user: string;
+  user_name: string;
+  user_email: string;
+  role: string;
+  created_at: string;
+}
+
+export interface RecruitmentPerson {
+  id: string;
+  name: string;
+  role: string;
+}
+
+export interface RequisitionActivity {
+  by_stage: Array<{ stage: string; count: number }>;
+  recent: Array<{ id: string; candidate: string; stage: string | null; status: string; applied_at: string | null }>;
+  total: number;
+}
+
+export interface RequisitionHistoryEntry {
+  id: string;
+  action: string;
+  actor: string;
+  created_at: string;
+  metadata: Record<string, unknown>;
 }
 
 export interface Candidate {

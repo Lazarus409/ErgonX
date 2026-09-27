@@ -117,7 +117,7 @@ export const navigation: NavigationItem[] = [
     scopes: INSTITUTION_WIDE,
     children: [
       { label: "Dashboard", href: "/recruitment/dashboard", permission: "candidate.view" },
-      { label: "Job postings", href: "/recruitment/job-postings", permission: "job_posting.view" },
+      { label: "Requisitions", href: "/recruitment/job-postings", permission: "job_posting.view" },
       { label: "Candidates", href: "/recruitment/candidates", permission: "candidate.view" },
       { label: "Pipeline", href: "/recruitment/pipeline", permission: "candidate.view" },
       { label: "Applications", href: "/recruitment/applications", permission: "candidate.view" },

@@ -220,7 +220,36 @@ export interface FinanceDashboard {
   };
 }
 
+export interface RecruitmentBoardCard {
+  id: string;
+  candidate_id: string;
+  candidate: string;
+  job_posting_id: string;
+  job_title: string;
+  status: string;
+  applied_at: string | null;
+}
+
+export interface RecruitmentBoardColumn {
+  key: string;
+  label: string;
+  stage_id?: string;
+  count: number;
+  cards: RecruitmentBoardCard[];
+}
+
 export interface RecruitmentDashboard {
+  range_months?: number;
+  range_start?: string;
+  /** Sum of openings on published requisitions. */
+  open_roles?: number;
+  requisitions_pending_approval?: number;
+  candidates_in_process?: number;
+  interviews_this_week?: number;
+  offers_pending?: number;
+  /** Draft, each active stage, then Hired — applications within the range. */
+  board?: RecruitmentBoardColumn[];
+  job_options?: Array<{ id: string; title: string; code: string }>;
   open_jobs: number;
   active_candidates: number;
   applications: number;

@@ -48,7 +48,10 @@ export async function getPayrollDashboard(): Promise<PayrollDashboard> {
   return apiGet<PayrollDashboard>("/dashboards/payroll/");
 }
 
-export async function getRecruitmentDashboard(): Promise<RecruitmentDashboard> { return apiGet<RecruitmentDashboard>("/dashboards/recruitment/"); }
+/** `months` selects the "Last N months" range for the pipeline board (3, 6 or 12; backend default 12). */
+export async function getRecruitmentDashboard(months?: 3 | 6 | 12): Promise<RecruitmentDashboard> {
+  return apiGet<RecruitmentDashboard>(months ? `/dashboards/recruitment/?months=${months}` : "/dashboards/recruitment/");
+}
 
 /** Used by the accounting dashboard screen. */
 export async function getFinanceDashboard(): Promise<FinanceDashboard> {

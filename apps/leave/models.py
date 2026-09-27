@@ -370,6 +370,14 @@ class LeaveRequest(TenantOwnedModel):
     )
     submitted_at = models.DateTimeField(null=True, blank=True)
     cancelled_at = models.DateTimeField(null=True, blank=True)
+    # Set when a reviewer returns the request to the employee for changes.
+    changes_requested_at = models.DateTimeField(null=True, blank=True)
+    changes_requested_note = models.TextField(blank=True)
+
+    @property
+    def reference(self):
+        """Stable human reference; matches the universal search format (LR-XXXXXXXX)."""
+        return f"LR-{str(self.pk)[:8].upper()}" if self.pk else ""
 
     class Meta:
         ordering = ("-start_date", "-created_at")
@@ -433,6 +441,7 @@ class LeaveApproval(TenantOwnedModel):
         APPROVED = "APPROVED", "Approved"
         REJECTED = "REJECTED", "Rejected"
         SKIPPED = "SKIPPED", "Skipped"
+        RETURNED = "RETURNED", "Changes requested"
 
     institution = models.ForeignKey(
         Institution, on_delete=models.CASCADE, related_name="leave_approvals"
@@ -451,6 +460,13 @@ class LeaveApproval(TenantOwnedModel):
     )
     comment = models.TextField(blank=True)
     acted_at = models.DateTimeField(null=True, blank=True)
+    delegated_from = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="delegated_leave_approvals",
+    )
 
     class Meta:
         ordering = ("leave_request", "sequence")
@@ -476,3 +492,30 @@ class LeaveApproval(TenantOwnedModel):
                 errors["approver"] = "Approver must be an active institution member."
         if errors:
             raise ValidationError(errors)
+
+
+class LeaveRequestComment(TenantOwnedModel):
+    """Discussion on a leave request between the employee and reviewers."""
+
+    institution = models.ForeignKey(
+        Institution, on_delete=models.CASCADE, related_name="leave_request_comments"
+    )
+    leave_request = models.ForeignKey(
+        LeaveRequest, on_delete=models.CASCADE, related_name="comments"
+    )
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="leave_request_comments",
+    )
+    body = models.TextField(max_length=2000)
+
+    class Meta:
+        ordering = ("leave_request", "created_at")
+        indexes = [models.Index(fields=("institution", "leave_request", "created_at"))]
+
+    def clean(self):
+        if not (self.body or "").strip():
+            raise ValidationError({"body": "Comment cannot be empty."})
+        if self.leave_request_id and self.leave_request.institution_id != self.institution_id:
+            raise ValidationError({"leave_request": "Request must belong to the same institution."})

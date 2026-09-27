@@ -337,8 +337,14 @@ class DashboardViewSet(ViewSet):
             + (balance_totals["adjusted"] or Decimal("0"))
         )
         used_days = balance_totals["used"] or Decimal("0")
+        # "Last N months" selector: 3, 6 or 12 months including the current one.
+        try:
+            span = int(request.query_params.get("months", 6))
+        except (TypeError, ValueError):
+            span = 6
+        span = span if span in (3, 6, 12) else 6
         first_month = today.replace(day=1)
-        for _ in range(5):
+        for _ in range(span - 1):
             first_month = (first_month - timedelta(days=1)).replace(day=1)
         month_rollups = {
             item["month"].date() if hasattr(item["month"], "date") else item["month"]: item
@@ -350,7 +356,7 @@ class DashboardViewSet(ViewSet):
         }
         months = []
         month = first_month
-        for _ in range(6):
+        for _ in range(span):
             item = month_rollups.get(month, {})
             months.append({
                 "month": month.isoformat(),
@@ -371,8 +377,64 @@ class DashboardViewSet(ViewSet):
         for offset in range(28):
             day = today + timedelta(days=offset)
             leave_calendar.append({"date": day.isoformat(), "on_leave": sum(1 for start, end in upcoming_spans if start <= day <= end)})
+        # Range KPIs.
+        submitted = records.exclude(status=LeaveRequest.Status.DRAFT).filter(start_date__gte=first_month, start_date__lte=today)
+        in_range = approved.filter(end_date__gte=first_month, start_date__lte=today)
+        absence_days = Decimal("0")
+        for start, end, days in in_range.values_list("start_date", "end_date", "requested_days"):
+            total_span = (end - start).days + 1
+            overlap = (min(end, today) - max(start, first_month)).days + 1
+            absence_days += (days or Decimal("0")) * Decimal(overlap) / Decimal(total_span)
+        active_headcount = Employee.objects.filter(institution=institution, status=Employee.Status.ACTIVE).count()
+        working_days = sum(
+            1 for offset in range((today - first_month).days + 1) if (first_month + timedelta(days=offset)).weekday() < 5
+        )
+        absence_rate = (
+            (absence_days / (Decimal(active_headcount) * Decimal(working_days)) * Decimal("100")).quantize(Decimal("0.01"))
+            if active_headcount and working_days
+            else None
+        )
+
+        # Policy compliance & alerts.
+        from apps.leave.services import matching_policy
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        breaches = []
+        for item in records.filter(status__in=(LeaveRequest.Status.PENDING, LeaveRequest.Status.APPROVED), start_date__gte=first_month).select_related("employee", "leave_type"):
+            try:
+                policy = matching_policy(item)
+            except DjangoValidationError:
+                breaches.append({"id": str(item.id), "employee": item.employee.full_name, "issue": "No applicable leave policy"})
+                continue
+            if policy.max_consecutive_days is not None and item.requested_days > policy.max_consecutive_days:
+                breaches.append({"id": str(item.id), "employee": item.employee.full_name, "issue": "Exceeds maximum consecutive days"})
+            elif (item.leave_type.requires_attachment or policy.requires_document) and not item.attachment_id:
+                breaches.append({"id": str(item.id), "employee": item.employee.full_name, "issue": "Missing required document"})
+        with_balances = LeaveBalance.objects.filter(institution=institution, year=today.year).values("employee_id")
+        incomplete = Employee.objects.filter(institution=institution, status=Employee.Status.ACTIVE).exclude(id__in=with_balances)
+        long_absences = approved.filter(start_date__gt=today, start_date__lte=today + timedelta(days=30), requested_days__gte=5).select_related("employee", "leave_type").order_by("start_date")
+
         return Response({
             "currency": institution.default_currency,
+            "range_months": span,
+            "range_start": first_month.isoformat(),
+            "total_requests": submitted.count(),
+            "approved_requests": submitted.filter(status=LeaveRequest.Status.APPROVED).count(),
+            "average_absence_rate": absence_rate,
+            "compliance": {
+                "policy_breaches": {"count": len(breaches), "items": breaches[:10]},
+                "incomplete_leave_records": {
+                    "count": incomplete.count(),
+                    "items": [{"id": str(emp.id), "employee": emp.full_name, "issue": f"No {today.year} leave balance"} for emp in incomplete.order_by("last_name")[:10]],
+                },
+                "upcoming_long_absences": {
+                    "count": long_absences.count(),
+                    "items": [
+                        {"id": str(item.id), "employee": item.employee.full_name, "issue": f"{item.leave_type.name}: {item.requested_days} day(s) from {item.start_date.isoformat()}"}
+                        for item in long_absences[:10]
+                    ],
+                },
+            },
             "pending": records.filter(status=LeaveRequest.Status.PENDING).count(),
             "currently_on_leave": approved.filter(start_date__lte=today, end_date__gte=today).count(),
             "upcoming": approved.filter(start_date__gt=today).count(),

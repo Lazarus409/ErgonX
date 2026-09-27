@@ -1,8 +1,8 @@
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import models, transaction
 from django.db.models import Q
 from django.utils import timezone
 
@@ -11,6 +11,7 @@ from apps.audit.services import record_audit_event
 from apps.institutions.models import InstitutionMembership
 from apps.institutions.services import record_user_activity
 from apps.leave.models import (
+    LeaveRequestComment,
     LeaveApproval,
     LeaveBalance,
     LeavePolicy,
@@ -354,7 +355,8 @@ def submit_leave_request(*, leave_request, actor):
         leave_request.status = LeaveRequest.Status.PENDING
         leave_request.save(update_fields=("status", "submitted_at", "updated_at"))
         approvers = _configured_approvers(leave_request)
-        for sequence, approver in enumerate(approvers, start=1):
+        prior_steps = leave_request.approvals.aggregate(last=models.Max("sequence"))["last"] or 0
+        for sequence, approver in enumerate(approvers, start=prior_steps + 1):
             LeaveApproval.objects.create(
                 institution=leave_request.institution,
                 leave_request=leave_request,
@@ -593,3 +595,253 @@ def carry_forward_leave_balance(*, balance, actor, target_year=None):
         metadata={"source_year": balance.year, "amount": str(carry)},
     )
     return next_balance
+
+
+def _current_step(leave_request):
+    return (
+        LeaveApproval.objects.select_for_update()
+        .filter(leave_request=leave_request, status=LeaveApproval.Status.PENDING)
+        .order_by("sequence")
+        .first()
+    )
+
+
+def _has_permission(user, institution, code):
+    membership = _active_membership(user, institution)
+    return bool(membership and membership.role.permissions.filter(code=code).exists())
+
+
+EDITABLE_DRAFT_FIELDS = ("leave_type", "start_date", "end_date", "requested_days", "reason", "attachment")
+
+
+@transaction.atomic
+def update_leave_request(*, leave_request, actor, **values):
+    """Edit a draft (new, or returned for changes) before it is submitted again."""
+    leave_request = LeaveRequest.objects.select_for_update().get(pk=leave_request.pk)
+    if leave_request.status != LeaveRequest.Status.DRAFT:
+        raise ValidationError({"status": "Only draft requests can be edited."})
+    if leave_request.employee.user_id != actor.id and not _has_permission(actor, leave_request.institution, "leave.configure"):
+        raise ValidationError({"employee": "Only the requester may edit this leave request."})
+    unknown = set(values) - set(EDITABLE_DRAFT_FIELDS)
+    if unknown:
+        raise ValidationError({field: "This field cannot be changed on a draft." for field in unknown})
+    for field, value in values.items():
+        setattr(leave_request, field, value)
+    validate_request_against_policy(leave_request)
+    leave_request.save()
+    record_audit_event(
+        actor=actor,
+        institution=leave_request.institution,
+        entity=leave_request,
+        action="leave.request.updated",
+        metadata={"fields": sorted(values)},
+    )
+    return leave_request
+
+
+@transaction.atomic
+def request_leave_changes(*, leave_request, actor, comment=""):
+    """Return a pending request to the employee as an editable draft."""
+    leave_request = LeaveRequest.objects.select_for_update().get(pk=leave_request.pk)
+    if leave_request.status != LeaveRequest.Status.PENDING:
+        raise ValidationError({"status": "Only pending requests can be returned for changes."})
+    if not (comment or "").strip():
+        raise ValidationError({"comment": "Explain what needs to change."})
+    approval = _current_step(leave_request)
+    if approval is None or approval.approver_id != actor.id:
+        raise ValidationError({"approver": "This is not the actor's active approval step."})
+    now = timezone.now()
+    approval.status = LeaveApproval.Status.RETURNED
+    approval.comment = comment
+    approval.acted_at = now
+    approval.save(update_fields=("status", "comment", "acted_at", "updated_at"))
+    LeaveApproval.objects.filter(
+        leave_request=leave_request, status=LeaveApproval.Status.PENDING
+    ).update(status=LeaveApproval.Status.SKIPPED, updated_at=now)
+    leave_request.status = LeaveRequest.Status.DRAFT
+    leave_request.changes_requested_at = now
+    leave_request.changes_requested_note = comment
+    leave_request.save(update_fields=("status", "changes_requested_at", "changes_requested_note", "updated_at"))
+    _notify(
+        leave_request.employee.user,
+        leave_request,
+        "LEAVE_CHANGES_REQUESTED",
+        "Changes requested on your leave",
+        f"Please update your leave request: {comment}",
+    )
+    record_audit_event(
+        actor=actor,
+        institution=leave_request.institution,
+        entity=leave_request,
+        action="leave.request.changes_requested",
+        metadata={"sequence": approval.sequence},
+    )
+    return leave_request
+
+
+@transaction.atomic
+def delegate_leave_approval(*, leave_request, actor, delegate, comment=""):
+    """Hand the active approval step to another leave approver."""
+    leave_request = LeaveRequest.objects.select_for_update().get(pk=leave_request.pk)
+    if leave_request.status != LeaveRequest.Status.PENDING:
+        raise ValidationError({"status": "Only pending requests can be delegated."})
+    approval = _current_step(leave_request)
+    if approval is None:
+        raise ValidationError({"approval": "There is no active approval step."})
+    institution = leave_request.institution
+    if approval.approver_id != actor.id and not _has_permission(actor, institution, "leave.configure"):
+        raise ValidationError({"approver": "Only the current approver or a leave administrator may delegate."})
+    if delegate is None or delegate.id == approval.approver_id:
+        raise ValidationError({"delegate": "Choose a different approver."})
+    if delegate.id == leave_request.employee.user_id:
+        raise ValidationError({"delegate": "Employees cannot approve their own leave."})
+    if not _has_permission(delegate, institution, "leave.approve"):
+        raise ValidationError({"delegate": "The delegate must be an active member who can approve leave."})
+    previous = approval.approver
+    approval.delegated_from = previous
+    approval.approver = delegate
+    approval.full_clean()
+    approval.save(update_fields=("approver", "delegated_from", "updated_at"))
+    if (comment or "").strip():
+        LeaveRequestComment.objects.create(
+            institution=institution, leave_request=leave_request, author=actor, body=f"Delegated: {comment.strip()}"
+        )
+    _notify(
+        delegate,
+        leave_request,
+        "LEAVE_APPROVAL_REQUIRED",
+        "Leave approval delegated to you",
+        f"Leave request for {leave_request.employee.full_name} was delegated to you for review.",
+    )
+    record_audit_event(
+        actor=actor,
+        institution=institution,
+        entity=leave_request,
+        action="leave.request.delegated",
+        metadata={"sequence": approval.sequence, "from": str(previous.id), "to": str(delegate.id)},
+    )
+    return leave_request
+
+
+@transaction.atomic
+def add_leave_comment(*, leave_request, actor, body):
+    comment = LeaveRequestComment(
+        institution=leave_request.institution, leave_request=leave_request, author=actor, body=(body or "").strip()
+    )
+    comment.full_clean()
+    comment.save()
+    record_audit_event(
+        actor=actor,
+        institution=leave_request.institution,
+        entity=leave_request,
+        action="leave.request.commented",
+    )
+    return comment
+
+
+def leave_review_context(*, leave_request, user):
+    """Everything a reviewer needs beside the request itself (read-only)."""
+    from apps.employees.models import Employment
+
+    institution = leave_request.institution
+    employee = leave_request.employee
+    year = leave_request.start_date.year
+    balance = LeaveBalance.objects.filter(
+        employee=employee, leave_type=leave_request.leave_type, year=year
+    ).first()
+    try:
+        policy = matching_policy(leave_request)
+    except ValidationError:
+        policy = None
+
+    checks = []
+    if policy is None:
+        checks.append({"code": "policy", "label": "Applicable policy", "status": "fail", "detail": "No active policy covers this employee and leave type."})
+    else:
+        checks.append({"code": "policy", "label": "Applicable policy", "status": "pass", "detail": policy.name})
+        if balance is None:
+            checks.append({"code": "balance", "label": "Leave balance", "status": "warn", "detail": "No balance exists yet for this year; it is created on submission."})
+        elif policy.allow_negative_balance or balance.available >= leave_request.requested_days:
+            checks.append({"code": "balance", "label": "Leave balance", "status": "pass", "detail": f"{balance.available} day(s) available."})
+        else:
+            checks.append({"code": "balance", "label": "Leave balance", "status": "fail", "detail": f"Only {balance.available} day(s) available."})
+        if policy.max_consecutive_days is not None:
+            ok = leave_request.requested_days <= policy.max_consecutive_days
+            checks.append({"code": "max_consecutive", "label": "Maximum consecutive days", "status": "pass" if ok else "fail", "detail": f"Policy allows {policy.max_consecutive_days} day(s)."})
+        needs_document = leave_request.leave_type.requires_attachment or policy.requires_document
+        if needs_document:
+            checks.append({"code": "document", "label": "Supporting document", "status": "pass" if leave_request.attachment_id else "fail", "detail": "Required by policy."})
+        if policy.min_service_days:
+            served = (leave_request.start_date - employee.hire_date).days
+            checks.append({"code": "service", "label": "Minimum service", "status": "pass" if served >= policy.min_service_days else "fail", "detail": f"{policy.min_service_days} day(s) required; {max(served, 0)} served."})
+
+    employment = Employment.objects.filter(employee=employee, is_current=True).select_related("department").first()
+    team = []
+    if employment:
+        month_start = leave_request.start_date.replace(day=1)
+        next_month = (month_start + timedelta(days=32)).replace(day=1)
+        colleagues = (
+            LeaveRequest.objects.filter(
+                institution=institution,
+                status__in=(LeaveRequest.Status.PENDING, LeaveRequest.Status.APPROVED),
+                employee__employments__is_current=True,
+                employee__employments__department_id=employment.department_id,
+                start_date__lt=next_month,
+                end_date__gte=month_start,
+            )
+            .exclude(pk=leave_request.pk)
+            .select_related("employee", "leave_type")
+            .order_by("start_date")
+        )
+        overlapping = 0
+        for item in colleagues:
+            overlaps = item.start_date <= leave_request.end_date and item.end_date >= leave_request.start_date
+            overlapping += int(overlaps)
+            team.append({
+                "id": str(item.id),
+                "employee_id": str(item.employee_id),
+                "employee_name": item.employee.full_name,
+                "leave_type": item.leave_type.name,
+                "start_date": item.start_date,
+                "end_date": item.end_date,
+                "status": item.status,
+                "overlaps": overlaps,
+            })
+        checks.append({
+            "code": "team_overlap",
+            "label": "Team availability",
+            "status": "warn" if overlapping else "pass",
+            "detail": f"{overlapping} team member(s) off during these dates." if overlapping else "No team members off during these dates.",
+        })
+
+    queue = list(
+        LeaveApproval.objects.filter(
+            institution=institution, approver=user, status=LeaveApproval.Status.PENDING,
+            leave_request__status=LeaveRequest.Status.PENDING,
+        )
+        .order_by("leave_request__submitted_at", "leave_request__created_at")
+        .values_list("leave_request_id", flat=True)
+    )
+    previous_id = next_id = None
+    if leave_request.pk in queue:
+        index = queue.index(leave_request.pk)
+        previous_id = queue[index - 1] if index > 0 else None
+        next_id = queue[index + 1] if index + 1 < len(queue) else None
+    current = leave_request.approvals.filter(status=LeaveApproval.Status.PENDING).order_by("sequence").first()
+    return {
+        "reference": leave_request.reference,
+        "department": employment.department.name if employment and employment.department_id else None,
+        "position": employment.position.title if employment and employment.position_id else None,
+        "employment_type": employment.employment_type if employment else None,
+        "balance": None if balance is None else {
+            "year": balance.year,
+            "entitlement": balance.opening_balance + balance.accrued + balance.adjusted,
+            "used": balance.used,
+            "available": balance.available,
+        },
+        "policy_checks": checks,
+        "team_on_leave": team,
+        "queue": {"previous_id": previous_id, "next_id": next_id, "position": (queue.index(leave_request.pk) + 1) if leave_request.pk in queue else None, "total": len(queue)},
+        "can_decide": bool(current and current.approver_id == user.id),
+        "can_delegate": bool(current and (current.approver_id == user.id or _has_permission(user, institution, "leave.configure"))),
+    }

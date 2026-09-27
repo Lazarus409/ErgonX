@@ -280,3 +280,30 @@ export interface BudgetDetail {
   people: { created_by: string | null; submitted_by: string | null; submitted_by_id: string | null; approved_by: string | null };
   audit: RecordAuditEntry[];
 }
+
+export const REPORT_TYPES: Array<[string, string]> = [["BALANCE_SHEET", "Statement of financial position"], ["INCOME_STATEMENT", "Income statement"], ["TRIAL_BALANCE", "Trial balance"], ["AR_AGING", "Receivables aging"], ["AP_AGING", "Payables aging"], ["BUDGET_VS_ACTUAL", "Budget vs actual"]];
+export const REPORT_CATEGORIES: Array<[string, string]> = [["STANDARD", "Standard reports"], ["MANAGEMENT", "Management reports"], ["COMPLIANCE", "Compliance reports"], ["AUDIT", "Audit reports"], ["END_OF_PERIOD", "End of period"], ["CUSTOM", "Custom reports"]];
+export const REPORT_FREQUENCIES: Array<[string, string]> = [["NONE", "Not scheduled"], ["MONTHLY", "Monthly"], ["QUARTERLY", "Quarterly"], ["YEARLY", "Yearly"]];
+
+export interface SavedReport {
+  id: string; code: string; name: string; report_type: string; report_type_label: string; category: string; category_label: string; description: string;
+  parameters: Record<string, string | boolean>; owner: string | null; owner_name: string | null; allowed_roles: string[]; is_standard: boolean;
+  schedule_frequency: string; next_run_on: string | null; notes: string; status: string; last_run_at: string | null; created_at: string; updated_at: string;
+}
+
+export interface ReportResultRow { code: string; label: string; current: string; comparative: string | null; buckets?: Record<string, string> }
+export interface ReportResult {
+  title: string; subtitle: string; columns: string[]; bucket_columns?: string[];
+  sections: Array<{ title: string; rows: ReportResultRow[]; total: string; total_comparative: string | null; bucket_totals?: Record<string, string> }>;
+  totals: Array<{ label: string; current: string; comparative: string | null }>;
+  summary: Array<{ label: string; value: string }>;
+  checks: Record<string, boolean>;
+}
+export interface ReportRun { id: string; version: number; status: string; parameters: Record<string, string | boolean>; result: ReportResult; error: string; run_by: string | null; created_at: string; scheduled: boolean }
+export interface ReportRuns {
+  versions: Array<{ id: string; version: number; status: string; created_at: string; run_by: string | null; scheduled: boolean }>;
+  run: ReportRun | null;
+  audit: RecordAuditEntry[];
+  institution: { name: string; currency: string };
+  roles: string[];
+}

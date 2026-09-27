@@ -60,6 +60,7 @@ const statusConfig: Record<string, { label: string; tone: BadgeTone; icon?: Luci
   OPEN: { label: "Open", tone: "info" },
   SENT: { label: "Sent", tone: "info" },
   ON_HOLD: { label: "On hold", tone: "violet" },
+  GENERATED: { label: "Generated", tone: "success" },
   ON_TRACK: { label: "On track", tone: "success" },
   AT_RISK: { label: "At risk", tone: "warning" },
   OVER_BUDGET: { label: "Over budget", tone: "danger" },

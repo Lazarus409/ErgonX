@@ -10,19 +10,23 @@ from rest_framework.viewsets import ViewSet
 from apps.reports.services import build_report_details, build_report_rows, rows_to_csv
 from apps.institutions.services import effective_permission_codes
 from common.permissions import TenantContextPermission, TenantRBACPermission
-from common.scoping import scope_to_employees
+from common.scoping import ATTENDANCE_BROAD, LEAVE_BROAD, scope_to_employees
 
 # Beyond report.view, a report needs the permissions that already guard its data,
-# so a role never reads a summary of records it could not open directly.
+# so a role never reads a summary of records it could not open directly. Each
+# entry is a list of requirements; a requirement is met by any one of its codes.
+# Leave and attendance need a management permission: leave.view and
+# attendance.view alone are self-service (every staff member has them for their
+# own records), so they do not open the institution-wide reports.
 REPORT_PERMISSIONS = {
-    "workforce-cost": ("employee.view", "payroll.view"),
-    "recruitment": ("candidate.view",),
-    "leave": ("leave.view",),
-    "attendance": ("attendance.view",),
-    "payroll": ("payroll.view",),
-    "accounting": ("journal.view",),
-    "ap-ar": ("invoice.view", "vendor_bill.view"),
-    "expenses": ("expense.view",),
+    "workforce-cost": (("employee.view",), ("payroll.view",)),
+    "recruitment": (("candidate.view",),),
+    "leave": (LEAVE_BROAD,),
+    "attendance": (ATTENDANCE_BROAD,),
+    "payroll": (("payroll.view",),),
+    "accounting": (("journal.view",),),
+    "ap-ar": (("invoice.view",), ("vendor_bill.view",)),
+    "expenses": (("expense.view",),),
 }
 
 
@@ -47,8 +51,7 @@ class ReportsViewSet(ViewSet):
 
     def _respond(self, request, name):
         granted = set(effective_permission_codes(request.membership))
-        missing = [code for code in REPORT_PERMISSIONS[name] if code not in granted]
-        if missing:
+        if not all(granted & set(requirement) for requirement in REPORT_PERMISSIONS[name]):
             raise PermissionDenied("Your role does not include access to this report.")
         filters = {
             "status": request.query_params.get("status"),

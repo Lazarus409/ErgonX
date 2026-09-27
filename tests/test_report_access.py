@@ -29,7 +29,9 @@ def test_reports_follow_the_role_permissions_behind_their_data(api_client, insti
     api_client.force_authenticate(finance)
     finance_reports = _visible(api_client)
     assert {"accounting", "ap-ar", "expenses", "payroll"} <= finance_reports
-    assert finance_reports.isdisjoint({"workforce-cost", "recruitment"})
+    # Finance staff hold leave.view / attendance.view for their own records only,
+    # which does not open the institution-wide leave and attendance reports.
+    assert finance_reports.isdisjoint({"workforce-cost", "recruitment", "leave", "attendance"})
 
     admin = user_factory()
     membership_factory(user=admin, institution=institution, role_code="INSTITUTION_ADMIN", is_primary=True)

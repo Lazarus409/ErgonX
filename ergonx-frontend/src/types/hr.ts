@@ -50,6 +50,10 @@ export interface Employee {
   personal_email: string;
   work_email: string;
   phone: string;
+  preferred_name: string;
+  mobile_phone: string;
+  office_location: string;
+  linkedin_url: string;
   avatar_key: string;
   date_of_birth: string | null;
   gender: Gender | string;
@@ -69,6 +73,10 @@ export interface EmployeePayload {
   personal_email?: string;
   work_email?: string;
   phone?: string;
+  preferred_name?: string;
+  mobile_phone?: string;
+  office_location?: string;
+  linkedin_url?: string;
   avatar_key?: string;
   date_of_birth?: string | null;
   gender?: Gender | string;
@@ -90,9 +98,23 @@ export interface Employment {
   end_date: string | null;
   status: EmploymentStatus | string;
   is_current: boolean;
+  working_pattern: WorkingPattern | string;
+  work_arrangement: WorkArrangement | string;
+  office_days: string[];
+  time_zone: string;
+  team: string;
+  cost_centre: string;
+  probation_status: ProbationStatus | string;
+  probation_end_date: string | null;
+  notice_period_weeks: number | null;
   created_at: string;
   updated_at: string;
 }
+
+export type WorkingPattern = "FULL_TIME" | "PART_TIME" | "SHIFT";
+export type WorkArrangement = "ON_SITE" | "HYBRID" | "REMOTE";
+export type ProbationStatus = "NOT_APPLICABLE" | "IN_PROGRESS" | "EXTENDED" | "COMPLETED";
+export const WEEKDAY_CODES = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"] as const;
 
 export interface EmploymentPayload {
   employee: string;
@@ -109,6 +131,15 @@ export interface EmploymentPayload {
   end_date?: string | null;
   status?: EmploymentStatus | string;
   is_current?: boolean;
+  working_pattern?: WorkingPattern | string;
+  work_arrangement?: WorkArrangement | string;
+  office_days?: string[];
+  time_zone?: string;
+  team?: string;
+  cost_centre?: string;
+  probation_status?: ProbationStatus | string;
+  probation_end_date?: string | null;
+  notice_period_weeks?: number | null;
 }
 
 export interface EmergencyContact {

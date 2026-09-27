@@ -29,10 +29,10 @@ export default function ErrorState({ title = "Unable to load data", message, onR
   }
   return (
     <div role="alert" className={cx("flex flex-col items-center justify-center rounded-2xl border border-line bg-surface px-6 py-12 text-center shadow-elevation-1", className)}>
-      <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-danger-soft" aria-hidden="true">
-        <AlertTriangle className="h-6 w-6 text-danger" />
+      <span className="flex h-20 w-20 items-center justify-center rounded-full bg-danger-soft ring-8 ring-danger-soft/40" aria-hidden="true">
+        <AlertTriangle className="h-8 w-8 text-danger" />
       </span>
-      <h2 className="mt-4 text-card-title font-semibold text-ink-strong">{title}</h2>
+      <h2 className="mt-4 text-card-title font-bold text-headline">{title}</h2>
       <p className="mt-1.5 max-w-md text-support text-ink-muted">{message}</p>
       {(onRetry || action) && (
         <div className="mt-5 flex flex-wrap justify-center gap-2">

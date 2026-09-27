@@ -56,7 +56,7 @@ export default function AcceptInvitationPage() {
           <span className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-success-soft text-success" aria-hidden="true"><CheckCircle2 className="h-6 w-6" /></span>
           <AuthHeading eyebrow="Access configured" title="You're ready to sign in." description={`Your ${preview?.role_name ?? details?.role_name ?? ""} access for ${details?.institution_name ?? "your institution"} has been activated.`} />
           {preview && <AccessPreview preview={preview} />}
-          <ButtonLink href="/login" size="lg" block className="mt-8">Sign in to ErgonX</ButtonLink>
+          <ButtonLink href="/login" variant="strong" size="lg" block className="mt-8">Sign in to ErgonX</ButtonLink>
         </div>
       ) : (
         <form onSubmit={submit}>
@@ -76,7 +76,7 @@ export default function AcceptInvitationPage() {
               <Field label={details.existing_account ? "Current password" : "Create password"}>
                 <Input required minLength={8} type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={details.existing_account ? "current-password" : "new-password"} />
               </Field>
-              <Button type="submit" size="lg" block loading={saving} loadingLabel="Activating access…">Accept invitation</Button>
+              <Button type="submit" variant="strong" size="lg" block loading={saving} loadingLabel="Activating access…">Accept invitation</Button>
             </div>
           )}
         </form>

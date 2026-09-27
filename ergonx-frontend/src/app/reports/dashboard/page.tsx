@@ -97,7 +97,7 @@ function ReportDrillDown({ report, title, group, filters, onClose }: { report: R
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="flex items-center gap-1 text-caption font-medium text-ink-muted">{title}<ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />Details</p>
-              <h2 className="text-card-title font-semibold text-ink-strong">{label}</h2>
+              <h2 className="text-card-title font-bold text-headline">{label}</h2>
               <p className="text-support text-ink-muted">{loading && !data ? "Loading records…" : `${rows.length} record${rows.length === 1 ? "" : "s"}${rows.length >= 1000 ? " (first 1,000 shown; the CSV has the same limit)" : ""}.`}</p>
             </div>
             <div className="flex items-center gap-2">
@@ -228,7 +228,7 @@ export default function ReportsDashboardPage() {
               <div className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <h2 className="text-card-title font-semibold text-ink-strong">{report?.title}</h2>
+                    <h2 className="text-card-title font-bold text-headline">{report?.title}</h2>
                     <p className="text-support text-ink-muted">Live summary. Select a row to see the records behind it. The CSV download uses the filters you set here.</p>
                   </div>
                   <span className="rounded-full bg-surface-muted px-2.5 py-1 text-caption font-semibold text-ink-muted tabular-nums">{data?.rows.length ?? 0} rows</span>

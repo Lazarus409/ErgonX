@@ -28,7 +28,7 @@ export default function SidebarLogo({ collapsed }: { collapsed: boolean }) {
   }
 
   return (
-    <span className="relative block h-9 w-[124px]" aria-label="ErgonX" role="img">
+    <span className="relative block h-12 w-[156px]" aria-label="ErgonX" role="img">
       <span
         aria-hidden="true"
         className={cx(
@@ -36,7 +36,7 @@ export default function SidebarLogo({ collapsed }: { collapsed: boolean }) {
           collapsed ? "pointer-events-none scale-[0.72] opacity-0 blur-[1px]" : "scale-100 opacity-100 blur-0",
         )}
       >
-        <Logo variant="reversed" height={28} alt="" priority />
+        <Logo variant="reversed" height={40} alt="" priority />
       </span>
       <span
         aria-hidden="true"
@@ -45,7 +45,7 @@ export default function SidebarLogo({ collapsed }: { collapsed: boolean }) {
           collapsed ? "scale-100 opacity-100 delay-[40ms]" : "pointer-events-none scale-50 opacity-0",
         )}
       >
-        <Logo variant="mark" height={32} alt="" priority />
+        <Logo variant="mark" height={34} alt="" priority />
         {toggles > 0 && (
           <span
             key={toggles}

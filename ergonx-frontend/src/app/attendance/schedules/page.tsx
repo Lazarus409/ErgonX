@@ -460,7 +460,7 @@ export default function SchedulesPage() {
           }
         />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-line bg-surface">
+        <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-elevation-1">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[900px] text-left">
               <thead className="border-b border-line bg-surface-muted">
@@ -570,7 +570,7 @@ export default function SchedulesPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
           <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-surface shadow-xl">
             <div className="sticky top-0 flex items-center justify-between border-b border-line bg-surface px-6 py-4">
-              <h2 className="text-lg font-semibold text-ink-strong">
+              <h2 className="text-lg font-bold text-headline">
                 {editing ? "Edit Work Schedule" : "New Work Schedule"}
               </h2>
 
@@ -783,7 +783,7 @@ export default function SchedulesPage() {
           <div className="flex max-h-[92vh] w-full max-w-2xl flex-col rounded-2xl bg-surface shadow-xl">
             <div className="flex items-center justify-between border-b border-line px-6 py-4">
               <div>
-                <h2 className="text-lg font-semibold text-ink-strong">
+                <h2 className="text-lg font-bold text-headline">
                   Assign Employees
                 </h2>
                 <p className="mt-1 text-sm text-ink-muted">

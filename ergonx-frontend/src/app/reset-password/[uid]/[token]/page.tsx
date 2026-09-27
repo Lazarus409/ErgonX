@@ -56,7 +56,7 @@ export default function ResetPasswordPage() {
           <Field label="Confirm new password" error={confirmation && password !== confirmation ? "Passwords do not match yet." : null}>
             <Input required minLength={8} type="password" size="lg" autoComplete="new-password" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} />
           </Field>
-          <Button type="submit" size="lg" block loading={saving} loadingLabel="Updating…">Set new password</Button>
+          <Button type="submit" variant="strong" size="lg" block loading={saving} loadingLabel="Updating…">Set new password</Button>
         </form>
       )}
       <Link href="/login" className="mt-6 block text-center text-support font-semibold text-ink-muted hover:text-ink-strong">Return to sign in</Link>

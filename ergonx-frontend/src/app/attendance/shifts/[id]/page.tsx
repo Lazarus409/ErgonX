@@ -149,9 +149,9 @@ export default function ShiftDetailPage() {
       </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <section className="rounded-xl border border-line bg-surface">
+        <section className="rounded-2xl border border-line bg-surface shadow-elevation-1">
           <div className="border-b border-line px-5 py-4">
-            <h2 className="text-base font-semibold text-ink-strong">
+            <h2 className="text-base font-bold text-headline">
               Shift Configuration
             </h2>
           </div>
@@ -182,9 +182,9 @@ export default function ShiftDetailPage() {
           </dl>
         </section>
 
-        <section className="rounded-xl border border-line bg-surface">
+        <section className="rounded-2xl border border-line bg-surface shadow-elevation-1">
           <div className="border-b border-line px-5 py-4">
-            <h2 className="text-base font-semibold text-ink-strong">
+            <h2 className="text-base font-bold text-headline">
               Work Schedules
             </h2>
             <p className="mt-1 text-xs text-ink-muted">
@@ -227,9 +227,9 @@ export default function ShiftDetailPage() {
         </section>
       </div>
 
-      <section className="rounded-xl border border-line bg-surface">
+      <section className="rounded-2xl border border-line bg-surface shadow-elevation-1">
         <div className="border-b border-line px-5 py-4">
-          <h2 className="text-base font-semibold text-ink-strong">
+          <h2 className="text-base font-bold text-headline">
             Assigned Employees
           </h2>
           <p className="mt-1 text-xs text-ink-muted">

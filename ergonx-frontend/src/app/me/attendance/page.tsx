@@ -249,10 +249,10 @@ export default function MyAttendancePage() {
         />
       </section>
 
-      <section className="rounded-xl border border-line bg-surface">
+      <section className="rounded-2xl border border-line bg-surface shadow-elevation-1">
         <div className="flex flex-col gap-3 border-b border-line p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="font-semibold text-ink-strong">Today</h2>
+            <h2 className="text-card-title font-bold text-headline">Today</h2>
 
             <p className="mt-1 text-sm text-ink-muted">
               {today
@@ -298,9 +298,9 @@ export default function MyAttendancePage() {
         )}
       </section>
 
-      <section className="rounded-xl border border-line bg-surface">
+      <section className="rounded-2xl border border-line bg-surface shadow-elevation-1">
         <div className="border-b border-line p-5">
-          <h2 className="font-semibold text-ink-strong">Attendance History</h2>
+          <h2 className="text-card-title font-bold text-headline">Attendance History</h2>
 
           <p className="mt-1 text-sm text-ink-muted">
             Your most recent attendance records.
@@ -372,7 +372,7 @@ export default function MyAttendancePage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
           <div className="w-full max-w-lg rounded-2xl bg-surface shadow-xl">
             <div className="flex items-center justify-between border-b border-line px-6 py-4">
-              <h2 className="text-lg font-semibold text-ink-strong">
+              <h2 className="text-lg font-bold text-headline">
                 Request Attendance Correction
               </h2>
 
@@ -457,16 +457,14 @@ function StatCard({
   value: string;
 }) {
   return (
-    <div className="rounded-xl border border-line bg-surface p-5">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-ink-muted">{label}</p>
-
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-surface-sunken text-ink">
-          {icon}
-        </span>
+    <div className="flex items-start gap-4 rounded-2xl border border-line bg-surface p-5 shadow-elevation-1">
+      <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-mod-attendance-soft text-mod-attendance [&_svg]:h-6 [&_svg]:w-6" aria-hidden="true">
+        {icon}
+      </span>
+      <div className="min-w-0">
+        <p className="text-[0.9375rem] font-bold text-headline">{label}</p>
+        <p className="mt-2 text-[1.75rem] font-bold leading-tight text-ink-strong tabular-nums">{value}</p>
       </div>
-
-      <p className="mt-3 text-2xl font-bold text-ink-strong">{value}</p>
     </div>
   );
 }
@@ -474,7 +472,7 @@ function StatCard({
 function Detail({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs font-medium uppercase tracking-wide text-ink-subtle">
+      <dt className="text-caption font-medium text-ink-muted">
         {label}
       </dt>
       <dd className="mt-1 text-sm font-medium text-ink-strong">{value}</dd>

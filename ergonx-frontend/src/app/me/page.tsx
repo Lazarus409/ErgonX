@@ -142,14 +142,14 @@ export default function SelfServiceHome() {
         subtitle="Here's your workday at a glance."
         aside={
           showAttendance ? (
-            <div className="rounded-2xl bg-white/[0.08] p-5 ring-1 ring-inset ring-white/15 backdrop-blur-sm">
-              <p className="flex items-center gap-1.5 text-caption font-semibold text-accent-aqua"><Clock3 className="h-3.5 w-3.5" aria-hidden="true" />Today</p>
-              <p className="mt-2 text-heading font-semibold text-white first-letter:uppercase">{loading && !data ? "Loading…" : todayStatus}</p>
+            <div className="rounded-2xl border border-primary/15 bg-primary-soft/70 p-5">
+              <p className="flex items-center gap-1.5 text-caption font-semibold text-primary-ink"><Clock3 className="h-3.5 w-3.5" aria-hidden="true" />Today</p>
+              <p className="mt-2 text-heading font-semibold text-ink-strong first-letter:uppercase">{loading && !data ? "Loading…" : todayStatus}</p>
               <dl className="mt-3 grid grid-cols-2 gap-3 text-support">
-                <div><dt className="text-white/55">Check-in</dt><dd className="font-semibold text-white tabular-nums">{clockTime(today?.check_in)}</dd></div>
-                <div><dt className="text-white/55">Check-out</dt><dd className="font-semibold text-white tabular-nums">{clockTime(today?.check_out)}</dd></div>
+                <div><dt className="text-ink-muted">Check-in</dt><dd className="font-semibold text-ink-strong tabular-nums">{clockTime(today?.check_in)}</dd></div>
+                <div><dt className="text-ink-muted">Check-out</dt><dd className="font-semibold text-ink-strong tabular-nums">{clockTime(today?.check_out)}</dd></div>
               </dl>
-              <Link href="/me/attendance" className="mt-4 inline-flex items-center gap-1.5 text-support font-semibold text-white hover:underline">Open attendance<ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
+              <Link href="/me/attendance" className="mt-4 inline-flex items-center gap-1.5 text-support font-semibold text-ink-strong hover:underline">Open attendance<ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
             </div>
           ) : undefined
         }

@@ -149,7 +149,7 @@ export default function HRDashboardPage() {
         toolbar={
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-card-title font-semibold text-ink-strong">Recent hires</h2>
+              <h2 className="text-card-title font-bold text-headline">Recent hires</h2>
               <p className="text-support text-ink-muted">Most recently hired active employees with a current employment record.</p>
             </div>
             {can("employee.view") && <Link href="/hr/employees" className="shrink-0 text-support font-semibold text-primary-ink hover:underline">View all</Link>}

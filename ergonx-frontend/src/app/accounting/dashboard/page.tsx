@@ -156,7 +156,7 @@ export default function AccountingDashboard() {
           rows={unreconciled.latest}
           rowKey={(line) => line.id}
           loading={initial}
-          toolbar={<div className="flex items-center justify-between gap-3"><div><h2 className="text-card-title font-semibold text-ink-strong">Unreconciled bank lines</h2><p className="text-support text-ink-muted">{unreconciled.count > unreconciled.latest.length ? `Latest ${unreconciled.latest.length} of ${formatNumber(unreconciled.count)}.` : "Imported statement lines awaiting a match."}</p></div>{can("bank_reconciliation.view") && <ButtonLink href="/accounting/banking" size="sm" variant="secondary">Reconcile</ButtonLink>}</div>}
+          toolbar={<div className="flex items-center justify-between gap-3"><div><h2 className="text-card-title font-bold text-headline">Unreconciled bank lines</h2><p className="text-support text-ink-muted">{unreconciled.count > unreconciled.latest.length ? `Latest ${unreconciled.latest.length} of ${formatNumber(unreconciled.count)}.` : "Imported statement lines awaiting a match."}</p></div>{can("bank_reconciliation.view") && <ButtonLink href="/accounting/banking" size="sm" variant="secondary">Reconcile</ButtonLink>}</div>}
           empty={{ title: "Nothing to reconcile", description: "Every imported statement line is matched to a posted cash journal.", icon: Landmark }}
           columns={[
             { key: "date", header: "Date", cell: (line) => formatDate(line.statement_date) },

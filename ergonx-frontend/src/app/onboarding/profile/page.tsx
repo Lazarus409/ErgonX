@@ -85,7 +85,7 @@ export default function OnboardingProfilePage() {
       {saveError && <ErrorState title="Could not save the profile" message={saveError} />}
       <section className="overflow-hidden rounded-3xl border border-line bg-surface shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
         <div className="flex flex-col gap-4 border-b border-line-soft bg-gradient-to-r from-surface-muted to-primary-soft/50 px-6 py-6 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-4"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-white shadow-sm"><Building2 className="h-5 w-5" /></div><div><h2 className="text-base font-semibold text-ink-strong">Organization details</h2><p className="mt-1 text-sm text-ink-muted">Contact information and operating location.</p></div></div>
+          <div className="flex items-center gap-4"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-white shadow-sm"><Building2 className="h-5 w-5" /></div><div><h2 className="text-base font-bold text-headline">Organization details</h2><p className="mt-1 text-sm text-ink-muted">Contact information and operating location.</p></div></div>
           <div className="inline-flex items-center gap-2 self-start rounded-full border border-primary/25 bg-surface px-3 py-1.5 text-xs font-semibold text-primary-ink sm:self-auto"><Sparkles className="h-3.5 w-3.5" />You can update this anytime</div>
         </div>
         <div className="p-6 sm:p-8">

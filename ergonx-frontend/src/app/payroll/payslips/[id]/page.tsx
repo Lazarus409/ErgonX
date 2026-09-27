@@ -76,7 +76,7 @@ function Detail({ label, value, subvalue }: { label: string; value: string; subv
 function ItemGroup({ title, items, currency, totalLabel, total }: { title: string; items: PayslipItem[]; currency: string; totalLabel: string; total: string }) {
   return (
     <div>
-      <h3 className="mb-3 text-card-title font-semibold text-ink-strong">{title}</h3>
+      <h3 className="mb-3 text-card-title font-bold text-ink-strong">{title}</h3>
       <dl className="space-y-2.5 text-sm">
         {items.map((item, index) => <div key={`${item.code}-${index}`} className="flex justify-between gap-3"><dt className="text-ink">{item.name}</dt><dd className="tabular-nums text-ink-strong">{formatAmount(item.amount, currency)}</dd></div>)}
         {!items.length && <p className="text-ink-muted">No {title.toLowerCase()} entries.</p>}

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronDown, PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
+import { ChevronDown, ChevronsLeft, PanelLeftOpen, X } from "lucide-react";
 import { useState } from "react";
 
 import Logo from "@/components/brand/Logo";
@@ -13,7 +13,6 @@ import { useAuth } from "@/components/guards/AuthProvider";
 import { hasModule } from "@/types/institutions";
 import { cx } from "@/lib/cx";
 import { imageContentUrl } from "@/lib/api/images";
-import { accentForPath, moduleAccents } from "@/lib/moduleTheme";
 
 interface SidebarProps {
   collapsed: boolean;
@@ -74,25 +73,29 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
   // In the mobile drawer the sidebar is always rendered expanded.
   const renderPanel = (compact: boolean, mobile: boolean) => (
     <div className="flex h-full flex-col">
-      <div className={cx("flex h-14 shrink-0 items-center justify-between gap-2 overflow-hidden border-b border-white/[0.07]", compact ? "px-[18px]" : "pl-[18px] pr-2.5")}>
+      <div className={cx("flex h-[5.25rem] shrink-0 items-center justify-between gap-2 overflow-hidden", compact ? "px-[18px]" : "pl-7 pr-3")}>
         <Link href="/" onClick={closeMobile} className="min-w-0 rounded-lg focus-visible:outline-offset-4" aria-label="ErgonX home">
           <SidebarLogo collapsed={compact} />
         </Link>
-        {mobile ? (
+        {mobile && (
           <button type="button" onClick={closeMobile} className="rounded-xl p-2 text-white/70 transition-colors hover:bg-white/10 hover:text-white" aria-label="Close navigation">
             <X className="h-5 w-5" />
           </button>
-        ) : (
-          !compact && (
-            <button type="button" onClick={() => onCollapsedChange(true)} className="rounded-xl p-2 text-white/60 transition-colors hover:bg-white/10 hover:text-white" aria-label="Collapse sidebar" title="Collapse sidebar">
-              <PanelLeftClose className="h-[18px] w-[18px]" />
-            </button>
-          )
         )}
       </div>
 
-      <nav aria-label="Primary navigation" className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4 [scrollbar-color:rgb(255_255_255/0.18)_transparent]">
-        <ul className="space-y-0.5">
+      {/* Concept: the active institution sits directly under the ErgonX brand. */}
+      <div className={cx("shrink-0 pb-3", compact ? "px-3" : "px-4")}>
+        <InstitutionPanel
+          compact={compact}
+          name={institution?.name ?? "No active institution"}
+          code={institution?.code}
+          logoSrc={institution?.logoImageId ? imageContentUrl(institution.logoImageId) : null}
+        />
+      </div>
+
+      <nav aria-label="Primary navigation" className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-3 [scrollbar-color:rgb(255_255_255/0.18)_transparent]">
+        <ul className="space-y-1">
           {visibleNavigation.map((item) => {
             const childItems = childrenFor(item);
             const groupActive = isActive(item.href) || childItems.some((child) => childActive(item.href, child.href));
@@ -115,10 +118,9 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
                 {!compact && childItems.length > 0 && (
                   <div className={cx("grid transition-[grid-template-rows] duration-200 ease-standard", expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
                     <ul className="overflow-hidden" aria-label={`${item.label} sections`}>
-                      <li className="relative ml-[22px] mt-1 space-y-0.5 border-l border-white/10 pb-1 pl-3">
+                      <li className="relative ml-3 mt-1 space-y-0.5 pb-1">
                         {childItems.map((child) => {
                           const active = childActive(item.href, child.href);
-                          const accent = moduleAccents[accentForPath(child.href)];
                           return (
                             <Link
                               key={child.href}
@@ -127,11 +129,11 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
                               tabIndex={expanded ? undefined : -1}
                               aria-current={active ? "page" : undefined}
                               className={cx(
-                                "relative flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-support font-medium transition-colors duration-150",
-                                active ? "bg-white/[0.09] text-white" : "text-white/60 hover:bg-white/[0.05] hover:text-white",
+                                "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150",
+                                active ? "bg-primary/25 text-white" : "text-white/75 hover:bg-white/[0.05] hover:text-white",
                               )}
                             >
-                              <span aria-hidden="true" className={cx("h-1.5 w-1.5 shrink-0 rounded-full", active ? accent.solid : "bg-white/25")} />
+                              <span aria-hidden="true" className={cx("h-1.5 w-1.5 shrink-0 rounded-full", active ? "bg-accent-sky" : "bg-white/70")} />
                               <span className="truncate">{child.label}</span>
                             </Link>
                           );
@@ -146,7 +148,7 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
         </ul>
 
         {visibleSelfService.length > 0 && (
-          <div className="mt-7">
+          <div className="mt-5 border-t border-white/[0.08] pt-4">
             {compact ? (
               <>
                 <div className="mx-auto mb-3 h-px w-8 bg-white/10" aria-hidden="true" />
@@ -184,10 +186,9 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
                   {selfServicePages.length > 0 && (
                     <div className={cx("grid transition-[grid-template-rows] duration-200 ease-standard", selfServiceExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
                       <ul className="overflow-hidden" aria-label="My workspace pages">
-                        <li className="relative ml-[22px] mt-1 space-y-0.5 border-l border-white/10 pb-1 pl-3">
+                        <li className="relative ml-3 mt-1 space-y-0.5 pb-1">
                           {selfServicePages.map((page) => {
                             const active = isActive(page.href);
-                            const Icon = page.icon;
                             return (
                               <Link
                                 key={page.href}
@@ -196,11 +197,11 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
                                 tabIndex={selfServiceExpanded ? undefined : -1}
                                 aria-current={active ? "page" : undefined}
                                 className={cx(
-                                  "relative flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-support font-medium transition-colors duration-150",
-                                  active ? "bg-white/[0.09] text-white" : "text-white/60 hover:bg-white/[0.05] hover:text-white",
+                                  "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150",
+                                  active ? "bg-primary/25 text-white" : "text-white/75 hover:bg-white/[0.05] hover:text-white",
                                 )}
                               >
-                                <Icon className={cx("h-4 w-4 shrink-0", active ? "text-white" : "text-white/45")} aria-hidden="true" />
+                                <span aria-hidden="true" className={cx("h-1.5 w-1.5 shrink-0 rounded-full", active ? "bg-accent-sky" : "bg-white/70")} />
                                 <span className="truncate">{page.label}</span>
                               </Link>
                             );
@@ -216,19 +217,20 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
         )}
       </nav>
 
-      <div className="shrink-0 border-t border-white/[0.07] p-3">
-        {compact && !mobile && (
-          <button type="button" onClick={() => onCollapsedChange(false)} className="mb-2 flex h-9 w-full items-center justify-center rounded-lg text-white/60 transition-colors hover:bg-white/10 hover:text-white" aria-label="Expand sidebar" title="Expand sidebar">
-            <PanelLeftOpen className="h-[18px] w-[18px]" />
+      {!mobile && (
+        <div className="shrink-0 border-t border-white/[0.08] p-3">
+          <button
+            type="button"
+            onClick={() => onCollapsedChange(!compact)}
+            className={cx("flex h-10 w-full items-center gap-3 rounded-lg text-support font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white", compact ? "justify-center" : "px-3")}
+            aria-label={compact ? "Expand sidebar" : "Collapse sidebar"}
+            title={compact ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {compact ? <PanelLeftOpen className="h-[18px] w-[18px]" /> : <ChevronsLeft className="h-5 w-5" />}
+            {!compact && <span>Collapse sidebar</span>}
           </button>
-        )}
-        <InstitutionPanel
-          compact={compact}
-          name={institution?.name ?? "No active institution"}
-          code={institution?.code}
-          logoSrc={institution?.logoImageId ? imageContentUrl(institution.logoImageId) : null}
-        />
-      </div>
+        </div>
+      )}
     </div>
   );
 
@@ -238,7 +240,7 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
       <aside
         data-shell-chrome
         className={cx(
-          "fixed inset-y-0 left-0 z-40 hidden bg-brand-navy text-white shadow-[inset_-1px_0_0_rgb(255_255_255/0.04)] transition-[width] duration-[220ms] ease-standard dark:bg-brand-navy-deep lg:block",
+          "fixed inset-y-0 left-0 z-40 hidden bg-sidebar bg-[linear-gradient(180deg,var(--sidebar)_0%,var(--sidebar-deep)_100%)] text-white shadow-[inset_-1px_0_0_rgb(255_255_255/0.04)] transition-[width] duration-[220ms] ease-standard lg:block",
           collapsed ? "w-[var(--shell-sidebar-collapsed)]" : "w-[var(--shell-sidebar-expanded)]",
         )}
       >
@@ -253,7 +255,7 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
             role="dialog"
             aria-modal="true"
             aria-label="Navigation"
-            className="relative h-full w-[min(86vw,var(--shell-sidebar-expanded))] bg-brand-navy text-white shadow-overlay dark:bg-brand-navy-deep"
+            className="relative h-full w-[min(86vw,var(--shell-sidebar-expanded))] bg-sidebar bg-[linear-gradient(180deg,var(--sidebar)_0%,var(--sidebar-deep)_100%)] text-white shadow-overlay"
             style={{ animation: "drawer-in-left var(--duration-emphasis) var(--ease-standard) both" }}
           >
             {renderPanel(false, true)}
@@ -266,20 +268,18 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
 
 function NavRow({ item, active, groupActive, compact, onNavigate, expander }: { item: NavigationItem; active: boolean; groupActive: boolean; compact: boolean; onNavigate: () => void; expander?: React.ReactNode }) {
   const Icon = item.icon;
-  const accent = moduleAccents[accentForPath(item.href)];
+  // Concept: plain white icons; the active area gets a lifted row and a bright blue edge.
   return (
-    <div className={cx("group/nav relative flex items-center rounded-lg transition-colors duration-150", groupActive ? "bg-white/[0.08]" : "hover:bg-white/[0.05]")}>
-      {groupActive && <span aria-hidden="true" className="bg-signature absolute -left-3 top-2 bottom-2 w-[2px] rounded-r-full" />}
+    <div className={cx("group/nav relative flex items-center rounded-lg transition-colors duration-150", groupActive ? "bg-white/[0.09]" : "hover:bg-white/[0.05]")}>
+      {groupActive && <span aria-hidden="true" className="absolute -left-3 top-1.5 bottom-1.5 w-1 rounded-r-full bg-accent-sky" />}
       <Link
         href={item.href}
         onClick={onNavigate}
         aria-current={active ? "page" : undefined}
         aria-label={compact ? item.label : undefined}
-        className={cx("flex min-w-0 flex-1 items-center rounded-lg text-sm font-medium", compact ? "h-10 justify-center" : "h-9 gap-2.5 px-2.5", groupActive ? "text-white" : "text-white/70 group-hover/nav:text-white")}
+        className={cx("flex min-w-0 flex-1 items-center rounded-lg text-[0.9375rem] font-medium", compact ? "h-11 justify-center" : "h-11 gap-3.5 px-3", groupActive ? "text-white" : "text-white/80 group-hover/nav:text-white")}
       >
-        <span className={cx("flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors", groupActive ? cx(accent.solid, "text-white") : "text-white/65 group-hover/nav:text-white")}>
-          <Icon className="h-4 w-4" aria-hidden="true" />
-        </span>
+        <Icon className={cx("h-5 w-5 shrink-0", groupActive ? "text-white" : "text-white/80 group-hover/nav:text-white")} aria-hidden="true" />
         {!compact && <span className="truncate">{item.label}</span>}
       </Link>
       {expander}
@@ -300,20 +300,21 @@ function NavRow({ item, active, groupActive, compact, onNavigate, expander }: { 
 function InstitutionPanel({ compact, name, code, logoSrc }: { compact: boolean; name: string; code?: string | null; logoSrc: string | null }) {
   const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "E";
   return (
-    <div className={cx("flex items-center rounded-lg bg-white/[0.05]", compact ? "justify-center p-1.5" : "gap-3 p-2")} title={compact ? name : undefined}>
+    <div className={cx("flex items-center rounded-xl border border-white/[0.12] bg-white/[0.04]", compact ? "justify-center p-1.5" : "gap-3 px-3 py-2.5")} title={compact ? name : undefined}>
       {logoSrc ? (
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white p-0.5" aria-hidden="true">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white p-0.5" aria-hidden="true">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={logoSrc} alt="" className="h-full w-full object-contain" />
         </span>
       ) : (
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-accent-aqua/80 via-accent-blue to-accent-violet text-caption font-bold text-white" aria-hidden="true">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-caption font-bold text-white" aria-hidden="true">
           {initials}
         </span>
       )}
       {!compact && (
         <div className="min-w-0 flex-1 leading-tight">
-          <p className="truncate text-support font-semibold text-white">{name}</p>
+          <p className="text-[0.6875rem] font-medium text-white/55">Active institution</p>
+          <p className="mt-0.5 truncate text-support font-semibold text-white">{name}</p>
           {logoSrc ? (
             <p className="flex items-center gap-1 text-caption text-white/50">
               {code && <span className="truncate">{code} ·</span>}

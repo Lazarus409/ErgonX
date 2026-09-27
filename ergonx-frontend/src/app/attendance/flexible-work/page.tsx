@@ -249,7 +249,7 @@ export default function FlexibleWorkPage() {
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-base font-semibold text-ink-strong">
+                  <h2 className="text-base font-bold text-headline">
                     {rule.name}
                   </h2>
 
@@ -305,7 +305,7 @@ export default function FlexibleWorkPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
           <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-surface shadow-xl">
             <div className="sticky top-0 flex items-center justify-between border-b border-line bg-surface px-6 py-4">
-              <h2 className="text-lg font-semibold text-ink-strong">
+              <h2 className="text-lg font-bold text-headline">
                 {editing ? "Edit Flexible Work Rule" : "New Flexible Work Rule"}
               </h2>
 

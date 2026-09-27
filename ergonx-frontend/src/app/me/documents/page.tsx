@@ -96,7 +96,7 @@ export default function MyDocumentsPage() {
       <PageHeader title="My documents" description="Upload your own documents, and find the ones HR has shared with you." icon={FileText} accent="brand" />
 
       <section className="rounded-2xl border border-line bg-surface p-5 shadow-elevation-1" aria-labelledby="upload-heading">
-        <h2 id="upload-heading" className="text-card-title font-semibold text-ink-strong">Upload a document</h2>
+        <h2 id="upload-heading" className="text-card-title font-bold text-headline">Upload a document</h2>
         <p className="text-support text-ink-muted">IDs, certificates, qualifications and similar. What you upload is visible to you and to the people who manage employee records.</p>
         {uploadError && <Alert tone="danger" className="mt-4">{uploadError}</Alert>}
         <div className="mt-4 grid gap-4 sm:grid-cols-[12rem_1fr_auto] sm:items-end">

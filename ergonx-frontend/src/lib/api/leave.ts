@@ -8,9 +8,10 @@
  *   /leave-requests/        + /calendar/, /submit/, /approve/, /reject/, /cancel/
  *   /leave-approvals/       read-only approval trail
  *
- * `/leave-requests/` accepts GET and POST only. Status is read-only and is
- * changed exclusively through the action endpoints below; it must never be
- * PATCHed. Approved balances are consumed and restored by the backend.
+ * `/leave-requests/` accepts GET, POST and PATCH (drafts only, by the
+ * requester). Status is read-only and is changed exclusively through the
+ * action endpoints below. Approved balances are consumed and restored by the
+ * backend.
  */
 
 import { apiAction, apiDelete, apiGet, apiGetList, apiPatch, apiPost } from "./client";
@@ -18,6 +19,9 @@ import type { ListParams, PaginatedData } from "@/types/api";
 import type {
   LeaveApproval,
   LeaveBalance,
+  LeaveDelegateCandidate,
+  LeaveRequestComment,
+  LeaveReviewContext,
   LeavePolicy,
   LeavePolicyPayload,
   LeaveRequest,
@@ -174,6 +178,37 @@ export async function rejectLeaveRequest(
 
 export async function cancelLeaveRequest(id: string): Promise<LeaveRequest> {
   return apiAction<LeaveRequest>(`/leave-requests/${id}/cancel/`);
+}
+
+/** Returns a pending request to the employee as an editable draft. */
+export async function requestLeaveChanges(id: string, comment: string): Promise<LeaveRequest> {
+  return apiAction<LeaveRequest>(`/leave-requests/${id}/request-changes/`, { comment });
+}
+
+/** Hands the active approval step to another leave approver. */
+export async function delegateLeaveRequest(id: string, delegate: string, comment = ""): Promise<LeaveRequest> {
+  return apiAction<LeaveRequest>(`/leave-requests/${id}/delegate/`, { delegate, comment });
+}
+
+export async function listLeaveDelegates(id: string): Promise<LeaveDelegateCandidate[]> {
+  return apiGet<LeaveDelegateCandidate[]>(`/leave-requests/${id}/delegates/`);
+}
+
+/** Edits a draft request (new, or returned for changes). */
+export async function updateLeaveRequest(id: string, payload: Partial<LeaveRequestPayload>): Promise<LeaveRequest> {
+  return apiPatch<LeaveRequest, Partial<LeaveRequestPayload>>(`/leave-requests/${id}/`, payload);
+}
+
+export async function getLeaveReview(id: string): Promise<LeaveReviewContext> {
+  return apiGet<LeaveReviewContext>(`/leave-requests/${id}/review/`);
+}
+
+export async function listLeaveComments(id: string): Promise<LeaveRequestComment[]> {
+  return apiGet<LeaveRequestComment[]>(`/leave-requests/${id}/comments/`);
+}
+
+export async function addLeaveComment(id: string, body: string): Promise<LeaveRequestComment> {
+  return apiPost<LeaveRequestComment, { body: string }>(`/leave-requests/${id}/comments/`, { body });
 }
 
 /* Approvals ---------------------------------------------------------------- */

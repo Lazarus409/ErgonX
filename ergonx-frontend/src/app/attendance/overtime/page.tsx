@@ -639,7 +639,7 @@ export default function OvertimePage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
           <div className="w-full max-w-lg rounded-2xl bg-surface shadow-xl">
             <div className="flex items-center justify-between border-b border-line px-6 py-4">
-              <h2 className="text-lg font-semibold text-ink-strong">
+              <h2 className="text-lg font-bold text-headline">
                 {reviewAction === "approve"
                   ? "Approve Overtime"
                   : "Reject Overtime"}

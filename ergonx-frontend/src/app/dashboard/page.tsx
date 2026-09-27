@@ -21,6 +21,8 @@ import { FunnelChart, SegmentedBar } from "@/components/charts/Visuals";
 import { Badge } from "@/components/ui/Badge";
 import { Card, MetricCard, SummaryCard } from "@/components/ui/Card";
 import ErrorState from "@/components/ui/ErrorState";
+import ScopeNote from "@/components/ui/ScopeNote";
+import { useAuth } from "@/components/guards/AuthProvider";
 import { dashboardsApi } from "@/lib/api";
 import { useAccess } from "@/lib/access";
 import { useApiResource } from "@/lib/useApiResource";
@@ -46,6 +48,7 @@ export default function DashboardPage() {
   const load = useCallback(() => dashboardsApi.getExecutiveDashboard(), []);
   const { data, loading, error, reload } = useApiResource(load);
   const { moduleEnabled } = useAccess();
+  const { institution } = useAuth();
   const enabled = {
     hr: moduleEnabled("HR"),
     leave: moduleEnabled("LEAVE"),
@@ -82,15 +85,17 @@ export default function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
-      <header className="relative overflow-hidden rounded-3xl bg-brand-navy px-6 py-6 text-white shadow-elevation-2 sm:px-8 dark:bg-[#0b1a36] dark:ring-1 dark:ring-white/5">
-        <span aria-hidden="true" className="bg-signature absolute -right-20 -top-24 h-64 w-64 rounded-full opacity-25 blur-3xl" />
-        <div className="relative flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-          <div>
-            <p className="text-support font-semibold text-accent-aqua">{data?.executive_title ?? "Executive"} dashboard</p>
-            <h1 className="mt-1 text-title font-bold tracking-tight">Organization overview</h1>
-            <p className="mt-1.5 max-w-2xl text-body text-white/70">Institution-wide workforce, operations and financial position from live tenant data.</p>
-          </div>
-          <span className="inline-flex w-fit items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-caption font-semibold text-white/90 ring-1 ring-inset ring-white/15">
+      <header className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:items-start">
+        <div className="min-w-0">
+          <h1 className="text-balance text-[1.75rem] font-bold leading-9 tracking-tight text-headline sm:text-title">{data?.executive_title ?? "Executive"} Dashboard</h1>
+          <p className="mt-1.5 text-[1.0625rem] leading-7 text-heading-support">Organization overview</p>
+          <p className="mt-0.5 max-w-2xl text-support text-ink-muted">Institution-wide workforce, operations and financial position from live tenant data.</p>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start lg:flex-col lg:items-stretch">
+          <ScopeNote title="Organization-wide view" icon={Landmark} solidIcon className="flex-1">
+            Showing data for all modules, departments and locations{institution?.name ? <> at {institution.name.replace(/\.$/, "")}</> : null}.
+          </ScopeNote>
+          <span className="inline-flex w-fit items-center gap-2 self-end rounded-full border border-line bg-surface px-3 py-1.5 text-caption font-semibold text-ink-muted">
             <span className={cx("h-2 w-2 rounded-full", loading ? "animate-pulse bg-warning" : "bg-success")} aria-hidden="true" />
             {loading ? "Refreshing" : "Live data"}
           </span>

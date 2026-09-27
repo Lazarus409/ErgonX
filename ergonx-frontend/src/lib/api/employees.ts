@@ -270,6 +270,10 @@ export async function createEmployment(
   return apiPost<Employment, EmploymentPayload>("/employments/", payload);
 }
 
+export async function getEmployment(id: string): Promise<Employment> {
+  return apiGet<Employment>(`/employments/${id}/`);
+}
+
 export async function updateEmployment(
   id: string,
   payload: Partial<EmploymentPayload>,

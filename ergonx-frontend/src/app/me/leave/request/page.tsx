@@ -224,7 +224,7 @@ export default function RequestLeavePage() {
 
         <section className="rounded-xl border border-line bg-surface shadow-sm">
           <div className="border-b border-line px-6 py-5">
-            <h2 className="text-base font-semibold text-ink-strong">
+            <h2 className="text-base font-bold text-headline">
               Leave Details
             </h2>
 

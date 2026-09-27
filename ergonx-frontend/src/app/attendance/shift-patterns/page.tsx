@@ -335,12 +335,12 @@ export default function ShiftPatternsPage() {
             return (
               <section
                 key={pattern.id}
-                className="rounded-xl border border-line bg-surface"
+                className="rounded-2xl border border-line bg-surface shadow-elevation-1"
               >
                 <div className="flex flex-col gap-3 border-b border-line p-5 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <div className="flex items-center gap-3">
-                      <h2 className="text-base font-semibold text-ink-strong">
+                      <h2 className="text-base font-bold text-headline">
                         {pattern.name}
                       </h2>
 
@@ -453,7 +453,7 @@ export default function ShiftPatternsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
           <div className="w-full max-w-lg rounded-2xl bg-surface shadow-xl">
             <div className="flex items-center justify-between border-b border-line px-6 py-4">
-              <h2 className="text-lg font-semibold text-ink-strong">
+              <h2 className="text-lg font-bold text-headline">
                 {editing ? "Edit Shift Pattern" : "Add Shift Pattern"}
               </h2>
 

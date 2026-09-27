@@ -116,6 +116,11 @@ export interface LeaveBalance {
 
 export interface LeaveRequest {
   id: string;
+  /** Stable human reference (LR-XXXXXXXX), matching universal search. */
+  reference?: string;
+  /** Set when a reviewer returned the request to the employee for changes. */
+  changes_requested_at?: string | null;
+  changes_requested_note?: string;
   employee: string;
   leave_type: string;
   start_date: string;
@@ -145,6 +150,8 @@ export interface LeaveApproval {
   id: string;
   leave_request: string;
   approver: string | null;
+  approver_name?: string;
+  delegated_from?: string | null;
   sequence: number;
   status: LeaveApprovalStatus | string;
   comment: string;
@@ -160,4 +167,54 @@ export interface LeaveRequestFilters {
   status?: LeaveRequestStatus | string;
   start_date?: string;
   end_date?: string;
+}
+
+export interface LeaveRequestComment {
+  id: string;
+  leave_request: string;
+  author: string;
+  author_name: string;
+  body: string;
+  created_at: string;
+}
+
+export interface LeavePolicyCheck {
+  code: string;
+  label: string;
+  status: "pass" | "warn" | "fail" | "unavailable" | string;
+  detail: string;
+}
+
+export interface LeaveTeamAbsence {
+  id: string;
+  employee_id: string;
+  employee_name: string;
+  leave_type: string;
+  start_date: string;
+  end_date: string;
+  status: string;
+  overlaps: boolean;
+}
+
+/** GET /leave-requests/{id}/review/ */
+export interface LeaveReviewContext {
+  reference: string;
+  is_requester: boolean;
+  employee_name: string;
+  employee_number: string;
+  department: string | null;
+  position: string | null;
+  employment_type: string | null;
+  balance: { year: number; entitlement: string; used: string; available: string } | null;
+  policy_checks: LeavePolicyCheck[];
+  team_on_leave: LeaveTeamAbsence[];
+  queue: { previous_id: string | null; next_id: string | null; position: number | null; total: number };
+  can_decide: boolean;
+  can_delegate: boolean;
+}
+
+export interface LeaveDelegateCandidate {
+  id: string;
+  name: string;
+  role: string;
 }

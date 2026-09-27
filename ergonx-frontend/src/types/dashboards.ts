@@ -123,6 +123,14 @@ export interface LeaveDashboard {
   approved_days_by_department?: Array<{ department: string; requested_days: string | number; request_count: number }>;
   /** 28 consecutive days from today: approved requests covering each day. */
   leave_calendar?: Array<{ date: string; on_leave: number }>;
+  range_months?: number;
+  range_start?: string;
+  /** Submitted (non-draft) requests starting within the range. */
+  total_requests?: number;
+  approved_requests?: number;
+  /** Approved leave days / (active headcount x working days) in the range, %. */
+  average_absence_rate?: string | number | null;
+  compliance?: Record<"policy_breaches" | "incomplete_leave_records" | "upcoming_long_absences", { count: number; items: Array<{ id: string; employee: string; issue: string }> }>;
 }
 
 export interface AttendanceDashboard {
@@ -157,6 +165,18 @@ export interface AttendanceDashboard {
   }>;
   lateness_trend: Array<{ month: string; late_occurrences: number; total_minutes_late: number }>;
   lateness_by_department: Array<{ employee__employments__department__name: string; late_occurrences: number; total_minutes_late: number }>;
+  range_months?: number;
+  range_start?: string;
+  /** Attended (present, late, remote) / attended + absent over the range, %. */
+  attendance_rate?: number | null;
+  late_arrivals?: number;
+  /** Clock-ins without a clock-out on past days in the range. */
+  missing_punches?: number;
+  pending_adjustments?: number;
+  attendance_trend?: Array<{ month: string; attendance_rate: number | null }>;
+  department_rates?: Array<{ department: string; attendance_rate: number | null; records: number }>;
+  priority_exceptions?: Array<{ record_id: string; employee_id: string; employee: string; issue: string; date: string; status: string }>;
+  recent_adjustments?: Array<{ id: string; employee: string; adjustment_type: string; adjusted_by: string; date: string; status: string }>;
 }
 
 export interface PayrollDashboard {

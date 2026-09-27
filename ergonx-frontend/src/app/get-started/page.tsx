@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowLeft, ArrowRight, Building2, CheckCircle2, Send, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, Building2, CheckCircle2, CircleHelp, FileLock2, MailOpen, Send, ShieldCheck, UserRound } from "lucide-react";
 
 import AuthShell, { AuthHeading } from "@/components/brand/AuthShell";
 import Alert from "@/components/ui/Alert";
@@ -16,6 +16,8 @@ const steps = [
   ["Receive a secure link", "Once approved, the administrator you name gets a single-use link by email."],
   ["Set up your organization", "Open the link, create your administrator account, then invite your team."],
 ];
+
+const stepIcons = [Send, FileLock2, UserRound];
 
 const countries = [
   ["GH", "Ghana"],
@@ -88,30 +90,57 @@ export default function GetStartedPage() {
     }
   };
 
+  const intro = (
+    <>
+      <Link href="/login" className="mb-8 inline-flex items-center gap-2 text-[0.9375rem] font-semibold text-primary-ink hover:underline"><ArrowLeft className="h-4 w-4" aria-hidden="true" />Back to sign in</Link>
+      <AuthHeading title="Bring your organization to ErgonX." description="New organizations join by invitation from an ErgonX Super Admin. Request yours in a few steps." />
+      <div className="border-t border-line pt-7">
+        <div className="flex gap-4">
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary-ink" aria-hidden="true"><CircleHelp className="h-6 w-6" /></span>
+          <div>
+            <h2 className="text-card-title font-bold text-headline">Joining an organization already on ErgonX?</h2>
+            <p className="mt-1 text-support leading-6 text-ink-muted">You don&apos;t need to request access. Ask your organization&apos;s administrator or HR team to invite you, then use the link in the email.</p>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+
   return (
-    <AuthShell width="lg">
-      <Link href="/login" className="mb-8 inline-flex items-center gap-2 text-support font-semibold text-ink-muted hover:text-ink-strong"><ArrowLeft className="h-4 w-4" aria-hidden="true" />Back to sign in</Link>
-      <AuthHeading eyebrow="Get started" title="Bring your organization to ErgonX." description="New organizations join by invitation from an ErgonX Super Admin. Request yours in a few steps." />
-      <ol className="grid gap-4 sm:grid-cols-3">
-        {steps.map(([title, description], index) => (
-          <li key={title} className="flex gap-3 sm:flex-col">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-sm font-bold text-primary-ink">{index + 1}</span>
-            <div>
-              <h2 className="font-semibold text-ink-strong">{title}</h2>
-              <p className="mt-0.5 text-support text-ink-muted">{description}</p>
-            </div>
-          </li>
-        ))}
+    <AuthShell width="lg" intro={intro}>
+      <div className="flex flex-col items-center text-center">
+        <span className="relative flex h-28 w-28 items-center justify-center rounded-full bg-primary-soft" aria-hidden="true">
+          <MailOpen className="h-14 w-14 text-primary" strokeWidth={1.5} />
+          <span className="absolute -bottom-1 -right-1 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-white shadow-[0_10px_24px_-10px_rgb(20_99_255/0.8)]"><ShieldCheck className="h-6 w-6" /></span>
+        </span>
+        <p className="mt-5 text-[1.0625rem] font-semibold text-ink-strong">Invitation links are secure and single-use.</p>
+      </div>
+      <ol className="mt-8 grid gap-6 sm:grid-cols-3 sm:gap-0">
+        {steps.map(([title, description], index) => {
+          const Icon = stepIcons[index];
+          return (
+            <li key={title} className="relative flex gap-4 sm:flex-col sm:items-center sm:px-4 sm:text-center sm:[&:not(:first-child)]:border-l sm:[&:not(:first-child)]:border-line-soft">
+              {index < steps.length - 1 && <span aria-hidden="true" className="absolute left-[calc(50%+1.75rem)] top-5 hidden h-px w-[calc(100%-3.5rem)] bg-line sm:block" />}
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-soft text-sm font-bold text-primary-ink">{index + 1}</span>
+              <div className="sm:mt-2">
+                <p className="hidden text-caption text-ink-muted sm:block">Step {index + 1}</p>
+                <h2 className="font-bold text-headline sm:mt-1">{title}</h2>
+                <p className="mt-1 text-support text-ink-muted">{description}</p>
+                <span className="mt-4 hidden h-12 w-12 items-center justify-center rounded-full bg-primary-soft text-primary-ink sm:inline-flex" aria-hidden="true"><Icon className="h-5 w-5" /></span>
+              </div>
+            </li>
+          );
+        })}
       </ol>
 
-      <section aria-labelledby="request-heading" className="mt-8 rounded-2xl border border-line bg-surface p-5 shadow-elevation-1 sm:p-6">
+      <section aria-labelledby="request-heading" className="mt-8 border-t border-line-soft pt-7">
         {submittedTo ? (
           <div className="flex flex-col items-center py-6 text-center" role="status">
             <span className="flex h-12 w-12 items-center justify-center rounded-full bg-success-soft text-success" aria-hidden="true"><CheckCircle2 className="h-6 w-6" /></span>
-            <h2 id="request-heading" className="mt-4 text-card-title font-semibold text-ink-strong">Request received</h2>
+            <h2 id="request-heading" className="mt-4 text-card-title font-bold text-headline">Request received</h2>
             <p className="mt-1 max-w-md text-support text-ink-muted">Thank you. Once a Super Admin approves it, an invitation will be sent to <span className="font-semibold text-ink-strong">{submittedTo}</span>.</p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <ButtonLink href="/login" trailingIcon={<ArrowRight className="h-4 w-4" />}>Go to sign in</ButtonLink>
+              <ButtonLink href="/login" variant="strong" trailingIcon={<ArrowRight className="h-4 w-4" />}>Go to sign in</ButtonLink>
               <Button variant="secondary" onClick={() => setSubmittedTo(null)}>Send another request</Button>
             </div>
           </div>
@@ -120,7 +149,7 @@ export default function GetStartedPage() {
             <div className="mb-5 flex items-start gap-3">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-ink" aria-hidden="true"><Building2 className="h-5 w-5" /></span>
               <div>
-                <h2 id="request-heading" className="text-card-title font-semibold text-ink-strong">Request an invitation</h2>
+                <h2 id="request-heading" className="text-card-title font-bold text-headline">Request an invitation</h2>
                 <p className="text-support text-ink-muted">The invitation goes to the email below, and that person becomes your organization&apos;s first administrator.</p>
               </div>
             </div>
@@ -164,16 +193,13 @@ export default function GetStartedPage() {
               </div>
               <div className="flex flex-col gap-3 sm:col-span-2 sm:flex-row sm:items-center sm:justify-between">
                 <p className="flex items-center gap-2 text-support text-ink-muted"><ShieldCheck className="h-4 w-4 shrink-0 text-success" aria-hidden="true" />Invitation links are secure and single-use.</p>
-                <Button type="submit" loading={submitting} loadingLabel="Sending…" trailingIcon={<Send className="h-4 w-4" />}>Send request</Button>
+                <Button type="submit" variant="strong" size="lg" loading={submitting} loadingLabel="Sending…" trailingIcon={<Send className="h-4 w-4" />}>Send request</Button>
               </div>
             </form>
           </>
         )}
       </section>
 
-      <Alert tone="info" title="Joining an organization already on ErgonX?" className="mt-6">
-        You don&apos;t need to request access. Ask your organization&apos;s administrator or HR team to invite you, then use the link in the email.
-      </Alert>
     </AuthShell>
   );
 }

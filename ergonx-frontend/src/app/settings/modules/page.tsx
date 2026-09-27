@@ -5,7 +5,6 @@ import { BarChart3, Banknote, CalendarDays, Calculator, CheckCircle2, Layers3, P
 
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { IconTile } from "@/components/ui/Card";
 import ErrorState from "@/components/ui/ErrorState";
 import LoadingState from "@/components/ui/LoadingState";
 import PageHeader from "@/components/ui/PageHeader";
@@ -52,12 +51,11 @@ export default function ModuleSettingsPage() {
           const detail = moduleDetails[module.module_code] ?? { name: module.module_code.replaceAll("_", " "), description: "ErgonX workspace capability.", icon: CheckCircle2, accent: "settings" as ModuleAccent };
           return (
             <article key={module.id} className={cx("relative flex gap-4 overflow-hidden rounded-2xl border bg-surface p-5 shadow-elevation-1 transition-shadow hover:shadow-elevation-2", module.is_enabled ? "border-line" : "border-dashed border-line-strong")}>
-              {module.is_enabled && <span aria-hidden="true" className={cx("absolute inset-y-0 left-0 w-1", moduleAccents[detail.accent].solid)} />}
-              <IconTile icon={detail.icon} accent={detail.accent} className={module.is_enabled ? undefined : "opacity-60"} />
+              <span className={cx("flex h-14 w-14 shrink-0 items-center justify-center rounded-full", moduleAccents[detail.accent].tile, !module.is_enabled && "opacity-60")} aria-hidden="true"><detail.icon className="h-6 w-6" /></span>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <h2 className="text-card-title font-semibold text-ink-strong">{detail.name}</h2>
+                    <h2 className="text-card-title font-bold text-headline">{detail.name}</h2>
                     <p className="mt-0.5 text-support text-ink-muted">{detail.description}</p>
                   </div>
                   <StatusBadge status={module.is_enabled ? "ACTIVE" : "INACTIVE"} size="sm" />

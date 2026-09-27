@@ -6,7 +6,7 @@ import { Loader2 } from "lucide-react";
 
 import { cx } from "@/lib/cx";
 
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "link" | "inverse";
+export type ButtonVariant = "primary" | "strong" | "secondary" | "ghost" | "danger" | "link" | "inverse";
 export type ButtonSize = "sm" | "md" | "lg";
 
 const base =
@@ -14,7 +14,10 @@ const base =
 
 const variants: Record<ButtonVariant, string> = {
   primary: "bg-primary text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.16),0_1px_2px_rgb(15_35_69/0.18),var(--glow-primary)] hover:bg-primary-hover active:bg-primary-active",
-  secondary: "border border-line bg-surface text-ink-strong shadow-elevation-1 hover:border-line-strong hover:bg-surface-hover",
+  // Concept entry-screen call to action: deep navy.
+  strong: "bg-cta-strong text-white shadow-[0_10px_24px_-12px_rgb(11_27_61/0.6)] hover:bg-cta-strong-hover",
+  // Concept secondary action: blue outline on white.
+  secondary: "border border-primary/70 bg-surface text-primary-ink shadow-elevation-1 hover:border-primary hover:bg-primary-soft",
   ghost: "text-ink hover:bg-surface-hover hover:text-ink-strong",
   danger: "bg-danger text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.14),0_1px_2px_rgb(15_35_69/0.18)] hover:brightness-95 active:brightness-90",
   link: "h-auto px-0 text-primary-ink underline-offset-4 hover:underline active:translate-y-0",
@@ -22,9 +25,9 @@ const variants: Record<ButtonVariant, string> = {
 };
 
 const sizes: Record<ButtonSize, string> = {
-  sm: "h-8 rounded-lg px-3 text-support",
-  md: "h-9 rounded-lg px-3.5 text-sm",
-  lg: "h-11 rounded-lg px-5 text-sm",
+  sm: "h-8 rounded-lg px-3 text-support font-semibold",
+  md: "h-10 rounded-lg px-4 text-sm font-semibold",
+  lg: "h-12 rounded-lg px-5 text-[0.9375rem] font-semibold",
 };
 
 export function buttonClasses({ variant = "primary", size = "md", block = false, className }: { variant?: ButtonVariant; size?: ButtonSize; block?: boolean; className?: string } = {}): string {
@@ -91,7 +94,7 @@ export interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>
   showTooltip?: boolean;
 }
 
-const iconSizes: Record<ButtonSize, string> = { sm: "h-8 w-8 rounded-lg", md: "h-9 w-9 rounded-lg", lg: "h-11 w-11 rounded-lg" };
+const iconSizes: Record<ButtonSize, string> = { sm: "h-8 w-8 rounded-lg", md: "h-10 w-10 rounded-lg", lg: "h-12 w-12 rounded-lg" };
 
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
   { label, variant = "ghost", size = "md", loading, showTooltip = false, className, children, disabled, type = "button", ...rest },

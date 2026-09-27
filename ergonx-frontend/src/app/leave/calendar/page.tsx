@@ -286,7 +286,7 @@ export default function LeaveCalendarPage() {
 
           <div className="ml-1 flex items-center gap-2">
             <CalendarDays className="h-5 w-5 text-ink-muted" />
-            <h2 className="text-lg font-semibold text-ink-strong">
+            <h2 className="text-lg font-bold text-headline">
               {monthNames[month]} {year}
             </h2>
           </div>

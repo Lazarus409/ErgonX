@@ -199,7 +199,28 @@ export interface PayrollDashboard {
   cost_by_department?: { period: string | null; departments: Array<{ department: string; gross_pay: string | number }> };
 }
 
+export interface FinanceAttentionItem {
+  type: string;
+  description: string;
+  entity: string;
+  date: string;
+  status: string;
+  href: string;
+}
+
 export interface FinanceDashboard {
+  range_months?: number;
+  range_start?: string;
+  cash_flow_range?: CashFlowPoint[];
+  reconciliation_exceptions?: number;
+  pending_approvals?: number;
+  pending_approvals_breakdown?: { journals: number; vendor_bills: number; expenses: number };
+  unposted_journals?: number;
+  close_status?: { current_period: string | null; current_status: string | null; current_end: string | null; overdue_open_periods: number };
+  needs_attention?: FinanceAttentionItem[];
+  needs_attention_total?: number;
+  recent_journals?: Array<{ id: string; entry_date: string; journal_number: string; description: string; source: string; status: string }>;
+  controls?: Record<"period_close" | "segregation_of_duties" | "audit_trail", { ok: boolean; detail: string }>;
   currency: string;
   pending_journals: number;
   accounts_payable: string | number;

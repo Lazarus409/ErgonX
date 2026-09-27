@@ -54,6 +54,8 @@ export async function getRecruitmentDashboard(months?: 3 | 6 | 12): Promise<Recr
 }
 
 /** Used by the accounting dashboard screen. */
-export async function getFinanceDashboard(): Promise<FinanceDashboard> {
+/** `months` selects the "Last N months" cash-flow range (3, 6 or 12). */
+export async function getFinanceDashboard(months?: 3 | 6 | 12): Promise<FinanceDashboard> {
+  if (months) return apiGet<FinanceDashboard>(`/dashboards/finance/?months=${months}`);
   return apiGet<FinanceDashboard>("/dashboards/finance/");
 }

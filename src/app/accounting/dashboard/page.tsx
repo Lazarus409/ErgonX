@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback } from "react";
-import { ArrowDownLeft, ArrowUpRight, Building2, FileBarChart, FileText, Landmark, PieChart as PieChartIcon, Plus, Receipt, Scale, WalletCards } from "lucide-react";
+import Link from "next/link";
+import { useCallback, useState } from "react";
+import { AlertTriangle, ArrowDownLeft, ArrowUpRight, BarChart3, Building2, CalendarCheck, CalendarDays, CheckCircle2, ChevronDown, ChevronRight, Clock3, FileBarChart, FileClock, FilePen, FileText, Landmark, PieChart as PieChartIcon, Plus, Receipt, Scale, ShieldCheck, UsersRound } from "lucide-react";
 
 import ChartCard from "@/components/charts/ChartCard";
 import { BarsChart, DonutChart, TrendChart, donutLegend } from "@/components/charts/Charts";
@@ -17,6 +18,7 @@ import { dashboardsApi } from "@/lib/api";
 import { EM_DASH, formatAmount, formatDate, formatNumber, humanizeEnum, formatCount } from "@/lib/format";
 import { useApiResource } from "@/lib/useApiResource";
 import { hasModule } from "@/types/institutions";
+import { cx } from "@/lib/cx";
 
 const journalStatusColors: Record<string, string> = {
   DRAFT: "var(--ink-subtle)",
@@ -30,11 +32,12 @@ const journalStatusColors: Record<string, string> = {
 export default function AccountingDashboard() {
   const { institution, user } = useAuth();
   const can = (permission: string) => hasModule(institution?.enabledModules, "ACCOUNTING") && (user?.permissions.includes("*") || user?.permissions.includes(permission));
-  const { data, loading, error, reload } = useApiResource(useCallback(() => dashboardsApi.getFinanceDashboard(), []));
+  const [range, setRange] = useState<3 | 6 | 12>(12);
+  const { data, loading, error, reload } = useApiResource(useCallback(() => dashboardsApi.getFinanceDashboard(range), [range]));
   const initial = loading && !data;
   const currency = data?.currency;
   const pnl = data?.profit_and_loss_trend ?? [];
-  const cash = data?.cash_flow_trend ?? [];
+  const cash = data?.cash_flow_range ?? data?.cash_flow_trend ?? [];
   const latestPnl = pnl.at(-1);
   const latestCash = cash.at(-1);
   const buckets = Array.from(new Set([...(data?.accounts_receivable_aging ?? []).map((item) => item.bucket), ...(data?.accounts_payable_aging ?? []).map((item) => item.bucket)]));
@@ -50,20 +53,121 @@ export default function AccountingDashboard() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Accounting"
-        title="Accounting Dashboard"
-        description="Posted-ledger performance, cash movement, aging and journal controls."
-        icon={Scale}
-        accent="accounting"
+        title="Accounting"
+        description="Financial integrity for a stronger tomorrow."
         actions={
           <>
-            {can("financial_report.view") && <ButtonLink href="/accounting/reports" variant="secondary" leadingIcon={<FileBarChart className="h-4 w-4" />}>Financial reports</ButtonLink>}
-            {can("journal.create") && <ButtonLink href="/accounting/journals/new" leadingIcon={<Plus className="h-4 w-4" />}>New journal</ButtonLink>}
+            <label className="relative">
+              <span className="sr-only">Date range</span>
+              <CalendarDays className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-section-icon" aria-hidden="true" />
+              <select data-ui="select" value={range} onChange={(event) => setRange(Number(event.target.value) as 3 | 6 | 12)} className="h-12 appearance-none rounded-lg border border-line-strong bg-surface pl-11 pr-10 text-sm font-medium text-ink-strong">
+                {[3, 6, 12].map((months) => <option key={months} value={months}>Last {months} months</option>)}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" aria-hidden="true" />
+            </label>
+            {can("financial_report.view") && <ButtonLink href="/accounting/reports" size="lg" variant="secondary" leadingIcon={<FileBarChart className="h-5 w-5" />}>Financial reports</ButtonLink>}
+            {can("journal.create") && <ButtonLink href="/accounting/journals/new" size="lg" leadingIcon={<Plus className="h-5 w-5" />}>Create journal</ButtonLink>}
           </>
         }
       />
       {error && <ErrorState variant="inline" title="Unable to load accounting dashboard" message={error} onRetry={reload} />}
 
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Accounting indicators">
+        <MetricCard label="Reconciliation exceptions" value={data?.reconciliation_exceptions === undefined ? EM_DASH : formatNumber(data.reconciliation_exceptions)} description={data?.reconciliation_exceptions ? "Statement lines not yet matched" : "No data available"} icon={AlertTriangle} accent="leave" loading={initial} href={can("bank_reconciliation.view") ? "/accounting/banking" : undefined} />
+        <MetricCard label="Pending approvals" value={data?.pending_approvals === undefined ? EM_DASH : formatNumber(data.pending_approvals)} description={data?.pending_approvals ? `${data.pending_approvals_breakdown?.journals ?? 0} journals · ${data.pending_approvals_breakdown?.vendor_bills ?? 0} bills · ${data.pending_approvals_breakdown?.expenses ?? 0} expenses` : "No data available"} icon={FileClock} accent="reports" loading={initial} href={can("journal.view") ? "/accounting/journals?status=PENDING_APPROVAL" : undefined} />
+        <MetricCard label="Unposted journals" value={data?.unposted_journals === undefined ? EM_DASH : formatNumber(data.unposted_journals)} description={data?.unposted_journals ? "Draft, pending or approved" : "No data available"} icon={FilePen} accent="payroll" loading={initial} href={can("journal.view") ? "/accounting/journals" : undefined} />
+        <MetricCard label="Close status" value={data?.close_status?.current_status ? humanizeEnum(data.close_status.current_status) : EM_DASH} description={data?.close_status?.current_period ? `${data.close_status.current_period}${data.close_status.overdue_open_periods ? ` · ${data.close_status.overdue_open_periods} past period(s) open` : ""}` : "No data available"} icon={CalendarCheck} accent="settings" loading={initial} href={can("accounting_period.close") ? "/accounting/periods" : undefined} />
+      </section>
+
+      <div className="grid gap-5 2xl:grid-cols-2">
+        <ChartCard
+          title="Cash flow overview"
+          description="Inflows and outflows over time."
+          accent="accounting"
+          icon={BarChart3}
+          loading={initial}
+          error={!data && error ? "This data is unavailable right now." : null}
+          empty={!cash.length}
+          emptyDescription="Cash flow information will be displayed here when general ledger transactions on registered bank accounts are available."
+          legend={[{ label: "Inflow", color: "var(--success)", shape: "square" }, { label: "Outflow", color: "var(--warning)", shape: "square" }]}
+          footer={latestCash ? <span>Latest net movement: <strong className={Number(latestCash.net_movement) >= 0 ? "text-success-ink" : "text-danger-ink"}>{formatAmount(latestCash.net_movement, currency)}</strong></span> : undefined}
+          data={{ columns: ["Month", "Inflow", "Outflow", "Net"], rows: cash.map((point) => [point.month, formatAmount(point.inflow, currency), formatAmount(point.outflow, currency), formatAmount(point.net_movement, currency)]) }}
+        >
+          <BarsChart data={cash} xKey="month" xFormat="month" format="currency" currency={currency} height={240} series={[{ key: "inflow", label: "Inflow", color: "var(--success)" }, { key: "outflow", label: "Outflow", color: "var(--warning)" }]} />
+        </ChartCard>
+        <section className="rounded-2xl border border-line bg-surface p-5 shadow-elevation-1">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3"><FileText className="mt-0.5 h-7 w-7 text-section-icon" aria-hidden="true" /><div><h2 className="text-heading font-bold text-headline">Needs attention</h2><p className="text-support text-heading-support">Accounting items that require your review or action.</p></div></div>
+            {(data?.needs_attention_total ?? 0) > (data?.needs_attention?.length ?? 0) && <span className="text-sm text-ink-muted">{data?.needs_attention?.length} of {data?.needs_attention_total}</span>}
+          </div>
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[34rem] text-sm">
+              <thead className="bg-surface-muted text-left text-caption font-semibold text-ink-strong"><tr><th className="px-3 py-2">Type</th><th className="px-3 py-2">Description</th><th className="px-3 py-2">Entity</th><th className="px-3 py-2">Date</th><th className="px-3 py-2">Status</th></tr></thead>
+              <tbody className="divide-y divide-line-soft">
+                {(data?.needs_attention ?? []).map((item, index) => (
+                  <tr key={`${item.type}-${item.entity}-${index}`} className="hover:bg-surface-hover">
+                    <td className="whitespace-nowrap px-3 py-2 font-medium text-ink-strong">{item.type}</td>
+                    <td className="max-w-56 truncate px-3 py-2"><Link href={item.href} className="text-primary-ink hover:underline">{item.description}</Link></td>
+                    <td className="whitespace-nowrap px-3 py-2 text-ink-muted">{item.entity}</td>
+                    <td className="whitespace-nowrap px-3 py-2 text-ink-muted">{formatDate(item.date)}</td>
+                    <td className="px-3 py-2"><StatusBadge status={item.status} size="sm" /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!initial && !(data?.needs_attention ?? []).length && <div className="flex flex-col items-center py-8 text-center"><span className="flex h-16 w-16 items-center justify-center rounded-full bg-surface-muted text-ink-muted"><CheckCircle2 className="h-7 w-7" aria-hidden="true" /></span><p className="mt-3 font-bold text-headline">No items to review</p><p className="text-support text-ink-muted">There are no accounting items requiring attention at this time.</p></div>}
+          </div>
+        </section>
+      </div>
+
+      <div className="grid gap-5 2xl:grid-cols-2">
+        <section className="rounded-2xl border border-line bg-surface p-5 shadow-elevation-1">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3"><Clock3 className="mt-0.5 h-7 w-7 text-section-icon" aria-hidden="true" /><div><h2 className="text-heading font-bold text-headline">Recent journal activity</h2><p className="text-support text-heading-support">Latest journal entries posted or created.</p></div></div>
+            {can("journal.view") && <Link href="/accounting/journals" className="inline-flex items-center gap-1 text-sm font-semibold text-primary-ink hover:underline">View all<ChevronRight className="h-4 w-4" aria-hidden="true" /></Link>}
+          </div>
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[32rem] text-sm">
+              <thead className="bg-surface-muted text-left text-caption font-semibold text-ink-strong"><tr><th className="px-3 py-2">Date</th><th className="px-3 py-2">Journal #</th><th className="px-3 py-2">Description</th><th className="px-3 py-2">Source</th><th className="px-3 py-2">Status</th></tr></thead>
+              <tbody className="divide-y divide-line-soft">
+                {(data?.recent_journals ?? []).map((row) => (
+                  <tr key={row.id} className="hover:bg-surface-hover">
+                    <td className="whitespace-nowrap px-3 py-2 text-ink-muted">{formatDate(row.entry_date)}</td>
+                    <td className="whitespace-nowrap px-3 py-2"><Link href={`/accounting/journals/${row.id}`} className="font-semibold text-primary-ink hover:underline">{row.journal_number}</Link></td>
+                    <td className="max-w-56 truncate px-3 py-2">{row.description}</td>
+                    <td className="px-3 py-2 text-ink-muted">{humanizeEnum(row.source)}</td>
+                    <td className="px-3 py-2"><StatusBadge status={row.status} size="sm" /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!initial && !(data?.recent_journals ?? []).length && <div className="flex flex-col items-center py-8 text-center"><span className="flex h-16 w-16 items-center justify-center rounded-full bg-surface-muted text-ink-muted"><FileText className="h-7 w-7" aria-hidden="true" /></span><p className="mt-3 font-bold text-headline">No recent activity</p><p className="text-support text-ink-muted">Journal entries will appear here when data is available.</p></div>}
+          </div>
+        </section>
+        <section className="rounded-2xl border border-line bg-surface p-5 shadow-elevation-1">
+          <div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 h-7 w-7 text-section-icon" aria-hidden="true" /><div><h2 className="text-heading font-bold text-headline">Accounting controls</h2><p className="text-support text-heading-support">Key controls to help maintain financial integrity.</p></div></div>
+          <ul className="mt-4 space-y-3">
+            {([
+              ["period_close", "Period close checklist", CheckCircle2, "bg-success-soft text-success-ink", "/accounting/periods"],
+              ["segregation_of_duties", "Segregation of duties", UsersRound, "bg-mod-recruitment-soft text-mod-recruitment", "/settings/roles"],
+              ["audit_trail", "Audit trail access", FileText, "bg-mod-payroll-soft text-mod-payroll", "/audit"],
+            ] as const).map(([key, title, Icon, tone, href]) => {
+              const control = data?.controls?.[key];
+              return (
+                <li key={key}>
+                  <Link href={href} className="flex items-center gap-4 rounded-xl border border-line p-3 hover:border-primary/40 hover:bg-surface-hover">
+                    <span className={cx("flex h-12 w-12 shrink-0 items-center justify-center rounded-full", control && !control.ok ? "bg-warning-soft text-warning-ink" : tone)}>{control && !control.ok ? <AlertTriangle className="h-6 w-6" aria-hidden="true" /> : <Icon className="h-6 w-6" aria-hidden="true" />}</span>
+                    <span className="min-w-0 flex-1"><span className="block font-semibold text-ink-strong">{title}</span><span className="text-support text-ink-muted">{control?.detail ?? (initial ? "Checking…" : "No data available")}</span></span>
+                    <ChevronRight className="h-5 w-5 text-primary-ink" aria-hidden="true" />
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      </div>
+
+      <h2 className="pt-2 text-heading font-bold text-headline">Financial position</h2>
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Financial position">
         <MetricCard size="sm" label="Bank balance" value={data ? formatAmount(data.bank_balance, currency) : EM_DASH} description={data ? formatCount(data.registered_bank_accounts, "registered account") : undefined} icon={Landmark} accent="accounting" loading={initial} />
         <MetricCard size="sm" label="Accounts receivable" value={data ? formatAmount(data.accounts_receivable, currency) : EM_DASH} description="Outstanding from customers" icon={ArrowDownLeft} accent="attendance" loading={initial} href={can("invoice.view") ? "/accounting/receivables" : undefined} />
@@ -87,22 +191,7 @@ export default function AccountingDashboard() {
         <TrendChart data={pnl} xKey="month" format="currency" currency={currency} height={280} zeroLine series={[{ key: "income", label: "Income", color: "var(--chart-2)" }, { key: "expenses", label: "Expenses", color: "var(--chart-6)" }, { key: "net_income", label: "Net result", color: "var(--chart-1)" }]} />
       </ChartCard>
 
-      <div className="grid gap-5 xl:grid-cols-2">
-        <ChartCard
-          title="Bank cash movement"
-          description="Posted bank-ledger inflow and outflow for registered bank accounts."
-          accent="accounting"
-          icon={WalletCards}
-          loading={initial}
-          error={!data && error ? "This data is unavailable right now." : null}
-          empty={!cash.length}
-          emptyDescription="Post bank journals to see cash movement."
-          legend={[{ label: "Inflow", color: "var(--success)", shape: "square" }, { label: "Outflow", color: "var(--warning)", shape: "square" }]}
-          footer={latestCash ? <span>Latest net movement: <strong className={Number(latestCash.net_movement) >= 0 ? "text-success-ink" : "text-danger-ink"}>{formatAmount(latestCash.net_movement, currency)}</strong></span> : undefined}
-          data={{ columns: ["Month", "Inflow", "Outflow", "Net"], rows: cash.map((point) => [point.month, formatAmount(point.inflow, currency), formatAmount(point.outflow, currency), formatAmount(point.net_movement, currency)]) }}
-        >
-          <BarsChart data={cash} xKey="month" xFormat="month" format="currency" currency={currency} height={240} series={[{ key: "inflow", label: "Inflow", color: "var(--success)" }, { key: "outflow", label: "Outflow", color: "var(--warning)" }]} />
-        </ChartCard>
+      <div className="grid gap-5">
         <ChartCard
           title="Receivable and payable aging"
           description="Outstanding balances by age bucket."

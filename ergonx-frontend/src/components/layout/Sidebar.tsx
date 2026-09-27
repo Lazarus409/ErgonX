@@ -77,9 +77,19 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
         <Link href="/" onClick={closeMobile} className="min-w-0 rounded-lg focus-visible:outline-offset-4" aria-label="ErgonX home">
           <SidebarLogo collapsed={compact} />
         </Link>
-        {mobile && (
+        {mobile ? (
           <button type="button" onClick={closeMobile} className="rounded-xl p-2 text-white/70 transition-colors hover:bg-white/10 hover:text-white" aria-label="Close navigation">
             <X className="h-5 w-5" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => onCollapsedChange(!compact)}
+            className="shrink-0 rounded-xl p-2 text-white/65 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-sky"
+            aria-label={compact ? "Expand sidebar" : "Collapse sidebar"}
+            title={compact ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {compact ? <PanelLeftOpen className="h-5 w-5" /> : <ChevronsLeft className="h-5 w-5" />}
           </button>
         )}
       </div>
@@ -216,20 +226,6 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
         />
       </div>
 
-      {!mobile && (
-        <div className="shrink-0 px-3 pb-3">
-          <button
-            type="button"
-            onClick={() => onCollapsedChange(!compact)}
-            className={cx("flex h-10 w-full items-center gap-3 rounded-lg text-support font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white", compact ? "justify-center" : "px-3")}
-            aria-label={compact ? "Expand sidebar" : "Collapse sidebar"}
-            title={compact ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            {compact ? <PanelLeftOpen className="h-[18px] w-[18px]" /> : <ChevronsLeft className="h-5 w-5" />}
-            {!compact && <span>Collapse sidebar</span>}
-          </button>
-        </div>
-      )}
     </div>
   );
 

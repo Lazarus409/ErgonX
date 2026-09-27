@@ -185,6 +185,7 @@ export const navigation: NavigationItem[] = [
       { label: "Accounts Payable", href: "/accounting/payables", permission: "vendor_bill.view" },
       { label: "Accounts Receivable", href: "/accounting/receivables", permission: "invoice.view" },
       { label: "Bank Reconciliation", href: "/accounting/banking", permission: "bank_account.view" },
+      { label: "Payments & Receipts", href: "/accounting/banking/cash", permission: "payment.view" },
       { label: "Expenses", href: "/accounting/expenses", permission: "expense.view" },
       { label: "Financial Reports", href: "/accounting/reports", permission: "financial_report.view" },
     ],

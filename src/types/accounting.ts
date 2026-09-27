@@ -217,3 +217,27 @@ export interface JournalContext {
   audit: Array<{ id: string; action: string; actor: string; created_at: string; metadata: Record<string, unknown> }>;
   requires_approval: boolean;
 }
+
+export interface ReconciliationAccount {
+  id: string; name: string; bank_name: string; masked_account_number: string; currency: string;
+  state: "NOT_STARTED" | "IN_PROGRESS" | "RECONCILED" | "OVERDUE"; unmatched_lines: number;
+  latest_session: { id: string; period_start: string; period_end: string; status: string } | null;
+}
+
+export interface ReconciliationLine {
+  id: string; statement_date: string; description: string; reference: string; amount: string; currency: string; type: string; status: string;
+  journal_entry: string | null; journal_number: string | null; suggestion_count: number; exception_note: string;
+}
+
+export interface ReconciliationDetail {
+  session: { id: string; bank_account: string; bank_account_name: string; period_start: string; period_end: string; statement_opening_balance: string | null; statement_closing_balance: string | null; status: string; completed_at: string | null; last_imported_at: string | null; created_at: string; updated_at: string };
+  bank_account: { id: string; name: string; bank_name: string; masked_account_number: string; currency: string };
+  institution: { name: string };
+  started_by: string; completed_by: string | null; last_imported_by: string | null;
+  counts: { all: number; matched: number; unmatched: number; exceptions: number };
+  progress: number; matched_amount: string; unmatched_amount: string; book_balance: string; difference: string | null; can_complete: boolean;
+  lines: ReconciliationLine[];
+  import_result?: { created: number; skipped: number; errors: string[] };
+}
+
+export interface ReconciliationSuggestion { id: string; journal_number: string; entry_date: string; description: string; source: string }

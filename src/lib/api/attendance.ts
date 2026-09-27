@@ -19,6 +19,7 @@
 import { apiAction, apiGet, apiGetList, apiPost } from "./client";
 import type { ListParams, PaginatedData } from "@/types/api";
 import type {
+  AdjustmentReviewContext,
   AttendanceAdjustment,
   AttendanceAdjustmentPayload,
   AttendanceRecord,
@@ -118,18 +119,51 @@ export async function createAttendanceAdjustment(
 
 export async function approveAdjustment(
   id: string,
+  comment = "",
 ): Promise<AttendanceAdjustment> {
   return apiAction<AttendanceAdjustment>(
     `/attendance-adjustments/${id}/approve/`,
+    { comment },
   );
 }
 
 export async function rejectAdjustment(
   id: string,
+  comment = "",
 ): Promise<AttendanceAdjustment> {
   return apiAction<AttendanceAdjustment>(
     `/attendance-adjustments/${id}/reject/`,
+    { comment },
   );
+}
+
+export async function getAttendanceAdjustment(id: string): Promise<AttendanceAdjustment> {
+  return apiGet<AttendanceAdjustment>(`/attendance-adjustments/${id}/`);
+}
+
+export async function getAdjustmentReview(id: string): Promise<AdjustmentReviewContext> {
+  return apiGet<AdjustmentReviewContext>(`/attendance-adjustments/${id}/review/`);
+}
+
+/** Returns a pending adjustment to the requester with a note. */
+export async function requestAdjustmentChanges(id: string, comment: string): Promise<AttendanceAdjustment> {
+  return apiAction<AttendanceAdjustment>(`/attendance-adjustments/${id}/request-changes/`, { comment });
+}
+
+/** Requester edits a returned adjustment and sends it back for review. */
+export async function resubmitAdjustment(
+  id: string,
+  payload: { reason?: string; proposed_values?: Record<string, unknown>; evidence?: string | null },
+): Promise<AttendanceAdjustment> {
+  return apiAction<AttendanceAdjustment>(`/attendance-adjustments/${id}/resubmit/`, payload);
+}
+
+export async function delegateAdjustment(id: string, delegate: string, comment = ""): Promise<AttendanceAdjustment> {
+  return apiAction<AttendanceAdjustment>(`/attendance-adjustments/${id}/delegate/`, { delegate, comment });
+}
+
+export async function listAdjustmentDelegates(id: string): Promise<Array<{ id: string; name: string; role: string }>> {
+  return apiGet<Array<{ id: string; name: string; role: string }>>(`/attendance-adjustments/${id}/delegates/`);
 }
 
 /* Overtime ----------------------------------------------------------------- */

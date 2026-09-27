@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
@@ -9,8 +10,6 @@ import {
   Eye,
   Filter,
   Search,
-  UserCheck,
-  X,
   XCircle,
 } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
@@ -36,7 +35,6 @@ import { SegmentedControl } from "@/components/ui/SegmentedControl";
 const ALL = "ALL";
 const SEARCH_DEBOUNCE_MS = 350;
 
-type ReviewAction = "APPROVE" | "REJECT";
 
 interface Reference {
   employees: Map<string, Employee>;
@@ -95,10 +93,6 @@ export default function AttendanceAdjustmentsPage() {
   const [departmentFilter, setDepartmentFilter] = useState(ALL);
   const [page, setPage] = useState(1);
 
-  const [selected, setSelected] = useState<AttendanceAdjustment | null>(null);
-  const [reviewAction, setReviewAction] = useState<ReviewAction | null>(null);
-  const [reviewRunning, setReviewRunning] = useState(false);
-  const [reviewError, setReviewError] = useState("");
 
   const requestRef = useRef(0);
 
@@ -281,45 +275,6 @@ export default function AttendanceAdjustmentsPage() {
     });
   }, [data.results, debouncedSearch, departmentFilter, describe]);
 
-  const openReview = (adjustment: AttendanceAdjustment) => {
-    setSelected(adjustment);
-    setReviewAction(null);
-    setReviewError("");
-  };
-
-  const closeReview = () => {
-    setSelected(null);
-    setReviewAction(null);
-    setReviewError("");
-  };
-
-  const submitReview = useCallback(async () => {
-    if (!selected || !reviewAction) {
-      return;
-    }
-
-    setReviewRunning(true);
-    setReviewError("");
-
-    try {
-      // Approving applies the proposed values to the attendance record,
-      // recalculates the derived minutes and re-syncs overtime — all in the
-      // backend service.
-      if (reviewAction === "APPROVE") {
-        await attendanceApi.approveAdjustment(selected.id);
-      } else {
-        await attendanceApi.rejectAdjustment(selected.id);
-      }
-
-      closeReview();
-      reload();
-    } catch (caught) {
-      setReviewError(getApiErrorMessage(caught));
-    } finally {
-      setReviewRunning(false);
-    }
-  }, [selected, reviewAction, reload]);
-
   const totalPages = Math.max(1, Math.ceil(data.count / DEFAULT_PAGE_SIZE));
 
   return (
@@ -476,14 +431,13 @@ export default function AttendanceAdjustmentsPage() {
                     </td>
 
                     <td className="px-5 py-4 text-right">
-                      <button
-                        type="button"
-                        onClick={() => openReview(adjustment)}
+                      <Link
+                        href={`/attendance/adjustments/${adjustment.id}`}
                         className={buttonClasses({ variant: "secondary", size: "sm" })}
                       >
                         <Eye className="h-4 w-4" />
                         Review
-                      </button>
+                      </Link>
                     </td>
                   </tr>
                 );
@@ -536,182 +490,6 @@ export default function AttendanceAdjustmentsPage() {
         </div>
       </section>
 
-      {/* Review modal */}
-      {selected && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
-          <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-surface shadow-xl">
-            <div className="sticky top-0 flex items-start justify-between border-b border-line bg-surface px-5 py-4">
-              <div>
-                <h2 className="mt-1 text-lg font-bold text-headline">
-                  Review Attendance Adjustment
-                </h2>
-
-                <p className="mt-1 text-sm text-ink-muted">
-                  Review the requested change before taking action.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={closeReview}
-                disabled={reviewRunning}
-                className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover"
-                aria-label="Close"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="space-y-5 p-5">
-              {reviewError && (
-                <div className="rounded-lg border border-danger/25 bg-danger-soft px-4 py-3 text-sm text-danger-ink">
-                  {reviewError}
-                </div>
-              )}
-
-              <section className="rounded-xl border border-line p-4">
-                <div className="flex items-start gap-3">
-                  <div className="rounded-lg bg-surface-sunken p-2">
-                    <UserCheck className="h-5 w-5 text-ink-muted" />
-                  </div>
-
-                  <div>
-                    <p className="font-semibold text-ink-strong">
-                      {describe(selected).name}
-                    </p>
-
-                    <p className="mt-1 text-sm text-ink-muted">
-                      {describe(selected).number} ·{" "}
-                      {describe(selected).department} ·{" "}
-                      {describe(selected).date}
-                    </p>
-                  </div>
-                </div>
-              </section>
-
-              <section>
-                <h3 className="text-sm font-semibold text-ink-strong">
-                  Attendance Comparison
-                </h3>
-
-                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <ComparisonCard
-                    title="Original Record"
-                    checkIn={adjustmentTime(selected.old_values, "check_in")}
-                    checkOut={adjustmentTime(selected.old_values, "check_out")}
-                  />
-
-                  <ComparisonCard
-                    title="Requested Record"
-                    checkIn={adjustmentTime(
-                      selected.proposed_values,
-                      "check_in",
-                    )}
-                    checkOut={adjustmentTime(
-                      selected.proposed_values,
-                      "check_out",
-                    )}
-                    highlight
-                  />
-                </div>
-              </section>
-
-              <section className="rounded-xl bg-surface-muted p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-ink-subtle">
-                  Reason
-                </p>
-
-                <p className="mt-2 text-sm leading-6 text-ink">
-                  {selected.reason || EM_DASH}
-                </p>
-
-                <p className="mt-3 text-xs text-ink-muted">
-                  Requested on {formatDateTime(selected.created_at)}
-                </p>
-              </section>
-
-              <div className="flex items-center justify-between rounded-lg border border-line px-4 py-3">
-                <span className="text-sm text-ink-muted">Current status</span>
-
-                <StatusBadge status={selected.status} />
-              </div>
-
-              {selected.status === "PENDING" ? (
-                <section className="space-y-4 border-t border-line pt-5">
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setReviewAction("APPROVE")}
-                      className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-medium ${
-                        reviewAction === "APPROVE"
-                          ? "bg-success text-white"
-                          : "border border-line text-ink hover:bg-surface-hover"
-                      }`}
-                    >
-                      <CheckCircle2 className="mr-2 inline h-4 w-4" />
-                      Approve
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setReviewAction("REJECT")}
-                      className={`flex-1 rounded-lg px-4 py-2.5 text-sm font-medium ${
-                        reviewAction === "REJECT"
-                          ? "bg-danger text-white"
-                          : "border border-line text-ink hover:bg-surface-hover"
-                      }`}
-                    >
-                      <XCircle className="mr-2 inline h-4 w-4" />
-                      Reject
-                    </button>
-                  </div>
-
-                  {reviewAction === "APPROVE" && (
-                    <p className="rounded-lg bg-surface-muted p-3 text-xs leading-5 text-ink-muted">
-                      Approving applies the proposed values to the attendance
-                      record, recalculates worked, late and overtime minutes,
-                      and re-syncs the related overtime record.
-                    </p>
-                  )}
-
-                  {/*
-                    The decision endpoints accept no payload, so no rejection
-                    comment can be recorded against an adjustment.
-                  */}
-                  {reviewAction === "REJECT" && (
-                    <p className="rounded-lg bg-surface-muted p-3 text-xs leading-5 text-ink-muted">
-                      The attendance record is left unchanged. The API records
-                      no rejection comment for adjustments.
-                    </p>
-                  )}
-
-                  {reviewAction && (
-                    <button
-                      type="button"
-                      onClick={submitReview}
-                      disabled={reviewRunning}
-                      className={buttonClasses({ variant: "primary", className: "w-full" })}
-                    >
-                      {reviewRunning
-                        ? "Processing..."
-                        : `Confirm ${
-                            reviewAction === "APPROVE"
-                              ? "Approval"
-                              : "Rejection"
-                          }`}
-                    </button>
-                  )}
-                </section>
-              ) : (
-                <div className="rounded-lg bg-surface-muted p-4 text-sm text-ink-muted">
-                  This adjustment has already been processed and is read-only.
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
       <section className="rounded-xl border border-line bg-surface-muted px-5 py-4">
         <div className="flex items-start gap-3">
           <Clock3 className="mt-0.5 h-5 w-5 shrink-0 text-ink-muted" />
@@ -755,46 +533,6 @@ function SummaryCard({
       <p className="mt-4 text-2xl font-semibold text-ink-strong">{value}</p>
 
       <p className="mt-1 text-xs text-ink-muted">{detail}</p>
-    </div>
-  );
-}
-
-function ComparisonCard({
-  title,
-  checkIn,
-  checkOut,
-  highlight = false,
-}: {
-  title: string;
-  checkIn: string;
-  checkOut: string;
-  highlight?: boolean;
-}) {
-  return (
-    <div
-      className={`rounded-xl border p-4 ${
-        highlight
-          ? "border-line-strong bg-surface-muted"
-          : "border-line bg-surface"
-      }`}
-    >
-      <p className="text-xs font-semibold uppercase tracking-wide text-ink-subtle">
-        {title}
-      </p>
-
-      <div className="mt-4 grid grid-cols-2 gap-4">
-        <div>
-          <p className="text-xs text-ink-muted">Check-in</p>
-          <p className="mt-1 text-lg font-semibold text-ink-strong">{checkIn}</p>
-        </div>
-
-        <div>
-          <p className="text-xs text-ink-muted">Check-out</p>
-          <p className="mt-1 text-lg font-semibold text-ink-strong">
-            {checkOut}
-          </p>
-        </div>
-      </div>
     </div>
   );
 }

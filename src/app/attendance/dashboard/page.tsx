@@ -3,6 +3,13 @@
 import {
   Activity,
   AlertTriangle,
+  BarChart3,
+  ChevronDown,
+  ChevronRight,
+  FileText,
+  History,
+  PieChart as PieChartIcon,
+  SlidersHorizontal,
   CalendarDays,
   Clock3,
   Grid3X3,
@@ -11,11 +18,12 @@ import {
   Users,
   UserX,
 } from "lucide-react";
-import { useCallback } from "react";
+import Link from "next/link";
+import { useCallback, useState } from "react";
 
 import ChartCard from "@/components/charts/ChartCard";
 import { BarsChart, TrendChart } from "@/components/charts/Charts";
-import { HeatmapGrid, ProgressMeter } from "@/components/charts/Visuals";
+import { HeatmapGrid, ProgressMeter, RankingBars } from "@/components/charts/Visuals";
 import { hasValues } from "@/components/charts/format";
 import { ButtonLink } from "@/components/ui/Button";
 import { Sparkline } from "@/components/charts/Visuals";
@@ -31,7 +39,9 @@ import {
 import { useApiResource } from "@/lib/useApiResource";
 import { MAX_PAGE_SIZE } from "@/types/api";
 import type { AttendanceDashboard } from "@/types/dashboards";
-import { EM_DASH, formatNumber, formatCount } from "@/lib/format";
+import { EM_DASH, formatDate, formatNumber, formatCount } from "@/lib/format";
+import StatusBadge from "@/components/ui/StatusBadge";
+import EmptyState from "@/components/ui/EmptyState";
 
 /** Only the envelope `count` is needed for these reads. */
 const COUNT_ONLY = { page_size: 1 } as const;
@@ -47,7 +57,10 @@ interface AttendanceOverview {
 
 type LatenessRow = AttendanceDashboard["repeated_lateness"][number];
 
+type Range = 3 | 6 | 12;
+
 export default function AttendanceDashboardPage() {
+  const [range, setRange] = useState<Range>(12);
   const load = useCallback(async (): Promise<AttendanceOverview> => {
     const [
       today,
@@ -57,7 +70,7 @@ export default function AttendanceDashboardPage() {
       overtime,
       adjustments,
     ] = await Promise.all([
-      dashboardsApi.getAttendanceDashboard(),
+      dashboardsApi.getAttendanceDashboard(range),
       dashboardsApi
         .getLeaveDashboard()
         .then((rollup) => rollup.currently_on_leave)
@@ -92,7 +105,7 @@ export default function AttendanceDashboardPage() {
       overtimePending: overtime,
       adjustmentsPending: adjustments,
     };
-  }, []);
+  }, [range]);
 
   const { data, loading, error, reload } = useApiResource(load);
   const initial = loading && !data;
@@ -100,6 +113,11 @@ export default function AttendanceDashboardPage() {
   const value = (count: number | null | undefined): string =>
     count === null || count === undefined ? EM_DASH : formatNumber(count);
 
+  const rate = data?.today.attendance_rate;
+  const trend = data?.today.attendance_trend ?? [];
+  const departmentRates = (data?.today.department_rates ?? []).filter((item) => item.attendance_rate !== null).map((item) => ({ label: item.department, value: Number(item.attendance_rate) }));
+  const exceptions = data?.today.priority_exceptions ?? [];
+  const adjustmentsRecent = data?.today.recent_adjustments ?? [];
   const weekly = data?.today.weekly_attendance ?? [];
   const departments = data?.today.by_department ?? [];
   const lateness = data?.today.repeated_lateness ?? [];
@@ -109,33 +127,109 @@ export default function AttendanceDashboardPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Attendance"
-        title="Attendance Dashboard"
-        description="Monitor workforce attendance, schedules, shifts and attendance exceptions."
-        icon={Clock3}
-        accent="attendance"
-        meta={<span className="inline-flex items-center gap-1.5 text-caption text-ink-muted"><span className={loading ? "h-2 w-2 animate-pulse rounded-full bg-warning" : "h-2 w-2 rounded-full bg-success"} aria-hidden="true" />{loading ? "Refreshing…" : "Institution-wide snapshot for today"}</span>}
+        title="Attendance"
+        description="Monitor attendance, find exceptions and keep records accurate."
         actions={
           <>
-            <ButtonLink href="/attendance/schedules" variant="secondary" leadingIcon={<CalendarDays className="h-4 w-4" />}>Schedules</ButtonLink>
-            <ButtonLink href="/attendance/live" leadingIcon={<Activity className="h-4 w-4" />}>Live attendance</ButtonLink>
+            <label className="relative">
+              <span className="sr-only">Date range</span>
+              <CalendarDays className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-section-icon" aria-hidden="true" />
+              <select data-ui="select" value={range} onChange={(event) => setRange(Number(event.target.value) as Range)} className="h-12 appearance-none rounded-lg border border-line-strong bg-surface pl-11 pr-10 text-sm font-medium text-ink-strong">
+                {[3, 6, 12].map((months) => <option key={months} value={months}>Last {months} months</option>)}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted" aria-hidden="true" />
+            </label>
+            <ButtonLink href="/attendance/adjustments" size="lg" leadingIcon={<SlidersHorizontal className="h-5 w-5" />}>Review adjustments</ButtonLink>
           </>
         }
       />
 
       {error && <ErrorState variant="inline" title="Unable to load attendance dashboard" message={error} onRetry={reload} />}
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Today's attendance">
-        <MetricCard label="Present today" value={value(data?.today.present)} icon={UserCheck} accent="accounting" loading={initial} chart={<Sparkline values={weekly.map((day) => day.present)} color="var(--mod-accounting)" height={32} label="Present this week" />} />
-        <MetricCard label="Late today" value={value(data?.today.late)} icon={Clock3} accent="payroll" loading={initial} chart={<Sparkline values={weekly.map((day) => day.late)} color="var(--mod-payroll)" height={32} label="Late arrivals this week" />} />
-        <MetricCard label="Absent today" value={value(data?.today.absent)} icon={UserX} accent="audit" loading={initial} />
-        <MetricCard label="Currently on leave" value={value(data?.onLeave)} icon={CalendarDays} accent="leave" loading={initial} />
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Attendance indicators">
+        <MetricCard label="Attendance rate" value={rate === null || rate === undefined ? EM_DASH : `${Number(rate).toFixed(1)}%`} description={rate === null || rate === undefined ? "No data available" : `Last ${range} months`} icon={Users} accent="brand" loading={initial} />
+        <MetricCard label="Late arrivals" value={value(data?.today.late_arrivals)} description={data?.today.late_arrivals ? `Last ${range} months` : "No data available"} icon={Clock3} accent="leave" loading={initial} />
+        <MetricCard label="Missing punches" value={value(data?.today.missing_punches)} description={data?.today.missing_punches ? "Clock-ins without a clock-out" : "No data available"} icon={AlertTriangle} accent="recruitment" loading={initial} href="/attendance/live" />
+        <MetricCard label="Pending adjustments" value={value(data?.today.pending_adjustments)} description={data?.today.pending_adjustments ? "Awaiting review" : "No data available"} icon={FileText} accent="payroll" loading={initial} href="/attendance/adjustments" />
       </section>
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Scheduling and exceptions">
+
+      <div className="grid gap-5 xl:grid-cols-2">
+        <ChartCard
+          title="Attendance trend"
+          description="Monthly attendance rate over time."
+          icon={BarChart3}
+          loading={initial}
+          error={!data && error ? "This data is unavailable right now." : null}
+          empty={!trend.some((point) => point.attendance_rate !== null)}
+          emptyTitle="No attendance data available"
+          emptyDescription="Attendance trends will be displayed here when time and attendance records are available."
+          data={{ columns: ["Month", "Attendance rate (%)"], rows: trend.map((point) => [point.month, point.attendance_rate ?? "—"]) }}
+          height={260}
+        >
+          <TrendChart variant="area" data={trend.filter((point) => point.attendance_rate !== null)} xKey="month" format="percent" height={260} series={[{ key: "attendance_rate", label: "Attendance rate", color: "var(--primary)" }]} />
+        </ChartCard>
+        <ChartCard
+          title="Attendance by department"
+          description="Attendance rate by department."
+          icon={PieChartIcon}
+          loading={initial}
+          error={!data && error ? "This data is unavailable right now." : null}
+          empty={!departmentRates.length}
+          emptyTitle="No department data available"
+          emptyDescription="Attendance by department will be displayed here when time and attendance records are available."
+          data={{ columns: ["Department", "Attendance rate (%)"], rows: departmentRates.map((item) => [item.label, item.value]) }}
+        >
+          <RankingBars items={departmentRates} format="percent" color="var(--primary)" limit={10} />
+        </ChartCard>
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-2">
+        <Card
+          title="Priority exceptions"
+          description="Employees with attendance issues requiring attention."
+          icon={AlertTriangle}
+          padding="none"
+          className="[&>div:first-child]:px-5 [&>div:first-child]:pt-5"
+          actions={<Link href="/attendance/live" className="inline-flex items-center gap-1 text-support font-semibold text-primary-ink hover:underline">View all<ChevronRight className="h-4 w-4" aria-hidden="true" /></Link>}
+        >
+          {initial ? <div className="skeleton m-5 h-40 rounded-xl" /> : exceptions.length === 0 ? (
+            <EmptyState size="compact" icon={FileText} title="No exceptions to review" description="There are no attendance exceptions requiring attention at this time." />
+          ) : (
+            <MiniTable headings={["Employee", "Issue", "Date", "Status"]} rows={exceptions.map((item) => ({
+              key: item.record_id,
+              href: `/attendance/live/${item.record_id}`,
+              cells: [<span key="e" className="flex items-center gap-2.5 font-semibold text-headline"><Avatar name={item.employee} size="sm" />{item.employee}</span>, item.issue, formatDate(item.date), <StatusBadge key="s" status={item.status} size="sm" />],
+            }))} />
+          )}
+        </Card>
+        <Card
+          title="Recent adjustments"
+          description="Latest attendance adjustments and activity."
+          icon={History}
+          padding="none"
+          className="[&>div:first-child]:px-5 [&>div:first-child]:pt-5"
+          actions={<Link href="/attendance/adjustments" className="inline-flex items-center gap-1 text-support font-semibold text-primary-ink hover:underline">View all<ChevronRight className="h-4 w-4" aria-hidden="true" /></Link>}
+        >
+          {initial ? <div className="skeleton m-5 h-40 rounded-xl" /> : adjustmentsRecent.length === 0 ? (
+            <EmptyState size="compact" icon={FileText} title="No recent adjustments" description="Attendance adjustments will appear here when they are made." />
+          ) : (
+            <MiniTable headings={["Employee", "Adjustment type", "Adjusted by", "Date", "Status"]} rows={adjustmentsRecent.map((item) => ({
+              key: item.id,
+              href: `/attendance/adjustments/${item.id}`,
+              cells: [<span key="e" className="font-semibold text-headline">{item.employee}</span>, item.adjustment_type, item.adjusted_by, formatDate(item.date), <StatusBadge key="s" status={item.status} size="sm" />],
+            }))} />
+          )}
+        </Card>
+      </div>
+
+      <h2 className="pt-2 text-heading font-bold text-headline">This week</h2>
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label="Today's attendance">
+        <MetricCard size="sm" label="Present today" value={value(data?.today.present)} icon={UserCheck} accent="accounting" loading={initial} chart={<Sparkline values={weekly.map((day) => day.present)} color="var(--mod-accounting)" height={32} label="Present this week" />} />
+        <MetricCard size="sm" label="Absent today" value={value(data?.today.absent)} icon={UserX} accent="audit" loading={initial} />
+        <MetricCard size="sm" label="Currently on leave" value={value(data?.onLeave)} icon={CalendarDays} accent="leave" loading={initial} />
+        <MetricCard size="sm" label="Overtime pending" value={value(data?.overtimePending)} icon={Timer} accent="attendance" loading={initial} href="/attendance/overtime" />
         <MetricCard size="sm" label="Scheduled today" value={value(data?.scheduledToday)} description="Current schedule assignments" icon={Users} accent="attendance" loading={initial} />
         <MetricCard size="sm" label="Active shifts" value={value(data?.activeShifts)} icon={Activity} accent="attendance" loading={initial} href="/attendance/shifts" />
-        <MetricCard size="sm" label="Overtime pending" value={value(data?.overtimePending)} icon={Timer} accent="attendance" loading={initial} href="/attendance/overtime" />
-        <MetricCard size="sm" label="Adjustments pending" value={value(data?.adjustmentsPending)} icon={AlertTriangle} accent="attendance" loading={initial} href="/attendance/adjustments" />
       </section>
 
       <div className="grid gap-5 xl:grid-cols-5">
@@ -262,6 +356,23 @@ export default function AttendanceDashboardPage() {
           <TrendChart data={data?.today.lateness_trend ?? []} xKey="month" height={230} series={[{ key: "late_occurrences", label: "Late arrivals", color: "var(--warning)" }]} />
         </ChartCard>
       </div>
+    </div>
+  );
+}
+
+function MiniTable({ headings, rows }: { headings: string[]; rows: Array<{ key: string; href: string; cells: React.ReactNode[] }> }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[480px] text-sm">
+        <thead><tr className="bg-surface-muted/80 text-left">{headings.map((heading) => <th key={heading} scope="col" className="px-4 py-3 text-caption font-semibold text-ink-strong">{heading}</th>)}</tr></thead>
+        <tbody className="divide-y divide-line-soft">
+          {rows.map((row) => (
+            <tr key={row.key} className="hover:bg-surface-hover">
+              {row.cells.map((cell, index) => <td key={index} className="px-4 py-3">{index === 0 ? <Link href={row.href} className="hover:underline">{cell}</Link> : cell}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

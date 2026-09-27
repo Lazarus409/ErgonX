@@ -67,9 +67,23 @@ export interface AttendanceRecord {
 
 export interface AttendanceAdjustment {
   id: string;
+  /** ADJ-XXXXXXXX */
+  reference?: string;
   attendance_record: string;
+  employee?: string;
+  employee_name?: string;
+  attendance_date?: string;
   requested_by: string | null;
+  requested_by_name?: string | null;
+  adjustment_type?: AdjustmentType | string;
   reason: string;
+  evidence?: string | null;
+  approved_by_name?: string | null;
+  assigned_to?: string | null;
+  assigned_to_name?: string | null;
+  decision_note?: string;
+  changes_requested_at?: string | null;
+  resubmitted_at?: string | null;
   /** Snapshot captured by the backend when the adjustment is raised. */
   old_values: Record<string, unknown>;
   proposed_values: Record<string, unknown>;
@@ -84,6 +98,39 @@ export interface AttendanceAdjustmentPayload {
   attendance_record: string;
   reason: string;
   proposed_values: Record<string, unknown>;
+  adjustment_type?: AdjustmentType;
+  evidence?: string | null;
+}
+
+export type AdjustmentType = "MISSED_CLOCK_IN" | "MISSED_CLOCK_OUT" | "ADD_MISSED_HOURS" | "TIME_CORRECTION" | "NOTE_ONLY";
+
+export interface TimeWindow {
+  start: string | null;
+  end: string | null;
+  minutes: number | null;
+  off_day?: boolean;
+}
+
+/** GET /attendance-adjustments/{id}/review/ */
+export interface AdjustmentReviewContext {
+  reference: string;
+  employee_id: string;
+  employee_name: string;
+  employee_number: string;
+  department: string | null;
+  position: string | null;
+  attendance_date: string;
+  scheduled: TimeWindow | null;
+  recorded: TimeWindow | null;
+  requested: TimeWindow | null;
+  difference_minutes: number | null;
+  compliant: boolean;
+  policy_checks: Array<{ code: string; label: string; status: string; detail: string }>;
+  queue: { previous_id: string | null; next_id: string | null; position: number | null; total: number };
+  employee_dates: { previous_id: string | null; next_id: string | null };
+  is_requester: boolean;
+  can_decide: boolean;
+  can_delegate: boolean;
 }
 
 /** Read-only; generated from attendance, decided through approve/reject. */

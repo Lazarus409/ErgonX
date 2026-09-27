@@ -39,8 +39,9 @@ export async function getLeaveDashboard(months?: 3 | 6 | 12): Promise<LeaveDashb
   return apiGet<LeaveDashboard>(months ? `/dashboards/leave/?months=${months}` : "/dashboards/leave/");
 }
 
-export async function getAttendanceDashboard(): Promise<AttendanceDashboard> {
-  return apiGet<AttendanceDashboard>("/dashboards/attendance/");
+/** `months` selects the "Last N months" range (3, 6 or 12; backend default 12). */
+export async function getAttendanceDashboard(months?: 3 | 6 | 12): Promise<AttendanceDashboard> {
+  return apiGet<AttendanceDashboard>(months ? `/dashboards/attendance/?months=${months}` : "/dashboards/attendance/");
 }
 
 export async function getPayrollDashboard(): Promise<PayrollDashboard> {

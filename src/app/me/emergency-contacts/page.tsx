@@ -45,7 +45,7 @@ export default function EmergencyContactsPage() {
               <Avatar name={item.full_name} />
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="font-semibold text-ink-strong">{item.full_name}</h2>
+                  <h2 className="font-bold text-headline">{item.full_name}</h2>
                   {item.is_primary && <Badge size="sm" tone="brand">Primary</Badge>}
                 </div>
                 <p className="text-support text-ink-muted">{item.relationship}</p>

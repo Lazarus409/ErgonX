@@ -53,7 +53,7 @@ export default function PermissionGuard({
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="rounded-xl border border-line bg-surface p-8 text-center">
-          <h2 className="text-lg font-semibold text-ink-strong">
+          <h2 className="text-lg font-bold text-headline">
             Access Denied
           </h2>
           <p className="mt-2 text-sm text-ink-muted">

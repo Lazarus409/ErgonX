@@ -613,7 +613,7 @@ export default function LeavePoliciesPage() {
           <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-surface shadow-xl">
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-line bg-surface px-6 py-4">
               <div>
-                <h2 className="text-lg font-semibold text-ink-strong">
+                <h2 className="text-lg font-bold text-headline">
                   {editingPolicy ? "Edit Leave Policy" : "Add Leave Policy"}
                 </h2>
                 <p className="mt-1 text-sm text-ink-muted">

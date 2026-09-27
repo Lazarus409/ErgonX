@@ -47,9 +47,10 @@ export interface CardProps extends Omit<SurfaceProps, "title"> {
 }
 
 export function Card({ title, description, actions, icon, accent, accentLine, children, className, as = "section", ...rest }: CardProps) {
+  void accentLine;
   return (
     <Surface as={as} className={cx("relative min-w-0 overflow-hidden", className)} {...rest}>
-      {accentLine && accent && <span aria-hidden="true" className={cx("absolute inset-x-0 top-0 h-[2px]", moduleAccents[accent].solid)} />}
+      {/* The concept drops module-coloured top strips; `accentLine` is kept for API compatibility. */}
       {(title || actions) && <CardHeader title={title} description={description} actions={actions} icon={icon} accent={accent} />}
       {children}
     </Surface>
@@ -61,9 +62,9 @@ export function CardHeader({ title, description, actions, icon: Icon, className 
   return (
     <div className={cx("mb-4 flex items-start justify-between gap-4", className)}>
       <div className="flex min-w-0 items-start gap-3">
-        {Icon && <Icon className="mt-0.5 h-6 w-6 shrink-0 text-ink-strong" strokeWidth={1.9} aria-hidden="true" />}
+        {Icon && <Icon className="mt-0.5 h-6 w-6 shrink-0 text-section-icon" strokeWidth={2} aria-hidden="true" />}
         <div className="min-w-0">
-          {title && <h2 className="text-card-title font-bold text-ink-strong">{title}</h2>}
+          {title && <h2 className="text-card-title font-bold text-headline">{title}</h2>}
           {description && <p className="mt-0.5 text-support text-heading-support">{description}</p>}
         </div>
       </div>
@@ -101,10 +102,21 @@ export interface MetricCardProps {
   className?: string;
 }
 
+/** Plain text of a rendered value, used only to pick a type size. */
+function textOf(node: ReactNode): string {
+  if (node === null || node === undefined || typeof node === "boolean") return "";
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(textOf).join("");
+  if (typeof node === "object" && "props" in node) return textOf((node.props as { children?: ReactNode }).children);
+  return "";
+}
+
 export function MetricCard({ label, value, description, icon, accent = "brand", trend, loading, href, size = "md", footer, chart, className }: MetricCardProps) {
   const good = trend ? (trend.direction === "flat" ? null : (trend.direction === "up") === (trend.positiveIsGood ?? true)) : null;
   const TrendIcon = trend?.direction === "up" ? ArrowUpRight : trend?.direction === "down" ? ArrowDownRight : Minus;
   const Icon = icon;
+  // Long formatted values (currency) step down a size instead of wrapping.
+  const long = textOf(value).length > 9;
   // Concept KPI tile: soft circular icon on the left, bold label, large value.
   const body = (
     <>
@@ -115,12 +127,12 @@ export function MetricCard({ label, value, description, icon, accent = "brand", 
           </span>
         )}
         <div className="min-w-0 flex-1">
-          <p className="text-[0.9375rem] font-bold leading-5 text-ink-strong">{label}</p>
+          <p className="text-[0.9375rem] font-bold leading-5 text-headline">{label}</p>
           <div className="mt-2">
             {loading ? (
               <span className="skeleton block h-8 w-28 rounded-lg" aria-label="Loading" />
             ) : (
-              <p className={cx("font-bold tracking-tight text-ink-strong tabular-nums", size === "md" ? "text-kpi" : "text-kpi-sm")}>{value}</p>
+              <p className={cx("font-bold leading-tight tracking-tight text-ink-strong tabular-nums", long ? "whitespace-nowrap text-[1.1875rem] 2xl:text-[1.5rem]" : size === "md" ? "text-[1.75rem] 2xl:text-kpi" : "text-kpi-sm")}>{value}</p>
             )}
             {description && <p className="mt-1 text-support text-ink-muted">{description}</p>}
           </div>
@@ -266,7 +278,7 @@ export function SectionHeading({ title, description, actions, className }: { tit
   return (
     <div className={cx("flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between", className)}>
       <div>
-        <h2 className="text-heading font-bold text-ink-strong">{title}</h2>
+        <h2 className="text-heading font-bold text-headline">{title}</h2>
         {description && <p className="mt-0.5 text-support text-heading-support">{description}</p>}
       </div>
       {actions && <div className="flex items-center gap-2">{actions}</div>}

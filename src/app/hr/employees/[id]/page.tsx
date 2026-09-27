@@ -296,7 +296,7 @@ function SectionCard({
     <section id={id} className="scroll-mt-24 rounded-2xl border border-line bg-surface">
       <div className="flex items-start justify-between gap-4 border-b border-line px-6 py-5">
         <div className="min-w-0">
-          <h2 className="text-base font-semibold text-ink-strong">{title}</h2>
+          <h2 className="text-base font-bold text-headline">{title}</h2>
 
           {description && (
             <p className="mt-1 text-sm text-ink-muted">{description}</p>
@@ -776,7 +776,7 @@ export default function EmployeeDetailPage() {
       {showEmploymentChange && employmentChange && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
           <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-surface p-6 shadow-xl">
-            <h2 className="text-lg font-semibold text-ink-strong">
+            <h2 className="text-lg font-bold text-headline">
               Change Employment Assignment
             </h2>
             <p className="mt-2 text-sm leading-6 text-ink-muted">
@@ -1680,7 +1680,7 @@ export default function EmployeeDetailPage() {
           {showSaveConfirmation && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
               <div className="w-full max-w-md rounded-2xl bg-surface p-6 shadow-xl">
-                <h2 className="text-lg font-semibold text-ink-strong">
+                <h2 className="text-lg font-bold text-headline">
                   Confirm Changes
                 </h2>
 

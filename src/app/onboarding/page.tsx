@@ -126,22 +126,22 @@ export default function OnboardingPage() {
         title={`Set up ${institution?.name ?? "your institution"}.`}
         subtitle="Complete the essentials to prepare your organization. Each step is verified by the server."
         aside={
-          <div className="rounded-2xl bg-white/[0.08] p-5 ring-1 ring-inset ring-white/15 backdrop-blur-sm">
-            <p className="text-caption font-semibold text-accent-aqua">Setup progress</p>
-            <p className="mt-1 text-display font-bold tabular-nums">{percent}<span className="text-heading text-white/60">%</span></p>
-            <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/15" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} aria-label="Setup progress">
+          <div className="rounded-2xl border border-primary/15 bg-primary-soft/70 p-5">
+            <p className="text-caption font-semibold text-primary-ink">Setup progress</p>
+            <p className="mt-1 text-display font-bold text-headline tabular-nums">{percent}<span className="text-heading text-ink-muted">%</span></p>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-white" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent} aria-label="Setup progress">
               <div className="bg-signature h-full rounded-full transition-[width] duration-500 ease-standard" style={{ width: `${percent}%` }} />
             </div>
-            <p className="mt-2 text-caption text-white/65">{setupSummary.complete} of {setupSummary.required} required items complete</p>
+            <p className="mt-2 text-caption text-ink-muted">{setupSummary.complete} of {setupSummary.required} required items complete</p>
             {canManageOnboarding && (
-              <Button variant="inverse" size="sm" className="mt-4" loading={validating} loadingLabel="Validating…" leadingIcon={<RefreshCw className="h-4 w-4" />} onClick={() => void validate()}>Validate setup</Button>
+              <Button variant="secondary" size="sm" className="mt-4" loading={validating} loadingLabel="Validating…" leadingIcon={<RefreshCw className="h-4 w-4" />} onClick={() => void validate()}>Validate setup</Button>
             )}
           </div>
         }
       >
         <div className="flex flex-wrap items-center gap-3">
           <StatusBadge status={data.status} />
-          <span className="inline-flex items-center gap-2 text-support text-white/70"><ClipboardCheck className="h-4 w-4 text-accent-aqua" aria-hidden="true" />Current focus: <span className="font-semibold text-white">{isInstitutionSetupOwner ? "Institution profile, module selection, and setup owners" : formatStep(data.current_step)}</span></span>
+          <span className="inline-flex items-center gap-2 text-support text-ink-muted"><ClipboardCheck className="h-4 w-4 text-primary-ink" aria-hidden="true" />Current focus: <span className="font-semibold text-ink-strong">{isInstitutionSetupOwner ? "Institution profile, module selection, and setup owners" : formatStep(data.current_step)}</span></span>
         </div>
       </HomeHero>
 

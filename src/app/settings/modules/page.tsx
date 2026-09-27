@@ -57,7 +57,7 @@ export default function ModuleSettingsPage() {
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <h2 className="text-card-title font-bold text-ink-strong">{detail.name}</h2>
+                    <h2 className="text-card-title font-bold text-headline">{detail.name}</h2>
                     <p className="mt-0.5 text-support text-ink-muted">{detail.description}</p>
                   </div>
                   <StatusBadge status={module.is_enabled ? "ACTIVE" : "INACTIVE"} size="sm" />

@@ -9,7 +9,7 @@ export default function AccessDenied({ title = "You don't have access to this ar
         <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-mod-audit-soft text-mod-audit" aria-hidden="true">
           <ShieldX className="h-6 w-6" />
         </span>
-        <h2 className="mt-5 text-heading font-semibold text-ink-strong">{title}</h2>
+        <h2 className="mt-5 text-heading font-bold text-headline">{title}</h2>
         <p className="mt-2 text-support text-ink-muted">{description}</p>
         <ButtonLink href="/" variant="secondary" className="mt-6">Return home</ButtonLink>
       </div>

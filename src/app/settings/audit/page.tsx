@@ -56,7 +56,7 @@ export default function AuditSettingsPage() {
         toolbar={
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-mod-audit" aria-hidden="true" /><h2 className="text-card-title font-bold text-ink-strong">Activity history</h2></div>
+              <div className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-mod-audit" aria-hidden="true" /><h2 className="text-card-title font-bold text-headline">Activity history</h2></div>
               <span className="rounded-full bg-surface-muted px-2.5 py-1 text-caption font-semibold text-ink-muted tabular-nums">{data?.count ?? 0} records</span>
             </div>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">

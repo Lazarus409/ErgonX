@@ -293,7 +293,7 @@ export default function LeaveRequestDetailPage() {
 
               <div>
                 <div className="flex flex-wrap items-center gap-3">
-                  <h2 className="text-lg font-semibold text-ink-strong">
+                  <h2 className="text-lg font-bold text-headline">
                     {leaveType?.name ?? EM_DASH}
                   </h2>
 
@@ -389,7 +389,7 @@ export default function LeaveRequestDetailPage() {
         <div className="grid gap-6 lg:grid-cols-3">
           <section className="rounded-xl border border-line bg-surface shadow-sm lg:col-span-2">
             <div className="border-b border-line px-5 py-4">
-              <h2 className="text-sm font-semibold text-ink-strong">
+              <h2 className="text-sm font-bold text-headline">
                 Request Summary
               </h2>
             </div>
@@ -487,7 +487,7 @@ export default function LeaveRequestDetailPage() {
           */}
           <section className="rounded-xl border border-line bg-surface shadow-sm">
             <div className="border-b border-line px-5 py-4">
-              <h2 className="text-sm font-semibold text-ink-strong">
+              <h2 className="text-sm font-bold text-headline">
                 Policy Eligibility
               </h2>
             </div>
@@ -535,7 +535,7 @@ export default function LeaveRequestDetailPage() {
         {/* Balance impact */}
         <section className="rounded-xl border border-line bg-surface shadow-sm">
           <div className="border-b border-line px-5 py-4">
-            <h2 className="text-sm font-semibold text-ink-strong">
+            <h2 className="text-sm font-bold text-headline">
               Leave Balance Impact
             </h2>
 
@@ -586,7 +586,7 @@ export default function LeaveRequestDetailPage() {
         {/* Approval history */}
         <section className="rounded-xl border border-line bg-surface shadow-sm">
           <div className="border-b border-line px-5 py-4">
-            <h2 className="text-sm font-semibold text-ink-strong">
+            <h2 className="text-sm font-bold text-headline">
               Approval History
             </h2>
 
@@ -685,7 +685,7 @@ export default function LeaveRequestDetailPage() {
         {/* Attachments */}
         <section className="rounded-xl border border-line bg-surface shadow-sm">
           <div className="border-b border-line px-5 py-4">
-            <h2 className="text-sm font-semibold text-ink-strong">
+            <h2 className="text-sm font-bold text-headline">
               Attachments
             </h2>
 

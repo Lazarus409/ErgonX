@@ -100,7 +100,7 @@ export function Dialog({ open, onClose, title, description, children, footer, si
           <div className="flex items-start gap-4 px-6 pb-2 pt-6">
             {icon}
             <div className="min-w-0 flex-1">
-              <h2 id={titleId} className="text-heading font-semibold text-ink-strong">{title}</h2>
+              <h2 id={titleId} className="text-heading font-bold text-headline">{title}</h2>
               {description && <p id={descriptionId} className="mt-1 text-support text-ink-muted">{description}</p>}
             </div>
             {dismissible && (
@@ -156,7 +156,7 @@ export function Drawer({ open, onClose, title, description, children, footer, si
         >
           <div className="flex items-start gap-4 border-b border-line-soft px-6 py-5">
             <div className="min-w-0 flex-1">
-              <h2 id={titleId} className="text-heading font-semibold text-ink-strong">{title}</h2>
+              <h2 id={titleId} className="text-heading font-bold text-headline">{title}</h2>
               {description && <p className="mt-1 text-support text-ink-muted">{description}</p>}
             </div>
             <button type="button" onClick={onClose} aria-label="Close panel" className="-mr-2 rounded-xl p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-strong"><X className="h-5 w-5" /></button>

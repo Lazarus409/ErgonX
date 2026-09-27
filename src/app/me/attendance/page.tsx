@@ -252,7 +252,7 @@ export default function MyAttendancePage() {
       <section className="rounded-xl border border-line bg-surface">
         <div className="flex flex-col gap-3 border-b border-line p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="font-semibold text-ink-strong">Today</h2>
+            <h2 className="font-bold text-headline">Today</h2>
 
             <p className="mt-1 text-sm text-ink-muted">
               {today
@@ -300,7 +300,7 @@ export default function MyAttendancePage() {
 
       <section className="rounded-xl border border-line bg-surface">
         <div className="border-b border-line p-5">
-          <h2 className="font-semibold text-ink-strong">Attendance History</h2>
+          <h2 className="font-bold text-headline">Attendance History</h2>
 
           <p className="mt-1 text-sm text-ink-muted">
             Your most recent attendance records.
@@ -372,7 +372,7 @@ export default function MyAttendancePage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
           <div className="w-full max-w-lg rounded-2xl bg-surface shadow-xl">
             <div className="flex items-center justify-between border-b border-line px-6 py-4">
-              <h2 className="text-lg font-semibold text-ink-strong">
+              <h2 className="text-lg font-bold text-headline">
                 Request Attendance Correction
               </h2>
 

@@ -315,7 +315,7 @@ export default function AttendanceRecordDetailPage() {
       <div className="grid gap-6 xl:grid-cols-3">
         <section className="rounded-xl border border-line bg-surface p-5 shadow-sm xl:col-span-2">
           <div className="mb-5 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-ink-strong">
+            <h2 className="text-base font-bold text-headline">
               Record Detail
             </h2>
 
@@ -368,7 +368,7 @@ export default function AttendanceRecordDetailPage() {
         </section>
 
         <section className="rounded-xl border border-line bg-surface p-5 shadow-sm">
-          <h2 className="mb-5 text-base font-semibold text-ink-strong">
+          <h2 className="mb-5 text-base font-bold text-headline">
             Derived Minutes
           </h2>
 
@@ -402,7 +402,7 @@ export default function AttendanceRecordDetailPage() {
 
       <section className="rounded-xl border border-line bg-surface shadow-sm">
         <div className="border-b border-line px-5 py-4">
-          <h2 className="text-base font-semibold text-ink-strong">
+          <h2 className="text-base font-bold text-headline">
             Recent Attendance
           </h2>
           <p className="mt-1 text-xs text-ink-muted">
@@ -475,7 +475,7 @@ export default function AttendanceRecordDetailPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4">
           <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-surface shadow-xl">
             <div className="sticky top-0 flex items-center justify-between border-b border-line bg-surface px-6 py-4">
-              <h2 className="text-lg font-semibold text-ink-strong">
+              <h2 className="text-lg font-bold text-headline">
                 Request Adjustment
               </h2>
 

@@ -472,7 +472,7 @@ export default function AttendanceShiftsPage() {
           <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-surface shadow-xl">
             <div className="sticky top-0 flex items-center justify-between border-b border-line bg-surface px-6 py-4">
               <div>
-                <h2 className="text-lg font-semibold text-ink-strong">
+                <h2 className="text-lg font-bold text-headline">
                   {editingShift ? "Edit Shift" : "Add Shift"}
                 </h2>
                 <p className="mt-1 text-sm text-ink-muted">

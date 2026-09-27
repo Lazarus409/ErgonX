@@ -542,7 +542,7 @@ export default function AttendanceAdjustmentsPage() {
           <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-surface shadow-xl">
             <div className="sticky top-0 flex items-start justify-between border-b border-line bg-surface px-5 py-4">
               <div>
-                <h2 className="mt-1 text-lg font-semibold text-ink-strong">
+                <h2 className="mt-1 text-lg font-bold text-headline">
                   Review Attendance Adjustment
                 </h2>
 

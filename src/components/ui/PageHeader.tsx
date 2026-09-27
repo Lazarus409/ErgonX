@@ -1,13 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { ChevronRight, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { IconTile } from "@/components/ui/Card";
 import { cx } from "@/lib/cx";
-import { moduleAccents, accentForPath, type ModuleAccent } from "@/lib/moduleTheme";
+import type { ModuleAccent } from "@/lib/moduleTheme";
 
 export interface Breadcrumb {
   label: string;
@@ -29,13 +27,10 @@ interface PageHeaderProps {
   className?: string;
 }
 
-export default function PageHeader({ title, description, actions, eyebrow, breadcrumbs, icon, accent, back, meta, className }: PageHeaderProps) {
-  const pathname = usePathname() ?? "/";
-  // Pages that do not declare module context inherit it from their route.
-  const resolvedAccent = accent ?? accentForPath(pathname);
-  // The top bar already carries the route breadcrumb, so the module eyebrow
-  // only renders when a page asks for one explicitly.
-  const resolvedEyebrow = eyebrow;
+export default function PageHeader({ title, description, actions, breadcrumbs, back, meta, className }: PageHeaderProps) {
+  // Concept header: large royal-blue title with a blue supporting line. The
+  // top bar already carries the route breadcrumb and module context, so the
+  // legacy `eyebrow`, `icon` and `accent` props are accepted but not drawn.
   return (
     <header className={cx("flex flex-col gap-4 pb-2 sm:flex-row sm:items-start sm:justify-between", className)}>
       <div className="min-w-0">
@@ -52,20 +47,9 @@ export default function PageHeader({ title, description, actions, eyebrow, bread
             </ol>
           </nav>
         )}
-        <div className="flex items-start gap-4">
-          {icon && <span className="hidden sm:block"><IconTile icon={icon} accent={resolvedAccent} size="lg" /></span>}
-          <div className="min-w-0">
-            {resolvedEyebrow && (
-              <p className={cx("mb-1 flex items-center gap-2 text-caption font-semibold", moduleAccents[resolvedAccent].text)}>
-                {!icon && <span aria-hidden="true" className={cx("h-1.5 w-1.5 rounded-full", moduleAccents[resolvedAccent].solid)} />}
-                {resolvedEyebrow}
-              </p>
-            )}
-            <h1 className="text-balance text-[1.75rem] font-bold leading-9 tracking-tight text-ink-strong sm:text-title">{title}</h1>
-            {description && <p className="mt-1.5 max-w-3xl text-[0.9375rem] leading-6 text-heading-support sm:text-[1.0625rem]">{description}</p>}
-            {meta && <div className="mt-3 flex flex-wrap items-center gap-2">{meta}</div>}
-          </div>
-        </div>
+        <h1 className="text-balance text-[1.75rem] font-bold leading-9 tracking-tight text-headline sm:text-title">{title}</h1>
+        {description && <p className="mt-1.5 max-w-3xl text-[0.9375rem] leading-6 text-heading-support sm:text-[1.0625rem]">{description}</p>}
+        {meta && <div className="mt-3 flex flex-wrap items-center gap-2">{meta}</div>}
       </div>
       {actions && <div className="flex shrink-0 flex-wrap items-center gap-2.5 sm:pt-1.5">{actions}</div>}
     </header>

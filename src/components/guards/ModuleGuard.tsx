@@ -21,7 +21,7 @@ export default function ModuleGuard({
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="rounded-xl border border-line bg-surface p-8 text-center">
-          <h2 className="text-lg font-semibold text-ink-strong">
+          <h2 className="text-lg font-bold text-headline">
             Institution Context Required
           </h2>
           <p className="mt-2 text-sm text-ink-muted">
@@ -37,7 +37,7 @@ export default function ModuleGuard({
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="rounded-xl border border-line bg-surface p-8 text-center">
-          <h2 className="text-lg font-semibold text-ink-strong">
+          <h2 className="text-lg font-bold text-headline">
             Module Disabled
           </h2>
           <p className="mt-2 text-sm text-ink-muted">

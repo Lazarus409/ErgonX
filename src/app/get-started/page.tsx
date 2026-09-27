@@ -98,7 +98,7 @@ export default function GetStartedPage() {
         <div className="flex gap-4">
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary-ink" aria-hidden="true"><CircleHelp className="h-6 w-6" /></span>
           <div>
-            <h2 className="font-bold text-ink-strong">Joining an organization already on ErgonX?</h2>
+            <h2 className="font-bold text-headline">Joining an organization already on ErgonX?</h2>
             <p className="mt-1 text-support leading-6 text-ink-muted">You don&apos;t need to request access. Ask your organization&apos;s administrator or HR team to invite you, then use the link in the email.</p>
           </div>
         </div>
@@ -124,7 +124,7 @@ export default function GetStartedPage() {
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-soft text-sm font-bold text-primary-ink">{index + 1}</span>
               <div className="sm:mt-2">
                 <p className="hidden text-caption text-ink-muted sm:block">Step {index + 1}</p>
-                <h2 className="font-bold text-ink-strong sm:mt-1">{title}</h2>
+                <h2 className="font-bold text-headline sm:mt-1">{title}</h2>
                 <p className="mt-1 text-support text-ink-muted">{description}</p>
                 <span className="mt-4 hidden h-12 w-12 items-center justify-center rounded-full bg-primary-soft text-primary-ink sm:inline-flex" aria-hidden="true"><Icon className="h-5 w-5" /></span>
               </div>
@@ -137,7 +137,7 @@ export default function GetStartedPage() {
         {submittedTo ? (
           <div className="flex flex-col items-center py-6 text-center" role="status">
             <span className="flex h-12 w-12 items-center justify-center rounded-full bg-success-soft text-success" aria-hidden="true"><CheckCircle2 className="h-6 w-6" /></span>
-            <h2 id="request-heading" className="mt-4 text-card-title font-bold text-ink-strong">Request received</h2>
+            <h2 id="request-heading" className="mt-4 text-card-title font-bold text-headline">Request received</h2>
             <p className="mt-1 max-w-md text-support text-ink-muted">Thank you. Once a Super Admin approves it, an invitation will be sent to <span className="font-semibold text-ink-strong">{submittedTo}</span>.</p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <ButtonLink href="/login" variant="strong" trailingIcon={<ArrowRight className="h-4 w-4" />}>Go to sign in</ButtonLink>
@@ -149,7 +149,7 @@ export default function GetStartedPage() {
             <div className="mb-5 flex items-start gap-3">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-ink" aria-hidden="true"><Building2 className="h-5 w-5" /></span>
               <div>
-                <h2 id="request-heading" className="text-card-title font-bold text-ink-strong">Request an invitation</h2>
+                <h2 id="request-heading" className="text-card-title font-bold text-headline">Request an invitation</h2>
                 <p className="text-support text-ink-muted">The invitation goes to the email below, and that person becomes your organization&apos;s first administrator.</p>
               </div>
             </div>

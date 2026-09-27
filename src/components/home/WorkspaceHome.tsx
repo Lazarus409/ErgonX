@@ -108,15 +108,15 @@ export default function WorkspaceHome({ areaLabel, continueHref, continueTitle, 
     <div className="mx-auto max-w-7xl space-y-8">
       <HomeHero
         eyebrow={dateLine ?? areaLabel}
-        title={showGreeting ? (loading && !data ? <Skeleton className="h-10 w-72 bg-white/10" /> : `${greeting}.`) : "Continue your work."}
+        title={showGreeting ? (loading && !data ? <Skeleton className="h-10 w-72" /> : `${greeting}.`) : "Continue your work."}
         subtitle={showGreeting ? `Here's what needs you today at ${data?.greeting_context.institution_name ?? institution?.name ?? "your institution"}.` : "Use your permitted actions and current operational work below."}
         aside={
           resumeHref ? (
-            <Link href={resumeHref} className="group block rounded-2xl bg-white/[0.08] p-5 ring-1 ring-inset ring-white/15 backdrop-blur-sm transition-colors hover:bg-white/[0.12]">
-              <p className="flex items-center gap-1.5 text-caption font-semibold text-accent-aqua"><History className="h-3.5 w-3.5" aria-hidden="true" />Continue where you left off</p>
-              <p className="mt-2 font-semibold text-white">{resume?.title ?? continueTitle}</p>
-              <p className="mt-0.5 text-support text-white/60">{resume ? `Updated ${formatRelativeTime(resume.updated_at)}` : continueDescription}</p>
-              <span className="mt-4 inline-flex items-center gap-1.5 text-support font-semibold text-white">Resume<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" aria-hidden="true" /></span>
+            <Link href={resumeHref} className="group block rounded-2xl border border-primary/15 bg-primary-soft/70 p-5 transition-colors hover:border-primary/40">
+              <p className="flex items-center gap-1.5 text-caption font-semibold text-primary-ink"><History className="h-3.5 w-3.5" aria-hidden="true" />Continue where you left off</p>
+              <p className="mt-2 font-semibold text-ink-strong">{resume?.title ?? continueTitle}</p>
+              <p className="mt-0.5 text-support text-ink-muted">{resume ? `Updated ${formatRelativeTime(resume.updated_at)}` : continueDescription}</p>
+              <span className="mt-4 inline-flex items-center gap-1.5 text-support font-semibold text-ink-strong">Resume<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" aria-hidden="true" /></span>
             </Link>
           ) : undefined
         }
@@ -239,7 +239,7 @@ export default function WorkspaceHome({ areaLabel, continueHref, continueTitle, 
             <div className="relative flex items-start gap-3">
               <IconTile icon={UserRound} accent="brand" />
               <div>
-                <h2 className="text-card-title font-bold text-ink-strong">Your personal workspace</h2>
+                <h2 className="text-card-title font-bold text-headline">Your personal workspace</h2>
                 <p className="mt-0.5 text-support text-ink-muted">Your attendance, leave balances, payslips and documents in one place.</p>
               </div>
             </div>
@@ -358,7 +358,6 @@ function OperationalSnapshot() {
           ? Array.from({ length: Math.min(planKey.split(",").length, 4) }, (_, index) => <Skeleton key={index} className="h-36 rounded-2xl" />)
           : tiles.map((tile) => (
               <Link key={tile.key} href={tile.href} className="group relative flex flex-col overflow-hidden rounded-2xl border border-line bg-surface p-5 shadow-elevation-1 transition-[box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-elevation-2">
-                <span aria-hidden="true" className={cx("absolute inset-x-0 top-0 h-[3px]", moduleAccents[tile.accent].solid)} />
                 <p className="text-support font-medium text-ink-muted">{tile.label}</p>
                 <p className="mt-2 text-kpi font-semibold tracking-tight text-ink-strong tabular-nums">{tile.value}</p>
                 <p className="mt-1 truncate text-caption text-ink-muted">{tile.detail}</p>

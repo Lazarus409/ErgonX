@@ -236,7 +236,7 @@ export default function TopBar({ onOpenSidebar }: TopBarProps) {
         {/* Context identity: tenant + current area */}
         <div className="min-w-0 shrink leading-tight lg:w-56 xl:w-72">
           <p className="truncate text-caption font-medium text-primary-ink" title={institution?.name ?? undefined}>{crumb}</p>
-          <p className="truncate text-[1.375rem] font-bold leading-7 tracking-tight text-ink-strong">{pageTitle}</p>
+          <p className="truncate text-[1.375rem] font-bold leading-7 tracking-tight text-headline">{pageTitle}</p>
         </div>
 
         <div className="flex flex-1 justify-center">

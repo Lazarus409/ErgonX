@@ -9,7 +9,7 @@ export default function ModuleDisabled({ moduleName }: { moduleName: string }) {
         <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-neutral-soft text-neutral-ink" aria-hidden="true">
           <LockKeyhole className="h-6 w-6" />
         </span>
-        <h2 className="mt-5 text-heading font-semibold text-ink-strong">{moduleName} isn&apos;t enabled</h2>
+        <h2 className="mt-5 text-heading font-bold text-headline">{moduleName} isn&apos;t enabled</h2>
         <p className="mt-2 text-support text-ink-muted">
           The {moduleName} module is not enabled for the active institution. Contact an institution administrator if this module is required.
         </p>

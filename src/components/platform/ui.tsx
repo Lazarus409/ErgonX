@@ -70,7 +70,7 @@ export function SectionTitle({ eyebrow, title, description, meta, className }: {
     <div className={cx("flex flex-col justify-between gap-3 sm:flex-row sm:items-center", className)}>
       <div className="min-w-0">
         <p className="text-sm font-semibold text-primary-ink">{eyebrow}</p>
-        <h2 className="mt-1 text-xl font-semibold tracking-tight text-ink-strong">{title}</h2>
+        <h2 className="mt-1 text-xl font-bold tracking-tight text-headline">{title}</h2>
         {description && <p className="mt-1 text-sm leading-6 text-ink-muted">{description}</p>}
       </div>
       {meta && <div className="shrink-0 text-sm text-ink-muted">{meta}</div>}
@@ -85,7 +85,7 @@ export function PlatformCard({ eyebrow, title, description, icon: Icon, actions,
         {Icon && <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-navy-deep text-accent-sky dark:bg-primary-soft dark:text-primary-ink" aria-hidden="true"><Icon className="h-5 w-5" /></span>}
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-primary-ink">{eyebrow}</p>
-          <h2 className="mt-1 text-xl font-semibold tracking-tight text-ink-strong">{title}</h2>
+          <h2 className="mt-1 text-xl font-bold tracking-tight text-headline">{title}</h2>
           {description && <p className="mt-1 text-sm leading-6 text-ink-muted">{description}</p>}
         </div>
         {actions && <div className="shrink-0">{actions}</div>}

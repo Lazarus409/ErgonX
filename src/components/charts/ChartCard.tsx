@@ -135,9 +135,9 @@ export default function ChartCard({ title, description, summary, data, actions, 
     <figure className={cx("relative m-0 flex min-w-0 flex-col overflow-hidden rounded-2xl border border-line bg-surface p-5 shadow-elevation-1", className)} aria-label={title}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
-          {Icon && <Icon className="mt-0.5 h-6 w-6 shrink-0 text-ink-strong" strokeWidth={1.9} aria-hidden="true" />}
+          {Icon && <Icon className="mt-0.5 h-6 w-6 shrink-0 text-section-icon" strokeWidth={2} aria-hidden="true" />}
           <div className="min-w-0">
-            <figcaption className="text-card-title font-bold text-ink-strong">{title}</figcaption>
+            <figcaption className="text-card-title font-bold text-headline">{title}</figcaption>
             {description && <p className="mt-0.5 text-support text-heading-support">{description}</p>}
           </div>
         </div>

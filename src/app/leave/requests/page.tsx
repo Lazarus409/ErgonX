@@ -380,7 +380,7 @@ export default function LeaveRequestsPage() {
         {/* Requests */}
         <section className="overflow-hidden rounded-xl border border-line bg-surface shadow-sm">
           <div className="border-b border-line px-5 py-4">
-            <h2 className="text-sm font-semibold text-ink-strong">
+            <h2 className="text-sm font-bold text-headline">
               Employee Leave Requests
             </h2>
 

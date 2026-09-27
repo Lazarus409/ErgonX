@@ -77,6 +77,20 @@ class JobPostingViewSet(RecruitmentViewSet):
         call_validated_service(remove_hiring_team_member, member=member, actor=request.user)
         return Response(status=204)
 
+    @action(detail=False, methods=("get",))
+    def people(self, request):
+        """Active members (name and role only) for hiring-manager and hiring-team pickers."""
+        from apps.institutions.models import InstitutionMembership
+
+        members = (
+            InstitutionMembership.objects.filter(institution=request.institution, status=InstitutionMembership.Status.ACTIVE)
+            .select_related("user", "role").order_by("user__first_name", "user__last_name")
+        )
+        return Response([
+            {"id": str(item.user_id), "name": item.user.get_full_name() or item.user.email, "role": item.role.name if item.role_id else ""}
+            for item in members
+        ])
+
     @action(detail=True, methods=("get",))
     def history(self, request, pk=None):
         from apps.audit.models import AuditLog
@@ -112,7 +126,7 @@ class JobPostingViewSet(RecruitmentViewSet):
             return "job_posting.update"
         if self.action in {"approve", "return_for_changes"}:
             return "job_posting.approve"
-        if self.action in {"history", "activity"}:
+        if self.action in {"history", "activity", "people"}:
             return "job_posting.view"
         return super().get_required_permission()
 

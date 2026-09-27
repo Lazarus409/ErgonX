@@ -98,6 +98,8 @@ def test_hiring_team_and_api(api_client, setup):
     assert removed.status_code == 204
     history = api_client.get(base + "history/").json()["data"]
     assert {"recruitment.requisition.team_added", "recruitment.requisition.team_removed"} <= {row["action"] for row in history}
+    people = api_client.get("/api/v1/recruitment/job-postings/people/")
+    assert people.status_code == 200 and {"id", "name", "role"} == set(people.json()["data"][0])
     activity = api_client.get(base + "activity/")
     assert activity.status_code == 200 and "by_stage" in activity.json()["data"]
 

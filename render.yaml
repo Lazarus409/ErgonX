@@ -20,8 +20,21 @@ services:
         sync: false
       - key: FRONTEND_PUBLIC_URL
         sync: false
+      # Email (invitations, password resets). Set these in the Render dashboard;
+      # with EMAIL_DELIVERY_ENABLED=true the API refuses to start unless the
+      # SMTP values and FRONTEND_PUBLIC_URL are all present.
       - key: EMAIL_DELIVERY_ENABLED
-        value: "false"
+        sync: false
+      - key: EMAIL_HOST
+        sync: false
+      - key: EMAIL_PORT
+        sync: false
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+      - key: DEFAULT_FROM_EMAIL
+        sync: false
       - key: JWT_ACCESS_MINUTES
         value: "15"
       - key: JWT_REFRESH_DAYS

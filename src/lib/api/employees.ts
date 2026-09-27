@@ -15,10 +15,12 @@
 import {
   apiAction,
   apiDelete,
+  apiDownload,
   apiGet,
   apiGetList,
   apiPatch,
   apiPost,
+  apiPostMultipart,
   apiPut,
   ApiRequestError,
   fetchAllPages,
@@ -81,8 +83,18 @@ export async function deleteMyEmergencyContact(id: string): Promise<void> {
   return apiDelete(`/employees/me/emergency-contacts/${id}/`);
 }
 
-export interface SelfServiceDocument { id: string; original_filename: string; category: string; classification: string; created_at: string; }
+export interface SelfServiceDocument { id: string; original_filename: string; category: string; classification: string; content_type: string; size_bytes: number; uploaded_by: string | null; created_at: string; }
+/** Categories an employee can file their own documents under; mirrors SELF_SERVICE_DOCUMENT_CATEGORIES. */
+export const MY_DOCUMENT_CATEGORIES = ["Identification", "Certificate", "Qualification", "Medical", "Bank details", "Contract", "Other"] as const;
 export async function listMyDocuments(): Promise<SelfServiceDocument[]> { return apiGet<SelfServiceDocument[]>("/employees/me/documents/"); }
+export async function uploadMyDocument(file: File, category: string, onProgress?: (percent: number) => void): Promise<SelfServiceDocument> {
+  const body = new FormData();
+  body.append("uploaded_file", file);
+  body.append("category", category);
+  return apiPostMultipart<SelfServiceDocument>("/employees/me/documents/", body, onProgress);
+}
+export async function downloadMyDocument(id: string): Promise<Blob> { return apiDownload(`/employees/me/documents/${id}/`); }
+export async function removeMyDocument(id: string): Promise<void> { return apiDelete(`/employees/me/documents/${id}/`); }
 
 export async function createEmployee(
   payload: EmployeePayload,

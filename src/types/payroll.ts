@@ -20,7 +20,15 @@ export interface PayrollPeriod {
   updated_at: string;
 }
 
-export interface PayrollConfiguration { id: string; country_code: string; currency: string; payroll_frequency: string; payroll_setup_mode: string; selected_payroll_preset_version: string | null; pay_day_rule: Record<string, unknown>; rounding_rule: Record<string, unknown>; is_configured: boolean; configured_at: string | null; }
+export interface PayrollConfiguration { id: string; country_code: string; currency: string; payroll_frequency: string; payroll_setup_mode: string; selected_payroll_preset_version: string | null; pay_day_rule: PayDayRule; rounding_rule: Record<string, unknown>; custom_rules?: CustomPayrollRules; is_configured: boolean; configured_at: string | null; }
+/** When staff are paid; `{}` means not set. */
+export type PayDayRule = { type?: "LAST_DAY" } | { type: "DAY_OF_MONTH"; day: number };
+export type PayrollRuleBasis = "TAXABLE_INCOME" | "GROSS_PAY" | "BASE_SALARY";
+/** Institution-defined rules for the CUSTOM setup; mirrors apps/payroll/custom_rules.py. */
+export interface CustomPayrollRules {
+  income_tax?: { method: "NONE" | "FLAT" | "PROGRESSIVE"; name?: string; basis?: PayrollRuleBasis; rate?: string; threshold?: string; bands?: Array<{ upper_bound: string | null; rate: string }> };
+  contributions?: Array<{ code?: string; name: string; basis: PayrollRuleBasis; employee_rate: string; employer_rate: string; maximum_basis: string | null }>;
+}
 export interface EmployeePayrollProfile { id: string; employee: string; tax_residency: "RESIDENT" | "NON_RESIDENT" | string; tax_identification_number: string; created_at: string; updated_at: string; }
 export interface PayrollSetupChoice { mode: string; preset_version_id: string | null; preset_code: string | null; version_code: string | null; name: string; recommended: boolean; compliance_warning: string | null; }
 export interface PayrollSetupChoices { country_code: string; currency: string; choices: PayrollSetupChoice[]; }
@@ -56,6 +64,8 @@ export interface PayrollRecord {
   id: string;
   payroll_run: string;
   employee: string;
+  employee_name: string;
+  employee_number: string;
   gross_pay: string;
   taxable_income: string;
   total_deductions: string;

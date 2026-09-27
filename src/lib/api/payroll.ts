@@ -43,6 +43,11 @@ export async function listEmployeePayrollProfiles(params?: ListParams & { employ
 export async function createEmployeePayrollProfile(payload: EmployeePayrollProfilePayload): Promise<EmployeePayrollProfile> { return apiPost<EmployeePayrollProfile, EmployeePayrollProfilePayload>("/employee-payroll-profiles/", payload); }
 export async function updateEmployeePayrollProfile(id: string, payload: Partial<EmployeePayrollProfilePayload>): Promise<EmployeePayrollProfile> { return apiPatch<EmployeePayrollProfile, Partial<EmployeePayrollProfilePayload>>(`/employee-payroll-profiles/${id}/`, payload); }
 
+/** Start the payroll run for an open period. The key makes a double-click harmless. */
+export async function createPayrollRun(payrollPeriod: string, idempotencyKey: string): Promise<PayrollRun> {
+  return apiPost<PayrollRun, { payroll_period: string; idempotency_key: string }>("/payroll-runs/", { payroll_period: payrollPeriod, idempotency_key: idempotencyKey });
+}
+
 export async function createPayrollPeriod(payload: {
   name: string;
   start_date: string;

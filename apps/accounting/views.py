@@ -273,13 +273,86 @@ class VendorViewSet(TenantModelViewSet):
         serializer.save(institution=self.request.institution, actor=self.request.user)
 
 
-class VendorBillViewSet(TenantModelViewSet):
+class RecordAttachmentsMixin:
+    """Confidential supporting files on an accounting record (bills, invoices)."""
+
+    attachment_entity_type = ""
+    attachment_category = "SUPPORTING_DOCUMENT"
+
+    def _record_documents(self, record):
+        from apps.documents.models import Document
+
+        return Document.objects.for_institution(self.request.institution).filter(
+            entity_type=self.attachment_entity_type, entity_id=record.id, is_active=True
+        )
+
+    def _record_context(self, record):
+        from apps.audit.models import AuditLog
+        from apps.documents.serializers import DocumentSerializer
+
+        audit = AuditLog.objects.filter(institution=self.request.institution, entity_id=record.id).select_related("actor").order_by("-created_at")[:50]
+        return {
+            "attachments": DocumentSerializer(self._record_documents(record), many=True, context={"request": self.request}).data,
+            "audit": [
+                {"id": str(entry.id), "action": entry.action, "actor": _person(entry.actor), "created_at": entry.created_at, "metadata": entry.metadata}
+                for entry in audit
+            ],
+        }
+
+    @action(detail=True, methods=("post",), filter_backends=(), parser_classes=(MultiPartParser, FormParser))
+    def attachments(self, request, pk=None):
+        import mimetypes
+
+        from django.conf import settings as django_settings
+        from apps.audit.services import record_audit_event
+        from apps.documents.models import Document
+        from apps.documents.serializers import DocumentSerializer
+        from rest_framework.exceptions import ValidationError as DRFValidationError
+
+        record = self.get_object()
+        upload = request.FILES.get("uploaded_file")
+        if upload is None:
+            raise DRFValidationError({"uploaded_file": "Choose a file to upload."})
+        if upload.size > django_settings.DOCUMENT_UPLOAD_MAX_BYTES:
+            raise DRFValidationError({"uploaded_file": f"Files must be {django_settings.DOCUMENT_UPLOAD_MAX_BYTES // (1024 * 1024)} MB or smaller."})
+        name = (upload.name or "attachment").replace("\\", "/").rsplit("/", 1)[-1][:255]
+        content_type = (upload.content_type or "").split(";")[0].strip().lower()
+        if not content_type or content_type == "application/octet-stream":
+            content_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
+        document = Document.objects.create(
+            institution=request.institution, uploaded_by=request.user, stored_file=upload, original_filename=name,
+            content_type=content_type[:150], size_bytes=upload.size, category=self.attachment_category,
+            classification=Document.Classification.CONFIDENTIAL, entity_type=self.attachment_entity_type, entity_id=record.id,
+        )
+        record_audit_event(actor=request.user, institution=request.institution, entity=record, action=f"{self.attachment_entity_type.lower()}.attachment_added", metadata={"filename": name})
+        return Response(DocumentSerializer(document, context={"request": request}).data, status=201)
+
+    @action(detail=True, methods=("get",), filter_backends=(), url_path=r"attachments/(?P<document_id>[0-9a-f-]+)/download")
+    def download_attachment(self, request, pk=None, document_id=None):
+        from django.http import FileResponse
+        from rest_framework.exceptions import NotFound
+
+        document = self._record_documents(self.get_object()).filter(pk=document_id).first()
+        if document is None or not document.stored_file:
+            raise NotFound("Attachment not found.")
+        response = FileResponse(document.stored_file.open("rb"), as_attachment=True, filename=document.original_filename,
+                                content_type=document.content_type or "application/octet-stream")
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
+
+
+def _person(user):
+    return (user.get_full_name() or user.email) if user else "System"
+
+
+class VendorBillViewSet(RecordAttachmentsMixin, TenantModelViewSet):
+    attachment_entity_type = "accounting.VendorBill"
     model = VendorBill
     serializer_class = VendorBillSerializer
     required_module = "ACCOUNTING"
     http_method_names = ("get", "post", "patch", "head", "options")
-    filterset_fields = ("vendor", "status", "currency", "accounting_period", "bill_date")
-    search_fields = ("bill_number", "vendor__name", "vendor__vendor_code")
+    filterset_fields = ("vendor", "status", "currency", "accounting_period", "bill_date", "on_hold")
+    search_fields = ("bill_number", "vendor__name", "vendor__vendor_code", "lines__description")
     ordering_fields = ("bill_number", "bill_date", "due_date", "total_amount", "created_at")
     ordering = ("-bill_date", "-created_at")
     schema_action_descriptions = {
@@ -308,7 +381,129 @@ class VendorBillViewSet(TenantModelViewSet):
             "approve": "vendor_bill.approve",
             "post": "vendor_bill.post",
             "void": "vendor_bill.void",
+            "reject": "vendor_bill.approve",
+            "hold": "vendor_bill.approve",
+            "release": "vendor_bill.approve",
+            "revise": "vendor_bill.create",
+            "schedule_payment": "payment.create",
+            "attachments": "vendor_bill.create",
         }.get(self.action, "vendor_bill.view")
+
+    def _bill_response(self, service, **kwargs):
+        bill = call_validated_service(service, bill=self.get_object(), actor=self.request.user, **kwargs)
+        return Response(VendorBillSerializer(bill, context=self.get_serializer_context()).data)
+
+    @action(detail=True, methods=("post",), filter_backends=())
+    def reject(self, request, pk=None):
+        from apps.accounting.services import reject_vendor_bill
+
+        return self._bill_response(reject_vendor_bill, reason=str(request.data.get("reason", "")))
+
+    @action(detail=True, methods=("post",), filter_backends=())
+    def revise(self, request, pk=None):
+        from apps.accounting.services import revise_vendor_bill
+
+        return self._bill_response(revise_vendor_bill)
+
+    @action(detail=True, methods=("post",), filter_backends=())
+    def hold(self, request, pk=None):
+        from apps.accounting.services import set_vendor_bill_hold
+
+        return self._bill_response(set_vendor_bill_hold, on_hold=True, reason=str(request.data.get("reason", "")))
+
+    @action(detail=True, methods=("post",), filter_backends=())
+    def release(self, request, pk=None):
+        from apps.accounting.services import set_vendor_bill_hold
+
+        return self._bill_response(set_vendor_bill_hold, on_hold=False)
+
+    @action(detail=True, methods=("post",), filter_backends=(), url_path="schedule-payment")
+    def schedule_payment(self, request, pk=None):
+        from datetime import date as date_type
+
+        from apps.accounting.services import schedule_vendor_bill_payment
+        from rest_framework.exceptions import ValidationError as DRFValidationError
+
+        try:
+            payment_date = date_type.fromisoformat(str(request.data.get("payment_date", "")))
+        except ValueError:
+            raise DRFValidationError({"payment_date": "Use a YYYY-MM-DD date."})
+        return self._bill_response(schedule_vendor_bill_payment, payment_date=payment_date, payment_method=str(request.data.get("payment_method", "")))
+
+    @action(detail=True, methods=("get",), filter_backends=())
+    def context(self, request, pk=None):
+        """Payments, related records, attachments and audit history for the bill detail page."""
+        bill = self.get_object()
+        payload = self._record_context(bill)
+        payload["payments"] = [
+            {"id": str(item.id), "payment_number": item.payment_number, "payment_date": item.payment_date, "amount": str(item.amount),
+             "currency": item.currency, "payment_method": item.payment_method, "status": item.status}
+            for item in bill.payments.order_by("-payment_date")
+        ]
+        related = []
+        if bill.journal_entry_id:
+            related.append({"type": "AP journal", "reference": bill.journal_entry.journal_number, "status": bill.journal_entry.status, "href": f"/accounting/journals/{bill.journal_entry_id}"})
+        for certificate in bill.vat_withholding_certificates.all():
+            related.append({"type": "VAT withholding certificate", "reference": certificate.certificate_number, "status": getattr(certificate, "status", ""), "href": None})
+        for payment in payload["payments"]:
+            related.append({"type": "Payment", "reference": payment["payment_number"], "status": payment["status"], "href": None})
+        payload["related"] = related
+        payload["vendor"] = {
+            "id": str(bill.vendor_id), "name": bill.vendor.name, "code": bill.vendor.vendor_code, "email": bill.vendor.email,
+            "phone": bill.vendor.phone, "address": bill.vendor.address, "tax_identification_number": bill.vendor.tax_identification_number,
+        }
+        payload["institution"] = {"name": request.institution.name}
+        return Response(payload)
+
+    @action(detail=False, methods=("get",), filter_backends=())
+    def summary(self, request):
+        """Tab counts, approval queue and vendor/payment summary for the AP workspace."""
+        from datetime import timedelta
+
+        from django.db.models import Sum
+        from django.utils import timezone
+
+        from apps.accounting.models import Payment
+
+        try:
+            span = int(request.query_params.get("months", 12))
+        except (TypeError, ValueError):
+            span = 12
+        span = span if span in (3, 6, 12) else 12
+        start = timezone.localdate().replace(day=1)
+        for _ in range(span - 1):
+            start = (start - timedelta(days=1)).replace(day=1)
+        bills = VendorBill.objects.for_institution(request.institution)
+        in_range = bills.filter(bill_date__gte=start)
+        pending = bills.filter(status=VendorBill.Status.PENDING).select_related("vendor", "submitted_by").order_by("submitted_at", "bill_date")
+        membership = getattr(request, "membership", None)
+        codes = set(membership.role.permissions.values_list("code", flat=True)) if membership else set()
+        can_see_payments = "payment.view" in codes
+        payments = Payment.objects.filter(institution=request.institution, status=Payment.Status.POSTED, vendor_bill__isnull=False, payment_date__gte=start)
+        return Response({
+            "range_months": span,
+            "range_start": start.isoformat(),
+            "counts": {
+                "all": in_range.count(),
+                "pending": in_range.filter(status=VendorBill.Status.PENDING).count(),
+                "approved": in_range.filter(status=VendorBill.Status.APPROVED).count(),
+                "rejected": in_range.filter(status=VendorBill.Status.REJECTED).count(),
+                "paid": in_range.filter(status=VendorBill.Status.PAID).count(),
+                "on_hold": in_range.filter(on_hold=True).count(),
+            },
+            "approval_queue": [
+                {"id": str(bill.id), "vendor": bill.vendor.name, "bill_number": bill.bill_number, "amount": str(bill.total_amount),
+                 "currency": bill.currency, "submitted_at": bill.submitted_at, "submitted_by": _person(bill.submitted_by) if bill.submitted_by_id else None,
+                 "on_hold": bill.on_hold}
+                for bill in pending[:5]
+            ],
+            "approval_queue_total": pending.count(),
+            "active_vendors": Vendor.objects.for_institution(request.institution).filter(is_active=True).count(),
+            "total_bills": in_range.exclude(status=VendorBill.Status.VOID).count(),
+            "payments_made": payments.count() if can_see_payments else None,
+            "payments_amount": str(payments.aggregate(total=Sum("amount"))["total"] or 0) if can_see_payments else None,
+            "amounts_restricted": not can_see_payments,
+        })
 
     def perform_create(self, serializer):
         serializer.save(institution=self.request.institution, actor=self.request.user)

@@ -967,7 +967,10 @@ def submit_vendor_bill(*, bill, actor):
         )
     _refresh_vendor_bill_totals(bill)
     bill.status = VendorBill.Status.PENDING
-    bill.save(update_fields=("status", "updated_at"))
+    bill.submitted_by = actor
+    bill.submitted_at = timezone.now()
+    bill.rejection_reason = ""
+    bill.save(update_fields=("status", "submitted_by", "submitted_at", "rejection_reason", "updated_at"))
     _notify_permission_holders(
         bill.institution,
         "vendor_bill.approve",
@@ -996,8 +999,12 @@ def approve_vendor_bill(*, bill, actor):
             {"status": "Only pending vendor bills can be approved."},
             api_code="invalid_state_transition",
         )
+    if bill.on_hold:
+        raise CodedValidationError({"on_hold": "Release the hold before approving this bill."}, api_code="invalid_state_transition")
     bill.status = VendorBill.Status.APPROVED
-    bill.save(update_fields=("status", "updated_at"))
+    bill.approved_by = actor
+    bill.approved_at = timezone.now()
+    bill.save(update_fields=("status", "approved_by", "approved_at", "updated_at"))
     _notify_permission_holders(
         bill.institution,
         "vendor_bill.post",
@@ -1097,6 +1104,8 @@ def post_vendor_bill(*, bill, actor):
             {"status": "Only approved vendor bills can be posted."},
             api_code="invalid_state_transition",
         )
+    if bill.on_hold:
+        raise CodedValidationError({"on_hold": "Release the hold before posting this bill."}, api_code="invalid_state_transition")
     journal = _create_journal_record(
         institution=bill.institution,
         actor=actor,
@@ -1867,3 +1876,70 @@ def generate_payroll_journal(*, payroll_run, actor):
     PayrollRun.objects.filter(pk=run.pk).update(accounting_journal_entry=journal, updated_at=timezone.now())
     record_audit_event(actor=actor, institution=run.institution, entity=run, action="accounting.payroll_journal.generated", metadata={"journal_entry_id": str(journal.id)})
     return journal
+
+
+# --- Accounts payable workflow extras (concept "Accounts payable") -------------
+
+@transaction.atomic
+def reject_vendor_bill(*, bill, actor, reason):
+    bill = VendorBill.objects.select_for_update().get(pk=bill.pk)
+    _require(actor, bill.institution, "vendor_bill.approve")
+    if bill.status != VendorBill.Status.PENDING:
+        raise CodedValidationError({"status": "Only pending vendor bills can be rejected."}, api_code="invalid_state_transition")
+    if not (reason or "").strip():
+        raise CodedValidationError({"reason": "Explain why the bill is rejected."}, api_code="validation_error")
+    bill.status = VendorBill.Status.REJECTED
+    bill.rejected_by = actor
+    bill.rejected_at = timezone.now()
+    bill.rejection_reason = reason.strip()
+    bill.save(update_fields=("status", "rejected_by", "rejected_at", "rejection_reason", "updated_at"))
+    record_audit_event(actor=actor, institution=bill.institution, entity=bill, action="accounting.vendor_bill.rejected",
+                       metadata=_transition("PENDING", "REJECTED", reason=bill.rejection_reason))
+    return bill
+
+
+@transaction.atomic
+def revise_vendor_bill(*, bill, actor):
+    """Return a rejected bill to draft so it can be corrected and resubmitted."""
+    bill = VendorBill.objects.select_for_update().get(pk=bill.pk)
+    _require(actor, bill.institution, "vendor_bill.create")
+    if bill.status != VendorBill.Status.REJECTED:
+        raise CodedValidationError({"status": "Only rejected bills can be revised."}, api_code="invalid_state_transition")
+    bill.status = VendorBill.Status.DRAFT
+    bill.save(update_fields=("status", "updated_at"))
+    record_audit_event(actor=actor, institution=bill.institution, entity=bill, action="accounting.vendor_bill.revised", metadata=_transition("REJECTED", "DRAFT"))
+    return bill
+
+
+@transaction.atomic
+def set_vendor_bill_hold(*, bill, actor, on_hold, reason=""):
+    bill = VendorBill.objects.select_for_update().get(pk=bill.pk)
+    _require(actor, bill.institution, "vendor_bill.approve")
+    if bill.status in (VendorBill.Status.PAID, VendorBill.Status.VOID):
+        raise CodedValidationError({"status": "Paid or void bills cannot be held."}, api_code="invalid_state_transition")
+    if on_hold and not (reason or "").strip():
+        raise CodedValidationError({"reason": "Give a reason for the hold."}, api_code="validation_error")
+    bill.on_hold = on_hold
+    bill.hold_reason = reason.strip() if on_hold else ""
+    bill.save(update_fields=("on_hold", "hold_reason", "updated_at"))
+    record_audit_event(actor=actor, institution=bill.institution, entity=bill,
+                       action="accounting.vendor_bill.held" if on_hold else "accounting.vendor_bill.released", metadata={"reason": bill.hold_reason})
+    return bill
+
+
+@transaction.atomic
+def schedule_vendor_bill_payment(*, bill, actor, payment_date, payment_method):
+    bill = VendorBill.objects.select_for_update().get(pk=bill.pk)
+    _require(actor, bill.institution, "payment.create")
+    if bill.status not in (VendorBill.Status.POSTED, VendorBill.Status.PART_PAID):
+        raise CodedValidationError({"status": "Only posted, unpaid bills can be scheduled for payment."}, api_code="invalid_state_transition")
+    if bill.on_hold:
+        raise CodedValidationError({"on_hold": "Release the hold before scheduling payment."}, api_code="invalid_state_transition")
+    if payment_method not in Payment.Method.values:
+        raise CodedValidationError({"payment_method": "Choose a valid payment method."}, api_code="validation_error")
+    bill.scheduled_payment_date = payment_date
+    bill.scheduled_payment_method = payment_method
+    bill.save(update_fields=("scheduled_payment_date", "scheduled_payment_method", "updated_at"))
+    record_audit_event(actor=actor, institution=bill.institution, entity=bill, action="accounting.vendor_bill.payment_scheduled",
+                       metadata={"payment_date": payment_date.isoformat(), "payment_method": payment_method})
+    return bill

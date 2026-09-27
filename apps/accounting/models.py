@@ -828,6 +828,7 @@ class VendorBill(TenantOwnedModel):
         DRAFT = "DRAFT", "Draft"
         PENDING = "PENDING", "Pending approval"
         APPROVED = "APPROVED", "Approved"
+        REJECTED = "REJECTED", "Rejected"
         POSTED = "POSTED", "Posted"
         PART_PAID = "PART_PAID", "Part paid"
         PAID = "PAID", "Paid"
@@ -863,6 +864,18 @@ class VendorBill(TenantOwnedModel):
         blank=True,
         related_name="vendor_bills",
     )
+    # Approval trail, rejection, hold and payment scheduling (concept "Accounts payable").
+    submitted_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="vendor_bills_submitted")
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="vendor_bills_approved")
+    approved_at = models.DateTimeField(null=True, blank=True)
+    rejected_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="vendor_bills_rejected")
+    rejected_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.TextField(blank=True)
+    on_hold = models.BooleanField(default=False)
+    hold_reason = models.TextField(blank=True)
+    scheduled_payment_date = models.DateField(null=True, blank=True)
+    scheduled_payment_method = models.CharField(max_length=16, blank=True)
 
     class Meta:
         ordering = ("-bill_date", "-created_at")
@@ -926,8 +939,13 @@ class VendorBill(TenantOwnedModel):
         if errors:
             raise ValidationError(errors)
 
+    # Operational flags that may change after posting without touching the ledger.
+    OPERATIONAL_FIELDS = {"on_hold", "hold_reason", "scheduled_payment_date", "scheduled_payment_method", "updated_at"}
+
     def save(self, *args, **kwargs):
-        if self.pk and VendorBill.objects.filter(
+        update_fields = kwargs.get("update_fields")
+        operational_only = update_fields is not None and set(update_fields) <= self.OPERATIONAL_FIELDS
+        if self.pk and not operational_only and VendorBill.objects.filter(
             pk=self.pk, status__in=(self.Status.POSTED, self.Status.PAID)
         ).exists():
             raise ValidationError({"status": "Posted or paid bills are immutable."})

@@ -136,19 +136,48 @@ class VendorBillLineSerializer(ValidatedModelSerializer):
             )
 
 
+def _person_name(user):
+    return (user.get_full_name() or user.email) if user else None
+
+
 class VendorBillSerializer(ValidatedModelSerializer):
     lines = VendorBillLineSerializer(many=True)
+    vendor_name = serializers.CharField(source="vendor.name", read_only=True)
+    vendor_code = serializers.CharField(source="vendor.vendor_code", read_only=True)
+    submitted_by_name = serializers.SerializerMethodField()
+    approved_by_name = serializers.SerializerMethodField()
+    rejected_by_name = serializers.SerializerMethodField()
+    amount_paid = serializers.SerializerMethodField()
+
+    def get_submitted_by_name(self, obj):
+        return _person_name(obj.submitted_by)
+
+    def get_approved_by_name(self, obj):
+        return _person_name(obj.approved_by)
+
+    def get_rejected_by_name(self, obj):
+        return _person_name(obj.rejected_by)
+
+    def get_amount_paid(self, obj):
+        from django.db.models import Sum
+
+        total = obj.payments.filter(status="POSTED").aggregate(total=Sum("amount"))["total"] or Decimal("0")
+        return str(Decimal(total).quantize(Decimal("0.01")))
 
     class Meta:
         model = VendorBill
         fields = (
-            "id", "vendor", "bill_number", "bill_date", "due_date", "currency", "subtotal",
-            "tax_total", "withholding_total", "total_amount", "amount_payable", "status",
-            "accounting_period", "journal_entry", "lines", "created_at", "updated_at",
+            "id", "vendor", "vendor_name", "vendor_code", "bill_number", "bill_date", "due_date", "currency", "subtotal",
+            "tax_total", "withholding_total", "total_amount", "amount_payable", "amount_paid", "status",
+            "accounting_period", "journal_entry", "lines", "submitted_by_name", "submitted_at", "approved_by_name",
+            "approved_at", "rejected_by_name", "rejected_at", "rejection_reason", "on_hold", "hold_reason",
+            "scheduled_payment_date", "scheduled_payment_method", "created_at", "updated_at",
         )
         read_only_fields = (
             "id", "subtotal", "tax_total", "withholding_total", "total_amount",
-            "amount_payable", "status", "journal_entry", "created_at", "updated_at",
+            "amount_payable", "status", "journal_entry", "submitted_at", "approved_at", "rejected_at",
+            "rejection_reason", "on_hold", "hold_reason", "scheduled_payment_date", "scheduled_payment_method",
+            "created_at", "updated_at",
         )
 
     def __init__(self, *args, **kwargs):

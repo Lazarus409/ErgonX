@@ -28,6 +28,8 @@ interface SidebarProps {
  * eligibility. Visibility is never authorization: every route and endpoint
  * enforces its own gate.
  */
+const SELF_SERVICE_GROUP = "self-service";
+
 export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = false, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
   const { user, institution } = useAuth();
@@ -58,6 +60,11 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
   // A child living under another module root (HR › Leave) owns that root.
   const childActive = (parentHref: string, childHref: string) =>
     isActive(childHref) || (rootOf(childHref) !== rootOf(parentHref) && matches(rootOf(childHref)));
+
+  const selfServiceHome = visibleSelfService.find((item) => item.href === "/me");
+  const selfServicePages = visibleSelfService.filter((item) => item.href !== "/me");
+  const selfServiceActive = visibleSelfService.some((item) => isActive(item.href));
+  const selfServiceExpanded = toggled[SELF_SERVICE_GROUP] ?? selfServiceActive;
 
   const childrenFor = (item: NavigationItem) =>
     item.children?.filter((child) => (!child.module || hasModule(institution?.enabledModules, child.module)) && (!child.permission || hasPermission(child.permission))) ?? [];
@@ -141,17 +148,70 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
         {visibleSelfService.length > 0 && (
           <div className="mt-7">
             {compact ? (
-              <div className="mx-auto mb-3 h-px w-8 bg-white/10" aria-hidden="true" />
+              <>
+                <div className="mx-auto mb-3 h-px w-8 bg-white/10" aria-hidden="true" />
+                <ul className="space-y-1">
+                  {visibleSelfService.map((item) => (
+                    <li key={item.href}>
+                      <NavRow item={item} active={isActive(item.href)} groupActive={isActive(item.href)} compact={compact} onNavigate={closeMobile} />
+                    </li>
+                  ))}
+                </ul>
+              </>
             ) : (
-              <p className="mb-2 px-3 text-caption font-semibold text-white/40">My workspace</p>
-            )}
-            <ul className="space-y-1">
-              {visibleSelfService.map((item) => (
-                <li key={item.href}>
-                  <NavRow item={item} active={isActive(item.href)} groupActive={isActive(item.href)} compact={compact} onNavigate={closeMobile} />
+              // One "My workspace" entry: the header opens Employee Home and the
+              // chevron lists the personal pages, like the module groups above.
+              <ul>
+                <li>
+                  <NavRow
+                    item={{ ...(selfServiceHome ?? visibleSelfService[0]), label: "My workspace" }}
+                    active={selfServiceHome ? isActive(selfServiceHome.href) : false}
+                    groupActive={selfServiceActive}
+                    compact={false}
+                    onNavigate={closeMobile}
+                    expander={selfServicePages.length > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => setToggled((current) => ({ ...current, [SELF_SERVICE_GROUP]: !selfServiceExpanded }))}
+                        aria-expanded={selfServiceExpanded}
+                        aria-label={`${selfServiceExpanded ? "Collapse" : "Expand"} My workspace`}
+                        className="mr-1 rounded-lg p-1.5 text-white/50 transition-colors hover:bg-white/10 hover:text-white"
+                      >
+                        <ChevronDown className={cx("h-4 w-4 transition-transform duration-200 ease-standard", selfServiceExpanded && "rotate-180")} />
+                      </button>
+                    ) : undefined}
+                  />
+                  {selfServicePages.length > 0 && (
+                    <div className={cx("grid transition-[grid-template-rows] duration-200 ease-standard", selfServiceExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
+                      <ul className="overflow-hidden" aria-label="My workspace pages">
+                        <li className="relative ml-[22px] mt-1 space-y-0.5 border-l border-white/10 pb-1 pl-3">
+                          {selfServicePages.map((page) => {
+                            const active = isActive(page.href);
+                            const Icon = page.icon;
+                            return (
+                              <Link
+                                key={page.href}
+                                href={page.href}
+                                onClick={closeMobile}
+                                tabIndex={selfServiceExpanded ? undefined : -1}
+                                aria-current={active ? "page" : undefined}
+                                className={cx(
+                                  "relative flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-support font-medium transition-colors duration-150",
+                                  active ? "bg-white/[0.09] text-white" : "text-white/60 hover:bg-white/[0.05] hover:text-white",
+                                )}
+                              >
+                                <Icon className={cx("h-4 w-4 shrink-0", active ? "text-white" : "text-white/45")} aria-hidden="true" />
+                                <span className="truncate">{page.label}</span>
+                              </Link>
+                            );
+                          })}
+                        </li>
+                      </ul>
+                    </div>
+                  )}
                 </li>
-              ))}
-            </ul>
+              </ul>
+            )}
           </div>
         )}
       </nav>

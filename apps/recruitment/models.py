@@ -18,9 +18,23 @@ class JobPosting(AutoCodeMixin, TenantOwnedModel):
 
     class Status(models.TextChoices):
         DRAFT = "DRAFT", "Draft"
+        PENDING_APPROVAL = "PENDING_APPROVAL", "Pending approval"
+        APPROVED = "APPROVED", "Approved"
         OPEN = "OPEN", "Open"
         CLOSED = "CLOSED", "Closed"
         CANCELLED = "CANCELLED", "Cancelled"
+
+    class HiringReason(models.TextChoices):
+        NEW_ROLE = "NEW_ROLE", "New role"
+        REPLACEMENT = "REPLACEMENT", "Replacement"
+        EXPANSION = "EXPANSION", "Team expansion"
+        TEMPORARY_COVER = "TEMPORARY_COVER", "Temporary cover"
+
+    class InterviewPlan(models.TextChoices):
+        SINGLE_PANEL = "SINGLE_PANEL", "Single panel interview"
+        TWO_STAGE = "TWO_STAGE", "Screening + panel interview"
+        TECHNICAL_PANEL = "TECHNICAL_PANEL", "Technical assessment + panel"
+        PRESENTATION_PANEL = "PRESENTATION_PANEL", "Presentation + panel"
 
     institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="job_postings")
     code = models.CharField(max_length=50, blank=True)
@@ -32,9 +46,27 @@ class JobPosting(AutoCodeMixin, TenantOwnedModel):
     description = models.TextField(blank=True)
     employment_type = models.CharField(max_length=12, choices=Employment.EmploymentType.choices)
     openings = models.PositiveIntegerField(default=1)
-    status = models.CharField(max_length=12, choices=Status.choices, default=Status.DRAFT)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.DRAFT)
     opens_on = models.DateField(null=True, blank=True)
     closes_on = models.DateField(null=True, blank=True)
+    # Requisition / hiring plan
+    hiring_reason = models.CharField(max_length=16, choices=HiringReason.choices, blank=True)
+    grade = models.ForeignKey("organization.Grade", null=True, blank=True, on_delete=models.PROTECT, related_name="job_postings")
+    reports_to = models.ForeignKey(Position, null=True, blank=True, on_delete=models.PROTECT, related_name="reporting_job_postings")
+    target_start_date = models.DateField(null=True, blank=True)
+    salary_currency = models.CharField(max_length=3, blank=True)
+    salary_min = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    salary_max = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
+    interview_plan = models.CharField(max_length=20, choices=InterviewPlan.choices, blank=True)
+    responsibilities = models.TextField(blank=True, max_length=4000)
+    qualifications_essential = models.TextField(blank=True, max_length=4000)
+    qualifications_desirable = models.TextField(blank=True, max_length=4000)
+    # Approval
+    submitted_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="submitted_job_postings")
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="approved_job_postings")
+    approved_at = models.DateTimeField(null=True, blank=True)
+    approval_note = models.TextField(blank=True)
 
     class Meta:
         ordering = ("-created_at",)
@@ -58,12 +90,49 @@ class JobPosting(AutoCodeMixin, TenantOwnedModel):
             errors["hiring_manager"] = "Hiring manager must be an active institution member."
         if self.closes_on and self.opens_on and self.closes_on < self.opens_on:
             errors["closes_on"] = "Closing date cannot precede opening date."
+        for name in ("grade", "reports_to"):
+            obj = getattr(self, name, None)
+            if obj and obj.institution_id != self.institution_id:
+                errors[name] = "Referenced record must belong to the same institution."
+        if self.salary_min is not None and self.salary_max is not None and self.salary_max < self.salary_min:
+            errors["salary_max"] = "Maximum salary cannot be below the minimum."
+        if (self.salary_min is not None or self.salary_max is not None) and len((self.salary_currency or "").strip()) != 3:
+            errors["salary_currency"] = "Use a three-letter currency code with a salary range."
         if errors:
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
         self.code = self.code.strip().upper()
+        self.salary_currency = (self.salary_currency or "").strip().upper()
         super().save(*args, **kwargs)
+
+
+class JobPostingTeamMember(TenantOwnedModel):
+    """People involved in hiring for a requisition."""
+
+    class Role(models.TextChoices):
+        HIRING_MANAGER = "HIRING_MANAGER", "Hiring manager"
+        INTERVIEW_PANEL = "INTERVIEW_PANEL", "Interview panel"
+        HR_PARTNER = "HR_PARTNER", "HR business partner"
+        COORDINATOR = "COORDINATOR", "Recruitment coordinator"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="job_posting_team_members")
+    job_posting = models.ForeignKey(JobPosting, on_delete=models.CASCADE, related_name="team_members")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="hiring_team_memberships")
+    role = models.CharField(max_length=16, choices=Role.choices)
+
+    class Meta:
+        ordering = ("job_posting", "role", "created_at")
+        constraints = [models.UniqueConstraint(fields=("job_posting", "user"), name="uniq_hiring_team_member_per_posting")]
+
+    def clean(self):
+        errors = {}
+        if self.job_posting_id and self.job_posting.institution_id != self.institution_id:
+            errors["job_posting"] = "Requisition belongs to another institution."
+        if self.user_id and not self.user.memberships.filter(institution_id=self.institution_id, status="ACTIVE").exists():
+            errors["user"] = "Team members must be active institution members."
+        if errors:
+            raise ValidationError(errors)
 
 
 class Candidate(TenantOwnedModel):

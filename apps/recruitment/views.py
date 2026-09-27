@@ -4,8 +4,8 @@ from rest_framework.response import Response
 
 from apps.recruitment.models import Application, ApplicationStageHistory, Candidate, CandidateEvaluation, Interview, JobPosting, Offer, RecruitmentStage
 from apps.recruitment.selectors import applications_for_institution, candidate_scorecard, recruitment_pipeline
-from apps.recruitment.serializers import (ApplicationSerializer, ApplicationStageHistorySerializer, CandidateEvaluationSerializer, CandidateSerializer, CommentSerializer, HireCandidateSerializer, InterviewSerializer, InterviewStatusSerializer, JobPostingSerializer, OfferSerializer, RecruitmentStageSerializer, RejectionSerializer, StageMoveSerializer)
-from apps.recruitment.services import (close_job_posting, decide_offer, extend_offer, hire_candidate, move_application_stage, publish_job_posting, reject_application, submit_application, update_interview_status, withdraw_application, withdraw_offer)
+from apps.recruitment.serializers import (JobPostingTeamMemberSerializer, RequisitionDecisionSerializer, ApplicationSerializer, ApplicationStageHistorySerializer, CandidateEvaluationSerializer, CandidateSerializer, CommentSerializer, HireCandidateSerializer, InterviewSerializer, InterviewStatusSerializer, JobPostingSerializer, OfferSerializer, RecruitmentStageSerializer, RejectionSerializer, StageMoveSerializer)
+from apps.recruitment.services import (add_hiring_team_member, approve_job_posting, remove_hiring_team_member, return_job_posting, submit_job_posting_for_approval, close_job_posting, decide_offer, extend_offer, hire_candidate, move_application_stage, publish_job_posting, reject_application, submit_application, update_interview_status, withdraw_application, withdraw_offer)
 from apps.institutions.services import record_user_activity
 from apps.documents.models import Document
 from apps.documents.serializers import DocumentSerializer
@@ -38,9 +38,82 @@ class JobPostingViewSet(RecruitmentViewSet):
     def cancel(self, request, pk=None):
         return Response(self.get_serializer(call_validated_service(close_job_posting, job_posting=self.get_object(), actor=request.user, cancelled=True)).data)
 
+    @action(detail=True, methods=("post",), url_path="submit-approval")
+    def submit_approval(self, request, pk=None):
+        return Response(self.get_serializer(call_validated_service(submit_job_posting_for_approval, job_posting=self.get_object(), actor=request.user)).data)
+
+    @action(detail=True, methods=("post",))
+    def approve(self, request, pk=None):
+        payload = RequisitionDecisionSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        return Response(self.get_serializer(call_validated_service(approve_job_posting, job_posting=self.get_object(), actor=request.user, comment=payload.validated_data.get("comment", ""))).data)
+
+    @action(detail=True, methods=("post",), url_path="return")
+    def return_for_changes(self, request, pk=None):
+        payload = RequisitionDecisionSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        return Response(self.get_serializer(call_validated_service(return_job_posting, job_posting=self.get_object(), actor=request.user, comment=payload.validated_data.get("comment", ""))).data)
+
+    @action(detail=True, methods=("get", "post"))
+    def team(self, request, pk=None):
+        from django.contrib.auth import get_user_model
+
+        posting = self.get_object()
+        if request.method == "POST":
+            payload = JobPostingTeamMemberSerializer(data=request.data)
+            payload.is_valid(raise_exception=True)
+            user = get_user_model().objects.filter(pk=request.data.get("user")).first()
+            member = call_validated_service(add_hiring_team_member, job_posting=posting, actor=request.user, user=user, role=payload.validated_data["role"])
+            return Response(JobPostingTeamMemberSerializer(member).data, status=201)
+        return Response(JobPostingTeamMemberSerializer(posting.team_members.select_related("user"), many=True).data)
+
+    @action(detail=True, methods=("delete",), url_path=r"team/(?P<member_id>[0-9a-f-]+)")
+    def remove_team_member(self, request, pk=None, member_id=None):
+        from rest_framework.exceptions import NotFound
+
+        member = self.get_object().team_members.filter(pk=member_id).first()
+        if member is None:
+            raise NotFound("Team member not found.")
+        call_validated_service(remove_hiring_team_member, member=member, actor=request.user)
+        return Response(status=204)
+
+    @action(detail=True, methods=("get",))
+    def history(self, request, pk=None):
+        from apps.audit.models import AuditLog
+
+        posting = self.get_object()
+        entries = AuditLog.objects.filter(institution=request.institution, entity_id=posting.id).select_related("actor").order_by("-created_at")[:50]
+        return Response([
+            {"id": str(entry.id), "action": entry.action, "actor": (entry.actor.get_full_name() or entry.actor.email) if entry.actor else "System", "created_at": entry.created_at, "metadata": entry.metadata}
+            for entry in entries
+        ])
+
+    @action(detail=True, methods=("get",))
+    def activity(self, request, pk=None):
+        """Applications for this requisition grouped by stage (candidate activity)."""
+        from django.db.models import Count
+
+        posting = self.get_object()
+        applications = posting.applications.all()
+        by_stage = [
+            {"stage": row["current_stage__name"] or "Not staged", "count": row["count"]}
+            for row in applications.filter(status__in=("ACTIVE", "OFFERED")).values("current_stage__name", "current_stage__sequence").annotate(count=Count("id")).order_by("current_stage__sequence")
+        ]
+        recent = [
+            {"id": str(item.id), "candidate": item.candidate.full_name, "stage": item.current_stage.name if item.current_stage else None, "status": item.status, "applied_at": item.applied_at}
+            for item in applications.select_related("candidate", "current_stage").order_by("-applied_at", "-created_at")[:6]
+        ]
+        return Response({"by_stage": by_stage, "recent": recent, "total": applications.count()})
+
     def get_required_permission(self):
-        if self.action in {"publish", "close", "cancel"}:
+        if self.action in {"publish", "close", "cancel", "submit_approval", "team", "remove_team_member"}:
+            if self.action == "team" and self.request.method == "GET":
+                return "job_posting.view"
             return "job_posting.update"
+        if self.action in {"approve", "return_for_changes"}:
+            return "job_posting.approve"
+        if self.action in {"history", "activity"}:
+            return "job_posting.view"
         return super().get_required_permission()
 
 

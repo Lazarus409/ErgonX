@@ -26,6 +26,12 @@ def _active_member(actor, institution):
         raise ValidationError({"actor": "Actor must be an active institution member."})
 
 
+def _can(actor, institution, code):
+    return bool(actor) and actor.memberships.filter(
+        institution=institution, status="ACTIVE", role__permissions__code=code
+    ).exists()
+
+
 def _notify(user, instance, notification_type, title, message):
     if user is None:
         return
@@ -46,13 +52,18 @@ def publish_job_posting(*, job_posting, actor):
     _active_member(actor, posting.institution)
     if posting.status == JobPosting.Status.OPEN:
         return posting
-    if posting.status != JobPosting.Status.DRAFT:
-        raise ValidationError({"status": "Only draft job postings can be published."})
+    if posting.status not in {JobPosting.Status.DRAFT, JobPosting.Status.APPROVED}:
+        raise ValidationError({"status": "Only approved requisitions can be published."})
+    if posting.status == JobPosting.Status.DRAFT:
+        if not _can(actor, posting.institution, "job_posting.approve"):
+            raise ValidationError({"status": "Submit the requisition for approval before publishing."})
+        posting.approved_by = actor
+        posting.approved_at = timezone.now()
     posting.status = JobPosting.Status.OPEN
     if posting.opens_on is None:
         posting.opens_on = timezone.localdate()
     posting.full_clean()
-    posting.save(update_fields=("status", "opens_on", "updated_at"))
+    posting.save(update_fields=("status", "opens_on", "approved_by", "approved_at", "updated_at"))
     record_audit_event(actor=actor, institution=posting.institution, entity=posting, action="recruitment.job_posting.published")
     _notify(posting.hiring_manager, posting, "RECRUITMENT_JOB_POSTING_OPEN", "Job posting opened", f"{posting.title} is now open.")
     return posting
@@ -302,3 +313,103 @@ def hire_candidate(*, offer, actor, employee_number=None, existing_employee=None
     record_user_activity(actor=actor, institution=instance.institution, activity_code="offer.manage", entity=instance)
     _notify(instance.application.job_posting.hiring_manager, instance, "RECRUITMENT_CANDIDATE_HIRED", "Candidate hired", f"{candidate.full_name} has been converted to employee {employee.employee_number}.")
     return employee
+
+
+REQUISITION_REQUIRED_FIELDS = {
+    "title": "Job title",
+    "department_id": "Department",
+    "location_id": "Location",
+    "employment_type": "Employment type",
+    "hiring_reason": "Hiring reason",
+    "target_start_date": "Proposed start date",
+    "hiring_manager_id": "Hiring manager",
+    "responsibilities": "Key responsibilities",
+    "qualifications_essential": "Required qualifications and experience",
+}
+
+
+@transaction.atomic
+def submit_job_posting_for_approval(*, job_posting, actor):
+    posting = JobPosting.objects.select_for_update().get(pk=job_posting.pk)
+    _active_member(actor, posting.institution)
+    if posting.status == JobPosting.Status.PENDING_APPROVAL:
+        return posting
+    if posting.status != JobPosting.Status.DRAFT:
+        raise ValidationError({"status": "Only draft requisitions can be submitted for approval."})
+    missing = {field.removesuffix("_id"): f"{label} is required before submitting." for field, label in REQUISITION_REQUIRED_FIELDS.items() if not getattr(posting, field)}
+    if missing:
+        raise ValidationError(missing)
+    posting.status = JobPosting.Status.PENDING_APPROVAL
+    posting.submitted_by = actor
+    posting.submitted_at = timezone.now()
+    posting.approval_note = ""
+    posting.full_clean()
+    posting.save(update_fields=("status", "submitted_by", "submitted_at", "approval_note", "updated_at"))
+    record_audit_event(actor=actor, institution=posting.institution, entity=posting, action="recruitment.requisition.submitted")
+    from apps.institutions.models import InstitutionMembership
+
+    for membership in InstitutionMembership.objects.filter(
+        institution=posting.institution, status="ACTIVE", role__permissions__code="job_posting.approve"
+    ).exclude(user=actor).select_related("user").distinct():
+        _notify(membership.user, posting, "RECRUITMENT_REQUISITION_APPROVAL", "Requisition awaiting approval", f"{posting.title} ({posting.code}) needs approval before it can be published.")
+    return posting
+
+
+@transaction.atomic
+def approve_job_posting(*, job_posting, actor, comment=""):
+    posting = JobPosting.objects.select_for_update().get(pk=job_posting.pk)
+    if not _can(actor, posting.institution, "job_posting.approve"):
+        raise ValidationError({"actor": "Only requisition approvers can approve."})
+    if posting.status != JobPosting.Status.PENDING_APPROVAL:
+        raise ValidationError({"status": "Only requisitions pending approval can be approved."})
+    if posting.submitted_by_id == actor.id:
+        raise ValidationError({"actor": "Requisitions must be approved by someone other than the submitter."})
+    posting.status = JobPosting.Status.APPROVED
+    posting.approved_by = actor
+    posting.approved_at = timezone.now()
+    posting.approval_note = comment or ""
+    posting.save(update_fields=("status", "approved_by", "approved_at", "approval_note", "updated_at"))
+    record_audit_event(actor=actor, institution=posting.institution, entity=posting, action="recruitment.requisition.approved", metadata={"comment": comment})
+    _notify(posting.submitted_by, posting, "RECRUITMENT_REQUISITION_APPROVED", "Requisition approved", f"{posting.title} was approved and can be published.")
+    return posting
+
+
+@transaction.atomic
+def return_job_posting(*, job_posting, actor, comment=""):
+    posting = JobPosting.objects.select_for_update().get(pk=job_posting.pk)
+    if not _can(actor, posting.institution, "job_posting.approve"):
+        raise ValidationError({"actor": "Only requisition approvers can return requisitions."})
+    if posting.status != JobPosting.Status.PENDING_APPROVAL:
+        raise ValidationError({"status": "Only requisitions pending approval can be returned."})
+    if not (comment or "").strip():
+        raise ValidationError({"comment": "Explain what needs to change."})
+    posting.status = JobPosting.Status.DRAFT
+    posting.approval_note = comment.strip()
+    posting.save(update_fields=("status", "approval_note", "updated_at"))
+    record_audit_event(actor=actor, institution=posting.institution, entity=posting, action="recruitment.requisition.returned", metadata={"comment": comment})
+    _notify(posting.submitted_by, posting, "RECRUITMENT_REQUISITION_RETURNED", "Requisition returned for changes", comment.strip())
+    return posting
+
+
+@transaction.atomic
+def add_hiring_team_member(*, job_posting, actor, user, role):
+    from apps.recruitment.models import JobPostingTeamMember
+
+    _active_member(actor, job_posting.institution)
+    if job_posting.status in {JobPosting.Status.CLOSED, JobPosting.Status.CANCELLED}:
+        raise ValidationError({"job_posting": "Closed requisitions cannot change their hiring team."})
+    member = JobPostingTeamMember(institution=job_posting.institution, job_posting=job_posting, user=user, role=role)
+    member.full_clean()
+    member.save()
+    record_audit_event(actor=actor, institution=job_posting.institution, entity=job_posting, action="recruitment.requisition.team_added",
+                       metadata={"user_id": str(user.id), "role": role})
+    return member
+
+
+@transaction.atomic
+def remove_hiring_team_member(*, member, actor):
+    _active_member(actor, member.institution)
+    posting = member.job_posting
+    metadata = {"user_id": str(member.user_id), "role": member.role}
+    member.delete()
+    record_audit_event(actor=actor, institution=posting.institution, entity=posting, action="recruitment.requisition.team_removed", metadata=metadata)

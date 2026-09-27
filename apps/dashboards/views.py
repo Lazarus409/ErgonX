@@ -732,7 +732,55 @@ class DashboardViewSet(ViewSet):
         for _ in range(6):
             applications_trend.append({"month": month.isoformat(), "applications": monthly_counts.get(month, 0)})
             month = (month + timedelta(days=32)).replace(day=1)
+        # Concept "Recruitment": range, pipeline board and KPIs.
+        try:
+            span = int(request.query_params.get("months", 12))
+        except (TypeError, ValueError):
+            span = 12
+        span = span if span in (3, 6, 12) else 12
+        range_start = today.replace(day=1)
+        for _ in range(span - 1):
+            range_start = (range_start - timedelta(days=1)).replace(day=1)
+        in_range = applications.filter(created_at__date__gte=range_start)
+        week_start = today - timedelta(days=today.weekday())
+        stages = list(RecruitmentStage.objects.filter(institution=institution, is_active=True, is_terminal=False).order_by("sequence"))
+
+        def cards(queryset):
+            return [
+                {
+                    "id": str(item.id),
+                    "candidate_id": str(item.candidate_id),
+                    "candidate": item.candidate.full_name,
+                    "job_posting_id": str(item.job_posting_id),
+                    "job_title": item.job_posting.title,
+                    "status": item.status,
+                    "applied_at": item.applied_at,
+                }
+                for item in queryset.select_related("candidate", "job_posting").order_by("-applied_at", "-created_at")[:25]
+            ]
+
+        board = [{"key": "draft", "label": "Draft", "count": in_range.filter(status=Application.Status.DRAFT).count(), "cards": cards(in_range.filter(status=Application.Status.DRAFT))}]
+        for stage in stages:
+            staged = in_range.filter(current_stage=stage, status__in=(Application.Status.ACTIVE, Application.Status.OFFERED))
+            board.append({"key": str(stage.id), "label": stage.name, "stage_id": str(stage.id), "count": staged.count(), "cards": cards(staged)})
+        hired = in_range.filter(status=Application.Status.HIRED)
+        board.append({"key": "hired", "label": "Hired", "count": hired.count(), "cards": cards(hired)})
+        concept = {
+            "range_months": span,
+            "range_start": range_start.isoformat(),
+            "open_roles": JobPosting.objects.filter(institution=institution, status=JobPosting.Status.OPEN).aggregate(total=Sum("openings"))["total"] or 0,
+            "requisitions_pending_approval": JobPosting.objects.filter(institution=institution, status=JobPosting.Status.PENDING_APPROVAL).count(),
+            "candidates_in_process": applications.filter(status__in=(Application.Status.ACTIVE, Application.Status.OFFERED)).values("candidate").distinct().count(),
+            "interviews_this_week": Interview.objects.filter(
+                institution=institution, status=Interview.Status.SCHEDULED,
+                scheduled_at__date__gte=week_start, scheduled_at__date__lte=week_start + timedelta(days=6),
+            ).count(),
+            "offers_pending": Offer.objects.filter(institution=institution, status__in=(Offer.Status.DRAFT, Offer.Status.EXTENDED)).count(),
+            "board": board,
+            "job_options": list(JobPosting.objects.filter(institution=institution).exclude(status=JobPosting.Status.CANCELLED).order_by("title").values("id", "title", "code")),
+        }
         return Response({
+            **concept,
             "open_jobs": JobPosting.objects.filter(institution=institution, status=JobPosting.Status.OPEN).count(),
             "active_candidates": Candidate.objects.filter(institution=institution, status=Candidate.Status.ACTIVE).count(),
             "applications": applications.count(),

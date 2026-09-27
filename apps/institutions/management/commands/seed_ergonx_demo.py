@@ -1010,6 +1010,8 @@ class Command(BaseCommand):
                 employment.full_clean()
                 employment.save(update_fields=("reports_to", "updated_at"))
 
+        self._seed_profile_terms(current_employments)
+
         for department_code, head_number in DEPARTMENT_HEADS.items():
             department = institution.departments.get(code=department_code)
             head = current_employments[head_number].employee
@@ -1017,6 +1019,36 @@ class Command(BaseCommand):
                 department.head = head
                 department.full_clean()
                 department.save(update_fields=("head", "updated_at"))
+
+    def _seed_profile_terms(self, current_employments):
+        """Fill the profile/terms fields shown on Employee detail, only while blank."""
+        for employment in current_employments.values():
+            employee = employment.employee
+            if not employee.preferred_name and not employee.office_location:
+                employee.preferred_name = employee.first_name
+                employee.office_location = employment.location.name
+                employee.save(update_fields=("preferred_name", "office_location", "updated_at"))
+            if employment.cost_centre:
+                continue
+            remote = "remote" in employment.location.name.lower()
+            employment.working_pattern = (
+                Employment.WorkingPattern.PART_TIME
+                if employment.employment_type == Employment.EmploymentType.INTERN
+                else Employment.WorkingPattern.FULL_TIME
+            )
+            employment.work_arrangement = Employment.WorkArrangement.HYBRID if remote else Employment.WorkArrangement.ON_SITE
+            employment.office_days = ["TUE", "WED", "THU"] if remote else ["MON", "TUE", "WED", "THU", "FRI"]
+            employment.time_zone = "Africa/Accra"
+            employment.team = f"{employment.department.name} team"
+            employment.cost_centre = f"{employment.department.code}-01"
+            probation_end = employment.start_date + timedelta(days=182)
+            employment.probation_end_date = probation_end
+            employment.probation_status = (
+                Employment.ProbationStatus.COMPLETED if probation_end <= timezone.localdate() else Employment.ProbationStatus.IN_PROGRESS
+            )
+            employment.notice_period_weeks = 4 if employment.employment_type == Employment.EmploymentType.PERMANENT else 2
+            employment.full_clean()
+            employment.save()
 
     def _ensure_admin(self, password, *, reset_passwords=False):
         user, created = User.objects.get_or_create(

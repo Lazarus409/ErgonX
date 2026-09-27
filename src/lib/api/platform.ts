@@ -52,6 +52,8 @@ export interface PlatformInstitutionDetail extends PlatformInstitution {
 }
 
 export interface PlatformOverview {
+  /** Whether approving an access request emails the invitation link. */
+  email_delivery_enabled: boolean;
   institutions: { total: number; active: number; suspended: number; new_last_30_days: number };
   users: { total: number; signed_in_last_30_days: number };
   employees: { total: number };

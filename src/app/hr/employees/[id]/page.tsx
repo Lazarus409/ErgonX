@@ -1652,9 +1652,6 @@ export default function EmployeeDetailPage() {
             title="Current Employment Assignment"
             description="Employment assignments are effective-dated and cannot be overwritten from this profile form."
           >
-            <div className="mb-4 rounded-xl border border-warning/30 bg-warning-soft p-4 text-sm text-warning-ink">
-              Emergency-contact and lifecycle changes are currently session-only in the frontend. They will not be retained after a refresh until the backend exposes the corresponding endpoints.
-            </div>
             <div className="rounded-xl border border-dashed border-line-strong bg-surface-muted p-4 text-sm text-ink-muted">
               Save profile changes first, then use Change Assignment on the
               profile to create an effective-dated employment change safely.

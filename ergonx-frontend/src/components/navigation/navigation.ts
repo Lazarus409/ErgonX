@@ -1,5 +1,4 @@
 import {
-  BarChart3,
   CalendarDays,
   CircleDollarSign,
   ClipboardCheck,
@@ -88,7 +87,6 @@ export const INSIGHT_PERMISSIONS = ["dashboard.executive.view", "dashboard.hr.vi
 
 export const navigation: NavigationItem[] = [
   { label: "Home", href: "/", icon: House, permission: "home.view" },
-  { label: "Insights", href: "/insights", icon: BarChart3, anyPermissions: INSIGHT_PERMISSIONS, scopes: ["INSTITUTION"] },
   { label: "Executive Dashboard", href: "/dashboard", icon: LayoutDashboard, permission: "dashboard.executive.view" },
   {
     label: "My Department / Functional Area",

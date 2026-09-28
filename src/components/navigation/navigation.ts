@@ -1,5 +1,4 @@
 import {
-  BarChart3,
   CalendarDays,
   CircleDollarSign,
   ClipboardCheck,
@@ -86,9 +85,11 @@ export const sharedRecordRoutes: Array<{ pattern: RegExp; anyPermissions: readon
 /** Permissions that unlock at least one Insights section (`apps/dashboards/insights.py`). */
 export const INSIGHT_PERMISSIONS = ["dashboard.executive.view", "dashboard.hr.view", "dashboard.payroll.view", "dashboard.finance.view", "dashboard.leave.view", "dashboard.attendance.view", "candidate.view", "background_job.view"] as const;
 
+// Anyone who can decide something in a module gets the cross-module approvals inbox.
+export const APPROVAL_PERMISSIONS = ["approval_request.view", "leave.approve", "attendance.approve", "payroll.approve", "tax_relief.approve", "job_posting.approve", "offer.approve", "journal.approve", "vendor_bill.approve", "expense.approve", "budget.approve"];
+
 export const navigation: NavigationItem[] = [
   { label: "Home", href: "/", icon: House, permission: "home.view" },
-  { label: "Insights", href: "/insights", icon: BarChart3, anyPermissions: INSIGHT_PERMISSIONS, scopes: ["INSTITUTION"] },
   { label: "Executive Dashboard", href: "/dashboard", icon: LayoutDashboard, permission: "dashboard.executive.view" },
   {
     label: "My Department / Functional Area",
@@ -150,7 +151,7 @@ export const navigation: NavigationItem[] = [
     anyPermissions: moduleWorkspacePermissions.REPORTS,
     scopes: INSTITUTION_WIDE,
   },
-  { label: "Approvals", href: "/approvals", icon: GitPullRequest, permission: "approval_request.view" },
+  { label: "Approvals", href: "/approvals", icon: GitPullRequest, anyPermissions: APPROVAL_PERMISSIONS },
   { label: "Audit Trail", href: "/audit", icon: ShieldCheck, permission: "audit.view" },
   { label: "Users & Access", href: "/settings/users", icon: Users, permission: "settings.users.manage" },
   // Everyone keeps Settings for their own security and notifications; the page filters its cards.

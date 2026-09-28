@@ -13,6 +13,7 @@ import {
   apiPut,
   clearTenantContext,
   setAuthTokens,
+  setInstitutionId,
 } from "./client";
 
 export interface AuthUser {
@@ -157,9 +158,17 @@ export function getInstitutionAdminInvitation(token: string): Promise<Institutio
   return apiGet<InstitutionAdminInvitationDetails>(`/auth/institution-admin-invitations/${token}/`);
 }
 
-export async function acceptInstitutionAdminInvitation(token: string, payload: InstitutionAdminInvitationPayload): Promise<LoginResult> {
-  const result = await apiPost<LoginResult, InstitutionAdminInvitationPayload>(`/auth/institution-admin-invitations/${token}/`, payload);
+export interface InstitutionAdminInvitationAcceptance extends LoginResult {
+  institution: { id: string; name: string; code: string };
+}
+
+/** Creates the organization; the BFF signs the new admin in, replacing any earlier session. */
+export async function acceptInstitutionAdminInvitation(token: string, payload: InstitutionAdminInvitationPayload): Promise<InstitutionAdminInvitationAcceptance> {
+  const result = await apiPost<InstitutionAdminInvitationAcceptance, InstitutionAdminInvitationPayload>(`/auth/institution-admin-invitations/${token}/`, payload);
   setAuthTokens();
+  // A selector left over from an earlier session would point at an
+  // institution this new admin does not belong to.
+  setInstitutionId(result.institution?.id ?? null);
   return result;
 }
 

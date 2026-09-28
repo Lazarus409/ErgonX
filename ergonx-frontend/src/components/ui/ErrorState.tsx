@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
+import { TechnicalDetails } from "@/components/ui/StateBanner";
 import { cx } from "@/lib/cx";
 
 interface ErrorStateProps {
@@ -13,10 +14,12 @@ interface ErrorStateProps {
   action?: ReactNode;
   /** `inline` renders a compact banner suitable above existing content. */
   variant?: "block" | "inline";
+  /** Shown in a collapsed "Technical details" disclosure (block variant). */
+  details?: ReactNode;
   className?: string;
 }
 
-export default function ErrorState({ title = "Unable to load data", message, onRetry, action, variant = "block", className }: ErrorStateProps) {
+export default function ErrorState({ title = "Unable to load data", message, onRetry, action, variant = "block", details, className }: ErrorStateProps) {
   if (variant === "inline") {
     return (
       <div role="alert" className={cx("flex flex-col gap-3 rounded-xl border border-danger/25 bg-danger-soft p-4 sm:flex-row sm:items-center", className)}>
@@ -36,10 +39,11 @@ export default function ErrorState({ title = "Unable to load data", message, onR
       <p className="mt-1.5 max-w-md text-support text-ink-muted">{message}</p>
       {(onRetry || action) && (
         <div className="mt-5 flex flex-wrap justify-center gap-2">
-          {onRetry && <Button variant="secondary" onClick={onRetry} leadingIcon={<RefreshCw className="h-4 w-4" />}>Try again</Button>}
+          {onRetry && <Button onClick={onRetry} leadingIcon={<RefreshCw className="h-4 w-4" />}>Try again</Button>}
           {action}
         </div>
       )}
+      {details && <TechnicalDetails>{details}</TechnicalDetails>}
     </div>
   );
 }

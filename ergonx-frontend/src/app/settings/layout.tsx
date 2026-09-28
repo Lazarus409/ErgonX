@@ -20,7 +20,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
   // A settings page reached by URL is held to the same rule as its card on /settings.
   const area = settingsAreas.find((candidate) => candidate.href.startsWith("/settings/") && (pathname === candidate.href || pathname.startsWith(`${candidate.href}/`)));
   if (area && !canUseSettingsArea(area, user?.permissions ?? [], institution?.enabledModules, user?.dataScope)) {
-    return <AppShell><BackNavigation fallback="/settings" label="Back to Settings" /><AccessDenied /></AppShell>;
+    return <AppShell><BackNavigation fallback="/settings" label="Back to Settings" /><AccessDenied area={area.title} permission={area.permission} /></AppShell>;
   }
 
   return <AppShell>{pathname !== "/settings" && <BackNavigation fallback="/settings" label="Back to Settings" />}{children}</AppShell>;

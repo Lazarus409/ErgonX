@@ -371,13 +371,84 @@ class UniversalSearchView(APIView):
             limit = min(max(int(request.query_params.get("limit", 20)), 1), 50)
         except ValueError:
             raise CodedValidationError("Limit must be a whole number.", api_code="search_query_invalid")
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from apps.institutions.models import SearchEntry
+
+        window = {"7d": 7, "30d": 30, "365d": 365}.get(request.query_params.get("since", ""))
+        full = request.query_params.get("full") == "1"
         results = universal_search(
             institution=request.institution,
             permission_codes=request.membership.role.permissions.values_list("code", flat=True),
             query=query,
             result_types=result_types,
             module=module,
-            limit=limit,
+            limit=200 if full else limit,
+            per_provider=25 if full else None,
             scope=lambda queryset, employee_field, broad=None: scope_to_employees(queryset, request, employee_field, broad=broad),
+            since=timezone.now() - timedelta(days=window) if window else None,
+            department=request.query_params.get("department") or None,
+            location=request.query_params.get("location") or None,
+            sort=request.query_params.get("sort", "relevance"),
         )
-        return Response({"query": query, "results": results, "count": len(results)})
+        counts = {}
+        for row in results:
+            counts[row["group"]] = counts.get(row["group"], 0) + 1
+        if full:
+            # Remember the query as a recent search (latest ten per user).
+            entry = SearchEntry.objects.filter(institution=request.institution, user=request.user, kind=SearchEntry.Kind.RECENT, query__iexact=query).first()
+            if entry:
+                entry.save(update_fields=("updated_at",))
+            else:
+                SearchEntry.objects.create(institution=request.institution, user=request.user, kind=SearchEntry.Kind.RECENT, query=query[:200])
+            stale = SearchEntry.objects.filter(institution=request.institution, user=request.user, kind=SearchEntry.Kind.RECENT).order_by("-updated_at").values_list("id", flat=True)[10:]
+            SearchEntry.objects.filter(id__in=list(stale)).delete()
+        for row in results:
+            row.pop("department_id", None)
+            row.pop("location_id", None)
+        return Response({"query": query, "results": results if full else results[:limit], "count": len(results), "groups": counts})
+
+
+class SearchEntriesView(APIView):
+    """Recent and saved searches for the signed-in user."""
+
+    permission_classes = [TenantContextPermission, TenantRBACPermission]
+
+    def get_required_permission(self):
+        return "search.use"
+
+    def _rows(self, request):
+        from apps.institutions.models import SearchEntry
+
+        rows = SearchEntry.objects.filter(institution=request.institution, user=request.user)
+        return {
+            "recent": [{"id": str(row.id), "query": row.query, "updated_at": row.updated_at} for row in rows.filter(kind=SearchEntry.Kind.RECENT)[:10]],
+            "saved": [{"id": str(row.id), "query": row.query, "name": row.name or row.query, "filters": row.filters} for row in rows.filter(kind=SearchEntry.Kind.SAVED)],
+        }
+
+    def get(self, request):
+        return Response(self._rows(request))
+
+    def post(self, request):
+        from apps.institutions.models import SearchEntry
+        from common.exceptions import CodedValidationError
+
+        query = str(request.data.get("query", "")).strip()
+        if len(query) < 2:
+            raise CodedValidationError("Search query must contain at least two characters.", api_code="search_query_invalid")
+        filters = request.data.get("filters") if isinstance(request.data.get("filters"), dict) else {}
+        SearchEntry.objects.create(institution=request.institution, user=request.user, kind=SearchEntry.Kind.SAVED, query=query[:200],
+                                   name=str(request.data.get("name", ""))[:120], filters=filters)
+        return Response(self._rows(request), status=201)
+
+    def delete(self, request):
+        from apps.institutions.models import SearchEntry
+
+        entries = SearchEntry.objects.filter(institution=request.institution, user=request.user)
+        if request.query_params.get("id"):
+            entries.filter(pk=request.query_params["id"]).delete()
+        elif request.query_params.get("kind") == "RECENT":
+            entries.filter(kind=SearchEntry.Kind.RECENT).delete()
+        return Response(self._rows(request))

@@ -281,7 +281,7 @@ function AccountDetails({ account, activity, parentName }: { account: Account | 
             </div>
           )}
           {activity && !activity.monthly.length && <p className="text-sm text-ink-muted">No posted activity in this range.</p>}
-          <Link href={`/accounting/reports?report=general-ledger&account=${account.id}`} className="inline-flex items-center gap-1 text-sm font-semibold text-primary-ink hover:underline">Open ledger report<ChevronRight className="h-4 w-4" aria-hidden="true" /></Link>
+          <Link href="/accounting/reports" className="inline-flex items-center gap-1 text-sm font-semibold text-primary-ink hover:underline">Financial reports<ChevronRight className="h-4 w-4" aria-hidden="true" /></Link>
         </div>
       )}
     </section>

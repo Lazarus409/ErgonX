@@ -5,5 +5,5 @@ import { OrganizationResourceDetail } from "@/components/organization/Organizati
 
 export default function DepartmentDetailPage() {
   const { id } = useParams<{ id: string }>();
-  return <OrganizationResourceDetail kind="departments / functional areas" id={id} />;
+  return <OrganizationResourceDetail kind="departments" id={id} />;
 }

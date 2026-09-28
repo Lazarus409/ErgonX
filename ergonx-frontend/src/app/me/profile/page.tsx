@@ -22,7 +22,9 @@ export default function MyProfilePage() {
   const [avatarKey, setAvatarKey] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [imageId, setImageId] = useState<string | null>(user?.profileImageId ?? null);
+  // The session carries the saved avatar; a fresh upload shows immediately, before the session refreshes.
+  const [uploadedImageId, setImageId] = useState<string | null>(null);
+  const imageId = uploadedImageId ?? user?.profileImageId ?? null;
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -35,10 +37,6 @@ export default function MyProfilePage() {
       setAvatarKey(value?.avatar_key ?? "");
     }).catch((caught) => setError(getApiErrorMessage(caught)));
   }, []);
-
-  useEffect(() => {
-    setImageId(user?.profileImageId ?? null);
-  }, [user?.profileImageId]);
 
   async function save(event: FormEvent) {
     event.preventDefault(); setError(null); setMessage(null);

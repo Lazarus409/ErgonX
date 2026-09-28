@@ -9,6 +9,8 @@ export interface ApiResourceState<T> {
   loading: boolean;
   error: string | null;
   reload: () => void;
+  /** Replace the loaded value after a local mutation, without refetching. */
+  setData: (update: (current: T | null) => T | null) => void;
 }
 
 /**
@@ -64,5 +66,5 @@ export function useApiResource<T>(
     setReloadToken((token) => token + 1);
   }, []);
 
-  return { data, loading, error, reload };
+  return { data, loading, error, reload, setData };
 }

@@ -32,7 +32,11 @@ def rename_demo_institution(apps, schema_editor):
     institution.save(update_fields=("code", "name", "email", "updated_at"))
 
     for user in User.objects.filter(memberships__institution=institution, email__iendswith=OLD_DOMAIN).distinct():
-        user.email = _updated_email(user.email)
+        email = _updated_email(user.email)
+        # Emails are unique: keep the old address if the new one is already taken.
+        if User.objects.exclude(pk=user.pk).filter(email__iexact=email).exists():
+            continue
+        user.email = email
         user.save(update_fields=("email", "updated_at"))
 
     for employee in Employee.objects.filter(institution=institution):

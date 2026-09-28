@@ -360,3 +360,49 @@ export interface TeamSnapshot {
   today: DepartmentTodayCounts;
   pending_approvals: number;
 }
+
+/** One share row: count and percent of the active workforce. */
+export interface InsightShare {
+  label: string;
+  count: number;
+  percent: string | number | null;
+}
+
+export interface InsightKpi {
+  value: string | number;
+  previous?: string | number;
+  change_percent?: string | number | null;
+}
+
+/** `GET /home/insights/`: each section is null when the caller cannot see it. */
+export interface InsightsPayload {
+  currency: string;
+  executive_title: string;
+  range_months: number;
+  range_start: string;
+  range_end: string;
+  access: Record<"workforce" | "payroll" | "finance" | "recruitment" | "leave" | "attendance" | "operations", boolean>;
+  workforce: {
+    as_of: string;
+    total_employees: number;
+    demographics: { gender: InsightShare[]; age_range: InsightShare[]; employment_status: InsightShare[] };
+    by_department: InsightShare[];
+    by_location: InsightShare[];
+    age_distribution: InsightShare[];
+    tenure_distribution: InsightShare[];
+    headcount_trend: Array<{ month: string; headcount: number }>;
+  } | null;
+  kpis: {
+    employees: InsightKpi | null;
+    payroll: InsightKpi | null;
+    revenue: (InsightKpi & { cash_balance: string | number }) | null;
+    /** Posted income from 1 January against the same span last year. */
+    revenue_ytd: (InsightKpi & { cash_balance: string | number; year_start: string }) | null;
+    alerts: { value: number; breakdown: Array<{ code: string; label: string; count: number }> } | null;
+    /** Share of compliance checks passed; `change_points` is the change in percentage points. */
+    compliance: { value: string | number | null; previous: string | number | null; change_points: string | number | null; checks: Array<{ code: string; label: string; passed: number; total: number }> } | null;
+  };
+  revenue_by_source: Array<{ label: string; amount: string | number; percent: string | number | null }> | null;
+  module_trend: { months: string[]; series: Array<{ code: string; label: string; unit: string; values: number[] }> } | null;
+  leave_attendance: Array<{ month: string; leave_days: string | number | null; attendance_rate: string | number | null }> | null;
+}

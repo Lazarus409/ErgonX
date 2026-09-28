@@ -1,6 +1,6 @@
 import { apiAction, apiDownload, apiGet, apiGetList, apiPatch, apiPost, apiPostMultipart } from "./client";
 import type { ListParams, PaginatedData } from "@/types/api";
-import type { AccountActivity, JournalContext, Account, AccountingConfiguration, AccountingConfigurationPayload, AccountingPeriod, AccountingPresetApplicationResult, AccountingSetupChoices, BalanceSheet, BankAccount, BankStatementLine, Customer, Expense, GhanaComplianceReminder, IncomeStatement, Invoice, InvoiceLine, JournalEntry, PayComponentAccountMapping, PayComponentAccountMappingPayload, PayrollAccountMappingTemplate, Payment, Receipt, TaxCode, TaxComponent, TrialBalance, Vendor, VendorBill, VendorBillLine, WithholdingRule } from "@/types/accounting";
+import type { BatchJob, BulkPreview, ReportRun, ReportRuns, SavedReport, BudgetDetail, BudgetOverview, BudgetPayload, BudgetRecord, ReconciliationAccount, ReconciliationDetail, ReconciliationSuggestion, InvoiceContext, InvoiceReminder, ReceivablesSummary, PayablesSummary, VendorBillContext, RecordAttachment, AccountActivity, JournalContext, Account, AccountingConfiguration, AccountingConfigurationPayload, AccountingPeriod, AccountingPresetApplicationResult, AccountingSetupChoices, BalanceSheet, BankAccount, BankStatementLine, Customer, Expense, GhanaComplianceReminder, IncomeStatement, Invoice, InvoiceLine, JournalEntry, PayComponentAccountMapping, PayComponentAccountMappingPayload, PayrollAccountMappingTemplate, Payment, Receipt, TaxCode, TaxComponent, TrialBalance, Vendor, VendorBill, VendorBillLine, WithholdingRule } from "@/types/accounting";
 
 export type AccountPayload = Pick<Account, "code" | "name" | "account_type" | "parent" | "normal_balance" | "is_postable" | "is_active">;
 
@@ -115,3 +115,67 @@ export function uploadJournalAttachment(id: string, file: File, onProgress?: (pr
   return apiPostMultipart(`/journal-entries/${id}/attachments/`, body, onProgress);
 }
 export function downloadJournalAttachment(id: string, documentId: string): Promise<Blob> { return apiDownload(`/journal-entries/${id}/attachments/${documentId}/download/`); }
+
+export function getVendorBill(id: string): Promise<VendorBill> { return apiGet<VendorBill>(`/vendor-bills/${id}/`); }
+export function getPayablesSummary(months: 3 | 6 | 12): Promise<PayablesSummary> { return apiGet<PayablesSummary>(`/vendor-bills/summary/?months=${months}`); }
+export function previewVendorBillBulk(ids: string[]): Promise<BulkPreview> { return apiPost<BulkPreview, { ids: string[] }>("/vendor-bills/bulk/preview/", { ids }); }
+export function executeVendorBillBulk(payload: { ids: string[]; operation: string; reason?: string; confirm_text?: string }): Promise<BatchJob> { return apiPost<BatchJob, typeof payload>("/vendor-bills/bulk/execute/", payload); }
+export function listVendorBillBatchJobs(limit = 5): Promise<{ count: number; results: BatchJob[] }> { return apiGet<{ count: number; results: BatchJob[] }>(`/vendor-bills/batch-jobs/?limit=${limit}`); }
+export function getVendorBillContext(id: string): Promise<VendorBillContext> { return apiGet<VendorBillContext>(`/vendor-bills/${id}/context/`); }
+export function rejectVendorBill(id: string, reason: string): Promise<VendorBill> { return apiPost<VendorBill, { reason: string }>(`/vendor-bills/${id}/reject/`, { reason }); }
+export function reviseVendorBill(id: string): Promise<VendorBill> { return apiAction<VendorBill>(`/vendor-bills/${id}/revise/`); }
+export function holdVendorBill(id: string, reason: string): Promise<VendorBill> { return apiPost<VendorBill, { reason: string }>(`/vendor-bills/${id}/hold/`, { reason }); }
+export function releaseVendorBill(id: string): Promise<VendorBill> { return apiAction<VendorBill>(`/vendor-bills/${id}/release/`); }
+export function scheduleVendorBillPayment(id: string, payment_date: string, payment_method: string): Promise<VendorBill> { return apiPost<VendorBill, { payment_date: string; payment_method: string }>(`/vendor-bills/${id}/schedule-payment/`, { payment_date, payment_method }); }
+export function uploadRecordAttachment(resource: "vendor-bills" | "invoices" | "budgets", id: string, file: File, onProgress?: (progress: number) => void): Promise<RecordAttachment> {
+  const body = new FormData();
+  body.append("uploaded_file", file);
+  return apiPostMultipart(`/${resource}/${id}/attachments/`, body, onProgress);
+}
+export function downloadRecordAttachment(resource: "vendor-bills" | "invoices" | "budgets", id: string, documentId: string): Promise<Blob> { return apiDownload(`/${resource}/${id}/attachments/${documentId}/download/`); }
+
+export function getInvoice(id: string): Promise<Invoice> { return apiGet<Invoice>(`/invoices/${id}/`); }
+export function getReceivablesSummary(months: 3 | 6 | 12): Promise<ReceivablesSummary> { return apiGet<ReceivablesSummary>(`/invoices/summary/?months=${months}`); }
+export function getInvoiceContext(id: string): Promise<InvoiceContext> { return apiGet<InvoiceContext>(`/invoices/${id}/context/`); }
+export function holdInvoice(id: string, reason: string): Promise<Invoice> { return apiPost<Invoice, { reason: string }>(`/invoices/${id}/hold/`, { reason }); }
+export function releaseInvoice(id: string): Promise<Invoice> { return apiAction<Invoice>(`/invoices/${id}/release/`); }
+export function sendInvoice(id: string, email: string): Promise<Invoice & { delivery: string }> { return apiPost<Invoice & { delivery: string }, { email: string }>(`/invoices/${id}/send/`, { email }); }
+export function addInvoiceReminder(id: string, payload: { remind_on: string; channel: string; note: string }): Promise<InvoiceReminder[]> { return apiPost<InvoiceReminder[], typeof payload>(`/invoices/${id}/reminders/`, payload); }
+export function updateInvoiceReminder(id: string, reminderId: string, status: "DONE" | "CANCELLED"): Promise<InvoiceReminder[]> { return apiPost<InvoiceReminder[], { status: string }>(`/invoices/${id}/reminders/${reminderId}/`, { status }); }
+export type CustomerPayload = Pick<Customer, "name" | "email" | "phone" | "address" | "country_code" | "tax_identification_number" | "is_active">;
+export function createCustomer(payload: CustomerPayload): Promise<Customer> { return apiPost<Customer, CustomerPayload>("/customers/", payload); }
+export function updateCustomer(id: string, payload: Partial<CustomerPayload>): Promise<Customer> { return apiPatch<Customer, Partial<CustomerPayload>>(`/customers/${id}/`, payload); }
+
+export function listReconciliationAccounts(): Promise<ReconciliationAccount[]> { return apiGet<ReconciliationAccount[]>("/bank-reconciliations/accounts/"); }
+export function listReconciliationSessions(bankAccount: string): Promise<PaginatedData<ReconciliationDetail["session"]>> { return apiGetList<ReconciliationDetail["session"]>("/bank-reconciliations/", { bank_account: bankAccount, page_size: 100 } as ListParams); }
+export function startReconciliation(payload: { bank_account: string; period_start: string; period_end: string; statement_opening_balance?: string; statement_closing_balance?: string }): Promise<ReconciliationDetail> { return apiPost<ReconciliationDetail, typeof payload>("/bank-reconciliations/", payload); }
+export function getReconciliation(id: string): Promise<ReconciliationDetail> { return apiGet<ReconciliationDetail>(`/bank-reconciliations/${id}/`); }
+export function updateReconciliationBalances(id: string, payload: { statement_opening_balance: string | null; statement_closing_balance: string | null }): Promise<ReconciliationDetail> { return apiPatch<ReconciliationDetail, typeof payload>(`/bank-reconciliations/${id}/`, payload); }
+export function completeReconciliation(id: string): Promise<ReconciliationDetail> { return apiAction<ReconciliationDetail>(`/bank-reconciliations/${id}/complete/`); }
+export function importReconciliationStatement(id: string, file: File): Promise<ReconciliationDetail> { const body = new FormData(); body.append("file", file); return apiPostMultipart<ReconciliationDetail>(`/bank-reconciliations/${id}/import/`, body); }
+export function getReconciliationSuggestions(id: string, lineId: string): Promise<ReconciliationSuggestion[]> { return apiGet<ReconciliationSuggestion[]>(`/bank-reconciliations/${id}/lines/${lineId}/suggestions/`); }
+export function reconciliationLineAction(id: string, lineId: string, operation: "match" | "unmatch" | "flag" | "unflag", payload: { journal_entry?: string; note?: string } = {}): Promise<ReconciliationDetail> { return apiPost<ReconciliationDetail, typeof payload>(`/bank-reconciliations/${id}/lines/${lineId}/${operation}/`, payload); }
+export function downloadReconciliationReport(id: string): Promise<Blob> { return apiDownload(`/bank-reconciliations/${id}/report/`); }
+
+export function getBudgetOverview(params: { fiscal_year?: string; department?: string }): Promise<BudgetOverview> {
+  const query = new URLSearchParams(Object.entries(params).filter(([, value]) => value) as Array<[string, string]>);
+  return apiGet<BudgetOverview>(`/budgets/overview/${query.toString() ? `?${query.toString()}` : ""}`);
+}
+export function getBudget(id: string): Promise<BudgetRecord> { return apiGet<BudgetRecord>(`/budgets/${id}/`); }
+export function getBudgetDetail(id: string): Promise<BudgetDetail> { return apiGet<BudgetDetail>(`/budgets/${id}/detail_view/`); }
+export function createBudget(payload: BudgetPayload): Promise<BudgetRecord> { return apiPost<BudgetRecord, BudgetPayload>("/budgets/", payload); }
+export function updateBudget(id: string, payload: Partial<BudgetPayload>): Promise<BudgetRecord> { return apiPatch<BudgetRecord, Partial<BudgetPayload>>(`/budgets/${id}/`, payload); }
+export function submitBudget(id: string): Promise<BudgetRecord> { return apiAction<BudgetRecord>(`/budgets/${id}/submit/`); }
+export function approveBudget(id: string, note: string): Promise<BudgetRecord> { return apiPost<BudgetRecord, { note: string }>(`/budgets/${id}/approve/`, { note }); }
+export function returnBudget(id: string, note: string): Promise<BudgetRecord> { return apiPost<BudgetRecord, { note: string }>(`/budgets/${id}/return/`, { note }); }
+export function addBudgetNote(id: string, body: string): Promise<BudgetDetail["notes"][number]> { return apiPost<BudgetDetail["notes"][number], { body: string }>(`/budgets/${id}/notes/`, { body }); }
+export function listFiscalYears(): Promise<PaginatedData<{ id: string; name: string; start_date: string; end_date: string; status: string }>> { return apiGetList("/fiscal-years/", { page_size: 100, ordering: "-start_date" } as ListParams); }
+export function getBudgetOptions(): Promise<{ fiscal_years: Array<{ id: string; name: string; start_date: string; end_date: string }>; departments: Array<{ id: string; name: string }>; accounts: Array<{ id: string; code: string; name: string; account_type: string }> }> { return apiGet("/budgets/options/"); }
+
+export type SavedReportPayload = Partial<Pick<SavedReport, "name" | "report_type" | "category" | "description" | "parameters" | "allowed_roles" | "schedule_frequency" | "notes" | "owner">>;
+export function listSavedReports(params?: ListParams & { report_type?: string; category?: string }): Promise<PaginatedData<SavedReport>> { return apiGetList<SavedReport>("/financial-reports/", { page_size: 100, ...params } as ListParams); }
+export function getSavedReport(id: string): Promise<SavedReport> { return apiGet<SavedReport>(`/financial-reports/${id}/`); }
+export function createSavedReport(payload: SavedReportPayload): Promise<SavedReport> { return apiPost<SavedReport, SavedReportPayload>("/financial-reports/", payload); }
+export function updateSavedReport(id: string, payload: SavedReportPayload): Promise<SavedReport> { return apiPatch<SavedReport, SavedReportPayload>(`/financial-reports/${id}/`, payload); }
+export function runSavedReport(id: string, parameters: Record<string, string | boolean> = {}): Promise<ReportRun> { return apiPost<ReportRun, { parameters: typeof parameters }>(`/financial-reports/${id}/run/`, { parameters }); }
+export function getSavedReportRuns(id: string, runId?: string): Promise<ReportRuns> { return apiGet<ReportRuns>(`/financial-reports/${id}/runs/${runId ? `?run=${runId}` : ""}`); }

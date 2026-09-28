@@ -20,6 +20,7 @@ from apps.institutions.services import effective_permission_codes
 from apps.dashboards.department import department_dashboard
 from common.scoping import data_scope
 from apps.dashboards.home import home_payload
+from apps.dashboards.insights import insights_payload
 from apps.dashboards.serializers import HomeSerializer
 
 
@@ -988,3 +989,23 @@ class HomeViewSet(ViewSet):
             data_scope=data_scope(request),
         )
         return Response(HomeSerializer(payload).data)
+
+    @extend_schema(
+        responses={200: OpenApiTypes.OBJECT},
+        description=(
+            "Cross-module Insights for the selected range (months=3|6|12|24). Each section is "
+            "null unless its module is enabled and the caller has the matching dashboard access."
+        ),
+    )
+    @action(detail=False, methods=("get",))
+    def insights(self, request):
+        try:
+            span = int(request.query_params.get("months", 12))
+        except (TypeError, ValueError):
+            span = 12
+        return Response(insights_payload(
+            institution=request.institution,
+            permission_codes=effective_permission_codes(request.membership),
+            scope=data_scope(request),
+            span=span,
+        ))

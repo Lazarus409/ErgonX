@@ -281,7 +281,7 @@ export default function PayrollWorkspace() {
           <Rail icon={Zap} title="Related actions" description="Quick access to common payroll tasks.">
             <ul className="divide-y divide-line-soft">
               <RelatedLink href="/payroll/components" icon={Settings2} label="Manage payroll components" />
-              <RelatedLink href="/reports/dashboard" icon={BarChart3} label="View statutory reports" />
+              <RelatedLink href="/reports/dashboard?report=payroll" icon={BarChart3} label="View statutory reports" />
               <li><button type="button" onClick={exportCsv} disabled={!records.length} className="flex w-full items-center justify-between gap-2 py-2.5 text-left text-support font-semibold text-primary-ink hover:underline disabled:cursor-not-allowed disabled:text-ink-subtle disabled:no-underline"><span className="flex items-center gap-2.5"><Download className="h-4 w-4" aria-hidden="true" />Export payroll data</span><ChevronRight className="h-4 w-4" aria-hidden="true" /></button></li>
               <RelatedLink href="/payroll/configuration" icon={Settings} label="Payroll settings" />
             </ul>

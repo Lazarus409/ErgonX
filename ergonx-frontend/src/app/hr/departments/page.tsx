@@ -3,5 +3,5 @@
 import { OrganizationResourceList } from "@/components/organization/OrganizationResource";
 
 export default function DepartmentsPage() {
-  return <OrganizationResourceList kind="departments / functional areas" />;
+  return <OrganizationResourceList kind="departments" />;
 }

@@ -967,7 +967,10 @@ def submit_vendor_bill(*, bill, actor):
         )
     _refresh_vendor_bill_totals(bill)
     bill.status = VendorBill.Status.PENDING
-    bill.save(update_fields=("status", "updated_at"))
+    bill.submitted_by = actor
+    bill.submitted_at = timezone.now()
+    bill.rejection_reason = ""
+    bill.save(update_fields=("status", "submitted_by", "submitted_at", "rejection_reason", "updated_at"))
     _notify_permission_holders(
         bill.institution,
         "vendor_bill.approve",
@@ -996,8 +999,12 @@ def approve_vendor_bill(*, bill, actor):
             {"status": "Only pending vendor bills can be approved."},
             api_code="invalid_state_transition",
         )
+    if bill.on_hold:
+        raise CodedValidationError({"on_hold": "Release the hold before approving this bill."}, api_code="invalid_state_transition")
     bill.status = VendorBill.Status.APPROVED
-    bill.save(update_fields=("status", "updated_at"))
+    bill.approved_by = actor
+    bill.approved_at = timezone.now()
+    bill.save(update_fields=("status", "approved_by", "approved_at", "updated_at"))
     _notify_permission_holders(
         bill.institution,
         "vendor_bill.post",
@@ -1097,6 +1104,8 @@ def post_vendor_bill(*, bill, actor):
             {"status": "Only approved vendor bills can be posted."},
             api_code="invalid_state_transition",
         )
+    if bill.on_hold:
+        raise CodedValidationError({"on_hold": "Release the hold before posting this bill."}, api_code="invalid_state_transition")
     journal = _create_journal_record(
         institution=bill.institution,
         actor=actor,
@@ -1867,3 +1876,340 @@ def generate_payroll_journal(*, payroll_run, actor):
     PayrollRun.objects.filter(pk=run.pk).update(accounting_journal_entry=journal, updated_at=timezone.now())
     record_audit_event(actor=actor, institution=run.institution, entity=run, action="accounting.payroll_journal.generated", metadata={"journal_entry_id": str(journal.id)})
     return journal
+
+
+# --- Accounts payable workflow extras (concept "Accounts payable") -------------
+
+@transaction.atomic
+def reject_vendor_bill(*, bill, actor, reason):
+    bill = VendorBill.objects.select_for_update().get(pk=bill.pk)
+    _require(actor, bill.institution, "vendor_bill.approve")
+    if bill.status != VendorBill.Status.PENDING:
+        raise CodedValidationError({"status": "Only pending vendor bills can be rejected."}, api_code="invalid_state_transition")
+    if not (reason or "").strip():
+        raise CodedValidationError({"reason": "Explain why the bill is rejected."}, api_code="validation_error")
+    bill.status = VendorBill.Status.REJECTED
+    bill.rejected_by = actor
+    bill.rejected_at = timezone.now()
+    bill.rejection_reason = reason.strip()
+    bill.save(update_fields=("status", "rejected_by", "rejected_at", "rejection_reason", "updated_at"))
+    record_audit_event(actor=actor, institution=bill.institution, entity=bill, action="accounting.vendor_bill.rejected",
+                       metadata=_transition("PENDING", "REJECTED", reason=bill.rejection_reason))
+    return bill
+
+
+@transaction.atomic
+def revise_vendor_bill(*, bill, actor):
+    """Return a rejected bill to draft so it can be corrected and resubmitted."""
+    bill = VendorBill.objects.select_for_update().get(pk=bill.pk)
+    _require(actor, bill.institution, "vendor_bill.create")
+    if bill.status != VendorBill.Status.REJECTED:
+        raise CodedValidationError({"status": "Only rejected bills can be revised."}, api_code="invalid_state_transition")
+    bill.status = VendorBill.Status.DRAFT
+    bill.save(update_fields=("status", "updated_at"))
+    record_audit_event(actor=actor, institution=bill.institution, entity=bill, action="accounting.vendor_bill.revised", metadata=_transition("REJECTED", "DRAFT"))
+    return bill
+
+
+@transaction.atomic
+def set_vendor_bill_hold(*, bill, actor, on_hold, reason=""):
+    bill = VendorBill.objects.select_for_update().get(pk=bill.pk)
+    _require(actor, bill.institution, "vendor_bill.approve")
+    if bill.status in (VendorBill.Status.PAID, VendorBill.Status.VOID):
+        raise CodedValidationError({"status": "Paid or void bills cannot be held."}, api_code="invalid_state_transition")
+    if on_hold and not (reason or "").strip():
+        raise CodedValidationError({"reason": "Give a reason for the hold."}, api_code="validation_error")
+    bill.on_hold = on_hold
+    bill.hold_reason = reason.strip() if on_hold else ""
+    bill.save(update_fields=("on_hold", "hold_reason", "updated_at"))
+    record_audit_event(actor=actor, institution=bill.institution, entity=bill,
+                       action="accounting.vendor_bill.held" if on_hold else "accounting.vendor_bill.released", metadata={"reason": bill.hold_reason})
+    return bill
+
+
+@transaction.atomic
+def schedule_vendor_bill_payment(*, bill, actor, payment_date, payment_method):
+    bill = VendorBill.objects.select_for_update().get(pk=bill.pk)
+    _require(actor, bill.institution, "payment.create")
+    if bill.status not in (VendorBill.Status.POSTED, VendorBill.Status.PART_PAID):
+        raise CodedValidationError({"status": "Only posted, unpaid bills can be scheduled for payment."}, api_code="invalid_state_transition")
+    if bill.on_hold:
+        raise CodedValidationError({"on_hold": "Release the hold before scheduling payment."}, api_code="invalid_state_transition")
+    if payment_method not in Payment.Method.values:
+        raise CodedValidationError({"payment_method": "Choose a valid payment method."}, api_code="validation_error")
+    bill.scheduled_payment_date = payment_date
+    bill.scheduled_payment_method = payment_method
+    bill.save(update_fields=("scheduled_payment_date", "scheduled_payment_method", "updated_at"))
+    record_audit_event(actor=actor, institution=bill.institution, entity=bill, action="accounting.vendor_bill.payment_scheduled",
+                       metadata={"payment_date": payment_date.isoformat(), "payment_method": payment_method})
+    return bill
+
+
+# --- Accounts receivable collections (concept "Accounts receivable") ----------
+
+def invoice_amount_received(invoice):
+    from django.db.models import Sum
+
+    return Decimal(Receipt.objects.filter(invoice=invoice, status=Receipt.Status.POSTED).aggregate(total=Sum("amount"))["total"] or 0).quantize(Decimal("0.01"))
+
+
+@transaction.atomic
+def set_invoice_hold(*, invoice, actor, on_hold, reason=""):
+    invoice = Invoice.objects.select_for_update().get(pk=invoice.pk)
+    _require(actor, invoice.institution, "invoice.issue")
+    if invoice.status in (Invoice.Status.PAID, Invoice.Status.VOID):
+        raise CodedValidationError({"status": "Paid or void invoices cannot be held."}, api_code="invalid_state_transition")
+    if on_hold and not (reason or "").strip():
+        raise CodedValidationError({"reason": "Give a reason, such as the customer's dispute."}, api_code="validation_error")
+    invoice.on_hold = on_hold
+    invoice.hold_reason = reason.strip() if on_hold else ""
+    invoice.save(update_fields=("on_hold", "hold_reason", "updated_at"))
+    record_audit_event(actor=actor, institution=invoice.institution, entity=invoice,
+                       action="accounting.invoice.held" if on_hold else "accounting.invoice.released", metadata={"reason": invoice.hold_reason})
+    return invoice
+
+
+@transaction.atomic
+def send_invoice(*, invoice, actor, email=""):
+    """Issue a draft (posting its AR journal) and email it to the customer."""
+    from django.conf import settings as django_settings
+    from django.core.mail import send_mail
+
+    if invoice.status == Invoice.Status.DRAFT:
+        invoice = issue_invoice(invoice=invoice, actor=actor)
+    invoice = Invoice.objects.select_for_update().select_related("customer", "institution").get(pk=invoice.pk)
+    _require(actor, invoice.institution, "invoice.issue")
+    if invoice.status == Invoice.Status.VOID:
+        raise CodedValidationError({"status": "Void invoices cannot be sent."}, api_code="invalid_state_transition")
+    recipient = (email or invoice.customer.email or "").strip()
+    if not recipient:
+        raise CodedValidationError({"email": "Add the customer's email address to send the invoice."}, api_code="validation_error")
+    lines = "\n".join(f"- {line.description}: {invoice.currency} {line.line_total:,.2f}" for line in invoice.lines.all())
+    body = (
+        f"Dear {invoice.customer.name},\n\nPlease find invoice {invoice.invoice_number} from {invoice.institution.name}.\n\n{lines}\n\n"
+        f"Total due: {invoice.currency} {invoice.total_amount:,.2f}\nDue date: {invoice.due_date:%d %B %Y}\n\nThank you."
+    )
+    delivery = "SENT"
+    if not getattr(django_settings, "EMAIL_HOST", "") and "smtp" in getattr(django_settings, "EMAIL_BACKEND", "smtp"):
+        delivery = "NOT_CONFIGURED"
+    else:
+        try:
+            send_mail(f"Invoice {invoice.invoice_number} from {invoice.institution.name}", body, django_settings.DEFAULT_FROM_EMAIL, [recipient], fail_silently=False)
+        except Exception:  # noqa: BLE001 - delivery failure is recorded, not fatal
+            delivery = "FAILED"
+    if delivery == "SENT":
+        invoice.sent_at = timezone.now()
+        invoice.sent_to = recipient
+        invoice.save(update_fields=("sent_at", "sent_to", "updated_at"))
+    record_audit_event(actor=actor, institution=invoice.institution, entity=invoice, action="accounting.invoice.sent", metadata={"to": recipient, "delivery": delivery})
+    return invoice, delivery
+
+
+@transaction.atomic
+def add_invoice_reminder(*, invoice, actor, remind_on, channel, note=""):
+    from apps.accounting.models import InvoiceReminder
+
+    _require(actor, invoice.institution, "invoice.issue")
+    if invoice.status not in (Invoice.Status.ISSUED, Invoice.Status.PART_PAID):
+        raise CodedValidationError({"status": "Reminders apply to issued, unpaid invoices."}, api_code="invalid_state_transition")
+    reminder = InvoiceReminder(institution=invoice.institution, invoice=invoice, remind_on=remind_on, channel=channel, note=(note or "").strip(), created_by=actor)
+    reminder.full_clean()
+    reminder.save()
+    record_audit_event(actor=actor, institution=invoice.institution, entity=invoice, action="accounting.invoice.reminder_added", metadata={"remind_on": remind_on.isoformat(), "channel": channel})
+    return reminder
+
+
+@transaction.atomic
+def update_invoice_reminder(*, reminder, actor, status):
+    from apps.accounting.models import InvoiceReminder
+
+    _require(actor, reminder.institution, "invoice.issue")
+    if status not in (InvoiceReminder.Status.DONE, InvoiceReminder.Status.CANCELLED) or reminder.status != InvoiceReminder.Status.SCHEDULED:
+        raise CodedValidationError({"status": "Only scheduled reminders can be completed or cancelled."}, api_code="invalid_state_transition")
+    reminder.status = status
+    reminder.completed_at = timezone.now()
+    reminder.save(update_fields=("status", "completed_at", "updated_at"))
+    record_audit_event(actor=actor, institution=reminder.institution, entity=reminder.invoice, action=f"accounting.invoice.reminder_{status.lower()}")
+    return reminder
+
+
+# --- Bank reconciliation sessions (concept "Bank reconciliation") ------------
+
+def _session_lines(session):
+    return BankStatementLine.objects.filter(
+        bank_account=session.bank_account, statement_date__gte=session.period_start, statement_date__lte=session.period_end,
+    )
+
+
+def bank_book_balance(*, bank_account, as_of):
+    totals = JournalLine.objects.filter(
+        account=bank_account.ledger_account, journal_entry__status__in=(JournalEntry.Status.POSTED, JournalEntry.Status.REVERSED),
+        journal_entry__entry_date__lte=as_of,
+    ).aggregate(debit=Sum("debit"), credit=Sum("credit"))
+    return _money(Decimal(totals["debit"] or 0) - Decimal(totals["credit"] or 0))
+
+
+def suggested_journals(*, statement_line, window_days=7, limit=5):
+    """Posted journals whose bank-ledger movement equals the statement amount,
+    dated near the statement date and not already matched."""
+    from datetime import timedelta
+
+    bank_account = statement_line.bank_account
+    candidates = JournalEntry.objects.filter(
+        institution=statement_line.institution, status=JournalEntry.Status.POSTED,
+        entry_date__gte=statement_line.statement_date - timedelta(days=window_days),
+        entry_date__lte=statement_line.statement_date + timedelta(days=window_days),
+        lines__account=bank_account.ledger_account, bank_statement_match__isnull=True,
+    ).distinct().order_by("entry_date")
+    matches = []
+    for journal in candidates[:50]:
+        if _bank_journal_movement(journal=journal, bank_account=bank_account) == statement_line.amount:
+            matches.append(journal)
+            if len(matches) >= limit:
+                break
+    return matches
+
+
+@transaction.atomic
+def start_reconciliation_session(*, institution, actor, bank_account, period_start, period_end, statement_opening_balance=None, statement_closing_balance=None):
+    from apps.accounting.models import BankReconciliationSession
+
+    _require(actor, institution, "bank_reconciliation.manage")
+    session = BankReconciliationSession.objects.filter(bank_account=bank_account, period_start=period_start, period_end=period_end).first()
+    if session:
+        return session
+    session = BankReconciliationSession(
+        institution=institution, bank_account=bank_account, period_start=period_start, period_end=period_end,
+        statement_opening_balance=statement_opening_balance, statement_closing_balance=statement_closing_balance, started_by=actor,
+    )
+    session.full_clean()
+    session.save()
+    record_audit_event(actor=actor, institution=institution, entity=session, action="accounting.reconciliation.started",
+                       metadata={"bank_account_id": str(bank_account.id), "period_start": period_start.isoformat(), "period_end": period_end.isoformat()})
+    return session
+
+
+@transaction.atomic
+def update_reconciliation_balances(*, session, actor, statement_opening_balance=None, statement_closing_balance=None):
+    from apps.accounting.models import BankReconciliationSession
+
+    session = BankReconciliationSession.objects.select_for_update().get(pk=session.pk)
+    _require(actor, session.institution, "bank_reconciliation.manage")
+    if session.status == BankReconciliationSession.Status.COMPLETED:
+        raise CodedValidationError({"status": "Reopen is not supported; completed reconciliations are final."}, api_code="record_immutable")
+    session.statement_opening_balance = statement_opening_balance
+    session.statement_closing_balance = statement_closing_balance
+    session.save(update_fields=("statement_opening_balance", "statement_closing_balance", "updated_at"))
+    return session
+
+
+def reconciliation_overview(session):
+    lines = list(_session_lines(session).order_by("statement_date", "created_at"))
+    matched = [line for line in lines if line.status == BankStatementLine.Status.MATCHED]
+    unmatched = [line for line in lines if line.status == BankStatementLine.Status.UNMATCHED]
+    exceptions = [line for line in lines if line.status == BankStatementLine.Status.EXCEPTION]
+    book = bank_book_balance(bank_account=session.bank_account, as_of=session.period_end)
+    difference = None
+    if session.statement_closing_balance is not None:
+        # Reconciled when the statement closing balance equals the posted bank-ledger balance.
+        difference = _money(session.statement_closing_balance - book)
+    total = len(lines)
+    return {
+        "lines": lines,
+        "counts": {"all": total, "matched": len(matched), "unmatched": len(unmatched), "exceptions": len(exceptions)},
+        "matched_amount": _money(sum((abs(line.amount) for line in matched), Decimal("0"))),
+        "unmatched_amount": _money(sum((abs(line.amount) for line in unmatched + exceptions), Decimal("0"))),
+        "progress": round(len(matched) * 100 / total) if total else 0,
+        "book_balance": book,
+        "difference": difference,
+        "can_complete": session.status != "COMPLETED" and total > 0 and not unmatched and difference == Decimal("0.00"),
+    }
+
+
+@transaction.atomic
+def complete_reconciliation_session(*, session, actor):
+    from apps.accounting.models import BankReconciliationSession
+
+    session = BankReconciliationSession.objects.select_for_update().get(pk=session.pk)
+    _require(actor, session.institution, "bank_reconciliation.manage")
+    if session.status == BankReconciliationSession.Status.COMPLETED:
+        return session
+    overview = reconciliation_overview(session)
+    if not overview["counts"]["all"]:
+        raise CodedValidationError({"lines": "Import the statement before completing the reconciliation."}, api_code="validation_error")
+    if overview["counts"]["unmatched"]:
+        raise CodedValidationError({"lines": "Match every statement line or flag it as an exception first."}, api_code="validation_error")
+    if overview["difference"] is None:
+        raise CodedValidationError({"statement_closing_balance": "Enter the statement closing balance."}, api_code="validation_error")
+    if overview["difference"] != Decimal("0.00"):
+        raise CodedValidationError({"difference": f"The statement and books differ by {overview['difference']}."}, api_code="validation_error")
+    session.status = BankReconciliationSession.Status.COMPLETED
+    session.completed_by = actor
+    session.completed_at = timezone.now()
+    session.save(update_fields=("status", "completed_by", "completed_at", "updated_at"))
+    record_audit_event(actor=actor, institution=session.institution, entity=session, action="accounting.reconciliation.completed",
+                       metadata={"matched": overview["counts"]["matched"], "exceptions": overview["counts"]["exceptions"]})
+    return session
+
+
+@transaction.atomic
+def import_statement_csv(*, session, actor, content):
+    """Import statement lines from CSV with headers date, description, reference, amount[, external_id]."""
+    import csv
+    import io
+    from datetime import date as date_type
+
+    _require(actor, session.institution, "bank_reconciliation.manage")
+    reader = csv.DictReader(io.StringIO(content))
+    headers = {(name or "").strip().lower() for name in (reader.fieldnames or [])}
+    if not {"date", "amount"} <= headers:
+        raise CodedValidationError({"file": "The CSV needs at least 'date' and 'amount' columns."}, api_code="validation_error")
+    created, skipped, errors = 0, 0, []
+    for index, raw in enumerate(reader, start=2):
+        row = {(key or "").strip().lower(): (value or "").strip() for key, value in raw.items()}
+        try:
+            statement_date = date_type.fromisoformat(row["date"])
+            amount = Decimal(row["amount"].replace(",", ""))
+        except Exception:  # noqa: BLE001 - reported per row
+            errors.append(f"Row {index}: use YYYY-MM-DD dates and numeric amounts.")
+            continue
+        if amount == 0:
+            errors.append(f"Row {index}: amount cannot be zero.")
+            continue
+        external_id = row.get("external_id") or f"{statement_date:%Y%m%d}-{row.get('reference') or index}-{amount}"
+        before = BankStatementLine.objects.filter(bank_account=session.bank_account, external_id=external_id.strip().upper()).exists()
+        try:
+            create_bank_statement_line(
+                institution=session.institution, actor=actor, bank_account=session.bank_account, statement_date=statement_date,
+                external_id=external_id, reference=row.get("reference", "")[:150], description=row.get("description", ""),
+                amount=amount, currency=session.bank_account.currency,
+            )
+        except ValidationError as exc:
+            errors.append(f"Row {index}: {'; '.join(exc.messages)}")
+            continue
+        if before:
+            skipped += 1
+        else:
+            created += 1
+    from apps.accounting.models import BankReconciliationSession
+
+    BankReconciliationSession.objects.filter(pk=session.pk).update(last_imported_at=timezone.now(), last_imported_by=actor, updated_at=timezone.now())
+    record_audit_event(actor=actor, institution=session.institution, entity=session, action="accounting.reconciliation.statement_imported",
+                       metadata={"created": created, "skipped": skipped, "errors": len(errors)})
+    return {"created": created, "skipped": skipped, "errors": errors[:20]}
+
+
+@transaction.atomic
+def flag_statement_line(*, statement_line, actor, exception, note=""):
+    line = BankStatementLine.objects.select_for_update().get(pk=statement_line.pk)
+    _require(actor, line.institution, "bank_reconciliation.manage")
+    if line.status == BankStatementLine.Status.MATCHED:
+        raise CodedValidationError({"status": "Unmatch the line before flagging it."}, api_code="invalid_state_transition")
+    if exception and not (note or "").strip():
+        raise CodedValidationError({"note": "Explain the exception (for example, bank charge not yet journalled)."}, api_code="validation_error")
+    line.status = BankStatementLine.Status.EXCEPTION if exception else BankStatementLine.Status.UNMATCHED
+    line.exception_note = note.strip() if exception else ""
+    line.save()
+    record_audit_event(actor=actor, institution=line.institution, entity=line,
+                       action="accounting.bank_statement_line.flagged" if exception else "accounting.bank_statement_line.unflagged", metadata={"note": line.exception_note})
+    return line

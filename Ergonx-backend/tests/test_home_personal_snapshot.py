@@ -26,7 +26,7 @@ def _walk_keys(value):
 def demo(db):
     with override_settings(DEBUG=True):
         call_command("seed_ergonx_demo", password="ErgonxDemo!2026", stdout=StringIO())
-    return Institution.objects.get(code="APEX-DEMO")
+    return Institution.objects.get(code="CSA-DEMO")
 
 
 def _employee_member(institution):

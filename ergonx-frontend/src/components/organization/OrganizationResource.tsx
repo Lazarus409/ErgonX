@@ -21,21 +21,21 @@ import { useApiResource } from "@/lib/useApiResource";
 import { MAX_PAGE_SIZE, type PaginatedData } from "@/types/api";
 import type { Department, Grade, Location, Position } from "@/types/hr";
 
-export type OrganizationResourceKind = "departments / functional areas" | "positions" | "grades" | "locations";
+export type OrganizationResourceKind = "departments" | "positions" | "grades" | "locations";
 type Resource = Department | Position | Grade | Location;
 
 const metadata: Record<OrganizationResourceKind, { singular: string; title: string; description: string; icon: typeof Building2 }> = {
-  departments: { singular: "Department / Functional Area", title: "Departments / Functional Areas", description: "The departments / functional areas and functional areas your people, positions and approvals are organized by.", icon: Building2 },
+  departments: { singular: "Department / Functional Area", title: "Departments / Functional Areas", description: "The departments / functional areas your people, positions and approvals are organized by.", icon: Building2 },
   positions: { singular: "Position", title: "Positions", description: "Job positions and the department / functional area each one sits in.", icon: BriefcaseBusiness },
   grades: { singular: "Grade", title: "Grades", description: "Grade levels used for employees and pay structures.", icon: GraduationCap },
   locations: { singular: "Location", title: "Locations", description: "Offices, sites and remote arrangements people work from.", icon: MapPin },
 };
 
-function list(kind: OrganizationResourceKind): Promise<PaginatedData<Resource>> { switch (kind) { case "departments / functional areas": return organizationApi.listDepartments({ page_size: 100 }) as Promise<PaginatedData<Resource>>; case "positions": return organizationApi.listPositions({ page_size: 100 }) as Promise<PaginatedData<Resource>>; case "grades": return organizationApi.listGrades({ page_size: 100 }) as Promise<PaginatedData<Resource>>; case "locations": return organizationApi.listLocations({ page_size: 100 }) as Promise<PaginatedData<Resource>>; } }
-function get(kind: OrganizationResourceKind, id: string): Promise<Resource> { switch (kind) { case "departments / functional areas": return organizationApi.getDepartment(id) as Promise<Resource>; case "positions": return organizationApi.getPosition(id) as Promise<Resource>; case "grades": return organizationApi.getGrade(id) as Promise<Resource>; case "locations": return organizationApi.getLocation(id) as Promise<Resource>; } }
+function list(kind: OrganizationResourceKind): Promise<PaginatedData<Resource>> { switch (kind) { case "departments": return organizationApi.listDepartments({ page_size: 100 }) as Promise<PaginatedData<Resource>>; case "positions": return organizationApi.listPositions({ page_size: 100 }) as Promise<PaginatedData<Resource>>; case "grades": return organizationApi.listGrades({ page_size: 100 }) as Promise<PaginatedData<Resource>>; case "locations": return organizationApi.listLocations({ page_size: 100 }) as Promise<PaginatedData<Resource>>; } }
+function get(kind: OrganizationResourceKind, id: string): Promise<Resource> { switch (kind) { case "departments": return organizationApi.getDepartment(id) as Promise<Resource>; case "positions": return organizationApi.getPosition(id) as Promise<Resource>; case "grades": return organizationApi.getGrade(id) as Promise<Resource>; case "locations": return organizationApi.getLocation(id) as Promise<Resource>; } }
 function nameOf(item: Resource) { return "title" in item ? item.title : item.name; }
 function countryLabel(code: string) { if (!code) return "Not provided"; try { return new Intl.DisplayNames(["en"], { type: "region" }).of(code) ?? code; } catch { return code; } }
-function details(kind: OrganizationResourceKind, item: Resource): Array<[string, string]> { if (kind === "departments / functional areas") { const value = item as Department; return [["Code", value.code], ["Department / Functional Area head", value.head_name ?? "Not assigned"], ["Part of", value.parent_name ?? "None (top level)"], ["Description", value.description || "Not provided"]]; } if (kind === "positions") { const value = item as Position; return [["Code", value.code], ["Department / Functional Area", value.department_name ?? "Not assigned"], ["Description", value.description || "Not provided"]]; } if (kind === "grades") { const value = item as Grade; return [["Code", value.code], ["Level", String(value.level ?? "Not set")], ["Description", value.description || "Not provided"]]; } const value = item as Location; return [["Code", value.code], ["Address", value.address || "Not provided"], ["City", value.city || "Not provided"], ["Country", countryLabel(value.country)], ["Time zone", value.timezone || "Same as the institution"], ["Work arrangement", value.is_remote ? "Remote or hybrid" : "On site"]]; }
+function details(kind: OrganizationResourceKind, item: Resource): Array<[string, string]> { if (kind === "departments") { const value = item as Department; return [["Code", value.code], ["Department / Functional Area head", value.head_name ?? "Not assigned"], ["Part of", value.parent_name ?? "None (top level)"], ["Description", value.description || "Not provided"]]; } if (kind === "positions") { const value = item as Position; return [["Code", value.code], ["Department / Functional Area", value.department_name ?? "Not assigned"], ["Description", value.description || "Not provided"]]; } if (kind === "grades") { const value = item as Grade; return [["Code", value.code], ["Level", String(value.level ?? "Not set")], ["Description", value.description || "Not provided"]]; } const value = item as Location; return [["Code", value.code], ["Address", value.address || "Not provided"], ["City", value.city || "Not provided"], ["Country", countryLabel(value.country)], ["Time zone", value.timezone || "Same as the institution"], ["Work arrangement", value.is_remote ? "Remote or hybrid" : "On site"]]; }
 
 export function OrganizationResourceList({ kind }: { kind: OrganizationResourceKind }) {
   const [query, setQuery] = useState("");
@@ -91,14 +91,14 @@ export function OrganizationResourceList({ kind }: { kind: OrganizationResourceK
                 <span className="min-w-0">
                   <span className="block truncate font-semibold text-ink-strong group-hover:text-primary-ink">{nameOf(record)}</span>
                   {kind === "positions" && (record as Position).department_name && <span className="block truncate text-caption text-ink-muted">{(record as Position).department_name}</span>}
-                  {kind === "departments / functional areas" && (record as Department).parent_name && <span className="block truncate text-caption text-ink-muted">Part of {(record as Department).parent_name}</span>}
+                  {kind === "departments" && (record as Department).parent_name && <span className="block truncate text-caption text-ink-muted">Part of {(record as Department).parent_name}</span>}
                   {kind === "locations" && (record as Location).city && <span className="block truncate text-caption text-ink-muted">{[(record as Location).city, (record as Location).is_remote ? "Remote or hybrid" : null].filter(Boolean).join(" · ")}</span>}
                 </span>
               </Link>
             ),
           },
           { key: "code", header: "Code", sortValue: (record) => record.code, cell: (record) => <span className="font-mono text-support">{record.code}</span> },
-          ...(kind === "departments / functional areas" ? [{ key: "head", header: "Head", hideBelow: "md" as const, sortValue: (record: Resource) => (record as Department).head_name ?? "", cell: (record: Resource) => (record as Department).head_name ?? <span className="text-ink-muted">Not assigned</span> }] : []),
+          ...(kind === "departments" ? [{ key: "head", header: "Head", hideBelow: "md" as const, sortValue: (record: Resource) => (record as Department).head_name ?? "", cell: (record: Resource) => (record as Department).head_name ?? <span className="text-ink-muted">Not assigned</span> }] : []),
           { key: "status", header: "Status", cell: (record) => <StatusBadge status={record.is_active ? "ACTIVE" : "INACTIVE"} size="sm" /> },
           { key: "open", header: <span className="sr-only">Open</span>, cell: (record) => <Link href={`/hr/${kind}/${record.id}`} aria-label={`Open ${nameOf(record)}`} className="flex justify-end text-ink-subtle hover:text-ink-strong"><ChevronRight className="h-4 w-4" /></Link> },
         ]}
@@ -168,7 +168,7 @@ export function OrganizationResourceDetail({ kind, id }: { kind: OrganizationRes
           ))}
         </dl>
       </Card>
-      {kind === "departments / functional areas" && <DepartmentHeadCard department={item as Department} onSaved={reload} />}
+      {kind === "departments" && <DepartmentHeadCard department={item as Department} onSaved={reload} />}
     </div>
   );
 }

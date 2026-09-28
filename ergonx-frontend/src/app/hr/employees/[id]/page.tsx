@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   Building2,
@@ -12,6 +12,10 @@ import {
   Contact,
   FileText,
   History,
+  Lock,
+  LogOut,
+  PauseCircle,
+  PlayCircle,
   Link2,
   Mail,
   MapPin,
@@ -419,6 +423,7 @@ function SectionCard({
 
 export default function EmployeeDetailPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const searchParams = useSearchParams();
   const editMode = searchParams.get("edit") === "true";
   const [employee, setEmployee] = useState<EmployeeView | null>(null);
@@ -1096,14 +1101,25 @@ export default function EmployeeDetailPage() {
                 label="More employee actions"
                 trigger={(props) => <Button {...props} size="lg" variant="secondary" leadingIcon={<MoreVertical className="h-4 w-4" />}>More</Button>}
               >
-                {(close) => (
-                  <div className="p-1.5">
-                    <MenuItem icon={<BriefcaseBusiness />} onSelect={() => { close(); openEmploymentChange(); }}>Change assignment</MenuItem>
-                    <MenuItem icon={<History />} onSelect={() => { close(); setTab("overview"); window.setTimeout(() => document.getElementById("employment-history")?.scrollIntoView({ behavior: "smooth" }), 0); }}>Employment history</MenuItem>
-                    <MenuItem icon={<UserCog />} onSelect={() => { close(); setTab("overview"); window.setTimeout(() => document.getElementById("onboarding-offboarding")?.scrollIntoView({ behavior: "smooth" }), 0); }}>Onboarding &amp; offboarding</MenuItem>
-                    <MenuItem icon={<Printer />} onSelect={() => { close(); window.print(); }}>Print record</MenuItem>
-                  </div>
-                )}
+                {(close) => {
+                  // Concept "Record actions and lifecycle states": the menu adapts to the record's state.
+                  const terminated = employee.status === "TERMINATED";
+                  const offboarding = lifecycle?.offboarding?.status === "IN_PROGRESS";
+                  return (
+                    <div className="p-1.5">
+                      <MenuItem icon={<Pencil />} disabled={terminated} description={terminated ? "Terminated records are read-only" : undefined} onSelect={() => { close(); startEditing(); }}>Edit</MenuItem>
+                      {employee.status !== "ACTIVE" && !terminated && <MenuItem icon={<PlayCircle />} onSelect={() => { close(); setPendingStatus("ACTIVE"); }}>Activate</MenuItem>}
+                      {employee.status === "ACTIVE" && <MenuItem icon={<PauseCircle />} onSelect={() => { close(); setPendingStatus("INACTIVE"); }}>Deactivate</MenuItem>}
+                      <MenuItem icon={<LogOut />} disabled={terminated || offboarding} description={offboarding ? "Offboarding already in progress" : undefined} onSelect={() => { close(); void runLifecycleAction("offboarding-start"); }}>Offboard</MenuItem>
+                      <div className="my-1 border-t border-line-soft" />
+                      <MenuItem icon={<BriefcaseBusiness />} disabled={terminated} onSelect={() => { close(); openEmploymentChange(); }}>Change assignment</MenuItem>
+                      <MenuItem icon={<UserCog />} onSelect={() => { close(); setTab("overview"); window.setTimeout(() => document.getElementById("onboarding-offboarding")?.scrollIntoView({ behavior: "smooth" }), 0); }}>Onboarding &amp; offboarding</MenuItem>
+                      <div className="my-1 border-t border-line-soft" />
+                      <MenuItem icon={<History />} onSelect={() => { close(); router.push(`/records/employee/${employee.id}`); }}>View history</MenuItem>
+                      <MenuItem icon={<Printer />} onSelect={() => { close(); window.print(); }}>Export / print record</MenuItem>
+                    </div>
+                  );
+                }}
               </Menu>
               <Menu
                 label="Change employee status"
@@ -1206,6 +1222,16 @@ export default function EmployeeDetailPage() {
                 </div>
 
                 <div className="space-y-5">
+                  <ProfileCard title="Record Lifecycle" icon={History} badge={<StatusBadge status={employee.status} size="sm" />}>
+                    <p className="flex gap-2 rounded-lg bg-success-soft/60 px-3 py-2 text-caption text-ink">{employee.status === "TERMINATED" ? <Lock className="h-4 w-4 shrink-0 text-ink-muted" aria-hidden="true" /> : null}This employee record is retained for payroll, attendance, leave and audit history, even after deactivation or exit, in line with the data retention policy.</p>
+                    <ol className="mt-3 space-y-3 border-l-2 border-line-soft pl-4 text-sm">
+                      {lifecycle?.offboarding && lifecycle.offboarding.status !== "NOT_STARTED" && <li className="relative"><span aria-hidden="true" className="absolute -left-[1.4rem] top-1 h-3 w-3 rounded-full bg-warning" /><span className="font-semibold">Offboarding</span> <span className="text-ink-muted">{humanizeEnum(lifecycle.offboarding.status)}</span></li>}
+                      <li className="relative"><span aria-hidden="true" className="absolute -left-[1.4rem] top-1 h-3 w-3 rounded-full bg-success" /><span className="font-semibold">{humanizeEnum(employee.status)}</span> <span className="text-ink-muted">{formatDate(serviceStart)} – Present</span><span className="block text-caption text-ink-muted">Employee is currently {humanizeEnum(employee.status).toLowerCase()}</span></li>
+                      <li className="relative"><span aria-hidden="true" className="absolute -left-[1.4rem] top-1 h-3 w-3 rounded-full bg-ink-subtle" /><span className="font-semibold">Hired</span> <span className="text-ink-muted">{formatDate(serviceStart)}</span><span className="block text-caption text-ink-muted">Employee record created</span></li>
+                    </ol>
+                    <Link href={`/records/employee/${employee.id}`} className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-primary-ink hover:underline">View full history<ChevronRight className="h-4 w-4" aria-hidden="true" /></Link>
+                  </ProfileCard>
+
                   <ProfileCard title="Employment Status" icon={UserRound} badge={<StatusBadge status={employee.status} size="sm" />}>
                     <dl className="space-y-3">
                       <ProfileRow label="Status" value={humanizeEnum(employee.status)} />

@@ -528,7 +528,9 @@ def test_accounting_openapi_is_operation_level_and_matches_action_shapes():
                 assert "permission" in operation["description"]
                 assert operation["x-error-codes"]
     # +6: account balances/activity, journal context/notes/attachments/attachment download.
-    assert len(operations) == 99
+    # +9: vendor bill reject/revise/hold/release/schedule-payment/context/summary/attachments/download.
+    # +10: invoice hold/release/send/reminders (get+post)/reminder update/context/summary/attachments/download.
+    assert len(operations) == 121
 
     for action_name in ("submit", "approve", "post", "void"):
         operation = schema["paths"][

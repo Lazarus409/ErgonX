@@ -292,7 +292,7 @@ function ApplicationView({ candidateId, applicationId, onSwitch }: { candidateId
       )}
 
       {tab === "activity" && (
-        <Panel icon={Clock3} title="Activity" description="Updates, comments and actions related to this candidate.">
+        <Panel icon={Clock3} title="Activity" description="Updates, comments and actions related to this candidate." action={<Link href={`/records/application/${application.id}`} className="text-sm font-semibold text-primary-ink hover:underline">History &amp; lineage →</Link>}>
           <ActivityList entries={overview.activity} />
         </Panel>
       )}

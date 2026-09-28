@@ -69,10 +69,3 @@ uncommitted `.env.production` file. Set `EMAIL_DELIVERY_ENABLED=true`, then
 restart the backend container. Never use the mailbox's normal password. If
 delivery is disabled or fails, the Super Admin workspace clearly requires
 manual secure-link sharing.
-
-On Render, set the same values on the `ergonx-api` service (Environment tab):
-`EMAIL_DELIVERY_ENABLED=true`, `EMAIL_HOST=smtp.gmail.com`, `EMAIL_PORT=587`,
-`EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD` (the App Password),
-`DEFAULT_FROM_EMAIL` and `FRONTEND_PUBLIC_URL`, then redeploy. Approving an
-access request in the Super Admin console then emails the invitation link; the
-approve dialog shows beforehand whether email is on.

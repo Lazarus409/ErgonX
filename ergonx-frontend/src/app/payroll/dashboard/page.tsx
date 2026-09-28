@@ -95,7 +95,7 @@ export default function PayrollDashboardPage() {
         <ChartCard
           className="xl:col-span-2"
           title="Cost by department / functional area"
-          description={costByDepartment.period ? `Gross pay by current department, ${costByDepartment.period}.` : "Gross pay by current department / functional area for the latest finalized run."}
+          description={costByDepartment.period ? `Gross pay by current department / functional area, ${costByDepartment.period}.` : "Gross pay by current department / functional area for the latest finalized run."}
           accent="payroll"
           icon={Building2}
           loading={initial}

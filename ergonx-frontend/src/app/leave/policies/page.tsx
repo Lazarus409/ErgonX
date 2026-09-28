@@ -300,7 +300,7 @@ export default function LeavePoliciesPage() {
   const toggleSelection = (
     field:
       | "employmentTypes"
-      | "departments / functional areas"
+      | "departments"
       | "grades"
       | "genders"
       | "locations",
@@ -948,7 +948,7 @@ export default function LeavePoliciesPage() {
                     title="Departments / Functional Areas"
                     values={form.departments}
                     options={departmentOptions}
-                    onToggle={(value) => toggleSelection("departments / functional areas", value)}
+                    onToggle={(value) => toggleSelection("departments", value)}
                     allText={eligibilityText(form.departments)}
                   />
 

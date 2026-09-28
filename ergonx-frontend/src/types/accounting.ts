@@ -86,7 +86,38 @@ export interface VendorBillLine {
   updated_at: string;
 }
 
-export interface VendorBill { id: string; vendor: string; bill_number: string; bill_date: string; due_date: string | null; currency: string; subtotal: string; tax_total: string; withholding_total: string; total_amount: string; amount_payable: string; status: string; accounting_period: string; journal_entry: string | null; lines: VendorBillLine[]; created_at: string; updated_at: string; }
+export interface VendorBill {
+  id: string; vendor: string; bill_number: string; bill_date: string; due_date: string | null; currency: string; subtotal: string; tax_total: string; withholding_total: string; total_amount: string; amount_payable: string; status: string; accounting_period: string; journal_entry: string | null; lines: VendorBillLine[]; created_at: string; updated_at: string;
+  vendor_name?: string; vendor_code?: string; amount_paid?: string;
+  submitted_by_name?: string | null; submitted_at?: string | null; approved_by_name?: string | null; approved_at?: string | null;
+  rejected_by_name?: string | null; rejected_at?: string | null; rejection_reason?: string;
+  on_hold?: boolean; hold_reason?: string; scheduled_payment_date?: string | null; scheduled_payment_method?: string;
+}
+
+export interface PayablesSummary {
+  range_months: number;
+  range_start: string;
+  counts: Record<"all" | "pending" | "approved" | "rejected" | "paid" | "on_hold", number>;
+  approval_queue: Array<{ id: string; vendor: string; bill_number: string; amount: string; currency: string; submitted_at: string | null; submitted_by: string | null; on_hold: boolean }>;
+  approval_queue_total: number;
+  active_vendors: number;
+  total_bills: number;
+  payments_made: number | null;
+  payments_amount: string | null;
+  amounts_restricted: boolean;
+}
+
+export interface RecordAttachment { id: string; original_filename: string; content_type: string; size_bytes: number; created_at: string }
+export interface RecordAuditEntry { id: string; action: string; actor: string; created_at: string; metadata: Record<string, unknown> }
+
+export interface VendorBillContext {
+  attachments: RecordAttachment[];
+  audit: RecordAuditEntry[];
+  payments: Array<{ id: string; payment_number: string; payment_date: string; amount: string; currency: string; payment_method: string; status: string }>;
+  related: Array<{ type: string; reference: string; status: string; href: string | null }>;
+  vendor: { id: string; name: string; code: string; email: string; phone: string; address: string; tax_identification_number: string };
+  institution: { name: string };
+}
 export interface Customer { id: string; customer_code: string; name: string; email: string; phone: string; address: string; country_code: string; tax_identification_number: string; tax_residency: string; taxpayer_type: string; vat_registered: boolean; withholding_category: string; statutory_profile_metadata: Record<string, unknown>; is_active: boolean; created_at: string; updated_at: string; }
 export interface InvoiceLine {
   id: string;
@@ -100,7 +131,36 @@ export interface InvoiceLine {
   updated_at: string;
 }
 
-export interface Invoice { id: string; customer: string; invoice_number: string; invoice_date: string; due_date: string | null; currency: string; subtotal: string; tax_total: string; total_amount: string; status: string; accounting_period: string; journal_entry: string | null; external_tax_reference: string | null; lines: InvoiceLine[]; created_at: string; updated_at: string; }
+export interface Invoice {
+  id: string; customer: string; invoice_number: string; invoice_date: string; due_date: string | null; currency: string; subtotal: string; tax_total: string; total_amount: string; status: string; accounting_period: string; journal_entry: string | null; external_tax_reference: string | null; lines: InvoiceLine[]; created_at: string; updated_at: string;
+  customer_name?: string; customer_code?: string; amount_received?: string; amount_due?: string; on_hold?: boolean; hold_reason?: string; sent_at?: string | null; sent_to?: string; notes?: string;
+}
+
+export interface InvoiceReminder { id: string; remind_on: string; channel: string; note: string; status: string; created_by: string; completed_at: string | null }
+
+export interface ReceivablesSummary {
+  range_months: number;
+  range_start: string;
+  outstanding: { count: number; amount: string | null };
+  due_this_week: { count: number; amount: string | null };
+  overdue: { count: number; amount: string | null };
+  exceptions: { count: number; on_hold: number; over_60_days: number };
+  counts: Record<"all" | "outstanding" | "overdue" | "paid" | "on_hold" | "drafts", number>;
+  upcoming_receipts: Array<{ id: string; customer: string; invoice_number: string; due_date: string; amount_due: string | null; currency: string }>;
+  amounts_restricted: boolean;
+  today: string;
+}
+
+export interface InvoiceContext {
+  attachments: RecordAttachment[];
+  audit: RecordAuditEntry[];
+  receipts: Array<{ id: string; receipt_number: string; receipt_date: string; amount: string; currency: string; payment_method: string; status: string }>;
+  reminders: InvoiceReminder[];
+  related: Array<{ type: string; reference: string; status: string; href: string | null }>;
+  collection: { days_outstanding: number | null; days_overdue: number };
+  customer: { id: string; name: string; code: string; email: string; phone: string; address: string; tax_identification_number: string };
+  institution: { name: string };
+}
 export interface BankAccount { id: string; name: string; bank_name: string; masked_account_number: string; currency: string; ledger_account: string; is_active: boolean; created_at: string; updated_at: string; }
 export interface Expense { id: string; expense_date: string; account: string; amount: string; currency: string; description: string; attachment: string | null; status: string; created_by: string; approved_by: string | null; journal_entry: string | null; created_at: string; updated_at: string; }
 export interface Payment { id: string; payment_number: string; payment_date: string; amount: string; currency: string; payment_method: string; bank_account: string | null; vendor_bill: string; journal_entry: string | null; status: string; created_at: string; updated_at: string; }
@@ -156,4 +216,128 @@ export interface JournalContext {
   attachments: Array<{ id: string; original_filename: string; content_type: string; size_bytes: number; created_at: string }>;
   audit: Array<{ id: string; action: string; actor: string; created_at: string; metadata: Record<string, unknown> }>;
   requires_approval: boolean;
+}
+
+export interface ReconciliationAccount {
+  id: string; name: string; bank_name: string; masked_account_number: string; currency: string;
+  state: "NOT_STARTED" | "IN_PROGRESS" | "RECONCILED" | "OVERDUE"; unmatched_lines: number;
+  latest_session: { id: string; period_start: string; period_end: string; status: string } | null;
+}
+
+export interface ReconciliationLine {
+  id: string; statement_date: string; description: string; reference: string; amount: string; currency: string; type: string; status: string;
+  journal_entry: string | null; journal_number: string | null; suggestion_count: number; exception_note: string;
+}
+
+export interface ReconciliationDetail {
+  session: { id: string; bank_account: string; bank_account_name: string; period_start: string; period_end: string; statement_opening_balance: string | null; statement_closing_balance: string | null; status: string; completed_at: string | null; last_imported_at: string | null; created_at: string; updated_at: string };
+  bank_account: { id: string; name: string; bank_name: string; masked_account_number: string; currency: string };
+  institution: { name: string };
+  started_by: string; completed_by: string | null; last_imported_by: string | null;
+  counts: { all: number; matched: number; unmatched: number; exceptions: number };
+  progress: number; matched_amount: string; unmatched_amount: string; book_balance: string; difference: string | null; can_complete: boolean;
+  lines: ReconciliationLine[];
+  import_result?: { created: number; skipped: number; errors: string[] };
+}
+
+export interface ReconciliationSuggestion { id: string; journal_number: string; entry_date: string; description: string; source: string }
+
+export const BUDGET_CATEGORIES: Array<[string, string]> = [["PERSONNEL", "Personnel"], ["OPERATING", "Operating expenses"], ["SUPPLIES", "Supplies & materials"], ["TRAVEL", "Travel"], ["CAPITAL", "Capital equipment"], ["TRANSFERS", "Transfers"], ["OTHER", "Other"]];
+export const BUDGET_TYPES: Array<[string, string]> = [["OPERATING", "Operating"], ["CAPITAL", "Capital"], ["PROJECT", "Project"]];
+
+export interface BudgetLineRecord { id?: string; category: string; account: string | null; account_code?: string | null; account_name?: string | null; description: string; initiative: string; allocated: string }
+export interface BudgetTotals { allocated: string; committed: string; actual: string; remaining: string; variance: string; health?: string }
+
+export interface BudgetRecord {
+  id: string; code: string; name: string; fiscal_year: string; fiscal_year_name: string; period_start: string; period_end: string;
+  department: string | null; department_name: string | null; budget_type: string; owner: string | null; owner_name: string | null;
+  description: string; status: string; version: number; lines: BudgetLineRecord[]; totals: BudgetTotals; approval_note: string;
+  submitted_at: string | null; approved_at: string | null; created_at: string; updated_at: string;
+}
+
+export type BudgetPayload = Pick<BudgetRecord, "name" | "fiscal_year" | "department" | "budget_type" | "owner" | "description"> & { lines: Array<Omit<BudgetLineRecord, "id" | "account_code" | "account_name">> };
+
+export interface BudgetOverview {
+  fiscal_years: Array<{ id: string; name: string; start_date: string; end_date: string }>;
+  fiscal_year: string | null;
+  folders: Array<{ id: string | null; name: string; count: number }>;
+  total_budgets: number;
+  categories: Array<{ category: string; label: string; allocated: string; committed: string; actual: string; variance: string; status: string }>;
+  initiatives: Array<{ initiative: string; allocated: string; actual: string; committed: string; budgets: string[] }>;
+  comparisons: Array<{ department: string; department_id: string | null; allocated: string; actual: string; committed: string; budgets: number }>;
+  budgets: Array<{ id: string; code: string; name: string; department: string; status: string; budget_type: string } & BudgetTotals>;
+  pending_approvals: Array<{ id: string; name: string; submitted_at: string | null }>;
+}
+
+export interface BudgetDetail {
+  budget: BudgetRecord;
+  totals: BudgetTotals;
+  health: string;
+  categories: Array<{ category: string; label: string; allocated: string; committed: string; actual: string; remaining: string; variance: string; percent_of_budget: string; lines: Array<{ id: string; description: string; initiative: string; account: string | null; allocated: string; committed: string; actual: string; remaining: string; variance: string }> }>;
+  initiatives: Array<{ initiative: string; allocated: string; actual: string; committed: string }>;
+  notes: Array<{ id: string; author: string; body: string; created_at: string }>;
+  attachments: RecordAttachment[];
+  people: { created_by: string | null; submitted_by: string | null; submitted_by_id: string | null; approved_by: string | null };
+  audit: RecordAuditEntry[];
+}
+
+export const REPORT_TYPES: Array<[string, string]> = [["BALANCE_SHEET", "Statement of financial position"], ["INCOME_STATEMENT", "Income statement"], ["TRIAL_BALANCE", "Trial balance"], ["AR_AGING", "Receivables aging"], ["AP_AGING", "Payables aging"], ["BUDGET_VS_ACTUAL", "Budget vs actual"]];
+export const REPORT_CATEGORIES: Array<[string, string]> = [["STANDARD", "Standard reports"], ["MANAGEMENT", "Management reports"], ["COMPLIANCE", "Compliance reports"], ["AUDIT", "Audit reports"], ["END_OF_PERIOD", "End of period"], ["CUSTOM", "Custom reports"]];
+export const REPORT_FREQUENCIES: Array<[string, string]> = [["NONE", "Not scheduled"], ["MONTHLY", "Monthly"], ["QUARTERLY", "Quarterly"], ["YEARLY", "Yearly"]];
+
+export interface SavedReport {
+  id: string; code: string; name: string; report_type: string; report_type_label: string; category: string; category_label: string; description: string;
+  parameters: Record<string, string | boolean>; owner: string | null; owner_name: string | null; allowed_roles: string[]; is_standard: boolean;
+  schedule_frequency: string; next_run_on: string | null; notes: string; status: string; last_run_at: string | null; created_at: string; updated_at: string;
+}
+
+export interface ReportResultRow { code: string; label: string; current: string; comparative: string | null; buckets?: Record<string, string> }
+export interface ReportResult {
+  title: string; subtitle: string; columns: string[]; bucket_columns?: string[];
+  sections: Array<{ title: string; rows: ReportResultRow[]; total: string; total_comparative: string | null; bucket_totals?: Record<string, string> }>;
+  totals: Array<{ label: string; current: string; comparative: string | null }>;
+  summary: Array<{ label: string; value: string }>;
+  checks: Record<string, boolean>;
+}
+export interface ReportRun { id: string; version: number; status: string; parameters: Record<string, string | boolean>; result: ReportResult; error: string; run_by: string | null; created_at: string; scheduled: boolean }
+export interface ReportRuns {
+  versions: Array<{ id: string; version: number; status: string; created_at: string; run_by: string | null; scheduled: boolean }>;
+  run: ReportRun | null;
+  audit: RecordAuditEntry[];
+  institution: { name: string; currency: string };
+  roles: string[];
+}
+
+/** Governed bulk actions (concept "Bulk actions and batch governance"). */
+export type BulkOperationGroup = "safe" | "workflow" | "restricted";
+export interface BulkOperationPreview {
+  code: string;
+  label: string;
+  description: string;
+  group: BulkOperationGroup;
+  needs_reason: boolean;
+  confirm_text: string;
+  available: boolean;
+  unavailable_reason: string;
+  eligible: string[];
+  ineligible: Array<{ id: string; reference: string; reason: string }>;
+  eligible_amount: string;
+}
+export interface BulkPreview { resource: string; count: number; total_amount: string; currencies: string[]; operations: BulkOperationPreview[] }
+export interface BatchJob {
+  id: string;
+  resource: string;
+  operation: string;
+  operation_label: string;
+  status: "QUEUED" | "PROCESSING" | "COMPLETED" | "PARTIAL" | "FAILED";
+  reason: string;
+  total_items: number;
+  succeeded: number;
+  failed: number;
+  total_amount: string;
+  results: Array<{ id: string; reference: string; status: "succeeded" | "failed"; message: string }>;
+  created_by: string | null;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
 }

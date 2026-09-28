@@ -39,7 +39,7 @@ function initialValues(kind: OrganizationResourceKind, record: Record_ | null): 
     const position = record as Position;
     return { ...values, name: position.title, department: position.department ?? "", description: position.description };
   }
-  if (kind === "departments / functional areas") {
+  if (kind === "departments") {
     const department = record as Department;
     return { ...values, name: department.name, parent: department.parent ?? "", description: department.description };
   }
@@ -54,14 +54,14 @@ function initialValues(kind: OrganizationResourceKind, record: Record_ | null): 
 function payload(kind: OrganizationResourceKind, values: Values): Record<string, unknown> {
   const common = { code: values.code.trim(), is_active: values.is_active };
   if (kind === "positions") return { ...common, title: values.name.trim(), department: values.department || null, description: values.description.trim() };
-  if (kind === "departments / functional areas") return { ...common, name: values.name.trim(), parent: values.parent || null, description: values.description.trim() };
+  if (kind === "departments") return { ...common, name: values.name.trim(), parent: values.parent || null, description: values.description.trim() };
   if (kind === "grades") return { ...common, name: values.name.trim(), level: values.level === "" ? null : Number(values.level), description: values.description.trim() };
   return { ...common, name: values.name.trim(), address: values.address.trim(), city: values.city.trim(), country: values.country, timezone: values.timezone, is_remote: values.is_remote };
 }
 
 export function saveOrganizationRecord(kind: OrganizationResourceKind, id: string | null, body: Record<string, unknown>): Promise<Record_> {
   switch (kind) {
-    case "departments / functional areas": return id ? organizationApi.updateDepartment(id, body as Partial<Department>) : organizationApi.createDepartment(body as Partial<Department>);
+    case "departments": return id ? organizationApi.updateDepartment(id, body as Partial<Department>) : organizationApi.createDepartment(body as Partial<Department>);
     case "positions": return id ? organizationApi.updatePosition(id, body as Partial<Position>) : organizationApi.createPosition(body as Partial<Position>);
     case "grades": return id ? organizationApi.updateGrade(id, body as Partial<Grade>) : organizationApi.createGrade(body as Partial<Grade>);
     case "locations": return id ? organizationApi.updateLocation(id, body as Partial<Location>) : organizationApi.createLocation(body as Partial<Location>);
@@ -77,7 +77,7 @@ export default function OrganizationForm({ kind, record, open, onClose, onSaved 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const needsDepartments = kind === "departments / functional areas" || kind === "positions";
+  const needsDepartments = kind === "departments" || kind === "positions";
   const loadDepartments = useCallback(() => (open && needsDepartments ? organizationApi.listDepartments({ page_size: 100, ordering: "name" }) : Promise.resolve(null)), [open, needsDepartments]);
   const { data: departments } = useApiResource(loadDepartments);
   const loadCatalogues = useCallback(() => (open && kind === "locations" ? institutionsApi.getLocaleCatalogues().catch(() => null) : Promise.resolve(null)), [open, kind]);
@@ -122,14 +122,14 @@ export default function OrganizationForm({ kind, record, open, onClose, onSaved 
     >
       <form id="organization-form" onSubmit={submit} className="space-y-4">
         {error && <Alert tone="danger">{error}</Alert>}
-        <Field label={kind === "positions" ? "Position title" : kind === "departments / functional areas" ? "Department / Functional Area or functional area" : "Name"} required error={fieldError("name")}>
-          <Input required autoFocus value={values.name} onChange={(event) => set("name", event.target.value)} maxLength={150} placeholder={kind === "departments / functional areas" ? "e.g. Customer Success" : kind === "positions" ? "e.g. Marketing Officer" : kind === "grades" ? "e.g. Senior Officer" : "e.g. Kumasi Branch"} />
+        <Field label={kind === "positions" ? "Position title" : kind === "departments" ? "Department / Functional Area" : "Name"} required error={fieldError("name")}>
+          <Input required autoFocus value={values.name} onChange={(event) => set("name", event.target.value)} maxLength={150} placeholder={kind === "departments" ? "e.g. Customer Success" : kind === "positions" ? "e.g. Marketing Officer" : kind === "grades" ? "e.g. Senior Officer" : "e.g. Kumasi Branch"} />
         </Field>
         <Field label="Code" optional helper={record ? undefined : "Generated automatically when left blank."} error={fieldError("code")}>
           <Input value={values.code} onChange={(event) => set("code", event.target.value.toUpperCase())} maxLength={50} className="font-mono" />
         </Field>
 
-        {kind === "departments / functional areas" && (
+        {kind === "departments" && (
           <Field label="Part of" optional helper="Choose a parent to make this a sub-department / functional area. Its head also covers sub-departments / functional areas." error={fieldError("parent")}>
             <Select value={values.parent} onChange={(event) => set("parent", event.target.value)}>
               <option value="">None (top level)</option>

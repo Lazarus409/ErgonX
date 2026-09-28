@@ -828,6 +828,7 @@ class VendorBill(TenantOwnedModel):
         DRAFT = "DRAFT", "Draft"
         PENDING = "PENDING", "Pending approval"
         APPROVED = "APPROVED", "Approved"
+        REJECTED = "REJECTED", "Rejected"
         POSTED = "POSTED", "Posted"
         PART_PAID = "PART_PAID", "Part paid"
         PAID = "PAID", "Paid"
@@ -863,6 +864,18 @@ class VendorBill(TenantOwnedModel):
         blank=True,
         related_name="vendor_bills",
     )
+    # Approval trail, rejection, hold and payment scheduling (concept "Accounts payable").
+    submitted_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="vendor_bills_submitted")
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="vendor_bills_approved")
+    approved_at = models.DateTimeField(null=True, blank=True)
+    rejected_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="vendor_bills_rejected")
+    rejected_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.TextField(blank=True)
+    on_hold = models.BooleanField(default=False)
+    hold_reason = models.TextField(blank=True)
+    scheduled_payment_date = models.DateField(null=True, blank=True)
+    scheduled_payment_method = models.CharField(max_length=16, blank=True)
 
     class Meta:
         ordering = ("-bill_date", "-created_at")
@@ -926,8 +939,13 @@ class VendorBill(TenantOwnedModel):
         if errors:
             raise ValidationError(errors)
 
+    # Operational flags that may change after posting without touching the ledger.
+    OPERATIONAL_FIELDS = {"on_hold", "hold_reason", "scheduled_payment_date", "scheduled_payment_method", "updated_at"}
+
     def save(self, *args, **kwargs):
-        if self.pk and VendorBill.objects.filter(
+        update_fields = kwargs.get("update_fields")
+        operational_only = update_fields is not None and set(update_fields) <= self.OPERATIONAL_FIELDS
+        if self.pk and not operational_only and VendorBill.objects.filter(
             pk=self.pk, status__in=(self.Status.POSTED, self.Status.PAID)
         ).exists():
             raise ValidationError({"status": "Posted or paid bills are immutable."})
@@ -1089,6 +1107,14 @@ class Invoice(AutoCodeMixin, TenantOwnedModel):
         JournalEntry, on_delete=models.PROTECT, null=True, blank=True, related_name="invoices"
     )
     external_tax_reference = models.CharField(max_length=100, null=True, blank=True)
+    # Collections (concept "Accounts receivable"): holds/disputes, delivery and notes.
+    on_hold = models.BooleanField(default=False)
+    hold_reason = models.TextField(blank=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    sent_to = models.EmailField(blank=True)
+    notes = models.TextField(blank=True, max_length=2000)
+
+    OPERATIONAL_FIELDS = {"on_hold", "hold_reason", "sent_at", "sent_to", "updated_at"}
 
     class Meta:
         ordering = ("-invoice_date", "-created_at")
@@ -1126,7 +1152,9 @@ class Invoice(AutoCodeMixin, TenantOwnedModel):
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
-        if self.pk and Invoice.objects.filter(
+        update_fields = kwargs.get("update_fields")
+        operational_only = update_fields is not None and set(update_fields) <= self.OPERATIONAL_FIELDS
+        if self.pk and not operational_only and Invoice.objects.filter(
             pk=self.pk, status__in=(self.Status.ISSUED, self.Status.PART_PAID, self.Status.PAID)
         ).exists():
             raise ValidationError({"status": "Issued or settled invoices are immutable."})
@@ -1457,6 +1485,7 @@ class BankStatementLine(TenantOwnedModel):
         related_name="bank_statement_lines_reconciled",
     )
     reconciled_at = models.DateTimeField(null=True, blank=True)
+    exception_note = models.TextField(blank=True)
 
     class Meta:
         ordering = ("-statement_date", "-created_at")
@@ -1636,3 +1665,262 @@ class JournalEntryNote(TenantOwnedModel):
     class Meta:
         ordering = ("-created_at",)
         indexes = [models.Index(fields=("institution", "journal_entry"))]
+
+
+class InvoiceReminder(TenantOwnedModel):
+    """A planned or completed collection follow-up on an invoice."""
+
+    class Channel(models.TextChoices):
+        EMAIL = "EMAIL", "Email"
+        PHONE = "PHONE", "Phone call"
+        LETTER = "LETTER", "Letter"
+        VISIT = "VISIT", "Visit"
+
+    class Status(models.TextChoices):
+        SCHEDULED = "SCHEDULED", "Scheduled"
+        DONE = "DONE", "Done"
+        CANCELLED = "CANCELLED", "Cancelled"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="invoice_reminders")
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name="reminders")
+    remind_on = models.DateField()
+    channel = models.CharField(max_length=8, choices=Channel.choices, default=Channel.EMAIL)
+    note = models.TextField(blank=True, max_length=2000)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.SCHEDULED)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="invoice_reminders")
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("remind_on", "created_at")
+        indexes = [models.Index(fields=("institution", "status", "remind_on"))]
+
+
+class BankReconciliationSession(TenantOwnedModel):
+    """One bank account reconciled against its statement for a period (concept "Bank reconciliation")."""
+
+    class Status(models.TextChoices):
+        IN_PROGRESS = "IN_PROGRESS", "In progress"
+        COMPLETED = "COMPLETED", "Reconciled"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="bank_reconciliation_sessions")
+    bank_account = models.ForeignKey(BankAccount, on_delete=models.PROTECT, related_name="reconciliation_sessions")
+    period_start = models.DateField()
+    period_end = models.DateField()
+    statement_opening_balance = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True)
+    statement_closing_balance = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True)
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.IN_PROGRESS)
+    started_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="reconciliations_started")
+    completed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="reconciliations_completed")
+    completed_at = models.DateTimeField(null=True, blank=True)
+    last_imported_at = models.DateTimeField(null=True, blank=True)
+    last_imported_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+
+    class Meta:
+        ordering = ("-period_end", "-created_at")
+        constraints = [
+            models.UniqueConstraint(fields=("bank_account", "period_start", "period_end"), name="uniq_reconciliation_session_period"),
+            models.CheckConstraint(condition=Q(period_end__gte=models.F("period_start")), name="reconciliation_session_period_valid"),
+        ]
+
+    def clean(self):
+        if self.bank_account_id and self.bank_account.institution_id != self.institution_id:
+            raise ValidationError({"bank_account": "Bank account belongs to another institution."})
+        if self.period_end and self.period_start and self.period_end < self.period_start:
+            raise ValidationError({"period_end": "Period end cannot precede its start."})
+
+
+class Budget(AutoCodeMixin, TenantOwnedModel):
+    """A departmental or institution-wide budget for a fiscal year (concept "Budgets")."""
+
+    auto_code_field = "code"
+    auto_code_prefix = "BUD"
+    auto_code_width = 4
+    auto_code_year_from = "today"
+
+    class BudgetType(models.TextChoices):
+        OPERATING = "OPERATING", "Operating"
+        CAPITAL = "CAPITAL", "Capital"
+        PROJECT = "PROJECT", "Project"
+
+    class Status(models.TextChoices):
+        DRAFT = "DRAFT", "Draft"
+        PENDING_APPROVAL = "PENDING_APPROVAL", "Pending approval"
+        APPROVED = "APPROVED", "Approved"
+        RETURNED = "RETURNED", "Changes requested"
+        CLOSED = "CLOSED", "Closed"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="budgets")
+    code = models.CharField(max_length=50, blank=True)
+    name = models.CharField(max_length=150)
+    fiscal_year = models.ForeignKey(FiscalYear, on_delete=models.PROTECT, related_name="budgets")
+    department = models.ForeignKey(Department, on_delete=models.PROTECT, null=True, blank=True, related_name="budgets")
+    budget_type = models.CharField(max_length=10, choices=BudgetType.choices, default=BudgetType.OPERATING)
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="budgets_owned")
+    description = models.TextField(blank=True, max_length=2000)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.DRAFT)
+    version = models.PositiveIntegerField(default=1)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="budgets_created")
+    submitted_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="budgets_submitted")
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="budgets_approved")
+    approved_at = models.DateTimeField(null=True, blank=True)
+    approval_note = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        constraints = [models.UniqueConstraint(fields=("institution", "code"), name="uniq_budget_code_per_institution")]
+        indexes = [models.Index(fields=("institution", "fiscal_year", "status"))]
+
+    def clean(self):
+        errors = {}
+        for name in ("fiscal_year", "department"):
+            obj = getattr(self, name, None)
+            if obj and obj.institution_id != self.institution_id:
+                errors[name] = "Referenced record must belong to the same institution."
+        if self.owner_id and not self.owner.memberships.filter(institution_id=self.institution_id, status="ACTIVE").exists():
+            errors["owner"] = "Owner must be an active institution member."
+        if errors:
+            raise ValidationError(errors)
+
+
+class BudgetLine(TenantOwnedModel):
+    class Category(models.TextChoices):
+        PERSONNEL = "PERSONNEL", "Personnel"
+        OPERATING = "OPERATING", "Operating expenses"
+        SUPPLIES = "SUPPLIES", "Supplies & materials"
+        TRAVEL = "TRAVEL", "Travel"
+        CAPITAL = "CAPITAL", "Capital equipment"
+        TRANSFERS = "TRANSFERS", "Transfers"
+        OTHER = "OTHER", "Other"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="budget_lines")
+    budget = models.ForeignKey(Budget, on_delete=models.CASCADE, related_name="lines")
+    category = models.CharField(max_length=10, choices=Category.choices)
+    account = models.ForeignKey(Account, on_delete=models.PROTECT, null=True, blank=True, related_name="budget_lines")
+    description = models.CharField(max_length=200, blank=True)
+    initiative = models.CharField(max_length=120, blank=True)
+    allocated = models.DecimalField(max_digits=20, decimal_places=2)
+
+    class Meta:
+        ordering = ("category", "created_at")
+        constraints = [models.CheckConstraint(condition=Q(allocated__gte=0), name="budget_line_allocated_nonnegative")]
+
+    def clean(self):
+        if self.account_id and self.account.institution_id != self.institution_id:
+            raise ValidationError({"account": "Account belongs to another institution."})
+        if self.account_id and self.account.account_type not in (Account.AccountType.EXPENSE, Account.AccountType.ASSET):
+            raise ValidationError({"account": "Budget lines track expense or capital (asset) accounts."})
+
+
+class BudgetNote(TenantOwnedModel):
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="budget_notes")
+    budget = models.ForeignKey(Budget, on_delete=models.CASCADE, related_name="notes")
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="budget_notes")
+    body = models.TextField(max_length=4000)
+
+    class Meta:
+        ordering = ("-created_at",)
+
+
+class FinancialReport(AutoCodeMixin, TenantOwnedModel):
+    """A saved financial report definition (concepts "Financial reports" and "Financial report detail")."""
+
+    auto_code_field = "code"
+    auto_code_prefix = "RPT"
+    auto_code_width = 4
+    auto_code_year_from = "today"
+
+    class ReportType(models.TextChoices):
+        BALANCE_SHEET = "BALANCE_SHEET", "Statement of financial position"
+        INCOME_STATEMENT = "INCOME_STATEMENT", "Income statement"
+        TRIAL_BALANCE = "TRIAL_BALANCE", "Trial balance"
+        AR_AGING = "AR_AGING", "Receivables aging"
+        AP_AGING = "AP_AGING", "Payables aging"
+        BUDGET_VS_ACTUAL = "BUDGET_VS_ACTUAL", "Budget vs actual"
+
+    class Category(models.TextChoices):
+        STANDARD = "STANDARD", "Standard reports"
+        MANAGEMENT = "MANAGEMENT", "Management reports"
+        COMPLIANCE = "COMPLIANCE", "Compliance reports"
+        AUDIT = "AUDIT", "Audit reports"
+        END_OF_PERIOD = "END_OF_PERIOD", "End of period"
+        CUSTOM = "CUSTOM", "Custom reports"
+
+    class Frequency(models.TextChoices):
+        NONE = "NONE", "Not scheduled"
+        MONTHLY = "MONTHLY", "Monthly"
+        QUARTERLY = "QUARTERLY", "Quarterly"
+        YEARLY = "YEARLY", "Yearly"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="financial_reports")
+    code = models.CharField(max_length=50, blank=True)
+    name = models.CharField(max_length=150)
+    report_type = models.CharField(max_length=20, choices=ReportType.choices)
+    category = models.CharField(max_length=16, choices=Category.choices, default=Category.CUSTOM)
+    description = models.TextField(blank=True, max_length=2000)
+    parameters = models.JSONField(default=dict, blank=True)
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="financial_reports_owned")
+    allowed_roles = models.JSONField(default=list, blank=True)
+    is_standard = models.BooleanField(default=False)
+    schedule_frequency = models.CharField(max_length=10, choices=Frequency.choices, default=Frequency.NONE)
+    next_run_on = models.DateField(null=True, blank=True)
+    notes = models.TextField(blank=True, max_length=4000)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+
+    class Meta:
+        ordering = ("name",)
+        constraints = [models.UniqueConstraint(fields=("institution", "code"), name="uniq_financial_report_code")]
+
+
+class FinancialReportRun(TenantOwnedModel):
+    class Status(models.TextChoices):
+        COMPLETED = "COMPLETED", "Completed"
+        FAILED = "FAILED", "Failed"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="financial_report_runs")
+    report = models.ForeignKey(FinancialReport, on_delete=models.CASCADE, related_name="runs")
+    version = models.PositiveIntegerField()
+    parameters = models.JSONField(default=dict, blank=True)
+    status = models.CharField(max_length=10, choices=Status.choices)
+    result = models.JSONField(default=dict, blank=True)
+    error = models.TextField(blank=True)
+    run_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    scheduled = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ("-created_at",)
+        constraints = [models.UniqueConstraint(fields=("report", "version"), name="uniq_financial_report_run_version")]
+
+
+class BatchJob(TenantOwnedModel):
+    """One governed bulk operation over many records (concept "Bulk actions and batch governance").
+
+    Bulk actions run the same service each record's own button uses, one record per savepoint,
+    so a failure on one record never rolls back the others and every change keeps its audit event.
+    """
+
+    class Status(models.TextChoices):
+        QUEUED = "QUEUED", "Queued"
+        PROCESSING = "PROCESSING", "Processing"
+        COMPLETED = "COMPLETED", "Completed"
+        PARTIAL = "PARTIAL", "Partial success"
+        FAILED = "FAILED", "Failed"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="batch_jobs")
+    resource = models.CharField(max_length=40)
+    operation = models.CharField(max_length=40)
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.QUEUED)
+    reason = models.CharField(max_length=500, blank=True)
+    total_items = models.PositiveIntegerField(default=0)
+    succeeded = models.PositiveIntegerField(default=0)
+    failed = models.PositiveIntegerField(default=0)
+    total_amount = models.DecimalField(max_digits=18, decimal_places=2, default=Decimal("0"))
+    results = models.JSONField(default=list, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="batch_jobs")
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        indexes = [models.Index(fields=("institution", "resource", "-created_at"))]

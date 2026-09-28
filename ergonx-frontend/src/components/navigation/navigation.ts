@@ -1,4 +1,5 @@
 import {
+  BarChart3,
   CalendarDays,
   CircleDollarSign,
   ClipboardCheck,
@@ -82,8 +83,12 @@ export const sharedRecordRoutes: Array<{ pattern: RegExp; anyPermissions: readon
   { pattern: /^\/hr\/employees\/(?!new$)[^/]+$/, anyPermissions: ["employee.view"], scopes: ["DEPARTMENT"] },
 ];
 
+/** Permissions that unlock at least one Insights section (`apps/dashboards/insights.py`). */
+export const INSIGHT_PERMISSIONS = ["dashboard.executive.view", "dashboard.hr.view", "dashboard.payroll.view", "dashboard.finance.view", "dashboard.leave.view", "dashboard.attendance.view", "candidate.view", "background_job.view"] as const;
+
 export const navigation: NavigationItem[] = [
   { label: "Home", href: "/", icon: House, permission: "home.view" },
+  { label: "Insights", href: "/insights", icon: BarChart3, anyPermissions: INSIGHT_PERMISSIONS, scopes: ["INSTITUTION"] },
   { label: "Executive Dashboard", href: "/dashboard", icon: LayoutDashboard, permission: "dashboard.executive.view" },
   {
     label: "My Department / Functional Area",
@@ -139,7 +144,7 @@ export const navigation: NavigationItem[] = [
   },
   {
     label: "Reports & Analytics",
-    href: "/reports/dashboard",
+    href: "/reports",
     icon: FileBarChart,
     module: "REPORTS",
     anyPermissions: moduleWorkspacePermissions.REPORTS,

@@ -24,6 +24,6 @@ export default function ModuleAccessGate({ module, anyPermissions = [], allPermi
 
   const workspace = canAccess({ module, anyPermissions, scopes }, context) && allPermissions.every(can);
   const sharedRecord = (!module || context.moduleEnabled(module)) && sharedRecordRoutes.some((route) => route.pattern.test(pathname) && canAccess(route, context));
-  if (!workspace && !sharedRecord) return <AccessDenied />;
+  if (!workspace && !sharedRecord) return <AccessDenied permission={[...allPermissions.filter((code) => !can(code)), ...anyPermissions][0]} />;
   return <>{children}</>;
 }

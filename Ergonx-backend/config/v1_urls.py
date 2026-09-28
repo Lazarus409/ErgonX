@@ -1,6 +1,7 @@
 from django.urls import include, path
 
-from apps.institutions.views import UniversalSearchView
+from apps.institutions.access import AccessRequestView
+from apps.institutions.views import UniversalSearchView, SearchEntriesView
 
 urlpatterns = [
     path("auth/", include("apps.accounts.urls")),
@@ -8,6 +9,8 @@ urlpatterns = [
     path("platform/", include("apps.accounts.platform_urls")),
     path("", include("apps.audit.urls")),
     path("search/", UniversalSearchView.as_view(), name="universal-search"),
+    path("search/entries/", SearchEntriesView.as_view(), name="search-entries"),
+    path("access-requests/", AccessRequestView.as_view(), name="access-requests"),
     path("", include("apps.organization.urls")),
     path("", include("apps.employees.urls")),
     path("", include("apps.leave.urls")),

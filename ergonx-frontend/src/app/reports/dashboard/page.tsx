@@ -1,13 +1,16 @@
 "use client";
 
 import { BarChart3, Briefcase, CalendarDays, ChevronRight, Clock3, Download, FileBarChart, ListTree, Receipt, Scale, Users, WalletCards, X, type LucideIcon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import ChartCard from "@/components/charts/ChartCard";
 import { BarsChart } from "@/components/charts/Charts";
 import { Button } from "@/components/ui/Button";
 import { DataTable, DataToolbar } from "@/components/ui/DataTable";
+import BackNavigation from "@/components/ui/BackNavigation";
 import ErrorState from "@/components/ui/ErrorState";
+import LoadingState from "@/components/ui/LoadingState";
 import EmptyState from "@/components/ui/EmptyState";
 import { Field, Input } from "@/components/ui/Field";
 import PageHeader from "@/components/ui/PageHeader";
@@ -118,17 +121,23 @@ function ReportDrillDown({ report, title, group, filters, onClose }: { report: R
   );
 }
 
+/** Report viewer; `?report=<id>&status=&date_from=&date_to=` opens a saved library report. */
 export default function ReportsDashboardPage() {
+  return <Suspense fallback={<LoadingState variant="table" />}><ReportsDashboard /></Suspense>;
+}
+
+function ReportsDashboard() {
+  const params = useSearchParams();
   const { institution, user } = useAuth();
   const visibleReports = useMemo(() => {
     const granted = new Set(user?.permissions ?? []);
     const has = (code: string) => granted.has("*") || granted.has(code);
     return reports.filter((item) => hasModule(institution?.enabledModules, item.module) && has("report.view") && (has("report.all") || item.permissions.every((requirement) => requirement.some(has))));
   }, [institution?.enabledModules, user?.permissions]);
-  const [selected, setSelected] = useState<ReportId>("workforce-cost");
-  const [status, setStatus] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [selected, setSelected] = useState<ReportId>(() => reports.find((item) => item.id === params.get("report"))?.id ?? "workforce-cost");
+  const [status, setStatus] = useState(() => params.get("status") ?? "");
+  const [dateFrom, setDateFrom] = useState(() => params.get("date_from") ?? "");
+  const [dateTo, setDateTo] = useState(() => params.get("date_to") ?? "");
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [drill, setDrill] = useState<string[] | null>(null);
@@ -163,9 +172,10 @@ export default function ReportsDashboardPage() {
     : [];
   return (
     <div className="mx-auto max-w-7xl space-y-6">
+      <BackNavigation fallback="/reports" label="Back to Reports & Analytics" />
       <PageHeader
         eyebrow="Reports & Analytics"
-        title="Reports & analytics"
+        title="Report viewer"
         description="Summaries of the areas your role can see. Download any report as CSV."
         icon={BarChart3}
         accent="reports"

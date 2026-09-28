@@ -2,7 +2,7 @@ import { cx } from "@/lib/cx";
 
 /** Shimmer placeholder block. Decorative: hidden from assistive technology. */
 export function Skeleton({ className }: { className?: string }) {
-  return <span aria-hidden="true" className={cx("skeleton block rounded-lg", className)} />;
+  return <span aria-hidden="true" className={cx("skeleton block", !className?.includes("rounded") && "rounded-lg", className)} />;
 }
 
 function Frame({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
@@ -76,6 +76,22 @@ export function TableSkeleton({ rows = 6, columns = 5, label = "Loading records"
             {Array.from({ length: columns }, (_, column) => <Skeleton key={column} className={cx("h-4", column === 0 ? "w-4/5" : "w-3/5")} />)}
           </div>
         ))}
+      </div>
+    </Frame>
+  );
+}
+
+/** Concept "Loading state": a named list load with avatar rows. */
+export function ListSkeleton({ rows = 4, label = "Loading records", hint = "Please wait while we fetch the latest data." }: { rows?: number; label?: string; hint?: string }) {
+  return (
+    <Frame label={label} className="rounded-2xl border border-line bg-surface p-5 shadow-elevation-1">
+      <div className="flex items-center gap-3" aria-hidden="true">
+        <Skeleton className="h-12 w-12 rounded-full" />
+        <div><p className="font-bold text-headline">{label}…</p><p className="text-support text-ink-muted">{hint}</p></div>
+      </div>
+      <div className="mt-5 grid grid-cols-[2.5rem_2fr_1fr_1fr_1fr] gap-x-4 gap-y-3" aria-hidden="true">
+        <Skeleton className="col-span-2 h-4" /><Skeleton className="h-4" /><Skeleton className="h-4" /><Skeleton className="h-4" />
+        {Array.from({ length: rows }, (_, row) => [<Skeleton key={`a${row}`} className="h-9 w-9 rounded-full" />, <Skeleton key={`b${row}`} className="h-3.5 self-center" />, <Skeleton key={`c${row}`} className="h-3.5 w-4/5 self-center" />, <Skeleton key={`d${row}`} className="h-3.5 w-3/5 self-center" />, <Skeleton key={`e${row}`} className="h-3.5 w-3/5 self-center" />])}
       </div>
     </Frame>
   );

@@ -91,6 +91,10 @@ export async function handler(request: NextRequest, context: RouteContext): Prom
     return clearSession(request, jsonResponse({ success: true, data: { logged_out: true } }, 200));
   }
 
+  // Accepting an Institution Admin invitation creates the account and returns
+  // its token pair, so it signs the browser in exactly like auth/login.
+  const isInvitationAcceptance = request.method === "POST" && /^auth\/institution-admin-invitations\/[^/]+$/.test(route);
+
   const headers = new Headers();
   const acceptedHeaders = ["accept", "content-type", "x-institution-id"];
   for (const name of acceptedHeaders) {
@@ -99,11 +103,13 @@ export async function handler(request: NextRequest, context: RouteContext): Prom
   }
   headers.set("accept", headers.get("accept") || "application/json");
 
-  const access = request.cookies.get(ACCESS_COOKIE)?.value;
+  // The acceptance is anonymous; a stale or expired cookie from an earlier
+  // session must not be sent, or JWT authentication rejects the request.
+  const access = isInvitationAcceptance ? undefined : request.cookies.get(ACCESS_COOKIE)?.value;
   if (access) headers.set("authorization", `Bearer ${access}`);
 
   let body: BodyInit | undefined;
-  let remember = request.cookies.get(REMEMBER_COOKIE)?.value === "1";
+  let remember = !isInvitationAcceptance && request.cookies.get(REMEMBER_COOKIE)?.value === "1";
   if (!["GET", "HEAD"].includes(request.method)) {
     if (route === "auth/login") {
       // "Keep me signed in" only decides cookie lifetimes here; the API never sees it.
@@ -145,7 +151,7 @@ export async function handler(request: NextRequest, context: RouteContext): Prom
   }
   responseHeaders.set("Cache-Control", "no-store");
 
-  const isTokenRoute = route === "auth/login" || route === "auth/refresh";
+  const isTokenRoute = route === "auth/login" || route === "auth/refresh" || isInvitationAcceptance;
   if (isTokenRoute && upstream.headers.get("content-type")?.includes("application/json")) {
     const tokenResult = safeAuthPayload(await upstream.json());
     const response = NextResponse.json(tokenResult.body, { status: upstream.status, headers: responseHeaders });

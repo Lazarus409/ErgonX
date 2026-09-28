@@ -30,9 +30,19 @@ export default function CreateOrganizationPage() {
     setSaving(true); setSaveError(null);
     try {
       await authApi.acceptInstitutionAdminInvitation(token, { ...form, institution_name: form.institution_name.trim(), first_name: form.first_name.trim(), last_name: form.last_name.trim(), country_code: "GH", default_currency: "GHS", timezone: "Africa/Accra" });
+    } catch (caught) {
+      setSaveError(getApiErrorMessage(caught));
+      setSaving(false);
+      return;
+    }
+    // The organization exists now and the invitation is spent, so a failed
+    // session load must not look like a failed create; signing in recovers.
+    try {
       await refreshSession();
       router.replace("/onboarding");
-    } catch (caught) { setSaveError(getApiErrorMessage(caught)); } finally { setSaving(false); }
+    } catch {
+      router.replace("/login?next=%2Fonboarding");
+    }
   };
 
   return (

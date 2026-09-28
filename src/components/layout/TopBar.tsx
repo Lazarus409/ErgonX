@@ -32,6 +32,7 @@ import { Avatar } from "@/components/ui/Card";
 import { cx } from "@/lib/cx";
 import { accentForPath, moduleAccents } from "@/lib/moduleTheme";
 import { formatDateTime } from "@/lib/format";
+import { imageContentUrl } from "@/lib/api/images";
 
 interface TopBarProps {
   onOpenSidebar?: () => void;
@@ -288,18 +289,12 @@ export default function TopBar({ onOpenSidebar }: TopBarProps) {
 
         <button
           type="button"
-          role="switch"
-          aria-checked={theme === "dark"}
           onClick={toggleTheme}
-          className="hidden items-center gap-2 rounded-lg px-2 py-2 text-ink-muted transition-colors hover:bg-surface-hover sm:inline-flex"
+          className={cx("hidden sm:inline-flex", iconButton, theme === "dark" && "bg-surface-hover text-ink-strong")}
           title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-          aria-label="Dark mode"
+          aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
         >
-          <Sun className={cx("h-[18px] w-[18px]", theme !== "dark" && "text-ink-strong")} aria-hidden="true" />
-          <span className={cx("relative h-5 w-9 rounded-full transition-colors", theme === "dark" ? "bg-primary" : "bg-line-strong")} aria-hidden="true">
-            <span className={cx("absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-elevation-1 transition-transform", theme === "dark" ? "translate-x-[18px]" : "translate-x-0.5")} />
-          </span>
-          <Moon className={cx("h-[18px] w-[18px]", theme === "dark" && "text-ink-strong")} aria-hidden="true" />
+          <Moon className="h-5 w-5" aria-hidden="true" />
         </button>
 
         {/* Notifications */}
@@ -401,7 +396,7 @@ export default function TopBar({ onOpenSidebar }: TopBarProps) {
             aria-haspopup="menu"
             aria-expanded={profileOpen}
           >
-            <Avatar name={fullName} size="md" solid />
+            <Avatar name={fullName} src={user?.profileImageId ? imageContentUrl(user.profileImageId) : null} size="md" solid />
             <span className="hidden min-w-0 text-left leading-tight xl:block">
               <span className="block max-w-40 truncate text-sm font-bold text-ink-strong">{fullName}</span>
               <span className="block max-w-40 truncate text-caption text-heading-support">{user?.role ? user.role.replaceAll("_", " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase()) : ""}</span>
@@ -412,7 +407,7 @@ export default function TopBar({ onOpenSidebar }: TopBarProps) {
           {profileOpen && (
             <div role="menu" aria-label="Profile menu" className="absolute right-0 top-14 z-50 w-[min(calc(100vw-2rem),20rem)] origin-top-right animate-pop-in overflow-hidden rounded-2xl border border-line bg-surface shadow-overlay">
               <div className="flex items-center gap-3 border-b border-line-soft p-4">
-                <Avatar name={fullName} size="md" />
+                <Avatar name={fullName} src={user?.profileImageId ? imageContentUrl(user.profileImageId) : null} size="md" />
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-ink-strong">{fullName}</p>
                   <p className="truncate text-caption text-ink-muted">{user?.email ?? ""}</p>

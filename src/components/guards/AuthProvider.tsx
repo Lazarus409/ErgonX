@@ -101,6 +101,7 @@ async function loadLiveSession(): Promise<{
     email: context.user.email,
     firstName: context.user.first_name,
     lastName: context.user.last_name,
+    profileImageId: context.user.profile_image_id ?? null,
     role: context.active_membership.role_code,
     institutionId: institution.id,
     permissions: context.effective_permissions,

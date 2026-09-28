@@ -42,6 +42,8 @@ export interface SessionUser {
   /** Read-only role: the UI shows no create, edit or approve controls. */
   readOnly?: boolean;
   isPlatformAdmin?: boolean;
+  /** Uploaded profile image for the active institution. */
+  profileImageId?: string | null;
   institution?: SessionInstitution;
 }
 

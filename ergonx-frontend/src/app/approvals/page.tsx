@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, GitPullRequest, History, X } from "lucide-react";
+import { Check, CheckCircle2, GitPullRequest, History, X } from "lucide-react";
 import { useCallback, useState } from "react";
 
 import { Timeline } from "@/components/charts/Visuals";
@@ -33,12 +33,24 @@ export default function ApprovalsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Workflow" title="Approvals" description="Review and action backend-managed approval requests." icon={GitPullRequest} accent="brand" meta={<span className="text-support text-ink-muted"><strong className="text-ink-strong tabular-nums">{pending}</strong> pending decision{pending === 1 ? "" : "s"}</span>} />
+      <PageHeader
+        eyebrow="Workflow"
+        title="Approvals"
+        description="Review and action requests as they move through your institution's approval workflows."
+        icon={GitPullRequest}
+        accent="brand"
+        meta={
+          <span className={pending > 0 ? "inline-flex items-center gap-2 rounded-full bg-warning-soft px-3 py-1 text-support font-semibold text-warning-ink" : "inline-flex items-center gap-2 rounded-full bg-success-soft px-3 py-1 text-support font-semibold text-success-ink"}>
+            {pending === 0 && <CheckCircle2 className="h-4 w-4" aria-hidden="true" />}
+            <strong className="tabular-nums">{pending}</strong> pending decision{pending === 1 ? "" : "s"}
+          </span>
+        }
+      />
       {actionError && <ErrorState variant="inline" title="Approval action failed" message={actionError} onRetry={reload} />}
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-        <Card title="Approval requests" description="Requests submitted by governed ERP workflows." icon={GitPullRequest} accent="brand" padding="none" className="[&>div:first-child]:px-5 [&>div:first-child]:pt-5">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(20rem,0.85fr)]">
+        <Card title="Approval requests" description="Requests that need your decision appear here." icon={GitPullRequest} accent="brand" padding="none" className="min-h-[22rem] [&>div:first-child]:mb-0 [&>div:first-child]:border-b [&>div:first-child]:border-line-soft [&>div:first-child]:px-5 [&>div:first-child]:py-5 sm:[&>div:first-child]:px-6">
           {data.requests.length === 0 ? (
-            <EmptyState size="compact" icon={GitPullRequest} title="No approval requests" description="Requests submitted by ERP workflows will appear here." />
+            <EmptyState size="compact" icon={CheckCircle2} title="Your approval queue is clear" description="New requests from leave, payroll, recruitment and other workflows will appear here." className="min-h-[15rem] justify-center px-6" />
           ) : (
             <ul className="divide-y divide-line-soft border-t border-line-soft">
               {data.requests.map((request) => (
@@ -60,11 +72,11 @@ export default function ApprovalsPage() {
             </ul>
           )}
         </Card>
-        <Card title="Recent decisions" description="The last ten recorded approval actions." icon={History} accent="brand">
+        <Card title="Recent decisions" description="A record of the latest ten approval actions." icon={History} accent="brand" padding="none" className="min-h-[22rem] [&>div:first-child]:mb-0 [&>div:first-child]:border-b [&>div:first-child]:border-line-soft [&>div:first-child]:px-5 [&>div:first-child]:py-5 sm:[&>div:first-child]:px-6">
           {data.actions.length === 0 ? (
-            <p className="text-support text-ink-muted">No approval actions recorded.</p>
+            <EmptyState size="compact" icon={History} title="No decisions recorded yet" description="Approved, rejected and cancelled requests will be listed here." className="min-h-[15rem] justify-center px-6" />
           ) : (
-            <Timeline items={data.actions.slice(0, 10).map((item) => ({ id: item.id, title: humanizeEnum(item.action), time: formatDateTime(item.acted_at), description: item.comments || undefined, tone: /APPROV/i.test(item.action) ? "success" as const : /REJECT|CANCEL/i.test(item.action) ? "danger" as const : "neutral" as const }))} />
+            <div className="p-5 sm:p-6"><Timeline items={data.actions.slice(0, 10).map((item) => ({ id: item.id, title: humanizeEnum(item.action), time: formatDateTime(item.acted_at), description: item.comments || undefined, tone: /APPROV/i.test(item.action) ? "success" as const : /REJECT|CANCEL/i.test(item.action) ? "danger" as const : "neutral" as const }))} /></div>
           )}
         </Card>
       </div>

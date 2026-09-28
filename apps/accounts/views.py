@@ -547,7 +547,7 @@ class AuthBootstrapView(APIView):
             "default_landing": landing,
             "available_dashboards": sorted(dashboards),
         }
-        return Response(AuthBootstrapSerializer(payload).data)
+        return Response(AuthBootstrapSerializer(payload, context={"institution": request.institution}).data)
 
 
 @extend_schema(responses={200: OpenApiTypes.OBJECT, 201: OpenApiTypes.OBJECT})

@@ -13,6 +13,7 @@ import hmac
 import struct
 import time
 from apps.accounts.models import EmailOTPChallenge, InstitutionAccessRequest, InstitutionAdminInvitation, User, UserMFA
+from apps.documents.models import ImageAsset
 from apps.accounts.emails import send_email_mfa_code
 from django.utils.crypto import salted_hmac
 
@@ -84,9 +85,27 @@ class EmailOTPRequired(AuthenticationFailed):
 
 class UserSerializer(serializers.ModelSerializer):
     is_platform_admin = serializers.SerializerMethodField()
+    profile_image_id = serializers.SerializerMethodField()
 
     def get_is_platform_admin(self, user) -> bool:
         return bool(user.is_platform_admin or user.is_superuser)
+
+    def get_profile_image_id(self, user) -> str | None:
+        """Return this user's active avatar within the selected institution."""
+        institution = self.context.get("institution")
+        if institution is None:
+            return None
+        image_id = (
+            ImageAsset.objects.filter(
+                institution=institution,
+                owner_type=ImageAsset.OwnerType.USER,
+                owner_id=user.id,
+                is_active=True,
+            )
+            .values_list("id", flat=True)
+            .first()
+        )
+        return str(image_id) if image_id else None
 
     class Meta:
         model = User
@@ -96,6 +115,7 @@ class UserSerializer(serializers.ModelSerializer):
             "first_name",
             "last_name",
             "is_platform_admin",
+            "profile_image_id",
             "created_at",
         )
         read_only_fields = fields

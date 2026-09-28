@@ -164,6 +164,79 @@ def _payroll_between(institution, start, end):
     ).aggregate(total=Sum("gross_pay"))["total"] or Decimal("0")
 
 
+def _leave_policy_checks(institution, start, end):
+    """(passed, total) leave requests starting in the window that meet their leave policy.
+
+    The same rules as the leave dashboard's compliance panel: an applicable
+    policy exists, the maximum consecutive days hold, and a required document is attached.
+    """
+    from django.core.exceptions import ValidationError as DjangoValidationError
+
+    from apps.leave.services import matching_policy
+
+    passed = total = 0
+    for item in LeaveRequest.objects.filter(
+        institution=institution, status__in=(LeaveRequest.Status.PENDING, LeaveRequest.Status.APPROVED), start_date__gte=start, start_date__lte=end,
+    ).select_related("employee", "leave_type"):
+        total += 1
+        try:
+            policy = matching_policy(item)
+        except DjangoValidationError:
+            continue
+        if policy.max_consecutive_days is not None and item.requested_days > policy.max_consecutive_days:
+            continue
+        if (item.leave_type.requires_attachment or policy.requires_document) and not item.attachment_id:
+            continue
+        passed += 1
+    return passed, total
+
+
+def _payroll_exception_checks(institution, start, end):
+    """(handled, total) payroll run exceptions raised in the window; handled means acknowledged or resolved."""
+    raised = PayrollRunException.objects.filter(institution=institution, created_at__date__gte=start, created_at__date__lte=end)
+    return raised.exclude(status=PayrollRunException.Status.OPEN).count(), raised.count()
+
+
+def _compliance(institution, start, end, *, leave, payroll):
+    checks = []
+    if leave:
+        passed, total = _leave_policy_checks(institution, start, end)
+        checks.append({"code": "leave_policy", "label": "Leave requests within policy", "passed": passed, "total": total})
+    if payroll:
+        passed, total = _payroll_exception_checks(institution, start, end)
+        checks.append({"code": "payroll_exceptions", "label": "Payroll exceptions handled", "passed": passed, "total": total})
+    passed = sum(check["passed"] for check in checks)
+    total = sum(check["total"] for check in checks)
+    rate = (Decimal(passed) / Decimal(total) * Decimal("100")).quantize(Decimal("0.1")) if total else None
+    return rate, checks
+
+
+def _revenue_by_source(institution, start, end):
+    rows = (
+        JournalLine.objects.filter(
+            journal_entry__institution=institution,
+            journal_entry__status=JournalEntry.Status.POSTED,
+            journal_entry__entry_date__gte=start,
+            journal_entry__entry_date__lte=end,
+            account__account_type=Account.AccountType.INCOME,
+        )
+        .values("account__name")
+        .annotate(debit=Sum("debit"), credit=Sum("credit"))
+    )
+    amounts = sorted(
+        ((row["account__name"], (row["credit"] or Decimal("0")) - (row["debit"] or Decimal("0"))) for row in rows),
+        key=lambda item: -item[1],
+    )
+    amounts = [(name, amount) for name, amount in amounts if amount > 0]
+    if len(amounts) > 6:
+        amounts = amounts[:5] + [("Other income", sum(amount for _, amount in amounts[5:]))]
+    total = sum(amount for _, amount in amounts)
+    return [
+        {"label": name, "amount": amount, "percent": (amount / total * Decimal("100")).quantize(Decimal("0.1")) if total else None}
+        for name, amount in amounts
+    ]
+
+
 def insights_payload(*, institution, permission_codes, scope, span, today=None):
     from apps.dashboards.views import _bank_cash_position
 
@@ -191,6 +264,7 @@ def insights_payload(*, institution, permission_codes, scope, span, today=None):
 
     payload = {
         "currency": institution.default_currency,
+        "executive_title": institution.executive_title or "Executive",
         "range_months": span,
         "range_start": first_month.isoformat(),
         "range_end": today.isoformat(),
@@ -204,7 +278,8 @@ def insights_payload(*, institution, permission_codes, scope, span, today=None):
             "operations": can_operations,
         },
         "workforce": None,
-        "kpis": {"employees": None, "payroll": None, "revenue": None, "alerts": None},
+        "kpis": {"employees": None, "payroll": None, "revenue": None, "revenue_ytd": None, "alerts": None, "compliance": None},
+        "revenue_by_source": None,
         "module_trend": None,
         "leave_attendance": None,
     }
@@ -232,6 +307,30 @@ def insights_payload(*, institution, permission_codes, scope, span, today=None):
             "previous": previous,
             "change_percent": _change_percent(current, previous),
             "cash_balance": _bank_cash_position(institution)["balance"],
+        }
+
+    if can_finance:
+        year_start = date(today.year, 1, 1)
+        last_year_today = today.replace(year=today.year - 1) if not (today.month == 2 and today.day == 29) else date(today.year - 1, 2, 28)
+        current = _income_between(institution, year_start, today)
+        previous = _income_between(institution, date(today.year - 1, 1, 1), last_year_today)
+        payload["kpis"]["revenue_ytd"] = {
+            "value": current,
+            "previous": previous,
+            "change_percent": _change_percent(current, previous),
+            "cash_balance": payload["kpis"]["revenue"]["cash_balance"],
+            "year_start": year_start.isoformat(),
+        }
+        payload["revenue_by_source"] = _revenue_by_source(institution, first_month, today)
+
+    if can_leave or can_payroll:
+        rate, checks = _compliance(institution, first_month, today, leave=can_leave, payroll=can_payroll)
+        previous_rate, _previous_checks = _compliance(institution, previous_start, previous_end, leave=can_leave, payroll=can_payroll)
+        payload["kpis"]["compliance"] = {
+            "value": rate,
+            "previous": previous_rate,
+            "change_points": (rate - previous_rate) if rate is not None and previous_rate is not None else None,
+            "checks": checks,
         }
 
     if can_operations:

@@ -79,6 +79,37 @@ def test_insights_hides_sections_the_caller_cannot_see(
     assert data["range_months"] == 12
     assert not any(data["access"].values())
     assert data["workforce"] is None
-    assert data["kpis"] == {"employees": None, "payroll": None, "revenue": None, "alerts": None}
+    assert data["kpis"] == {"employees": None, "payroll": None, "revenue": None, "revenue_ytd": None, "alerts": None, "compliance": None}
+    assert data["revenue_by_source"] is None
     assert data["module_trend"] is None
     assert data["leave_attendance"] is None
+
+
+@pytest.mark.django_db
+def test_insights_compliance_counts_leave_policy_and_payroll_exceptions(
+    api_client, institution_factory, user_factory, membership_factory, employee_factory, organization_factory, assignment_dimensions_factory
+):
+    from apps.institutions.models import InstitutionModule
+    from apps.leave.models import LeaveRequest, LeaveType
+
+    institution = institution_factory(code="INSIGHTS-COMPLIANCE")
+    InstitutionModule.objects.filter(institution=institution, module_code="LEAVE").update(is_enabled=True)
+    user = user_factory()
+    membership_factory(user=user, institution=institution, role_code="HR_ADMIN", is_primary=True)
+    api_client.force_authenticate(user)
+    api_client.credentials(HTTP_X_INSTITUTION_ID=str(institution.id))
+    employee = employee_factory(institution, hire_date=date.today() - timedelta(days=400))
+    _employ(institution, employee, organization_factory, assignment_dimensions_factory)
+    leave_type = LeaveType.objects.create(institution=institution, code="UNCOVERED", name="Uncovered leave")
+    # No leave policy exists, so this request fails the policy check.
+    LeaveRequest.objects.create(
+        institution=institution, employee=employee, leave_type=leave_type, start_date=date.today(), end_date=date.today(),
+        requested_days=1, status=LeaveRequest.Status.PENDING,
+    )
+
+    data = api_client.get("/api/v1/home/insights/").data
+    compliance = data["kpis"]["compliance"]
+    assert compliance["checks"][0] == {"code": "leave_policy", "label": "Leave requests within policy", "passed": 0, "total": 1}
+    assert compliance["value"] == 0
+    # HR has no finance access.
+    assert data["kpis"]["revenue_ytd"] is None and data["revenue_by_source"] is None

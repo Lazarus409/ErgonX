@@ -387,6 +387,7 @@ class VendorBillViewSet(RecordAttachmentsMixin, TenantModelViewSet):
             "revise": "vendor_bill.create",
             "schedule_payment": "payment.create",
             "attachments": "vendor_bill.create",
+            # bulk_execute checks the chosen operation's own permission per call.
         }.get(self.action, "vendor_bill.view")
 
     def _bill_response(self, service, **kwargs):
@@ -454,6 +455,38 @@ class VendorBillViewSet(RecordAttachmentsMixin, TenantModelViewSet):
         }
         payload["institution"] = {"name": request.institution.name}
         return Response(payload)
+
+    @action(detail=False, methods=("post",), filter_backends=(), url_path="bulk/preview")
+    def bulk_preview(self, request):
+        """Which bulk actions the selected bills can take, and why the others cannot."""
+        from apps.accounting.batch import preview
+
+        ids = request.data.get("ids") or []
+        return Response(call_validated_service(preview, resource="vendor_bill", institution=request.institution, actor=request.user, ids=list(ids)))
+
+    @action(detail=False, methods=("post",), filter_backends=(), url_path="bulk/execute")
+    def bulk_execute(self, request):
+        """Run one governed bulk action; each bill succeeds or fails on its own."""
+        from apps.accounting.batch import RESOURCES, execute, serialize_job
+
+        job = call_validated_service(
+            execute, resource="vendor_bill", institution=request.institution, actor=request.user,
+            ids=list(request.data.get("ids") or []), operation_code=str(request.data.get("operation", "")),
+            reason=str(request.data.get("reason", "")), confirm_text=str(request.data.get("confirm_text", "")),
+        )
+        return Response(serialize_job(job, RESOURCES["vendor_bill"]["operations"]()), status=201)
+
+    @action(detail=False, methods=("get",), filter_backends=(), url_path="batch-jobs")
+    def batch_jobs(self, request):
+        """Recent bulk actions on vendor bills, newest first."""
+        from apps.accounting.batch import RESOURCES, serialize_job
+        from apps.accounting.models import BatchJob
+
+        operations = RESOURCES["vendor_bill"]["operations"]()
+        jobs = BatchJob.objects.filter(institution=request.institution, resource="vendor_bill").select_related("created_by")
+        limit = request.query_params.get("limit", "5")
+        limit = min(int(limit), 50) if limit.isdigit() and int(limit) > 0 else 5
+        return Response({"count": jobs.count(), "results": [serialize_job(job, operations) for job in jobs[:limit]]})
 
     @action(detail=False, methods=("get",), filter_backends=())
     def summary(self, request):

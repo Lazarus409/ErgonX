@@ -1891,3 +1891,36 @@ class FinancialReportRun(TenantOwnedModel):
     class Meta:
         ordering = ("-created_at",)
         constraints = [models.UniqueConstraint(fields=("report", "version"), name="uniq_financial_report_run_version")]
+
+
+class BatchJob(TenantOwnedModel):
+    """One governed bulk operation over many records (concept "Bulk actions and batch governance").
+
+    Bulk actions run the same service each record's own button uses, one record per savepoint,
+    so a failure on one record never rolls back the others and every change keeps its audit event.
+    """
+
+    class Status(models.TextChoices):
+        QUEUED = "QUEUED", "Queued"
+        PROCESSING = "PROCESSING", "Processing"
+        COMPLETED = "COMPLETED", "Completed"
+        PARTIAL = "PARTIAL", "Partial success"
+        FAILED = "FAILED", "Failed"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="batch_jobs")
+    resource = models.CharField(max_length=40)
+    operation = models.CharField(max_length=40)
+    status = models.CharField(max_length=12, choices=Status.choices, default=Status.QUEUED)
+    reason = models.CharField(max_length=500, blank=True)
+    total_items = models.PositiveIntegerField(default=0)
+    succeeded = models.PositiveIntegerField(default=0)
+    failed = models.PositiveIntegerField(default=0)
+    total_amount = models.DecimalField(max_digits=18, decimal_places=2, default=Decimal("0"))
+    results = models.JSONField(default=list, blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="batch_jobs")
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        indexes = [models.Index(fields=("institution", "resource", "-created_at"))]

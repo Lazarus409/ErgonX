@@ -185,6 +185,7 @@ export default function BudgetDetailPage() {
     </div>
   );
 }
+
 function Step({ done, danger, title, detail }: { done: boolean; danger?: boolean; title: string; detail: string }) {
   return (
     <li className="flex gap-3">
@@ -193,3 +194,4 @@ function Step({ done, danger, title, detail }: { done: boolean; danger?: boolean
     </li>
   );
 }
+

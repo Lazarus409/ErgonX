@@ -230,6 +230,7 @@ export default function CustomerInvoiceDetailPage() {
     </div>
   );
 }
+
 function PaymentHistory({ receipts, compact, onViewAll }: { receipts: Array<{ id: string; receipt_number: string; receipt_date: string; amount: string; currency: string; payment_method: string; status: string }>; compact?: boolean; onViewAll?: () => void }) {
   return (
     <Panel icon={Clock3} title={`Payment History (${receipts.length})`} action={compact && receipts.length > 3 && onViewAll ? <button type="button" onClick={onViewAll} className="text-sm font-semibold text-primary-ink hover:underline">View all</button> : undefined}>
@@ -239,6 +240,7 @@ function PaymentHistory({ receipts, compact, onViewAll }: { receipts: Array<{ id
     </Panel>
   );
 }
+
 function Reminders({ invoiceId, reminders, canManage, onAdd, onChanged, onError }: { invoiceId: string; reminders: Array<{ id: string; remind_on: string; channel: string; note: string; status: string; created_by: string; completed_at: string | null }>; canManage: boolean; onAdd: () => void; onChanged: () => void; onError: (message: string) => void }) {
   const update = async (reminderId: string, status: "DONE" | "CANCELLED") => {
     try { await accountingApi.updateInvoiceReminder(invoiceId, reminderId, status); onChanged(); } catch (caught) { onError(getApiErrorMessage(caught)); }

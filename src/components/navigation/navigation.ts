@@ -198,7 +198,7 @@ export const navigation: NavigationItem[] = [
   },
   {
     label: "Reports & Analytics",
-    href: "/reports/dashboard",
+    href: "/reports",
     icon: FileBarChart,
     module: "REPORTS",
     anyPermissions: moduleWorkspacePermissions.REPORTS,

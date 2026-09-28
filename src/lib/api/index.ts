@@ -62,3 +62,4 @@ export * as workflowsApi from "./workflows";
 export * as operationsApi from "./operations";
 export * as notificationsApi from "./notifications";
 export * as imagesApi from "./images";
+export * as reportLibraryApi from "./reportLibrary";

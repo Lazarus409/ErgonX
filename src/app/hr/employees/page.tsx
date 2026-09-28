@@ -391,7 +391,7 @@ export default function EmployeesPage() {
                   <option value={ALL}>Type: All</option>
                   {EMPLOYMENT_TYPES.map((option) => <option key={option} value={option}>Type: {humanizeEnum(option)}</option>)}
                 </Select>
-                <Select size="sm" aria-label="Department" value={department} onChange={(event) => changeDepartment(event.target.value)}>
+                <Select size="sm" aria-label="Department / Functional Area" value={department} onChange={(event) => changeDepartment(event.target.value)}>
                   <option value={ALL}>Department: All</option>
                   {lookups.departments.map((option) => <option key={option.id} value={option.id}>Department: {option.name}</option>)}
                 </Select>
@@ -435,7 +435,7 @@ export default function EmployeesPage() {
               );
             },
           },
-          { key: "department", header: "Department", cell: (employee) => assignmentFor(employee.id).department },
+          { key: "department", header: "Department / Functional Area", cell: (employee) => assignmentFor(employee.id).department },
           { key: "position", header: "Position", cell: (employee) => assignmentFor(employee.id).position },
           { key: "employment", header: "Employment type", hideBelow: "lg", cell: (employee) => assignmentFor(employee.id).employmentType },
           { key: "location", header: "Location", hideBelow: "2xl", cell: (employee) => assignmentFor(employee.id).location },
@@ -529,7 +529,7 @@ function EmployeePreview({ employee, employment, assignment, managerName, onClos
       <div className="space-y-4 p-5">
         {show("employment") && (
           <PreviewCard title="Employment details" icon={ClipboardList} editHref={`${profileHref}?edit=true`}>
-            <PreviewRow label="Department" value={assignment.department} />
+            <PreviewRow label="Department / Functional Area" value={assignment.department} />
             <PreviewRow label="Position" value={assignment.position} />
             <PreviewRow label="Employment type" value={assignment.employmentType} />
             <PreviewRow label="Location" value={assignment.location} />

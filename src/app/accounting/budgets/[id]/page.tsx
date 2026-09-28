@@ -62,7 +62,7 @@ export default function BudgetDetailPage() {
 
   return (
     <div className="space-y-5">
-      <nav aria-label="Breadcrumb" className="text-sm text-ink-muted"><Link href="/accounting/budgets" className="hover:underline">Budgets</Link><ChevronRight className="mx-1 inline h-4 w-4" aria-hidden="true" /><span>Department budgets</span><ChevronRight className="mx-1 inline h-4 w-4" aria-hidden="true" /><span className="font-medium text-ink-strong">{budget.department_name ?? "Institution-wide"}</span></nav>
+      <nav aria-label="Breadcrumb" className="text-sm text-ink-muted"><Link href="/accounting/budgets" className="hover:underline">Budgets</Link><ChevronRight className="mx-1 inline h-4 w-4" aria-hidden="true" /><span>Department / Functional Area budgets</span><ChevronRight className="mx-1 inline h-4 w-4" aria-hidden="true" /><span className="font-medium text-ink-strong">{budget.department_name ?? "Institution-wide"}</span></nav>
       <header className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div className="flex items-start gap-4">
           <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-primary-soft text-section-icon"><Folder className="h-8 w-8" aria-hidden="true" /></span>

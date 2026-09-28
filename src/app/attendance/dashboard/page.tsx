@@ -169,15 +169,15 @@ export default function AttendanceDashboardPage() {
           <TrendChart variant="area" data={trend.filter((point) => point.attendance_rate !== null)} xKey="month" format="percent" height={260} series={[{ key: "attendance_rate", label: "Attendance rate", color: "var(--primary)" }]} />
         </ChartCard>
         <ChartCard
-          title="Attendance by department"
-          description="Attendance rate by department."
+          title="Attendance by department / functional area"
+          description="Attendance rate by department / functional area."
           icon={PieChartIcon}
           loading={initial}
           error={!data && error ? "This data is unavailable right now." : null}
           empty={!departmentRates.length}
-          emptyTitle="No department data available"
-          emptyDescription="Attendance by department will be displayed here when time and attendance records are available."
-          data={{ columns: ["Department", "Attendance rate (%)"], rows: departmentRates.map((item) => [item.label, item.value]) }}
+          emptyTitle="No department / functional area data available"
+          emptyDescription="Attendance by department / functional area will be displayed here when time and attendance records are available."
+          data={{ columns: ["Department / Functional Area", "Attendance rate (%)"], rows: departmentRates.map((item) => [item.label, item.value]) }}
         >
           <RankingBars items={departmentRates} format="percent" color="var(--primary)" limit={10} />
         </ChartCard>
@@ -272,7 +272,7 @@ export default function AttendanceDashboardPage() {
       </div>
 
       <div className="grid gap-5 xl:grid-cols-5">
-        <Card className="xl:col-span-3" title="Department attendance heatmap" description="Today's outcomes by department. Darker cells mean more employees." icon={Grid3X3} accent="attendance">
+        <Card className="xl:col-span-3" title="Department / Functional Area attendance heatmap" description="Today's outcomes by department / functional area. Darker cells mean more employees." icon={Grid3X3} accent="attendance">
           {initial ? <div className="skeleton h-48 rounded-xl" /> : departments.length ? (
             <HeatmapGrid
               rows={departments.map((item) => item.employee__employments__department__name || "Unassigned")}
@@ -326,7 +326,7 @@ export default function AttendanceDashboardPage() {
                 return <span className="flex min-w-0 items-center gap-3"><Avatar name={name} size="sm" /><span className="min-w-0"><span className="block max-w-[14rem] truncate font-semibold text-ink-strong" title={name}>{name}</span><span className="block font-mono text-caption text-ink-muted">{item.employee__employee_number}</span></span></span>;
               },
             },
-            { key: "department", header: "Department", hideBelow: "md", cell: (item) => <span className="block max-w-[12rem] truncate" title={item.employee__employments__department__name}>{item.employee__employments__department__name || "Unassigned"}</span> },
+            { key: "department", header: "Department / Functional Area", hideBelow: "md", cell: (item) => <span className="block max-w-[12rem] truncate" title={item.employee__employments__department__name}>{item.employee__employments__department__name || "Unassigned"}</span> },
             {
               key: "late",
               header: "Late arrivals",

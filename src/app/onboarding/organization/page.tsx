@@ -83,7 +83,7 @@ export default function OrganizationStarterPage() {
       <section className="rounded-2xl border border-line bg-surface p-6">
         <p className="text-sm text-ink-muted">Creating records for {institution?.name ?? "your institution"}. Reference codes are generated automatically.</p>
         <div className="mt-6 grid gap-5 md:grid-cols-2">
-          <Section title="Department"><Input label="Department name" value={form.departmentName} onChange={(value) => update("departmentName", value)} /></Section>
+          <Section title="Department / Functional Area"><Input label="Department / Functional Area name" value={form.departmentName} onChange={(value) => update("departmentName", value)} /></Section>
           <Section title="Grade"><Input label="Grade name" value={form.gradeName} onChange={(value) => update("gradeName", value)} /></Section>
           <Section title="Location"><Input label="Location name" value={form.locationName} onChange={(value) => update("locationName", value)} /><Input label="City" value={form.city} onChange={(value) => update("city", value)} /></Section>
           <Section title="Position"><Input label="Position title" value={form.positionTitle} onChange={(value) => update("positionTitle", value)} /></Section>

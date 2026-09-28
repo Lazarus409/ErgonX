@@ -94,7 +94,7 @@ export default function RequisitionForm({ posting }: { posting?: JobPosting | nu
 
   const save = async (mode: "draft" | "submit") => {
     if (!form.title || !form.department || !form.position || !form.location || !form.employment_type) {
-      setErrors("Job title, department, position, location and employment type are needed to save.");
+      setErrors("Job title, department / functional area, position, location and employment type are needed to save.");
       return;
     }
     setSaving(mode);
@@ -155,8 +155,8 @@ export default function RequisitionForm({ posting }: { posting?: JobPosting | nu
             <p className="text-support text-ink-muted">Start with the essentials. Fields marked with <span className="text-danger-ink">*</span> are required.</p>
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
               <FormField label="Job title" required><input value={form.title} maxLength={200} onChange={(event) => update("title", event.target.value)} placeholder="e.g. Senior Research Officer" className={inputClass} /></FormField>
-              <FormField label="Department" required><select value={form.department} onChange={(event) => { update("department", event.target.value); update("position", ""); }} className={inputClass}><option value="">Select department</option>{lookups.departments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></FormField>
-              <FormField label="Position" required><select value={form.position} disabled={!form.department} onChange={(event) => update("position", event.target.value)} className={inputClass}><option value="">{form.department ? "Select position" : "Choose a department first"}</option>{positions.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></FormField>
+              <FormField label="Department / Functional Area" required><select value={form.department} onChange={(event) => { update("department", event.target.value); update("position", ""); }} className={inputClass}><option value="">Select department / functional area</option>{lookups.departments.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></FormField>
+              <FormField label="Position" required><select value={form.position} disabled={!form.department} onChange={(event) => update("position", event.target.value)} className={inputClass}><option value="">{form.department ? "Select position" : "Choose a department / functional area first"}</option>{positions.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></FormField>
               <FormField label="Location" required><select value={form.location} onChange={(event) => update("location", event.target.value)} className={inputClass}><option value="">Select location</option>{lookups.locations.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></FormField>
               <FormField label="Employment type" required><select value={form.employment_type} onChange={(event) => update("employment_type", event.target.value)} className={inputClass}><option value="">Select employment type</option>{EMPLOYMENT_TYPES.map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select></FormField>
               <FormField label="Hiring reason" required><select value={form.hiring_reason} onChange={(event) => update("hiring_reason", event.target.value)} className={inputClass}><option value="">Select hiring reason</option>{HIRING_REASONS.map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select></FormField>

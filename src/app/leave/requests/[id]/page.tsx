@@ -342,7 +342,7 @@ export default function LeaveRequestReviewPage() {
               )}
               {tab === "team" && (
                 (review?.team_on_leave.length ?? 0) === 0 ? (
-                  <div className="py-10 text-center"><span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary-soft text-primary"><Users className="h-7 w-7" aria-hidden="true" /></span><p className="mt-4 font-bold text-headline">No team members on leave</p><p className="mt-1 text-support text-ink-muted">Nobody else in {review?.department ?? "this department"} has pending or approved leave this month.</p></div>
+                  <div className="py-10 text-center"><span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary-soft text-primary"><Users className="h-7 w-7" aria-hidden="true" /></span><p className="mt-4 font-bold text-headline">No team members on leave</p><p className="mt-1 text-support text-ink-muted">Nobody else in {review?.department ?? "this department / functional area"} has pending or approved leave this month.</p></div>
                 ) : (
                   <ul className="divide-y divide-line-soft">
                     {review!.team_on_leave.map((item) => (

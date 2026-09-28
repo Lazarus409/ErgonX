@@ -173,7 +173,7 @@ export default function CreateEmployeePage() {
     }
 
     if (!form.department) {
-      nextErrors.department = "Department is required.";
+      nextErrors.department = "Department / Functional Area is required.";
     }
 
     if (!form.position) {
@@ -426,7 +426,7 @@ export default function CreateEmployeePage() {
             />
 
             <SelectField
-              label="Department"
+              label="Department / Functional Area"
               required
               value={form.department}
               error={errors.department}

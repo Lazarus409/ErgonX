@@ -43,7 +43,7 @@ type StepPresentation = {
 const stepPresentation: Record<string, StepPresentation> = {
   INSTITUTION_PROFILE: { title: "Institution profile", description: "Add your organization contact details, country, and time zone.", icon: Building2, action: { href: "/onboarding/profile", label: "Complete profile" } },
   MODULE_SELECTION: { title: "Choose your modules", description: "Enable the ErgonX modules your organization will use.", icon: Layers3, action: { href: "/settings/modules", label: "Choose modules" } },
-  ORGANIZATION_SETUP: { title: "Organization structure", description: "Create a department, position, grade, and location for Core HR.", icon: Landmark, action: { href: "/onboarding/organization", label: "Create structure" } },
+  ORGANIZATION_SETUP: { title: "Organization structure", description: "Create a department / functional area, position, grade, and location for Core HR.", icon: Landmark, action: { href: "/onboarding/organization", label: "Create structure" } },
   HR_CONFIGURATION: { title: "Core HR readiness", description: "Review your starter organization structure before validation.", icon: BadgeCheck, action: { href: "/onboarding/organization", label: "Review structure" } },
   PAYROLL_CONFIGURATION: { title: "Payroll configuration", description: "Set up payroll preferences when Payroll is enabled.", icon: CreditCard, action: { href: "/payroll/configuration", label: "Configure payroll" } },
   SCHEDULING_CONFIGURATION: { title: "Scheduling configuration", description: "Create an active work schedule for Attendance.", icon: CalendarDays, action: { href: "/attendance/schedules", label: "Configure schedules" } },

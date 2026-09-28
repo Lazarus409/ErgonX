@@ -376,7 +376,7 @@ export default function OvertimePage() {
           <select
             value={departmentFilter}
             onChange={(event) => setDepartmentFilter(event.target.value)}
-            aria-label="Filter by department"
+            aria-label="Filter by department / functional area"
             className="h-9 rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink outline-none"
           >
             <option value={ALL}>All Departments</option>

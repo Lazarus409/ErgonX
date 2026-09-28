@@ -122,7 +122,7 @@ export default function OrganizationForm({ kind, record, open, onClose, onSaved 
     >
       <form id="organization-form" onSubmit={submit} className="space-y-4">
         {error && <Alert tone="danger">{error}</Alert>}
-        <Field label={kind === "positions" ? "Position title" : kind === "departments" ? "Department or functional area" : "Name"} required error={fieldError("name")}>
+        <Field label={kind === "positions" ? "Position title" : kind === "departments" ? "Department / Functional Area" : "Name"} required error={fieldError("name")}>
           <Input required autoFocus value={values.name} onChange={(event) => set("name", event.target.value)} maxLength={150} placeholder={kind === "departments" ? "e.g. Customer Success" : kind === "positions" ? "e.g. Marketing Officer" : kind === "grades" ? "e.g. Senior Officer" : "e.g. Kumasi Branch"} />
         </Field>
         <Field label="Code" optional helper={record ? undefined : "Generated automatically when left blank."} error={fieldError("code")}>
@@ -130,7 +130,7 @@ export default function OrganizationForm({ kind, record, open, onClose, onSaved 
         </Field>
 
         {kind === "departments" && (
-          <Field label="Part of" optional helper="Choose a parent to make this a sub-department. Its head also covers sub-departments." error={fieldError("parent")}>
+          <Field label="Part of" optional helper="Choose a parent to make this a sub-department / functional area. Its head also covers sub-departments / functional areas." error={fieldError("parent")}>
             <Select value={values.parent} onChange={(event) => set("parent", event.target.value)}>
               <option value="">None (top level)</option>
               {departmentOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
@@ -138,7 +138,7 @@ export default function OrganizationForm({ kind, record, open, onClose, onSaved 
           </Field>
         )}
         {kind === "positions" && (
-          <Field label="Department" optional error={fieldError("department")}>
+          <Field label="Department / Functional Area" optional error={fieldError("department")}>
             <Select value={values.department} onChange={(event) => set("department", event.target.value)}>
               <option value="">Not assigned</option>
               {departmentOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}

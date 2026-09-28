@@ -945,7 +945,7 @@ export default function LeavePoliciesPage() {
                   />
 
                   <MultiSelectGroup
-                    title="Departments"
+                    title="Departments / Functional Areas"
                     values={form.departments}
                     options={departmentOptions}
                     onToggle={(value) => toggleSelection("departments", value)}

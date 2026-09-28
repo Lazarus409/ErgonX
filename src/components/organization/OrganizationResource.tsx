@@ -25,8 +25,8 @@ export type OrganizationResourceKind = "departments" | "positions" | "grades" | 
 type Resource = Department | Position | Grade | Location;
 
 const metadata: Record<OrganizationResourceKind, { singular: string; title: string; description: string; icon: typeof Building2 }> = {
-  departments: { singular: "Department", title: "Departments", description: "The departments and functional areas your people, positions and approvals are organized by.", icon: Building2 },
-  positions: { singular: "Position", title: "Positions", description: "Job positions and the department each one sits in.", icon: BriefcaseBusiness },
+  departments: { singular: "Department / Functional Area", title: "Departments / Functional Areas", description: "The departments / functional areas your people, positions and approvals are organized by.", icon: Building2 },
+  positions: { singular: "Position", title: "Positions", description: "Job positions and the department / functional area each one sits in.", icon: BriefcaseBusiness },
   grades: { singular: "Grade", title: "Grades", description: "Grade levels used for employees and pay structures.", icon: GraduationCap },
   locations: { singular: "Location", title: "Locations", description: "Offices, sites and remote arrangements people work from.", icon: MapPin },
 };
@@ -35,7 +35,7 @@ function list(kind: OrganizationResourceKind): Promise<PaginatedData<Resource>> 
 function get(kind: OrganizationResourceKind, id: string): Promise<Resource> { switch (kind) { case "departments": return organizationApi.getDepartment(id) as Promise<Resource>; case "positions": return organizationApi.getPosition(id) as Promise<Resource>; case "grades": return organizationApi.getGrade(id) as Promise<Resource>; case "locations": return organizationApi.getLocation(id) as Promise<Resource>; } }
 function nameOf(item: Resource) { return "title" in item ? item.title : item.name; }
 function countryLabel(code: string) { if (!code) return "Not provided"; try { return new Intl.DisplayNames(["en"], { type: "region" }).of(code) ?? code; } catch { return code; } }
-function details(kind: OrganizationResourceKind, item: Resource): Array<[string, string]> { if (kind === "departments") { const value = item as Department; return [["Code", value.code], ["Department head", value.head_name ?? "Not assigned"], ["Part of", value.parent_name ?? "None (top level)"], ["Description", value.description || "Not provided"]]; } if (kind === "positions") { const value = item as Position; return [["Code", value.code], ["Department", value.department_name ?? "Not assigned"], ["Description", value.description || "Not provided"]]; } if (kind === "grades") { const value = item as Grade; return [["Code", value.code], ["Level", String(value.level ?? "Not set")], ["Description", value.description || "Not provided"]]; } const value = item as Location; return [["Code", value.code], ["Address", value.address || "Not provided"], ["City", value.city || "Not provided"], ["Country", countryLabel(value.country)], ["Time zone", value.timezone || "Same as the institution"], ["Work arrangement", value.is_remote ? "Remote or hybrid" : "On site"]]; }
+function details(kind: OrganizationResourceKind, item: Resource): Array<[string, string]> { if (kind === "departments") { const value = item as Department; return [["Code", value.code], ["Department / Functional Area head", value.head_name ?? "Not assigned"], ["Part of", value.parent_name ?? "None (top level)"], ["Description", value.description || "Not provided"]]; } if (kind === "positions") { const value = item as Position; return [["Code", value.code], ["Department / Functional Area", value.department_name ?? "Not assigned"], ["Description", value.description || "Not provided"]]; } if (kind === "grades") { const value = item as Grade; return [["Code", value.code], ["Level", String(value.level ?? "Not set")], ["Description", value.description || "Not provided"]]; } const value = item as Location; return [["Code", value.code], ["Address", value.address || "Not provided"], ["City", value.city || "Not provided"], ["Country", countryLabel(value.country)], ["Time zone", value.timezone || "Same as the institution"], ["Work arrangement", value.is_remote ? "Remote or hybrid" : "On site"]]; }
 
 export function OrganizationResourceList({ kind }: { kind: OrganizationResourceKind }) {
   const [query, setQuery] = useState("");
@@ -190,7 +190,7 @@ function DepartmentHeadCard({ department, onSaved }: { department: Department; o
     setSaving(true); setError(null);
     try {
       await organizationApi.updateDepartment(department.id, { head: headId || null });
-      showToast({ tone: "success", message: headId ? "Department head updated." : "Department head removed." });
+      showToast({ tone: "success", message: headId ? "Department / Functional Area head updated." : "Department / Functional Area head removed." });
       onSaved();
     } catch (caught) {
       setError(getApiErrorMessage(caught));
@@ -200,12 +200,12 @@ function DepartmentHeadCard({ department, onSaved }: { department: Department; o
   };
 
   return (
-    <Card title="Department head" description="Approves the team's leave before HR and sees this department's people, attendance and leave. Sub-departments are included." icon={UserRoundCheck} accent="hr">
+    <Card title="Department / Functional Area head" description="Approves the team's leave before HR and sees this department / functional area's people, attendance and leave. Sub-departments / functional areas are included." icon={UserRoundCheck} accent="hr">
       {!canEdit ? (
         <p className="text-sm font-semibold text-ink-strong">{department.head_name ?? "Not assigned"}</p>
       ) : (
         <div className="space-y-3">
-          <Field label="Head" helper="Choose from this department's active employees. Give them the Department Head role in Users & Access so they get the department workspace.">
+          <Field label="Head" helper="Choose from this department / functional area's active employees. Give them the Department / Functional Area Head role in Users & Access so they get the department / functional area workspace.">
             <Select value={headId} disabled={loading || saving} onChange={(event) => setHeadId(event.target.value)}>
               <option value="">Not assigned</option>
               {currentMissing && <option value={department.head ?? ""}>{department.head_name} (outside this department)</option>}

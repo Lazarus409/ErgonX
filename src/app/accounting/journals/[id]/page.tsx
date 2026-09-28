@@ -151,7 +151,7 @@ export default function JournalDetailPage() {
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[40rem] text-sm">
-                  <thead className="bg-surface-muted text-left text-caption font-semibold text-ink-strong"><tr><th className="px-4 py-2">Line</th><th className="px-4 py-2">Account</th><th className="px-4 py-2">Description</th><th className="px-4 py-2">Department</th><th className="px-4 py-2">Project</th><th className="px-4 py-2 text-right">Debit</th><th className="px-4 py-2 text-right">Credit</th></tr></thead>
+                  <thead className="bg-surface-muted text-left text-caption font-semibold text-ink-strong"><tr><th className="px-4 py-2">Line</th><th className="px-4 py-2">Account</th><th className="px-4 py-2">Description</th><th className="px-4 py-2">Department / Functional Area</th><th className="px-4 py-2">Project</th><th className="px-4 py-2 text-right">Debit</th><th className="px-4 py-2 text-right">Credit</th></tr></thead>
                   <tbody className="divide-y divide-line-soft">
                     {journal.lines.map((line, index) => (
                       <tr key={line.id}>

@@ -27,7 +27,7 @@ export default function DepartmentApprovalsPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <PageHeader
-        eyebrow="My department"
+        eyebrow="My department / functional area"
         title="Leave approvals"
         description="Requests waiting on your decision. After you approve, HR gives the final approval where your institution requires it."
         icon={ClipboardCheck}

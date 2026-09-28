@@ -173,6 +173,7 @@ PERMISSIONS = {
     "document.delete": "Deactivate shared documents",
     "report.view": "View and export institution reports",
     "report.all": "View every report institution-wide, read-only, without the underlying module permissions",
+    "report.publish": "Publish saved dashboards and reports to everyone with access",
     "dashboard.executive.view": "View executive dashboard",
     "dashboard.hr.view": "View HR dashboard",
     "dashboard.leave.view": "View leave dashboard",
@@ -306,6 +307,7 @@ ROLE_PERMISSION_CODES = {
         "offer.view",
         "dashboard.executive.view",
         "report.view",
+        "report.publish",
         "report.all",
     ),
     "EMPLOYEE": (
@@ -402,6 +404,7 @@ ROLE_PERMISSION_CODES = {
         "dashboard.payroll.view",
         "dashboard.finance.view",
         "report.view",
+        "report.publish",
         *ACCOUNTING_PERMISSIONS,
     ),
     "AUDITOR": (

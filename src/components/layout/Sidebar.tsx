@@ -66,7 +66,11 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
   const selfServiceExpanded = toggled[SELF_SERVICE_GROUP] ?? selfServiceActive;
 
   const childrenFor = (item: NavigationItem) =>
-    item.children?.filter((child) => (!child.module || hasModule(institution?.enabledModules, child.module)) && (!child.permission || hasPermission(child.permission))) ?? [];
+    item.children?.filter((child) =>
+      (!child.module || hasModule(institution?.enabledModules, child.module)) &&
+      (!child.permission || hasPermission(child.permission)) &&
+      (!child.anyPermissions?.length || child.anyPermissions.some(hasPermission)),
+    ) ?? [];
 
   const closeMobile = () => onMobileClose?.();
 
@@ -321,15 +325,15 @@ function InstitutionPanel({ compact, name, code, logoSrc }: { compact: boolean; 
       )}
       {!compact && (
         <div className="min-w-0 flex-1 leading-tight">
-          <p className="text-xs font-medium text-white/55">Active institution</p>
-          <p className="mt-1 truncate text-[0.9375rem] font-semibold text-white">{name}</p>
+          <p className="hidden text-xs font-medium text-white/55">Active institution</p>
+          <p className="truncate text-[0.9375rem] font-semibold text-white">{name}</p>
           {logoSrc ? (
-            <p className="flex items-center gap-1 text-caption text-white/50">
+            <p className="hidden items-center gap-1 text-caption text-white/50">
               {code && <span className="truncate">{code} ·</span>}
               <span className="inline-flex shrink-0 items-center gap-1">on <Logo variant="mono-white" height={9} alt="ErgonX" className="opacity-75" /></span>
             </p>
           ) : (
-            code && <p className="truncate text-caption text-white/50">{code}</p>
+            code && <p className="hidden truncate text-caption text-white/50">{code}</p>
           )}
         </div>
       )}

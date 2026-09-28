@@ -33,6 +33,8 @@ services:
     dockerfilePath: ergonx-frontend/Dockerfile
     dockerContext: ergonx-frontend
     envVars:
+      - key: ERGONX_API_PROXY_URL
+        sync: false
       - key: NEXT_PUBLIC_API_BASE_URL
         sync: false
       - key: NEXT_PUBLIC_ENABLE_DEV_AUTH_BYPASS

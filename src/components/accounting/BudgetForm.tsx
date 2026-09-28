@@ -6,6 +6,7 @@ import { useCallback, useRef, useState } from "react";
 import { ArrowLeft, Plus, Save, Trash2, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import ErrorState from "@/components/ui/ErrorState";
 import LoadingState from "@/components/ui/LoadingState";
 import { accountingApi, getApiErrorMessage } from "@/lib/api";
@@ -30,11 +31,13 @@ export default function BudgetForm({ budget }: { budget?: BudgetRecord }) {
   const [form, setForm] = useState({ name: budget?.name ?? "", fiscal_year: budget?.fiscal_year ?? "", department: budget?.department ?? "", budget_type: budget?.budget_type ?? "OPERATING", description: budget?.description ?? "" });
   const [lines, setLines] = useState<Line[]>(() => budget?.lines.map((line) => ({ category: line.category, account: line.account ?? "", description: line.description, initiative: line.initiative, allocated: line.allocated })) ?? [emptyLine()]);
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const total = lines.reduce((sum, line) => sum + (Number(line.allocated) || 0), 0);
-  const setLine = (index: number, patch: Partial<Line>) => setLines((current) => current.map((line, position) => (position === index ? { ...line, ...patch } : line)));
+  const setLine = (index: number, patch: Partial<Line>) => { setDirty(true); return setLines((current) => current.map((line, position) => (position === index ? { ...line, ...patch } : line))); };
 
   const importCsv = async (file: File) => {
     const text = await file.text();
@@ -87,11 +90,11 @@ export default function BudgetForm({ budget }: { budget?: BudgetRecord }) {
       {problem && <ErrorState variant="inline" title="Budget not saved" message={problem} />}
       {notice && <p className="rounded-xl bg-primary-soft/60 px-4 py-3 text-sm text-primary-ink">{notice}</p>}
       <section className="grid gap-4 rounded-2xl border border-line bg-surface p-5 shadow-elevation-1 sm:grid-cols-2 lg:grid-cols-4">
-        <label className="sm:col-span-2"><span className="mb-1.5 block text-sm font-semibold">Budget name <span className="text-danger-ink">*</span></span><input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="e.g. FY2026 Operating Budget" className={inputClass} /></label>
-        <label><span className="mb-1.5 block text-sm font-semibold">Fiscal period <span className="text-danger-ink">*</span></span><select value={form.fiscal_year} onChange={(event) => setForm({ ...form, fiscal_year: event.target.value })} className={inputClass}><option value="">Select a period</option>{data.years.map((year) => <option key={year.id} value={year.id}>{year.name}</option>)}</select></label>
-        <label><span className="mb-1.5 block text-sm font-semibold">Budget type</span><select value={form.budget_type} onChange={(event) => setForm({ ...form, budget_type: event.target.value })} className={inputClass}>{BUDGET_TYPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-        <label className="sm:col-span-2"><span className="mb-1.5 block text-sm font-semibold">Department / cost centre</span><select value={form.department} onChange={(event) => setForm({ ...form, department: event.target.value })} className={inputClass}><option value="">Institution-wide</option>{data.departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}</select></label>
-        <label className="sm:col-span-2"><span className="mb-1.5 block text-sm font-semibold">Description</span><input value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} className={inputClass} /></label>
+        <label className="sm:col-span-2"><span className="mb-1.5 block text-sm font-semibold">Budget name <span className="text-danger-ink">*</span></span><input value={form.name} onChange={(event) => { setDirty(true); setForm({ ...form, name: event.target.value }); }} placeholder="e.g. FY2026 Operating Budget" className={inputClass} /></label>
+        <label><span className="mb-1.5 block text-sm font-semibold">Fiscal period <span className="text-danger-ink">*</span></span><select value={form.fiscal_year} onChange={(event) => { setDirty(true); setForm({ ...form, fiscal_year: event.target.value }); }} className={inputClass}><option value="">Select a period</option>{data.years.map((year) => <option key={year.id} value={year.id}>{year.name}</option>)}</select></label>
+        <label><span className="mb-1.5 block text-sm font-semibold">Budget type</span><select value={form.budget_type} onChange={(event) => { setDirty(true); setForm({ ...form, budget_type: event.target.value }); }} className={inputClass}>{BUDGET_TYPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+        <label className="sm:col-span-2"><span className="mb-1.5 block text-sm font-semibold">Department / cost centre</span><select value={form.department} onChange={(event) => { setDirty(true); setForm({ ...form, department: event.target.value }); }} className={inputClass}><option value="">Institution-wide</option>{data.departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}</select></label>
+        <label className="sm:col-span-2"><span className="mb-1.5 block text-sm font-semibold">Description</span><input value={form.description} onChange={(event) => { setDirty(true); setForm({ ...form, description: event.target.value }); }} className={inputClass} /></label>
       </section>
       <section className="rounded-2xl border border-line bg-surface p-5 shadow-elevation-1">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -121,7 +124,8 @@ export default function BudgetForm({ budget }: { budget?: BudgetRecord }) {
           </table>
         </div>
       </section>
-      <div className="flex justify-end gap-2"><Link href="/accounting/budgets" className="inline-flex h-12 items-center px-4 font-semibold text-primary-ink">Cancel</Link><Button size="lg" loading={saving} leadingIcon={<Save className="h-5 w-5" />} onClick={() => void save()}>{budget ? "Save changes" : "Save as draft"}</Button></div>
+      <div className="flex justify-end gap-2"><Button variant="ghost" size="lg" onClick={() => (dirty ? setLeaving(true) : router.push(budget ? `/accounting/budgets/${budget.id}` : "/accounting/budgets"))}>Cancel</Button><Button size="lg" loading={saving} leadingIcon={<Save className="h-5 w-5" />} onClick={() => void save()}>{budget ? "Save changes" : "Save as draft"}</Button></div>
+      <ConfirmDialog open={leaving} tone="warning" title="Discard changes?" description="You have unsaved changes. If you leave now, your changes will be lost." cancelLabel="Keep editing" confirmLabel="Discard" onCancel={() => setLeaving(false)} onConfirm={() => router.push(budget ? `/accounting/budgets/${budget.id}` : "/accounting/budgets")} />
     </div>
   );
 }

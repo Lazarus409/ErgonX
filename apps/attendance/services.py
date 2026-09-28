@@ -386,6 +386,8 @@ def decide_overtime(*, overtime_record, actor, approve, approved_minutes=None):
         raise ValidationError({"actor": "Actor cannot approve overtime."})
     if overtime_record.status != OvertimeRecord.Status.PENDING:
         raise ValidationError({"status": "Only pending overtime can be decided."})
+    if overtime_record.employee.user_id == actor.id:
+        raise ValidationError({"actor": "You cannot decide your own overtime."})
     if approve:
         overtime_record.status = OvertimeRecord.Status.APPROVED
         overtime_record.approved_minutes = (

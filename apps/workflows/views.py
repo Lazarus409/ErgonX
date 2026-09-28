@@ -1,9 +1,14 @@
+from drf_spectacular.utils import OpenApiTypes, extend_schema
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.viewsets import ViewSet
 
+from apps.institutions.services import effective_permission_codes
+from apps.workflows.inbox import approval_inbox
 from apps.workflows.models import ApprovalAction, ApprovalRequest, ApprovalWorkflowDefinition, ApprovalWorkflowStep
 from apps.workflows.serializers import ApprovalActionSerializer, ApprovalDecisionSerializer, ApprovalRequestSerializer, ApprovalWorkflowDefinitionSerializer, ApprovalWorkflowStepSerializer
 from apps.workflows.services import decide_approval_request, submit_approval_request
+from common.permissions import TenantContextPermission, TenantRBACPermission
 from common.viewsets import TenantModelViewSet
 
 
@@ -54,3 +59,24 @@ class ApprovalActionViewSet(TenantModelViewSet):
     serializer_class = ApprovalActionSerializer
     permission_resource = "approval_request"
     http_method_names = ("get", "head", "options")
+
+
+class ApprovalInboxViewSet(ViewSet):
+    """Everything waiting on the caller's decision, across modules."""
+
+    permission_classes = (TenantContextPermission, TenantRBACPermission)
+
+    def get_required_permission(self):
+        # Every member may open their inbox; each module gates its own rows.
+        return "home.view"
+
+    @extend_schema(
+        responses={200: OpenApiTypes.OBJECT},
+        description=(
+            "Pending approvals the caller can act on (leave steps they own, attendance, payroll, "
+            "recruitment, accounting and workflow requests gated by module, permission and data "
+            "scope) plus recent decisions. Each item names the module endpoint that decides it."
+        ),
+    )
+    def list(self, request):
+        return Response(approval_inbox(request, permission_codes=effective_permission_codes(request.membership)))

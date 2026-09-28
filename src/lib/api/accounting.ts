@@ -1,6 +1,6 @@
 import { apiAction, apiDownload, apiGet, apiGetList, apiPatch, apiPost, apiPostMultipart } from "./client";
 import type { ListParams, PaginatedData } from "@/types/api";
-import type { ReportRun, ReportRuns, SavedReport, BudgetDetail, BudgetOverview, BudgetPayload, BudgetRecord, ReconciliationAccount, ReconciliationDetail, ReconciliationSuggestion, InvoiceContext, InvoiceReminder, ReceivablesSummary, PayablesSummary, VendorBillContext, RecordAttachment, AccountActivity, JournalContext, Account, AccountingConfiguration, AccountingConfigurationPayload, AccountingPeriod, AccountingPresetApplicationResult, AccountingSetupChoices, BalanceSheet, BankAccount, BankStatementLine, Customer, Expense, GhanaComplianceReminder, IncomeStatement, Invoice, InvoiceLine, JournalEntry, PayComponentAccountMapping, PayComponentAccountMappingPayload, PayrollAccountMappingTemplate, Payment, Receipt, TaxCode, TaxComponent, TrialBalance, Vendor, VendorBill, VendorBillLine, WithholdingRule } from "@/types/accounting";
+import type { BatchJob, BulkPreview, ReportRun, ReportRuns, SavedReport, BudgetDetail, BudgetOverview, BudgetPayload, BudgetRecord, ReconciliationAccount, ReconciliationDetail, ReconciliationSuggestion, InvoiceContext, InvoiceReminder, ReceivablesSummary, PayablesSummary, VendorBillContext, RecordAttachment, AccountActivity, JournalContext, Account, AccountingConfiguration, AccountingConfigurationPayload, AccountingPeriod, AccountingPresetApplicationResult, AccountingSetupChoices, BalanceSheet, BankAccount, BankStatementLine, Customer, Expense, GhanaComplianceReminder, IncomeStatement, Invoice, InvoiceLine, JournalEntry, PayComponentAccountMapping, PayComponentAccountMappingPayload, PayrollAccountMappingTemplate, Payment, Receipt, TaxCode, TaxComponent, TrialBalance, Vendor, VendorBill, VendorBillLine, WithholdingRule } from "@/types/accounting";
 
 export type AccountPayload = Pick<Account, "code" | "name" | "account_type" | "parent" | "normal_balance" | "is_postable" | "is_active">;
 
@@ -118,6 +118,9 @@ export function downloadJournalAttachment(id: string, documentId: string): Promi
 
 export function getVendorBill(id: string): Promise<VendorBill> { return apiGet<VendorBill>(`/vendor-bills/${id}/`); }
 export function getPayablesSummary(months: 3 | 6 | 12): Promise<PayablesSummary> { return apiGet<PayablesSummary>(`/vendor-bills/summary/?months=${months}`); }
+export function previewVendorBillBulk(ids: string[]): Promise<BulkPreview> { return apiPost<BulkPreview, { ids: string[] }>("/vendor-bills/bulk/preview/", { ids }); }
+export function executeVendorBillBulk(payload: { ids: string[]; operation: string; reason?: string; confirm_text?: string }): Promise<BatchJob> { return apiPost<BatchJob, typeof payload>("/vendor-bills/bulk/execute/", payload); }
+export function listVendorBillBatchJobs(limit = 5): Promise<{ count: number; results: BatchJob[] }> { return apiGet<{ count: number; results: BatchJob[] }>(`/vendor-bills/batch-jobs/?limit=${limit}`); }
 export function getVendorBillContext(id: string): Promise<VendorBillContext> { return apiGet<VendorBillContext>(`/vendor-bills/${id}/context/`); }
 export function rejectVendorBill(id: string, reason: string): Promise<VendorBill> { return apiPost<VendorBill, { reason: string }>(`/vendor-bills/${id}/reject/`, { reason }); }
 export function reviseVendorBill(id: string): Promise<VendorBill> { return apiAction<VendorBill>(`/vendor-bills/${id}/revise/`); }

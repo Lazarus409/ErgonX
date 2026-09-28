@@ -307,3 +307,37 @@ export interface ReportRuns {
   institution: { name: string; currency: string };
   roles: string[];
 }
+
+/** Governed bulk actions (concept "Bulk actions and batch governance"). */
+export type BulkOperationGroup = "safe" | "workflow" | "restricted";
+export interface BulkOperationPreview {
+  code: string;
+  label: string;
+  description: string;
+  group: BulkOperationGroup;
+  needs_reason: boolean;
+  confirm_text: string;
+  available: boolean;
+  unavailable_reason: string;
+  eligible: string[];
+  ineligible: Array<{ id: string; reference: string; reason: string }>;
+  eligible_amount: string;
+}
+export interface BulkPreview { resource: string; count: number; total_amount: string; currencies: string[]; operations: BulkOperationPreview[] }
+export interface BatchJob {
+  id: string;
+  resource: string;
+  operation: string;
+  operation_label: string;
+  status: "QUEUED" | "PROCESSING" | "COMPLETED" | "PARTIAL" | "FAILED";
+  reason: string;
+  total_items: number;
+  succeeded: number;
+  failed: number;
+  total_amount: string;
+  results: Array<{ id: string; reference: string; status: "succeeded" | "failed"; message: string }>;
+  created_by: string | null;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+}

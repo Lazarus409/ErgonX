@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
-import { CalendarDays, CheckSquare, ChevronDown, ChevronRight, CreditCard, FileText, Filter, Info, MoreHorizontal, Plus, Search, Upload, UsersRound, X } from "lucide-react";
+import { CalendarDays, CheckSquare, Layers, ChevronDown, ChevronRight, CreditCard, FileText, Filter, Info, MoreHorizontal, Plus, Search, Upload, UsersRound, X } from "lucide-react";
 
+import { BulkActionsPanel, RecentBatchJobs } from "@/components/accounting/BulkActions";
 import { Button } from "@/components/ui/Button";
 import { Avatar } from "@/components/ui/Card";
 import ErrorState from "@/components/ui/ErrorState";
@@ -48,7 +49,8 @@ export default function PayablesPage() {
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulk, setBulk] = useState<{ ids: string[]; operation?: string } | null>(null);
+  const [jobLimit, setJobLimit] = useState(5);
 
   const rangeStart = useMemo(() => { const date = new Date(); date.setDate(1); date.setMonth(date.getMonth() - (range - 1)); return date.toISOString().slice(0, 10); }, [range]);
   const loadSummary = useCallback(() => accountingApi.getPayablesSummary(range), [range]);
@@ -63,6 +65,8 @@ export default function PayablesPage() {
   const { data: refs } = useApiResource(loadRefs);
   const vendors = refs?.[0].results ?? [];
   const rows = (bills?.results ?? []).filter((bill) => !rangeStart || bill.bill_date >= rangeStart);
+  const loadJobs = useCallback(() => accountingApi.listVendorBillBatchJobs(jobLimit), [jobLimit]);
+  const { data: jobs, reload: reloadJobs } = useApiResource(loadJobs);
   const refresh = () => { reload(); reloadSummary(); };
 
   const openCreate = () => { setForm(emptyForm()); setFormError(""); setModalOpen(true); };
@@ -71,17 +75,6 @@ export default function PayablesPage() {
     setSaving(true); setFormError("");
     try { await accountingApi.createVendorBill({ ...form, bill_number: form.bill_number.trim(), currency: form.currency.trim().toUpperCase(), lines: form.lines.map((line) => ({ ...line, description: line.description.trim() })) }); setModalOpen(false); refresh(); } catch (caught) { setFormError(getApiErrorMessage(caught)); } finally { setSaving(false); }
   };
-  const bulkApprove = async () => {
-    setBulkBusy(true); setProblem(null);
-    const failures: string[] = [];
-    for (const id of selected) {
-      const bill = rows.find((row) => row.id === id);
-      if (!bill || bill.status !== "PENDING") continue;
-      try { await accountingApi.approveVendorBill(id); } catch (caught) { failures.push(`${bill.bill_number}: ${getApiErrorMessage(caught)}`); }
-    }
-    setBulkBusy(false); setSelected([]); refresh();
-    if (failures.length) setProblem(failures.join(" "));
-  };
   const exportCsv = () => {
     const header = ["Vendor", "Bill #", "Invoice date", "Due date", "Amount", "Currency", "Status", "Approver"];
     const body = rows.map((bill) => [bill.vendor_name ?? "", bill.bill_number, bill.bill_date, bill.due_date ?? "", bill.total_amount, bill.currency, bill.on_hold ? `${bill.status} (on hold)` : bill.status, bill.approved_by_name ?? ""]);
@@ -89,7 +82,8 @@ export default function PayablesPage() {
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
     const link = document.createElement("a"); link.href = url; link.download = "vendor-bills.csv"; link.click(); URL.revokeObjectURL(url);
   };
-  const pendingSelected = selected.filter((id) => rows.find((row) => row.id === id)?.status === "PENDING").length;
+  const selectedTotal = rows.filter((row) => selected.includes(row.id)).reduce((sum, row) => sum + Number(row.total_amount || 0), 0);
+  const selectedCurrencies = new Set(rows.filter((row) => selected.includes(row.id)).map((row) => row.currency));
 
   return (
     <div className="space-y-5">
@@ -130,7 +124,8 @@ export default function PayablesPage() {
           {selected.length > 0 && (
             <div className="mx-4 mb-3 flex flex-wrap items-center gap-3 rounded-xl bg-primary-soft/60 px-3 py-2 text-sm">
               <span className="font-semibold text-primary-ink">{selected.length} selected</span>
-              {can("vendor_bill.approve") && <Button size="sm" disabled={!pendingSelected} loading={bulkBusy} onClick={() => void bulkApprove()}>Approve {pendingSelected} pending</Button>}
+              <span className="tabular-nums text-ink">{formatAmount(String(selectedTotal), selectedCurrencies.size === 1 ? [...selectedCurrencies][0] : undefined)}</span>
+              <Button size="sm" leadingIcon={<Layers className="h-4 w-4" />} onClick={() => setBulk({ ids: selected })}>Bulk actions</Button>
               <Button size="sm" variant="ghost" onClick={() => setSelected([])}>Clear</Button>
             </div>
           )}
@@ -164,6 +159,7 @@ export default function PayablesPage() {
                 ))}
               </tbody>
             </table>
+            {rows.length > 0 && <p className="pt-3 text-sm text-ink-muted">{selected.length ? `${formatNumber(selected.length)} of ${formatNumber(rows.length)} bills selected` : `${formatNumber(rows.length)} bills`}</p>}
             {!loading && !rows.length && !error && (
               <div className="flex flex-col items-center py-12 text-center">
                 <span className="flex h-20 w-20 items-center justify-center rounded-full bg-surface-muted text-ink-muted"><FileText className="h-9 w-9" aria-hidden="true" /></span>
@@ -207,6 +203,17 @@ export default function PayablesPage() {
           </section>
         </aside>
       </div>
+
+      <RecentBatchJobs jobs={jobs?.results ?? []} total={jobs?.count ?? 0} onRetry={(job) => setBulk({ ids: job.results.filter((item) => item.status === "failed").map((item) => item.id), operation: job.operation })} onViewAll={() => setJobLimit(50)} />
+
+      <BulkActionsPanel
+        open={Boolean(bulk)}
+        ids={bulk?.ids ?? []}
+        initialOperation={bulk?.operation}
+        onClose={() => setBulk(null)}
+        onClearSelection={() => setSelected([])}
+        onComplete={(job) => { setSelected([]); refresh(); reloadJobs(); if (job.failed) setProblem(`${job.operation_label}: ${job.failed} of ${job.total_items} bills were not updated. Open the batch report for details.`); else setProblem(null); }}
+      />
 
       {modalOpen && <BillModal form={form} vendors={vendors} accounts={refs?.[1].results ?? []} periods={refs?.[2].results ?? []} error={formError} saving={saving} onChange={setForm} onClose={() => setModalOpen(false)} onSave={() => void save()} />}
     </div>

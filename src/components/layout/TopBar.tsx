@@ -499,6 +499,12 @@ export default function TopBar({ onOpenSidebar }: TopBarProps) {
                 placeholder="Search employees, payroll, leave, accounting…"
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && searchQuery.trim().length >= 2) {
+                    router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+                    closeSearch();
+                  }
+                }}
                 aria-label="Search"
                 className="min-w-0 flex-1 bg-transparent text-body text-ink-strong outline-none placeholder:text-ink-subtle"
               />
@@ -544,6 +550,11 @@ export default function TopBar({ onOpenSidebar }: TopBarProps) {
                 </ul>
               )}
             </div>
+            {searchQuery.trim().length >= 2 && (
+              <button type="button" onClick={() => { router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`); closeSearch(); }} className="flex w-full items-center justify-between border-t border-line-soft px-5 py-3 text-sm font-semibold text-primary-ink hover:bg-surface-hover">
+                See all results for “{searchQuery.trim()}”<span className="inline-flex items-center gap-1 text-caption text-ink-muted">Enter<ArrowRight className="h-3.5 w-3.5" aria-hidden="true" /></span>
+              </button>
+            )}
           </div>
         </div>
       )}

@@ -247,3 +247,8 @@ export function permissionsFor(
 ): string[] {
   return membership?.role?.permissions ?? [];
 }
+
+/** Ask the institution's user managers for access to a restricted page (in-app notification + audit). */
+export function requestAccess(payload: { area: string; permission?: string; path?: string; note?: string }): Promise<{ sent_to: number; already_requested: boolean }> {
+  return apiPost<{ sent_to: number; already_requested: boolean }, typeof payload>("/access-requests/", payload);
+}

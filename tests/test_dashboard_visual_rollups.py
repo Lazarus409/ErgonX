@@ -21,8 +21,8 @@ from apps.recruitment.models import Application, Interview, Offer
 def demo(api_client, db):
     with override_settings(DEBUG=True):
         call_command("seed_ergonx_demo", password="ErgonxDemo!2026", stdout=StringIO())
-    institution = Institution.objects.get(code="APEX-DEMO")
-    api_client.force_authenticate(User.objects.get(email="kwame.mensah@apexdemo.example"))
+    institution = Institution.objects.get(code="CSA-DEMO")
+    api_client.force_authenticate(User.objects.get(email="kwame.mensah@csa.test"))
     api_client.credentials(HTTP_X_INSTITUTION_ID=str(institution.id))
     return institution
 

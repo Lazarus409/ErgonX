@@ -7,7 +7,7 @@ Sources: `ERGONX_CODEX_DEMO_SEED_IMPLEMENTATION_SPEC_v1.0.md`,
 
 ## Purpose
 
-The integrated demo command must create one isolated `APEX-DEMO` institution
+The integrated demo command must create one isolated `CSA-DEMO` institution
 through domain services. The workbook is a data specification, not a runtime
 import. This audit identifies the currently supported seed paths before the
 command is implemented.
@@ -18,7 +18,7 @@ command is implemented.
 | --- | --- | --- |
 | Institution, modules, onboarding | Supported | `Institution`, `InstitutionModule`, `bootstrap_institution`, and `validate_institution_onboarding`. |
 | Built-in and custom roles | Supported | Reuse bootstrapped roles; create custom roles via `create_custom_role` with permission codes resolved from the runtime catalogue. |
-| Users and memberships | Supported | `User`, `InstitutionMembership`, and `create_membership`; all identities remain within `@apexdemo.example`. |
+| Users and memberships | Supported | `User`, `InstitutionMembership`, and `create_membership`; all identities remain within `@csa.test`. |
 | Organization | Supported | `Department`, `Position`, `Grade`, and `Location`; stable workbook codes are supported. |
 | Employees, employment, onboarding | Supported | `Employee`, `Employment`, `create_employment`, and `EmployeeOnboarding`; employee number is the stable key. |
 | Compensation and payroll profiles | Supported | `change_current_compensation`, `EmployeePayrollProfile`, and governed payroll profile services. |
@@ -48,7 +48,7 @@ command is implemented.
    `seed_recruitment_demo`, `seed_payroll_demo`, and `seed_accounting_demo`
    establish useful service patterns but cannot be composed directly because
    they create different institutions. `seed_ergonx_demo` will own only the
-   reserved `APEX-DEMO` tenant.
+   reserved `CSA-DEMO` tenant.
 
 ## Implementation controls
 
@@ -58,7 +58,7 @@ command is implemented.
   rewriting finalized or posted data.
 - Implement `--validate-only` before any reset capability.
 - Add `--reset` only after deletion scope is restricted to the verified
-  `APEX-DEMO` institution and covered by tests.
+  `CSA-DEMO` institution and covered by tests.
 - Record every excluded workbook scenario in the command report as
   `SKIPPED_UNSUPPORTED`.
 

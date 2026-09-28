@@ -7,7 +7,7 @@ python manage.py seed_ergonx_demo
 python manage.py seed_ergonx_demo --validate-only
 ```
 
-The command owns only the reserved `APEX-DEMO` institution. It is idempotent
+The command owns only the reserved `CSA-DEMO` institution. It is idempotent
 and refuses to run with `DEBUG=False`.
 
 ## Current seeded scope

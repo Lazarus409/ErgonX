@@ -53,10 +53,10 @@ from apps.accounting.models import AccountingPeriod, AccountingPresetVersion, Ba
 from apps.accounting.services import apply_accounting_preset, approve_journal, approve_vendor_bill, create_accounting_period, create_bank_account, create_customer, create_expense, create_fiscal_year, create_invoice, create_payment, create_receipt, create_vendor, create_vendor_bill, generate_payroll_journal, issue_invoice, post_journal, post_vendor_bill, submit_expense, submit_journal, submit_vendor_bill
 
 
-DEMO_INSTITUTION_CODE = "APEX-DEMO"
-DEMO_ADMIN_EMAIL = "kwame.mensah@apexdemo.example"
-DEMO_DIRECTOR_EMAIL = "evelyn.darko@apexdemo.example"
-# Keep the APEX-DEMO credential aligned with the development credential used by
+DEMO_INSTITUTION_CODE = "CSA-DEMO"
+DEMO_ADMIN_EMAIL = "kwame.mensah@csa.test"
+DEMO_DIRECTOR_EMAIL = "evelyn.darko@csa.test"
+# Keep the CSA-DEMO credential aligned with the development credential used by
 # the onboarding/demo documentation and local UI smoke tests. This is only for
 # synthetic development accounts; production seeding is explicitly blocked.
 DEFAULT_DEMO_PASSWORD = "ErgonxDemo!2026"
@@ -216,16 +216,16 @@ COMPENSATION_AMOUNTS = (
 
 
 class Command(BaseCommand):
-    help = "Seed the isolated, idempotent APEX-DEMO foundation for the integrated ErgonX demo."
+    help = "Seed the isolated, idempotent CSA-DEMO foundation for the integrated ErgonX demo."
 
     def add_arguments(self, parser):
         parser.add_argument("--password", default=DEFAULT_DEMO_PASSWORD, help="Development-only password for newly created demo accounts.")
         parser.add_argument(
             "--reset-passwords",
             action="store_true",
-            help="Development-only: reset passwords for the synthetic APEX-DEMO users to --password.",
+            help="Development-only: reset passwords for the synthetic CSA-DEMO users to --password.",
         )
-        parser.add_argument("--validate-only", action="store_true", help="Validate the current APEX-DEMO foundation without writing data.")
+        parser.add_argument("--validate-only", action="store_true", help="Validate the current CSA-DEMO foundation without writing data.")
 
     def handle(self, *args, **options):
         if not settings.DEBUG:
@@ -233,7 +233,7 @@ class Command(BaseCommand):
 
         if options["validate_only"]:
             self._validate_existing()
-            self.stdout.write(self.style.SUCCESS("APEX-DEMO integrated dataset validation passed without mutation."))
+            self.stdout.write(self.style.SUCCESS("CSA-DEMO integrated dataset validation passed without mutation."))
             return
 
         with transaction.atomic():
@@ -250,28 +250,28 @@ class Command(BaseCommand):
     def _validate_existing(self):
         institution = Institution.objects.filter(code=DEMO_INSTITUTION_CODE).first()
         if institution is None:
-            raise CommandError("APEX-DEMO does not exist; validation cannot create it.")
-        if institution.name != "Apex Digital Services Ltd." or institution.country_code != "GH" or institution.default_currency != "GHS":
-            raise CommandError("APEX-DEMO institution profile has drifted; use the normal seed only after reviewing the demo tenant.")
+            raise CommandError("CSA-DEMO does not exist; validation cannot create it.")
+        if institution.name != "Cyber Security Authority" or institution.country_code != "GH" or institution.default_currency != "GHS":
+            raise CommandError("CSA-DEMO institution profile has drifted; use the normal seed only after reviewing the demo tenant.")
         if institution.modules.filter(module_code__in=MODULE_CODES, is_enabled=True).count() != len(MODULE_CODES):
-            raise CommandError("APEX-DEMO module baseline is incomplete.")
+            raise CommandError("CSA-DEMO module baseline is incomplete.")
         if not InstitutionMembership.objects.filter(institution=institution, user__email=DEMO_ADMIN_EMAIL, role__code="INSTITUTION_ADMIN", status=InstitutionMembership.Status.ACTIVE).exists():
-            raise CommandError("APEX-DEMO requires its active institution-admin seed membership.")
+            raise CommandError("CSA-DEMO requires its active institution-admin seed membership.")
         if not InstitutionMembership.objects.filter(institution=institution, user__email=DEMO_DIRECTOR_EMAIL, role__code="DIRECTOR", status=InstitutionMembership.Status.ACTIVE).exists():
-            raise CommandError("APEX-DEMO requires its active Director setup-owner membership.")
+            raise CommandError("CSA-DEMO requires its active Director setup-owner membership.")
         self._validate_organization(institution)
         if institution.employees.count() != len(EMPLOYEES):
-            raise CommandError("APEX-DEMO employee baseline is incomplete.")
+            raise CommandError("CSA-DEMO employee baseline is incomplete.")
         required_job_codes = {"JOB-2026-00018", "JOB-2026-00019", "JOB-2026-00020"}
         required_candidate_emails = {
-            "amina.bello@apexdemo.example",
-            "david.asamoah@apexdemo.example",
-            "grace.nartey@apexdemo.example",
-            "ibrahim.sule@apexdemo.example",
-            "lydia.mensima@apexdemo.example",
-            "mark.ofori@apexdemo.example",
-            "linda.bonsu.candidate@apexdemo.example",
-            "rita.adu@apexdemo.example",
+            "amina.bello@csa.test",
+            "david.asamoah@csa.test",
+            "grace.nartey@csa.test",
+            "ibrahim.sule@csa.test",
+            "lydia.mensima@csa.test",
+            "mark.ofori@csa.test",
+            "linda.bonsu.candidate@csa.test",
+            "rita.adu@csa.test",
         }
         seeded_job_codes = set(
             institution.job_postings.filter(code__in=required_job_codes).values_list(
@@ -287,7 +287,7 @@ class Command(BaseCommand):
         # Verify the fixed recruitment fixtures by their stable identities
         # instead of rejecting those additional, dashboard-supporting records.
         if seeded_job_codes != required_job_codes or seeded_candidate_emails != required_candidate_emails:
-            raise CommandError("APEX-DEMO recruitment baseline is incomplete.")
+            raise CommandError("CSA-DEMO recruitment baseline is incomplete.")
         required_leave_references = {
             "LR-2026-00041",
             "LR-2026-00042",
@@ -302,31 +302,31 @@ class Command(BaseCommand):
         # Rolling activity adds operational leave requests for dashboard data.
         # The fixed seed is complete when its named scenarios remain present.
         if seeded_leave_references != required_leave_references:
-            raise CommandError("APEX-DEMO leave baseline is incomplete.")
+            raise CommandError("CSA-DEMO leave baseline is incomplete.")
         if institution.schedule_assignments.filter(is_current=True).count() != len(EMPLOYEES):
-            raise CommandError("APEX-DEMO current schedule-assignment baseline is incomplete.")
+            raise CommandError("CSA-DEMO current schedule-assignment baseline is incomplete.")
         if not institution.overtime_records.filter(
             employee__employee_number="EMP-000113",
             attendance_record__attendance_date=date(2026, 9, 12),
         ).exists():
-            raise CommandError("APEX-DEMO overtime baseline is incomplete.")
+            raise CommandError("CSA-DEMO overtime baseline is incomplete.")
         run = institution.payroll_runs.filter(
             payroll_period__start_date=date(2026, 9, 1),
             payroll_period__end_date=date(2026, 9, 30),
         ).first()
         if run is None or run.status != PayrollRun.Status.FINALIZED or run.records.count() != len(EMPLOYEES):
-            raise CommandError("APEX-DEMO finalized September payroll baseline is incomplete.")
+            raise CommandError("CSA-DEMO finalized September payroll baseline is incomplete.")
         journal = run.accounting_journal_entry if run else None
         if journal is None or journal.status != journal.Status.POSTED:
-            raise CommandError("APEX-DEMO payroll journal is missing or not posted.")
+            raise CommandError("CSA-DEMO payroll journal is missing or not posted.")
         if journal.lines.aggregate(debits=models.Sum("debit"))["debits"] != journal.lines.aggregate(credits=models.Sum("credit"))["credits"]:
-            raise CommandError("APEX-DEMO payroll journal is not balanced.")
+            raise CommandError("CSA-DEMO payroll journal is not balanced.")
         if institution.vendor_bills.filter(bill_number="BILL-2026-000087", status=VendorBill.Status.PAID).count() != 1:
-            raise CommandError("APEX-DEMO vendor-bill payment scenario is incomplete.")
+            raise CommandError("CSA-DEMO vendor-bill payment scenario is incomplete.")
         if institution.invoices.filter(invoice_number="INV-2026-000184", status=Invoice.Status.PART_PAID).count() != 1:
-            raise CommandError("APEX-DEMO invoice receipt scenario is incomplete.")
+            raise CommandError("CSA-DEMO invoice receipt scenario is incomplete.")
         if institution.expenses.filter(description="EXP-2026-000112 Travel expense", status=Expense.Status.PENDING).count() != 1:
-            raise CommandError("APEX-DEMO pending expense scenario is incomplete.")
+            raise CommandError("CSA-DEMO pending expense scenario is incomplete.")
         self._validate_home_activity(institution)
         self._validate_role_access(institution)
 
@@ -392,7 +392,7 @@ class Command(BaseCommand):
                 status=InstitutionMembership.Status.ACTIVE,
             ).first()
             if membership is None:
-                raise CommandError(f"APEX-DEMO requires an active {role_code} role scenario.")
+                raise CommandError(f"CSA-DEMO requires an active {role_code} role scenario.")
             permissions = set(effective_permission_codes(membership))
             missing = sorted(policy["required"] - permissions)
             forbidden = sorted(policy["forbidden"] & permissions)
@@ -403,14 +403,14 @@ class Command(BaseCommand):
                 if forbidden:
                     details.append(f"unexpected {', '.join(forbidden)}")
                 raise CommandError(
-                    f"APEX-DEMO {role_code} access policy has drifted: {'; '.join(details)}."
+                    f"CSA-DEMO {role_code} access policy has drifted: {'; '.join(details)}."
                 )
 
     def _seed_foundation(self, password, *, reset_passwords=False):
         institution, _ = Institution.objects.update_or_create(
             code=DEMO_INSTITUTION_CODE,
             defaults={
-                "name": "Apex Digital Services Ltd.",
+                "name": "Cyber Security Authority",
                 "email": DEMO_ADMIN_EMAIL,
                 "country_code": "GH",
                 "default_currency": "GHS",
@@ -467,7 +467,7 @@ class Command(BaseCommand):
 
         # Earlier seed revisions labelled the posted payroll journal as a
         # manual journal creation. Remove only that known synthetic event;
-        # APEX-DEMO has no manual journal scenario using this entity.
+        # CSA-DEMO has no manual journal scenario using this entity.
         if journal is not None:
             UserActivityEvent.objects.filter(
                 institution=institution,
@@ -485,7 +485,7 @@ class Command(BaseCommand):
         for actor, activity_code, entity in activities:
             if actor is None or entity is None:
                 raise CommandError(
-                    f"APEX-DEMO cannot seed Home activity {activity_code}; its source record is missing."
+                    f"CSA-DEMO cannot seed Home activity {activity_code}; its source record is missing."
                 )
             if UserActivityEvent.objects.filter(
                 institution=institution,
@@ -521,7 +521,7 @@ class Command(BaseCommand):
                 entity_id=entity_id,
             ).exists():
                 raise CommandError(
-                    f"APEX-DEMO Home activity baseline is missing {activity_code}."
+                    f"CSA-DEMO Home activity baseline is missing {activity_code}."
                 )
 
     def _ensure_compensation_and_payroll_profiles(self, institution, admin):
@@ -623,32 +623,32 @@ class Command(BaseCommand):
         for code, title, department_code, position_code, location_code in assignments:
             posting, _ = JobPosting.objects.get_or_create(
                 institution=institution, code=code,
-                defaults={"title": title, "department": institution.departments.get(code=department_code), "position": institution.positions.get(code=position_code), "location": institution.locations.get(code=location_code), "hiring_manager": admin, "employment_type": "PERMANENT", "description": "APEX-DEMO recruitment scenario."},
+                defaults={"title": title, "department": institution.departments.get(code=department_code), "position": institution.positions.get(code=position_code), "location": institution.locations.get(code=location_code), "hiring_manager": admin, "employment_type": "PERMANENT", "description": "CSA-DEMO recruitment scenario."},
             )
             if posting.status == JobPosting.Status.DRAFT:
                 publish_job_posting(job_posting=posting, actor=admin)
             postings[code] = posting
 
         scenario_rows = (
-            ("APP-2026-00121", "Amina", "Bello", "amina.bello@apexdemo.example", "JOB-2026-00018", "Screening", "ACTIVE"),
-            ("APP-2026-00122", "David", "Asamoah", "david.asamoah@apexdemo.example", "JOB-2026-00019", "Shortlisted", "ACTIVE"),
-            ("APP-2026-00123", "Grace", "Nartey", "grace.nartey@apexdemo.example", "JOB-2026-00018", "Interview", "ACTIVE"),
-            ("APP-2026-00124", "Ibrahim", "Sule", "ibrahim.sule@apexdemo.example", "JOB-2026-00020", "Final Review", "ACTIVE"),
-            ("APP-2026-00125", "Lydia", "Mensima", "lydia.mensima@apexdemo.example", "JOB-2026-00019", "Offer", "OFFERED"),
-            ("APP-2026-00126", "Mark", "Ofori", "mark.ofori@apexdemo.example", "JOB-2026-00020", "Applied", "REJECTED"),
-            ("APP-2026-00127", "Linda", "Bonsu", "linda.bonsu.candidate@apexdemo.example", "JOB-2026-00018", "Offer", "HIRED"),
-            ("APP-2026-00128", "Rita", "Adu", "rita.adu@apexdemo.example", "JOB-2026-00018", "Applied", "ACTIVE"),
+            ("APP-2026-00121", "Amina", "Bello", "amina.bello@csa.test", "JOB-2026-00018", "Screening", "ACTIVE"),
+            ("APP-2026-00122", "David", "Asamoah", "david.asamoah@csa.test", "JOB-2026-00019", "Shortlisted", "ACTIVE"),
+            ("APP-2026-00123", "Grace", "Nartey", "grace.nartey@csa.test", "JOB-2026-00018", "Interview", "ACTIVE"),
+            ("APP-2026-00124", "Ibrahim", "Sule", "ibrahim.sule@csa.test", "JOB-2026-00020", "Final Review", "ACTIVE"),
+            ("APP-2026-00125", "Lydia", "Mensima", "lydia.mensima@csa.test", "JOB-2026-00019", "Offer", "OFFERED"),
+            ("APP-2026-00126", "Mark", "Ofori", "mark.ofori@csa.test", "JOB-2026-00020", "Applied", "REJECTED"),
+            ("APP-2026-00127", "Linda", "Bonsu", "linda.bonsu.candidate@csa.test", "JOB-2026-00018", "Offer", "HIRED"),
+            ("APP-2026-00128", "Rita", "Adu", "rita.adu@csa.test", "JOB-2026-00018", "Applied", "ACTIVE"),
         )
         applications = {}
         for reference, first_name, last_name, email, job_code, stage_name, target_status in scenario_rows:
-            candidate, _ = Candidate.objects.get_or_create(institution=institution, email=email, defaults={"first_name": first_name, "last_name": last_name, "source": "APEX-DEMO"})
+            candidate, _ = Candidate.objects.get_or_create(institution=institution, email=email, defaults={"first_name": first_name, "last_name": last_name, "source": "CSA-DEMO"})
             application, _ = Application.objects.get_or_create(institution=institution, job_posting=postings[job_code], candidate=candidate, defaults={"notes": reference})
             if application.status == Application.Status.DRAFT:
                 application = submit_application(application=application, actor=admin)
             if application.status == Application.Status.ACTIVE and application.current_stage_id != stages[stage_name].id:
                 move_application_stage(application=application, stage=stages[stage_name], actor=admin, comment=reference)
             if target_status == "REJECTED" and application.status != Application.Status.REJECTED:
-                reject_application(application=application, actor=admin, reason="APEX-DEMO scenario")
+                reject_application(application=application, actor=admin, reason="CSA-DEMO scenario")
             applications[reference] = application
             if not candidate.location and not candidate.current_title:
                 # Application profile shown on Candidate detail, only while blank.
@@ -656,7 +656,7 @@ class Command(BaseCommand):
                 candidate.location = ("Accra, Ghana", "Kumasi, Ghana", "Tema, Ghana", "Takoradi, Ghana")[index % 4]
                 candidate.employment_status = Candidate.EmploymentStatus.EMPLOYED if index % 3 else Candidate.EmploymentStatus.UNEMPLOYED
                 candidate.current_title = postings[job_code].title if index % 3 else ""
-                candidate.current_employer = "APEX-DEMO previous employer" if index % 3 else ""
+                candidate.current_employer = "CSA-DEMO previous employer" if index % 3 else ""
                 candidate.years_experience = 2 + index % 7
                 candidate.highest_qualification = (Candidate.Qualification.BACHELORS, Candidate.Qualification.MASTERS, Candidate.Qualification.PROFESSIONAL)[index % 3]
                 candidate.field_of_study = "Business Administration"
@@ -666,7 +666,7 @@ class Command(BaseCommand):
 
         for reference in ("APP-2026-00123", "APP-2026-00124", "APP-2026-00125", "APP-2026-00127"):
             application = applications[reference]
-            interview, _ = Interview.objects.get_or_create(institution=institution, application=application, notes=reference, defaults={"scheduled_at": timezone.now(), "duration_minutes": 60, "interview_type": "Panel", "location_or_link": "APEX-DEMO", "interviewer": admin})
+            interview, _ = Interview.objects.get_or_create(institution=institution, application=application, notes=reference, defaults={"scheduled_at": timezone.now(), "duration_minutes": 60, "interview_type": "Panel", "location_or_link": "CSA-DEMO", "interviewer": admin})
             if interview.status == Interview.Status.SCHEDULED:
                 update_interview_status(interview=interview, actor=admin, status=Interview.Status.COMPLETED)
 
@@ -735,7 +735,7 @@ class Command(BaseCommand):
                 request = submit_leave_request(leave_request=request, actor=employee.user)
             if target_status == "APPROVED" and request.status == LeaveRequest.Status.PENDING:
                 for approval in request.approvals.filter(status="PENDING").order_by("sequence"):
-                    request = approve_leave_request(leave_request=request, actor=approval.approver, comment="APEX-DEMO approval")
+                    request = approve_leave_request(leave_request=request, actor=approval.approver, comment="CSA-DEMO approval")
             if request.status != target_status:
                 # Leave requests are operational workflow records. A user may
                 # have legitimately progressed a seeded scenario after the
@@ -855,7 +855,7 @@ class Command(BaseCommand):
         if configuration is None:
             apply_accounting_preset(institution=institution, actor=admin, preset_version=version, base_currency="GHS", fiscal_year_start_month=1)
         elif configuration.selected_accounting_preset_version_id != version.id:
-            raise CommandError("APEX-DEMO accounting preset has drifted; refusing to migrate its financial configuration.")
+            raise CommandError("CSA-DEMO accounting preset has drifted; refusing to migrate its financial configuration.")
         fiscal_year, _ = FiscalYear.objects.get_or_create(
             institution=institution, name="FY2026",
             defaults={"start_date": date(2026, 1, 1), "end_date": date(2026, 12, 31)},
@@ -907,8 +907,8 @@ class Command(BaseCommand):
         rent = institution.accounts.get(code="5200")
         revenue = institution.accounts.get(code="4100")
         bank_ledger = institution.accounts.get(code="1110")
-        vendor, _ = Vendor.objects.get_or_create(institution=institution, vendor_code="VND-APEX-001", defaults={"name": "Apex Office Supplies Ltd.", "email": "supplies@apexdemo.example", "country_code": "GH", "is_active": True})
-        customer, _ = Customer.objects.get_or_create(institution=institution, customer_code="CUS-APEX-001", defaults={"name": "Blue Coast Logistics Ltd.", "email": "accounts@bluecoast.example", "country_code": "GH", "is_active": True})
+        vendor, _ = Vendor.objects.get_or_create(institution=institution, vendor_code="VND-APEX-001", defaults={"name": "Apex Office Supplies Ltd.", "email": "supplies@csa.test", "country_code": "GH", "is_active": True})
+        customer, _ = Customer.objects.get_or_create(institution=institution, customer_code="CUS-APEX-001", defaults={"name": "Blue Coast Logistics Ltd.", "email": "accounts@bluecoast.test", "country_code": "GH", "is_active": True})
         bank, _ = BankAccount.objects.get_or_create(institution=institution, name="Apex Operating Account", defaults={"bank_name": "Apex Demo Bank", "masked_account_number": "****-001", "currency": "GHS", "ledger_account": bank_ledger, "is_active": True})
         bill = VendorBill.objects.filter(institution=institution, vendor=vendor, bill_number="BILL-2026-000087").first()
         if bill is None:
@@ -942,7 +942,7 @@ class Command(BaseCommand):
         """Create the 30 linked people first, then their current employment."""
         employees = {}
         for number, first_name, last_name, phone, dob, gender, hire_date, role_code in EMPLOYEES:
-            email = f"{first_name.lower()}.{last_name.lower()}@apexdemo.example"
+            email = f"{first_name.lower()}.{last_name.lower()}@csa.test"
             user, created = User.objects.get_or_create(
                 email=email,
                 defaults={"first_name": first_name, "last_name": last_name, "is_active": True},
@@ -1153,7 +1153,7 @@ class Command(BaseCommand):
         for code, (name, permission_codes) in CUSTOM_ROLES.items():
             role = Role.objects.filter(institution=institution, code=code).first()
             if role is None:
-                create_custom_role(institution=institution, actor=admin, code=code, name=name, description="APEX-DEMO role for persona demonstrations.", permission_codes=permission_codes)
+                create_custom_role(institution=institution, actor=admin, code=code, name=name, description="CSA-DEMO role for persona demonstrations.", permission_codes=permission_codes)
                 continue
             actual = set(role.permissions.values_list("code", flat=True))
             expected = set(permission_codes)
@@ -1173,12 +1173,12 @@ class Command(BaseCommand):
     def _validate_organization(self, institution):
         expected = ORGANIZATION
         if institution.departments.filter(code__in=[row[0] for row in expected["departments"]]).count() != len(expected["departments"]):
-            raise CommandError("APEX-DEMO department baseline is incomplete.")
+            raise CommandError("CSA-DEMO department baseline is incomplete.")
         if institution.positions.filter(code__in=[row[0] for row in expected["positions"]]).count() != len(expected["positions"]):
-            raise CommandError("APEX-DEMO position baseline is incomplete.")
+            raise CommandError("CSA-DEMO position baseline is incomplete.")
         if institution.grades.filter(code__in=[row[0] for row in expected["grades"]]).count() != len(expected["grades"]):
-            raise CommandError("APEX-DEMO grade baseline is incomplete.")
+            raise CommandError("CSA-DEMO grade baseline is incomplete.")
         if institution.locations.filter(code__in=[row[0] for row in expected["locations"]]).count() != len(expected["locations"]):
-            raise CommandError("APEX-DEMO location baseline is incomplete.")
+            raise CommandError("CSA-DEMO location baseline is incomplete.")
         if institution.employees.filter(employee_number__in=[row[0] for row in EMPLOYEES]).count() not in (0, len(EMPLOYEES)):
-            raise CommandError("APEX-DEMO employee baseline is incomplete.")
+            raise CommandError("CSA-DEMO employee baseline is incomplete.")

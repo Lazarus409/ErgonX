@@ -12,7 +12,7 @@ from apps.institutions.models import Institution
 def test_integrated_demo_seed_is_idempotent_and_preserves_progressed_leave_workflow():
     output = StringIO()
     call_command("seed_ergonx_demo", password="ErgonxDemo!2026", stdout=output)
-    institution = Institution.objects.get(code="APEX-DEMO")
+    institution = Institution.objects.get(code="CSA-DEMO")
     baseline = {
         "institutions": Institution.objects.count(),
         "employees": institution.employees.count(),

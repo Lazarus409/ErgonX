@@ -196,7 +196,7 @@ export default function CustomerInvoiceDetailPage() {
             {scheduled.length ? <ul className="space-y-2 text-sm">{scheduled.slice(0, 3).map((row) => <li key={row.id} className="rounded-lg bg-surface-muted px-3 py-2"><span className="font-semibold">{formatDate(row.remind_on)}</span> · {humanizeEnum(row.channel)}{row.note && <span className="block text-caption text-ink-muted">{row.note}</span>}</li>)}</ul> : <Empty icon={Bell} title="No reminders scheduled" text="Set up payment reminders for this invoice." />}
           </Panel>
           <AttachmentsPanel resource="invoices" recordId={invoice.id} attachments={context.attachments} canUpload={can("invoice.create")} onChanged={reload} />
-          <AuditPanel entries={context.audit} labels={AUDIT_LABELS} />
+          <AuditPanel entries={context.audit} labels={AUDIT_LABELS} historyHref={`/records/invoice/${invoice.id}`} />
         </aside>
       </div>
 

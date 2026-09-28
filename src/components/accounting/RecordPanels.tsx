@@ -70,7 +70,7 @@ export function AttachmentsPanel({ resource, recordId, attachments, canUpload, o
   );
 }
 
-export function AuditPanel({ entries, labels }: { entries: RecordAuditEntry[]; labels: Record<string, string> }) {
+export function AuditPanel({ entries, labels, historyHref }: { entries: RecordAuditEntry[]; labels: Record<string, string>; historyHref?: string }) {
   const [all, setAll] = useState(false);
   return (
     <Panel icon={Clock3} title={`Audit History (${entries.length})`} action={entries.length > 5 ? <button type="button" onClick={() => setAll((current) => !current)} className="text-sm font-semibold text-primary-ink hover:underline">{all ? "Show recent" : "View all"}</button> : undefined}>
@@ -84,6 +84,7 @@ export function AuditPanel({ entries, labels }: { entries: RecordAuditEntry[]; l
           ))}
         </ol>
       ) : <Empty icon={FileText} title="No audit history available" text="Audit events will appear here when data is available." />}
+      {historyHref && <a href={historyHref} className="mt-3 inline-block text-sm font-semibold text-primary-ink hover:underline">Full history &amp; lineage →</a>}
     </Panel>
   );
 }

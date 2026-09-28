@@ -212,7 +212,7 @@ export default function VendorBillDetailPage() {
             <RouteSteps bill={bill} compact />
           </Panel>
           <AttachmentsPanel resource="vendor-bills" recordId={bill.id} attachments={context.attachments} canUpload={can("vendor_bill.create")} onChanged={reload} />
-          <AuditPanel entries={context.audit} labels={AUDIT_LABELS} />
+          <AuditPanel entries={context.audit} labels={AUDIT_LABELS} historyHref={`/records/vendor_bill/${bill.id}`} />
         </aside>
       </div>
 

@@ -132,3 +132,28 @@ class InstitutionAccessRequest(BaseModel):
 
     def __str__(self):
         return f"Access request from {self.institution_name} ({self.email})"
+
+
+class AuthAttempt(BaseModel):
+    """One sign-in attempt, kept for a day to drive account lockout and IP limits.
+
+    Stored in the database (not the per-process cache) so every gunicorn worker
+    sees the same counts. The email is kept only as a keyed hash.
+    """
+
+    class Outcome(models.TextChoices):
+        SUCCEEDED = "SUCCEEDED", "Succeeded"
+        FAILED = "FAILED", "Failed"
+        CHALLENGED = "CHALLENGED", "MFA code requested"
+
+    email_key = models.CharField(max_length=64)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    outcome = models.CharField(max_length=12, choices=Outcome.choices)
+    reason = models.CharField(max_length=40, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=("email_key", "created_at")),
+            models.Index(fields=("ip_address", "created_at")),
+            models.Index(fields=("created_at",)),
+        ]

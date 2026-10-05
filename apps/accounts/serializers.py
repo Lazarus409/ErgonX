@@ -2,7 +2,7 @@ from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
-from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.exceptions import AuthenticationFailed, Throttled
 from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
@@ -15,6 +15,8 @@ import time
 from apps.accounts.models import EmailOTPChallenge, InstitutionAccessRequest, InstitutionAdminInvitation, User, UserMFA
 from apps.documents.models import ImageAsset
 from apps.accounts.emails import send_email_mfa_code
+from apps.accounts.security import mask_email
+from apps.audit.services import record_audit_event
 from django.utils.crypto import salted_hmac
 
 
@@ -34,29 +36,72 @@ def verify_totp(secret: str, code: str) -> bool:
 
 EMAIL_OTP_TTL = timedelta(minutes=5)
 EMAIL_OTP_MAX_ATTEMPTS = 5
+# A fresh code is sent at most once a minute and five times per 15 minutes
+# (Wave 0 decision BQ-10). Within the cooldown the open code stays valid.
+EMAIL_OTP_RESEND_COOLDOWN = timedelta(seconds=60)
+EMAIL_OTP_ISSUE_LIMIT = 5
+EMAIL_OTP_ISSUE_WINDOW = timedelta(minutes=15)
 
 
 class EmailOTPDeliveryError(Exception):
     """The email one-time code could not be issued or delivered."""
 
 
+class EmailOTPThrottled(Throttled):
+    api_code = "email_otp_throttled"
+
+
 def _email_otp_digest(code: str) -> str:
     return salted_hmac("ergonx-email-mfa", code).hexdigest()
 
 
-def issue_email_otp(user) -> EmailOTPChallenge:
-    """Revoke open challenges, then store and email a fresh six-digit code."""
+def email_otp_resend_wait(challenge) -> int:
+    """Seconds until a new code may be requested for this challenge."""
+    remaining = (challenge.sent_at + EMAIL_OTP_RESEND_COOLDOWN - timezone.now()).total_seconds()
+    return max(0, int(-(-remaining // 1)))
+
+
+def issue_email_otp(user, *, purpose="login") -> EmailOTPChallenge:
+    """Email a fresh six-digit code, or keep the open one while the resend cooldown runs.
+
+    A new code revokes earlier open codes. More than EMAIL_OTP_ISSUE_LIMIT codes
+    in EMAIL_OTP_ISSUE_WINDOW raises EmailOTPThrottled, so repeated sign-ins cannot
+    buy unlimited guesses or flood the mailbox.
+    """
     if not settings.EMAIL_DELIVERY_ENABLED:
         raise EmailOTPDeliveryError("Email MFA delivery is not configured.")
-    EmailOTPChallenge.objects.filter(user=user, consumed_at__isnull=True).update(consumed_at=timezone.now())
-    plain_code = f"{secrets.randbelow(1_000_000):06d}"
     now = timezone.now()
+    latest = EmailOTPChallenge.objects.filter(user=user).order_by("-created_at").first()
+    if (
+        latest
+        and latest.consumed_at is None
+        and latest.expires_at > now
+        and latest.attempts < EMAIL_OTP_MAX_ATTEMPTS
+        and latest.sent_at > now - EMAIL_OTP_RESEND_COOLDOWN
+    ):
+        return latest
+    recent = list(
+        EmailOTPChallenge.objects.filter(user=user, created_at__gte=now - EMAIL_OTP_ISSUE_WINDOW)
+        .order_by("-created_at")
+        .values_list("created_at", flat=True)[:EMAIL_OTP_ISSUE_LIMIT]
+    )
+    if len(recent) >= EMAIL_OTP_ISSUE_LIMIT:
+        wait = max(1, int((recent[-1] + EMAIL_OTP_ISSUE_WINDOW - now).total_seconds()))
+        raise EmailOTPThrottled(wait=wait, detail="Too many verification codes were requested. Wait a few minutes before asking for another.")
+    EmailOTPChallenge.objects.filter(user=user, consumed_at__isnull=True).update(consumed_at=now)
+    plain_code = f"{secrets.randbelow(1_000_000):06d}"
     challenge = EmailOTPChallenge.objects.create(user=user, code_digest=_email_otp_digest(plain_code), expires_at=now + EMAIL_OTP_TTL, sent_at=now)
     try:
         send_email_mfa_code(recipient_email=user.email, code=plain_code, expires_at=challenge.expires_at)
     except Exception as exc:
         challenge.delete()
         raise EmailOTPDeliveryError("Email MFA delivery failed.") from exc
+    record_audit_event(
+        actor=user,
+        entity=challenge,
+        action="account.mfa.email_otp.issued",
+        metadata={"purpose": purpose, "destination": mask_email(user.email), "expires_at": challenge.expires_at.isoformat()},
+    )
     return challenge
 
 
@@ -69,6 +114,8 @@ def consume_email_otp(user, code: str) -> bool:
     challenge.attempts += 1
     challenge.save(update_fields=("attempts", "updated_at"))
     if not hmac.compare_digest(challenge.code_digest, _email_otp_digest(code)):
+        if challenge.attempts >= EMAIL_OTP_MAX_ATTEMPTS:
+            record_audit_event(actor=user, entity=challenge, action="account.mfa.email_otp.locked", metadata={"attempts": challenge.attempts})
         return False
     challenge.consumed_at = timezone.now()
     challenge.save(update_fields=("consumed_at", "updated_at"))
@@ -148,10 +195,14 @@ class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
             code = str(attrs.get("mfa_code", "")).strip()
             if not code:
                 try:
-                    issue_email_otp(self.user)
+                    challenge = issue_email_otp(self.user)
                 except EmailOTPDeliveryError as exc:
                     raise AuthenticationFailed(str(exc), code="email_otp_unavailable")
-                raise EmailOTPRequired("Enter the verification code sent to your email.")
+                raise EmailOTPRequired({
+                    "detail": "Enter the verification code sent to your email.",
+                    "destination": mask_email(self.user.email),
+                    "resend_available_in": email_otp_resend_wait(challenge),
+                })
             if not consume_email_otp(self.user, code):
                 raise AuthenticationFailed("The email verification code is invalid or expired.", code="email_otp_invalid")
         elif mfa and not verify_totp(mfa.secret, attrs.get("mfa_code", "")):

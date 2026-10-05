@@ -1,6 +1,6 @@
 from django.urls import path
 
-from apps.accounts.views import AccountProfileView, AuthBootstrapView, InstitutionAccessRequestDecisionView, InstitutionAccessRequestView, InstitutionAdminInvitationAcceptanceView, InstitutionAdminInvitationActionView, InstitutionAdminInvitationView, InvitationAcceptanceView, LoginView, MFASettingsView, MeView, PasswordChangeView, PasswordResetConfirmView, PasswordResetRequestView, RefreshView, SelfServiceRegistrationView
+from apps.accounts.views import AccountProfileView, AuthBootstrapView, InstitutionAccessRequestDecisionView, InstitutionAccessRequestView, InstitutionAdminInvitationAcceptanceView, InstitutionAdminInvitationActionView, InstitutionAdminInvitationView, InvitationAcceptanceView, LoginView, LogoutView, MFASettingsView, MeView, PasswordChangeView, PasswordResetConfirmView, PasswordResetRequestView, RefreshView, SelfServiceRegistrationView
 
 urlpatterns = [
     path("login/", LoginView.as_view(), name="login"),
@@ -12,6 +12,7 @@ urlpatterns = [
     path("institution-access-requests/", InstitutionAccessRequestView.as_view(), name="institution-access-request"),
     path("institution-access-requests/<uuid:pk>/<str:decision>/", InstitutionAccessRequestDecisionView.as_view(), name="institution-access-request-decision"),
     path("refresh/", RefreshView.as_view(), name="refresh"),
+    path("logout/", LogoutView.as_view(), name="logout"),
     path("me/", MeView.as_view(), name="me"),
     path("profile/", AccountProfileView.as_view(), name="account-profile"),
     path("profile/password/", PasswordChangeView.as_view(), name="account-password-change"),

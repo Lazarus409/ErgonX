@@ -197,6 +197,10 @@ CORS_ALLOW_HEADERS = (*default_headers, "x-institution-id")
 
 # Outbound email remains disabled until SMTP has been explicitly configured.
 # This prevents local/demo environments from accidentally sending real emails.
+# Shared with the Next.js BFF, which forwards the browser's IP in
+# X-ErgonX-Client-IP together with this secret. Empty disables per-IP sign-in limits.
+BFF_PROXY_SECRET = os.environ.get("BFF_PROXY_SECRET", "")
+
 EMAIL_DELIVERY_ENABLED = os.environ.get("EMAIL_DELIVERY_ENABLED", "false").lower() == "true"
 EMAIL_BACKEND = os.environ.get(
     "EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend"

@@ -19,6 +19,8 @@ from django.db import models, transaction
 from django.utils.text import slugify
 from urllib.parse import quote
 from uuid import uuid4
+from rest_framework.exceptions import AuthenticationFailed
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework_simplejwt.tokens import RefreshToken
 from drf_spectacular.utils import OpenApiTypes, extend_schema
@@ -42,8 +44,20 @@ from apps.accounts.serializers import (
     PasswordResetRequestSerializer,
     MFASetupSerializer,
     EmailOTPDeliveryError,
+    EmailOTPRequired,
+    MFARequired,
     consume_email_otp,
+    email_otp_resend_wait,
     issue_email_otp,
+)
+from apps.accounts.models import AuthAttempt
+from apps.accounts.security import (
+    client_ip,
+    email_key,
+    ensure_login_allowed,
+    mask_email,
+    record_login_attempt,
+    revoke_refresh_tokens,
 )
 from apps.institutions.services import create_membership, effective_permission_codes
 from apps.institutions.models import Institution, InstitutionInvitation, InstitutionMembership, InstitutionModule, Role
@@ -56,8 +70,90 @@ from common.scoping import data_scope
 from common.permissions import READ_ONLY_ROLES, TenantContextPermission
 
 
+def _login_method(user):
+    mfa = UserMFA.objects.filter(user=user, is_enabled=True).first()
+    if mfa is None:
+        return "password"
+    return "email_otp" if mfa.method == UserMFA.Method.EMAIL_OTP else "totp"
+
+
 class LoginView(TokenObtainPairView):
+    """Password sign-in with MFA challenge, account lockout and per-IP limits (Wave 0 BQ-10)."""
+
     serializer_class = EmailTokenObtainPairSerializer
+
+    def post(self, request, *args, **kwargs):
+        email = str(request.data.get("email") or "").strip()
+        key = email_key(email)
+        ip, ip_trusted = client_ip(request)
+        ensure_login_allowed(key=key, ip=ip, ip_trusted=ip_trusted)
+        code_given = bool(str(request.data.get("mfa_code") or "").strip())
+        serializer = self.get_serializer(data=request.data)
+        try:
+            serializer.is_valid(raise_exception=True)
+        except TokenError as exc:
+            raise InvalidToken(exc.args[0])
+        except (MFARequired, EmailOTPRequired) as exc:
+            # Without a code these only ask for one; with a code they mean it was wrong.
+            if code_given:
+                self._failed(key, ip, email, "mfa_invalid", getattr(serializer, "user", None))
+            else:
+                record_login_attempt(key=key, ip=ip, outcome=AuthAttempt.Outcome.CHALLENGED, reason=exc.api_code)
+            raise
+        except AuthenticationFailed as exc:
+            reason = getattr(exc, "api_code", None) or exc.get_codes()
+            reason = reason if isinstance(reason, str) else "authentication_failed"
+            reason = "invalid_credentials" if reason == "no_active_account" else reason
+            if reason != "email_otp_unavailable":
+                self._failed(key, ip, email, reason, getattr(serializer, "user", None))
+            raise
+        user = serializer.user
+        record_login_attempt(key=key, ip=ip, outcome=AuthAttempt.Outcome.SUCCEEDED)
+        record_audit_event(actor=user, entity=user, action="account.login.succeeded", ip=ip, metadata={"method": _login_method(user)})
+        return Response(serializer.validated_data, status=200)
+
+    @staticmethod
+    def _failed(key, ip, email, reason, user):
+        record_login_attempt(key=key, ip=ip, outcome=AuthAttempt.Outcome.FAILED, reason=reason)
+        user = user or User.objects.filter(email__iexact=email).first()
+        metadata = {"reason": reason}
+        if user is None:
+            metadata["email_key"] = key
+        record_audit_event(actor=user, entity=user, action="account.login.failed", ip=ip, metadata=metadata)
+
+
+class LogoutView(APIView):
+    """Blacklist the session's refresh token so it cannot mint new access tokens.
+
+    Called by the BFF on sign-out with the refresh token from its HttpOnly cookie.
+    Always answers 200 so a stale or foreign token reveals nothing.
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    @extend_schema(request=OpenApiTypes.OBJECT, responses={200: OpenApiTypes.OBJECT})
+    def post(self, request):
+        raw = str(request.data.get("refresh") or "")
+        if raw:
+            try:
+                token = RefreshToken(raw)
+                token.blacklist()
+            except TokenError:
+                token = None
+            user = User.objects.filter(pk=token.payload.get("user_id")).first() if token else None
+            if user is not None:
+                record_audit_event(actor=user, entity=user, action="account.logout", ip=client_ip(request)[0], metadata={"jti": token.payload.get("jti")})
+        return Response({"logged_out": True})
+
+
+def _session_jti(raw_refresh, user):
+    """The jti of the caller's own refresh token, so a password change keeps this session."""
+    try:
+        token = RefreshToken(str(raw_refresh or ""))
+    except TokenError:
+        return None
+    return token.payload.get("jti") if str(token.payload.get("user_id")) == str(user.pk) else None
 
 
 class MFAConflict(APIException):
@@ -106,7 +202,7 @@ class MFASettingsView(APIView):
         code = str(request.data.get("code") or "").strip()
         if not code:
             try:
-                challenge = issue_email_otp(request.user)
+                challenge = issue_email_otp(request.user, purpose="enrolment")
             except EmailOTPDeliveryError as exc:
                 raise MFAConflict(str(exc), api_code="email_otp_unavailable")
             current = UserMFA.objects.filter(user=request.user).first()
@@ -115,8 +211,9 @@ class MFASettingsView(APIView):
                 "pending": bool(current and not current.is_enabled),
                 "method": current.method if current else None,
                 "email_code_sent": True,
-                "email": request.user.email,
+                "email": mask_email(request.user.email),
                 "expires_at": challenge.expires_at,
+                "resend_available_in": email_otp_resend_wait(challenge),
             })
         if not consume_email_otp(request.user, code):
             raise ValidationError({"code": "The email verification code is invalid or expired."})
@@ -215,7 +312,7 @@ class InstitutionAdminInvitationActionView(APIView):
 
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(request=InstitutionAccessRequestApproveSerializer, responses={200: OpenApiTypes.OBJECT})
+    @extend_schema(request=InstitutionAccessRequestApproveSerializer, responses={200: OpenApiTypes.OBJECT}, operation_id="auth_institution_admin_invitations_action")
     @transaction.atomic
     def post(self, request, pk, action):
         _assert_platform_admin(request)
@@ -312,7 +409,7 @@ class InstitutionAccessRequestDecisionView(APIView):
 
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(request=InstitutionAccessRequestApproveSerializer, responses={200: OpenApiTypes.OBJECT})
+    @extend_schema(request=InstitutionAccessRequestApproveSerializer, responses={200: OpenApiTypes.OBJECT}, operation_id="auth_institution_access_requests_decide")
     @transaction.atomic
     def post(self, request, pk, decision):
         _assert_platform_admin(request)
@@ -442,6 +539,9 @@ class PasswordChangeView(APIView):
         serializer.is_valid(raise_exception=True)
         request.user.set_password(serializer.validated_data["new_password"])
         request.user.save(update_fields=("password", "updated_at"))
+        # Other sessions end; the BFF passes this session's refresh token so it survives.
+        revoked = revoke_refresh_tokens(request.user, keep_jti=_session_jti(request.data.get("current_refresh"), request.user))
+        record_audit_event(actor=request.user, entity=request.user, action="account.password.changed", metadata={"sessions_revoked": revoked})
         return Response({"changed": True})
 
 
@@ -462,6 +562,8 @@ class PasswordResetRequestView(APIView):
                 send_password_reset(recipient_email=user.email, uid=uid, token=token)
             except (BadHeaderError, OSError, SMTPException):
                 pass
+            else:
+                record_audit_event(actor=user, entity=user, action="account.password.reset_requested")
         return Response({"requested": True}, status=202)
 
 
@@ -481,6 +583,8 @@ class PasswordResetConfirmView(APIView):
             return Response({"detail": "This password reset link is invalid or has expired."}, status=400)
         user.set_password(serializer.validated_data["new_password"])
         user.save(update_fields=("password", "updated_at"))
+        revoked = revoke_refresh_tokens(user)
+        record_audit_event(actor=user, entity=user, action="account.password.reset_completed", metadata={"sessions_revoked": revoked})
         return Response({"reset": True})
 
 

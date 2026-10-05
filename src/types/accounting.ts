@@ -10,6 +10,8 @@ export interface Account {
   normal_balance: NormalBalance;
   is_postable: boolean;
   is_active: boolean;
+  /** Durable system role (CASH, EMPLOYEE_PAYABLE, ...); posting resolves accounts by it. */
+  system_mapping_code?: string | null;
   created_at: string;
   updated_at: string;
 }

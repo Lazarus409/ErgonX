@@ -2,7 +2,7 @@ import { apiAction, apiDownload, apiGet, apiGetList, apiPatch, apiPost, apiPostM
 import type { ListParams, PaginatedData } from "@/types/api";
 import type { BatchJob, BulkPreview, ReportRun, ReportRuns, SavedReport, BudgetDetail, BudgetOverview, BudgetPayload, BudgetRecord, ReconciliationAccount, ReconciliationDetail, ReconciliationSuggestion, InvoiceContext, InvoiceReminder, ReceivablesSummary, PayablesSummary, VendorBillContext, RecordAttachment, AccountActivity, JournalContext, Account, AccountingConfiguration, AccountingConfigurationPayload, AccountingPeriod, AccountingPresetApplicationResult, AccountingSetupChoices, BalanceSheet, BankAccount, BankStatementLine, Customer, Expense, GhanaComplianceReminder, IncomeStatement, Invoice, InvoiceLine, JournalEntry, PayComponentAccountMapping, PayComponentAccountMappingPayload, PayrollAccountMappingTemplate, Payment, Receipt, TaxCode, TaxComponent, TrialBalance, Vendor, VendorBill, VendorBillLine, WithholdingRule } from "@/types/accounting";
 
-export type AccountPayload = Pick<Account, "code" | "name" | "account_type" | "parent" | "normal_balance" | "is_postable" | "is_active">;
+export type AccountPayload = Pick<Account, "code" | "name" | "account_type" | "parent" | "normal_balance" | "is_postable" | "is_active"> & { system_mapping_code?: string | null };
 
 export function listAccounts(params?: ListParams & { account_type?: string; normal_balance?: string; parent?: string; is_postable?: boolean; is_active?: boolean }): Promise<PaginatedData<Account>> {
   return apiGetList<Account>("/accounts/", params);

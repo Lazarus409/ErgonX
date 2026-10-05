@@ -20,11 +20,22 @@ import { Button } from "@/components/ui/Button";
 import { Checkbox, Field, Input } from "@/components/ui/Field";
 import { IDLE_MINUTES } from "@/components/guards/IdleSignOut";
 
+/** Landing chosen by the API from effective permissions (decision BQ-01). */
+const LANDING_ROUTES: Record<string, string> = {
+  PLATFORM: "/platform",
+  EXECUTIVE: "/dashboard",
+  INSIGHTS: "/insights",
+  ME: "/me",
+  HOME: "/",
+};
+
 function resolvePostLoginHref(bootstrap: SessionBootstrap): string {
-  if (bootstrap.defaultLanding === "PLATFORM") {
-    return "/platform";
-  }
-  return "/";
+  return LANDING_ROUTES[bootstrap.defaultLanding] ?? "/";
+}
+
+/** Only same-origin paths: "//host" and "/\host" would leave the site. */
+function safeNext(next: string | null): string | null {
+  return next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : null;
 }
 
 /**
@@ -79,8 +90,8 @@ export default function SignInForm({ variant = "workspace" }: { variant?: "works
         router.replace("/platform");
         return;
       }
-      const next = new URLSearchParams(window.location.search).get("next");
-      router.replace(next?.startsWith("/") ? next : resolvePostLoginHref(bootstrap));
+      const next = safeNext(new URLSearchParams(window.location.search).get("next"));
+      router.replace(next ?? resolvePostLoginHref(bootstrap));
     } catch (err: unknown) {
       const apiError = err as { code?: string };
       if (apiError.code === "mfa_required") { setMfaRequired(true); setEmailOtp(false); setError("Enter the six-digit code from your authenticator app."); }

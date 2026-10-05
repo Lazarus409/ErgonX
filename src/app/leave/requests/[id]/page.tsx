@@ -15,6 +15,7 @@ import {
   FileText,
   Info,
   MessageCircle,
+  Minus,
   Paperclip,
   Pencil,
   Send,
@@ -388,10 +389,11 @@ export default function LeaveRequestReviewPage() {
               <ul className="space-y-2">
                 {review.policy_checks.map((check) => (
                   <li key={check.code} className="flex items-start gap-3 rounded-xl bg-surface-muted/60 px-3 py-2.5">
-                    <span className={cx("mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full", check.status === "pass" ? "bg-success-soft text-success" : check.status === "warn" ? "bg-warning-soft text-warning-ink" : "bg-danger-soft text-danger")} aria-hidden="true">
-                      {check.status === "pass" ? <Check className="h-3.5 w-3.5" /> : check.status === "warn" ? <Info className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
+                    <span className={cx("mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full", check.status === "pass" ? "bg-success-soft text-success" : check.status === "warn" ? "bg-warning-soft text-warning-ink" : check.status === "fail" ? "bg-danger-soft text-danger" : "bg-surface-muted text-ink-muted")} aria-hidden="true">
+                      {check.status === "pass" ? <Check className="h-3.5 w-3.5" /> : check.status === "warn" ? <Info className="h-3.5 w-3.5" /> : check.status === "fail" ? <X className="h-3.5 w-3.5" /> : <Minus className="h-3.5 w-3.5" />}
                     </span>
-                    <span className="min-w-0"><span className="block text-sm font-semibold text-ink-strong">{check.label}</span><span className="block text-caption text-ink-muted">{check.detail}</span></span>
+                    {/* "not_evaluated": the rule could not be checked; it is never shown as compliant. */}
+                    <span className="min-w-0"><span className="block text-sm font-semibold text-ink-strong">{check.label}{check.status === "not_evaluated" && <span className="ml-2 text-caption font-medium text-ink-muted">Not evaluated</span>}</span><span className="block text-caption text-ink-muted">{check.detail}</span></span>
                   </li>
                 ))}
               </ul>

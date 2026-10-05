@@ -97,11 +97,17 @@ export interface RoleSummary {
   permissions: string[];
 }
 
+export type RoleDataScope = "INSTITUTION" | "DEPARTMENT" | "SELF";
+
 export interface InstitutionRole extends RoleSummary {
   description: string;
   is_system_role: boolean;
   is_custom: boolean;
   is_active: boolean;
+  /** Whose records the role works with. */
+  data_scope: RoleDataScope;
+  /** May read what it is granted but change nothing beyond self-service. */
+  is_read_only: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -165,6 +171,12 @@ export interface InstitutionModule {
   module_code: ModuleCode | string;
   is_enabled: boolean;
   configuration_status: ConfigurationStatus | string;
+  /** Modules that must stay enabled for this one to work. */
+  depends_on?: string[];
+  /** Modules that build on this one. */
+  required_by?: string[];
+  /** False for the foundation module (Core HR). */
+  can_disable?: boolean;
 }
 
 export interface InstitutionOnboardingStep {

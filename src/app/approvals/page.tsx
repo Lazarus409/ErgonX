@@ -52,7 +52,7 @@ export default function ApprovalsPage() {
   const { showToast } = useToast();
   const load = useCallback(() => workflowsApi.getApprovalInbox(), []);
   const { data, loading, error, reload } = useApiResource(load);
-  const [filter, setFilter] = useState<InboxModule | "ALL">("ALL");
+  const [filter, setFilter] = useState<InboxModule | "ALL" | "STALE">("ALL");
   const [pending, setPending] = useState<{ item: InboxItem; action: InboxAction } | null>(null);
   const [shown, setShown] = useState(PAGE);
 
@@ -62,8 +62,9 @@ export default function ApprovalsPage() {
 
   const { summary } = data;
   // Fall back to "All" once the filtered module's last item has been decided.
-  const activeFilter = filter !== "ALL" && !summary.by_module.some((row) => row.module === filter) ? "ALL" : filter;
-  const visible = activeFilter === "ALL" ? data.items : data.items.filter((item) => item.module === activeFilter);
+  const isStale = (item: InboxItem) => now - new Date(item.submitted_at).getTime() > 3 * DAY;
+  const activeFilter = filter === "STALE" ? (summary.waiting_over_3_days ? "STALE" : "ALL") : filter !== "ALL" && !summary.by_module.some((row) => row.module === filter) ? "ALL" : filter;
+  const visible = activeFilter === "ALL" ? data.items : activeFilter === "STALE" ? data.items.filter(isStale) : data.items.filter((item) => item.module === activeFilter);
   const awaiting = summary.actionable + summary.needs_review;
 
   return (
@@ -99,12 +100,12 @@ export default function ApprovalsPage() {
           accent="brand"
           padding="none"
           className="min-h-[22rem] [&>div:first-child]:mb-0 [&>div:first-child]:border-b [&>div:first-child]:border-line-soft [&>div:first-child]:px-5 [&>div:first-child]:py-5 sm:[&>div:first-child]:px-6"
-          actions={summary.by_module.length > 1 ? (
+          actions={summary.by_module.length > 1 || summary.waiting_over_3_days > 0 ? (
             <SegmentedControl
               label="Filter by module"
               value={activeFilter}
               onChange={(value) => { setFilter(value); setShown(PAGE); }}
-              options={[{ value: "ALL" as const, label: `All ${summary.total}` }, ...summary.by_module.map((row) => ({ value: row.module, label: `${MODULES[row.module].label} ${row.count}` }))]}
+              options={[{ value: "ALL" as const, label: `All ${summary.total}` }, ...(summary.waiting_over_3_days ? [{ value: "STALE" as const, label: `Over 3 days ${summary.waiting_over_3_days}` }] : []), ...summary.by_module.map((row) => ({ value: row.module, label: `${MODULES[row.module].label} ${row.count}` }))]}
             />
           ) : undefined}
         >

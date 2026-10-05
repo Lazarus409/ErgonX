@@ -91,7 +91,8 @@ export async function getCurrentUser(): Promise<AuthUser> {
 export function getMFAStatus(): Promise<MFAStatus> { return apiGet<MFAStatus>("/auth/security/mfa/"); }
 export function beginMFASetup(): Promise<MFAStatus> { return apiPost<MFAStatus, Record<string, never>>("/auth/security/mfa/", {}); }
 export function confirmMFASetup(code: string): Promise<MFAStatus> { return apiPut<MFAStatus, { code: string }>("/auth/security/mfa/", { code }); }
-export async function disableMFA(): Promise<MFAStatus> { await apiDelete("/auth/security/mfa/"); return { enabled: false, pending: false }; }
+/** Turning MFA off needs the current password (step-up), not just a session. */
+export async function disableMFA(currentPassword: string): Promise<MFAStatus> { await apiDelete("/auth/security/mfa/", { data: { current_password: currentPassword } }); return { enabled: false, pending: false }; }
 /** Without `code`, emails a verification code; with `code`, confirms it and switches to email OTP. */
 export function setMFAMethod(method: MFAMethod, code?: string): Promise<MFAStatus> { return apiPatch<MFAStatus, { method: MFAMethod; code?: string }>("/auth/security/mfa/", code ? { method, code } : { method }); }
 

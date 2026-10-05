@@ -272,3 +272,57 @@ def test_deleting_a_user_keeps_their_audit_records(user_factory):
     AuditLog.objects.create(actor=user, action="test.event")
     user.delete()
     assert AuditLog.objects.get(action="test.event").actor is None
+
+
+# ---- Authenticator app (TOTP) and MFA removal --------------------------------
+
+
+def _totp_now(secret):
+    import time
+
+    return _totp(secret, int(time.time()))
+
+
+def test_authenticator_setup_confirms_only_with_a_valid_code(api_client, user_factory):
+    user = user_factory(email="totp.setup@example.com")
+    api_client.force_authenticate(user)
+    secret = api_client.post(MFA, {}, format="json").json()["data"]["secret"]
+
+    wrong = api_client.put(MFA, {"code": "000000" if _totp_now(secret) != "000000" else "111111"}, format="json")
+    assert wrong.status_code == 400
+    assert not UserMFA.objects.get(user=user).is_enabled
+
+    right = api_client.put(MFA, {"code": _totp_now(secret)}, format="json")
+    assert right.status_code == 200
+    assert UserMFA.objects.get(user=user).is_enabled
+    assert AuditLog.objects.filter(actor=user, action="account.mfa.enabled").exists()
+
+
+def test_sign_in_with_authenticator_rejects_a_drifted_code(api_client, user_factory):
+    user = user_factory(email="totp.drift@example.com")
+    mfa = UserMFA.objects.create(user=user, secret="JBSWY3DPEHPK3PXP", is_enabled=True)
+    import time
+
+    stale = _totp(mfa.secret, int(time.time()) - 5 * 30)
+    if stale in {_totp(mfa.secret, int(time.time()) + drift * 30) for drift in (-1, 0, 1)}:
+        pytest.skip("the stale code happens to equal a current one")
+    assert login(api_client, user.email, mfa_code=stale).status_code in (400, 401)
+    assert login(api_client, user.email, mfa_code=_totp_now(mfa.secret)).status_code == 200
+
+
+def test_turning_off_mfa_needs_the_current_password(api_client, user_factory):
+    user = user_factory(email="totp.off@example.com")
+    UserMFA.objects.create(user=user, secret="JBSWY3DPEHPK3PXP", is_enabled=True)
+    api_client.force_authenticate(user)
+
+    refused = api_client.delete(MFA, {"current_password": "wrong"}, format="json")
+    assert refused.status_code == 400
+    assert UserMFA.objects.filter(user=user, is_enabled=True).exists()
+    assert AuditLog.objects.filter(actor=user, action="account.mfa.disable_refused").exists()
+
+    assert api_client.delete(MFA, format="json").status_code == 400
+
+    allowed = api_client.delete(MFA, {"current_password": PASSWORD_VALUE}, format="json")
+    assert allowed.status_code == 200
+    assert not UserMFA.objects.filter(user=user).exists()
+    assert AuditLog.objects.filter(actor=user, action="account.mfa.disabled").exists()

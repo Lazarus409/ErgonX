@@ -61,7 +61,7 @@ from apps.accounts.security import (
     record_login_attempt,
     revoke_refresh_tokens,
 )
-from apps.institutions.services import create_membership, effective_permission_codes
+from apps.institutions.services import create_membership, default_landing, effective_permission_codes
 from apps.institutions.models import Institution, InstitutionInvitation, InstitutionMembership, InstitutionModule, Role
 from apps.accounts.models import InstitutionAccessRequest, InstitutionAdminInvitation, User, UserMFA
 from apps.employees.models import Employee
@@ -291,6 +291,10 @@ class MFASettingsView(APIView):
 
     def delete(self, request):
         mfa = UserMFA.objects.filter(user=request.user).first()
+        if mfa and mfa.is_enabled and not request.user.check_password(str(request.data.get("current_password") or "")):
+            # Step-up (W0-SEC-04): a stolen session alone cannot remove MFA.
+            record_audit_event(actor=request.user, institution=getattr(request, "institution", None), entity=mfa, action="account.mfa.disable_refused", metadata={"method": mfa.method})
+            raise ValidationError({"current_password": "Enter your current password to turn off multi-factor authentication."})
         if mfa:
             record_audit_event(actor=request.user, institution=getattr(request, "institution", None), entity=mfa, action="account.mfa.disabled", metadata={"method": mfa.method})
             mfa.delete()
@@ -687,10 +691,8 @@ class AuthBootstrapView(APIView):
             for code in permission_codes
             if code.startswith("dashboard.") and code.endswith(".view")
         ]
-        # Home is the canonical post-login workspace for every institutional
-        # membership. Dashboards stay discoverable analytical destinations;
-        # role titles must not choose a user's landing route.
-        landing = "HOME"
+        # Landing follows effective permissions, never role titles (BQ-01).
+        landing = default_landing(permission_codes)
         payload = {
             "user": request.user,
             "active_institution": {

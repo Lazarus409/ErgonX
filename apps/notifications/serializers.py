@@ -4,6 +4,7 @@ from rest_framework import serializers
 from drf_spectacular.utils import extend_schema_field
 
 from apps.notifications.models import Notification
+from apps.notifications.services import MODULES, notification_module
 
 
 class NotificationSerializer(serializers.ModelSerializer):
@@ -13,7 +14,7 @@ class NotificationSerializer(serializers.ModelSerializer):
 
     ALLOWED_ROUTE_PREFIXES = (
         "/leave/requests/", "/payroll/runs/", "/recruitment/interviews/",
-        "/recruitment/applications/", "/accounting/journals/", "/attendance/",
+        "/recruitment/applications/", "/accounting/journals/", "/attendance/", "/approvals",
     )
 
     # Notifications addressed to the person the record is about open their own
@@ -49,6 +50,8 @@ class NotificationSerializer(serializers.ModelSerializer):
             except ValueError:
                 return None
 
+        if ref("approval_request_id"):
+            return "/approvals"
         if ref("leave_request_id"):
             return f"/leave/requests/{ref('leave_request_id')}"
         if ref("payroll_run_id"):
@@ -79,14 +82,33 @@ class NotificationSerializer(serializers.ModelSerializer):
         return self.route_for(obj.notification_type, obj.metadata)
 
     is_read = serializers.SerializerMethodField()
+    is_archived = serializers.SerializerMethodField()
+    module = serializers.SerializerMethodField()
 
     class Meta:
         model = Notification
         fields = (
-            "id", "notification_type", "title", "message", "status", "is_read", "route_hint",
-            "created_at", "read_at", "metadata",
+            "id", "notification_type", "module", "title", "message", "status", "is_read", "is_archived", "route_hint",
+            "created_at", "read_at", "archived_at", "metadata",
         )
         read_only_fields = fields
 
+    def get_is_archived(self, instance) -> bool:
+        return instance.archived_at is not None
+
+    @extend_schema_field(serializers.ChoiceField(choices=MODULES))
+    def get_module(self, instance) -> str:
+        return notification_module(instance.notification_type, instance.metadata)
+
     def get_is_read(self, instance) -> bool:
         return instance.status == Notification.Status.READ or instance.read_at is not None
+
+
+class NotificationBulkActionSerializer(serializers.Serializer):
+    ids = serializers.ListField(child=serializers.UUIDField(), min_length=1, max_length=200)
+    action = serializers.ChoiceField(choices=("mark_read", "archive", "unarchive"))
+
+
+class NotificationPreferencesSerializer(serializers.Serializer):
+    email_modules = serializers.ListField(child=serializers.ChoiceField(choices=MODULES), allow_empty=True)
+    email_available = serializers.BooleanField(read_only=True)

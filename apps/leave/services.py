@@ -728,13 +728,16 @@ def leave_review_context(*, leave_request, user):
     except ValidationError:
         policy = None
 
+    # Statuses: pass / warn / fail, or not_evaluated when a rule cannot be
+    # checked (missing data). Unknown is never reported as compliant.
     checks = []
     if policy is None:
         checks.append({"code": "policy", "label": "Applicable policy", "status": "fail", "detail": "No active policy covers this employee and leave type."})
+        checks.append({"code": "balance", "label": "Leave balance", "status": "not_evaluated", "detail": "Cannot be checked without an applicable policy."})
     else:
         checks.append({"code": "policy", "label": "Applicable policy", "status": "pass", "detail": policy.name})
         if balance is None:
-            checks.append({"code": "balance", "label": "Leave balance", "status": "warn", "detail": "No balance exists yet for this year; it is created on submission."})
+            checks.append({"code": "balance", "label": "Leave balance", "status": "not_evaluated", "detail": "No balance exists yet for this year, so availability cannot be checked."})
         elif policy.allow_negative_balance or balance.available >= leave_request.requested_days:
             checks.append({"code": "balance", "label": "Leave balance", "status": "pass", "detail": f"{balance.available} day(s) available."})
         else:
@@ -787,6 +790,8 @@ def leave_review_context(*, leave_request, user):
             "status": "warn" if overlapping else "pass",
             "detail": f"{overlapping} team member(s) off during these dates." if overlapping else "No team members off during these dates.",
         })
+    else:
+        checks.append({"code": "team_overlap", "label": "Team availability", "status": "not_evaluated", "detail": "The employee has no current department assignment."})
 
     queue = list(
         LeaveApproval.objects.filter(

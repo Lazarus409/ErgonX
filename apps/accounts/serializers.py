@@ -180,7 +180,8 @@ class AuthBootstrapSerializer(serializers.Serializer):
     enabled_modules = serializers.ListField(child=serializers.CharField())
     onboarding_ready = serializers.BooleanField()
     onboarding_status = serializers.CharField()
-    default_landing = serializers.CharField()
+    # EXECUTIVE → /dashboard, INSIGHTS → /insights, ME → /me (BQ-01).
+    default_landing = serializers.ChoiceField(choices=("EXECUTIVE", "INSIGHTS", "ME"))
     available_dashboards = serializers.ListField(child=serializers.CharField())
 
 

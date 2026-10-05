@@ -2841,240 +2841,6 @@ paths:
       - module_disabled
       - permission_denied
       - not_found
-    put:
-      operationId: approval_requests_update
-      description: |-
-        Update approval request.
-
-        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `approval_request.update` permission.
-
-        Tenant-owned results are scoped to the active institution.
-
-        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
-      summary: Update approval request
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this approval request.
-        required: true
-      tags:
-      - approval-requests
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ApprovalRequest'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/ApprovalRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/ApprovalRequest'
-        required: true
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - success
-                - data
-                - message
-                - errors
-                properties:
-                  success:
-                    type: boolean
-                    enum:
-                    - true
-                  data:
-                    $ref: '#/components/schemas/ApprovalRequest'
-                  message:
-                    type: string
-                  errors:
-                    type: object
-                    nullable: true
-                    additionalProperties: true
-          description: ''
-        '400':
-          description: Validation or business-rule failure; inspect code and errors.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Authentication is missing or invalid.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Tenant context, module enablement, or permission denied.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Resource not found in the caller's permitted scope.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-      x-error-codes:
-      - authentication_required
-      - authentication_failed
-      - tenant_mismatch
-      - module_disabled
-      - permission_denied
-      - not_found
-      - validation_error
-    patch:
-      operationId: approval_requests_partial_update
-      description: |-
-        Update approval request.
-
-        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `approval_request.update` permission.
-
-        Tenant-owned results are scoped to the active institution.
-
-        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
-      summary: Update approval request
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this approval request.
-        required: true
-      tags:
-      - approval-requests
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedApprovalRequest'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedApprovalRequest'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedApprovalRequest'
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - success
-                - data
-                - message
-                - errors
-                properties:
-                  success:
-                    type: boolean
-                    enum:
-                    - true
-                  data:
-                    $ref: '#/components/schemas/ApprovalRequest'
-                  message:
-                    type: string
-                  errors:
-                    type: object
-                    nullable: true
-                    additionalProperties: true
-          description: ''
-        '400':
-          description: Validation or business-rule failure; inspect code and errors.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Authentication is missing or invalid.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Tenant context, module enablement, or permission denied.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Resource not found in the caller's permitted scope.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-      x-error-codes:
-      - authentication_required
-      - authentication_failed
-      - tenant_mismatch
-      - module_disabled
-      - permission_denied
-      - not_found
-      - validation_error
-    delete:
-      operationId: approval_requests_destroy
-      description: |-
-        Delete approval request.
-
-        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `approval_request.delete` permission.
-
-        Tenant-owned results are scoped to the active institution.
-
-        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
-      summary: Delete approval request
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this approval request.
-        required: true
-      tags:
-      - approval-requests
-      security:
-      - jwtAuth: []
-      responses:
-        '204':
-          description: No response body
-        '401':
-          description: Authentication is missing or invalid.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Tenant context, module enablement, or permission denied.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Resource not found in the caller's permitted scope.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-      x-error-codes:
-      - authentication_required
-      - authentication_failed
-      - tenant_mismatch
-      - module_disabled
-      - permission_denied
-      - not_found
   /api/v1/approval-requests/{id}/approve/:
     post:
       operationId: approval_requests_approve_create
@@ -5830,6 +5596,12 @@ paths:
         schema:
           type: string
       - in: query
+        name: category
+        schema:
+          type: string
+          enum:
+          - security
+      - in: query
         name: entity_id
         schema:
           type: string
@@ -5863,6 +5635,13 @@ paths:
         name: q
         schema:
           type: string
+      - in: query
+        name: result
+        schema:
+          type: string
+          enum:
+          - failed
+          - success
       - name: search
         required: false
         in: query
@@ -5895,6 +5674,116 @@ paths:
                     - true
                   data:
                     $ref: '#/components/schemas/PaginatedAuditLogList'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+  /api/v1/audit/summary/:
+    get:
+      operationId: audit_summary_retrieve
+      description: |-
+        Counts for the audit trail header, under the same filters as the list.
+
+        Requires an authenticated user, an active institution context, the `audit.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: Get audit summary view
+      parameters:
+      - in: query
+        name: action
+        schema:
+          type: string
+      - in: query
+        name: actor
+        schema:
+          type: string
+      - in: query
+        name: category
+        schema:
+          type: string
+          enum:
+          - security
+      - in: query
+        name: entity_id
+        schema:
+          type: string
+      - in: query
+        name: entity_type
+        schema:
+          type: string
+      - in: query
+        name: from
+        schema:
+          type: string
+      - in: query
+        name: q
+        schema:
+          type: string
+      - in: query
+        name: result
+        schema:
+          type: string
+          enum:
+          - failed
+          - success
+      - in: query
+        name: to
+        schema:
+          type: string
+      tags:
+      - audit
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      successful:
+                        type: integer
+                      failed:
+                        type: integer
+                      security:
+                        type: integer
                   message:
                     type: string
                   errors:
@@ -18394,240 +18283,6 @@ paths:
       - module_disabled
       - permission_denied
       - not_found
-    put:
-      operationId: export_jobs_update
-      description: |-
-        Update export job.
-
-        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `export_job.update` permission.
-
-        Tenant-owned results are scoped to the active institution.
-
-        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
-      summary: Update export job
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this export job.
-        required: true
-      tags:
-      - export-jobs
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ExportJob'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/ExportJob'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/ExportJob'
-        required: true
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - success
-                - data
-                - message
-                - errors
-                properties:
-                  success:
-                    type: boolean
-                    enum:
-                    - true
-                  data:
-                    $ref: '#/components/schemas/ExportJob'
-                  message:
-                    type: string
-                  errors:
-                    type: object
-                    nullable: true
-                    additionalProperties: true
-          description: ''
-        '400':
-          description: Validation or business-rule failure; inspect code and errors.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Authentication is missing or invalid.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Tenant context, module enablement, or permission denied.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Resource not found in the caller's permitted scope.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-      x-error-codes:
-      - authentication_required
-      - authentication_failed
-      - tenant_mismatch
-      - module_disabled
-      - permission_denied
-      - not_found
-      - validation_error
-    patch:
-      operationId: export_jobs_partial_update
-      description: |-
-        Update export job.
-
-        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `export_job.update` permission.
-
-        Tenant-owned results are scoped to the active institution.
-
-        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
-      summary: Update export job
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this export job.
-        required: true
-      tags:
-      - export-jobs
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedExportJob'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedExportJob'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedExportJob'
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - success
-                - data
-                - message
-                - errors
-                properties:
-                  success:
-                    type: boolean
-                    enum:
-                    - true
-                  data:
-                    $ref: '#/components/schemas/ExportJob'
-                  message:
-                    type: string
-                  errors:
-                    type: object
-                    nullable: true
-                    additionalProperties: true
-          description: ''
-        '400':
-          description: Validation or business-rule failure; inspect code and errors.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Authentication is missing or invalid.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Tenant context, module enablement, or permission denied.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Resource not found in the caller's permitted scope.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-      x-error-codes:
-      - authentication_required
-      - authentication_failed
-      - tenant_mismatch
-      - module_disabled
-      - permission_denied
-      - not_found
-      - validation_error
-    delete:
-      operationId: export_jobs_destroy
-      description: |-
-        Delete export job.
-
-        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `export_job.delete` permission.
-
-        Tenant-owned results are scoped to the active institution.
-
-        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
-      summary: Delete export job
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this export job.
-        required: true
-      tags:
-      - export-jobs
-      security:
-      - jwtAuth: []
-      responses:
-        '204':
-          description: No response body
-        '401':
-          description: Authentication is missing or invalid.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Tenant context, module enablement, or permission denied.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Resource not found in the caller's permitted scope.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-      x-error-codes:
-      - authentication_required
-      - authentication_failed
-      - tenant_mismatch
-      - module_disabled
-      - permission_denied
-      - not_found
   /api/v1/export-jobs/{id}/download/:
     get:
       operationId: export_jobs_download_retrieve
@@ -21761,240 +21416,6 @@ paths:
       - module_disabled
       - permission_denied
       - not_found
-    put:
-      operationId: import_jobs_update
-      description: |-
-        Update import job.
-
-        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `import_job.update` permission.
-
-        Tenant-owned results are scoped to the active institution.
-
-        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
-      summary: Update import job
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this import job.
-        required: true
-      tags:
-      - import-jobs
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ImportJob'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/ImportJob'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/ImportJob'
-        required: true
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - success
-                - data
-                - message
-                - errors
-                properties:
-                  success:
-                    type: boolean
-                    enum:
-                    - true
-                  data:
-                    $ref: '#/components/schemas/ImportJob'
-                  message:
-                    type: string
-                  errors:
-                    type: object
-                    nullable: true
-                    additionalProperties: true
-          description: ''
-        '400':
-          description: Validation or business-rule failure; inspect code and errors.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Authentication is missing or invalid.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Tenant context, module enablement, or permission denied.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Resource not found in the caller's permitted scope.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-      x-error-codes:
-      - authentication_required
-      - authentication_failed
-      - tenant_mismatch
-      - module_disabled
-      - permission_denied
-      - not_found
-      - validation_error
-    patch:
-      operationId: import_jobs_partial_update
-      description: |-
-        Update import job.
-
-        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `import_job.update` permission.
-
-        Tenant-owned results are scoped to the active institution.
-
-        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
-      summary: Update import job
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this import job.
-        required: true
-      tags:
-      - import-jobs
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PatchedImportJob'
-          application/x-www-form-urlencoded:
-            schema:
-              $ref: '#/components/schemas/PatchedImportJob'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/PatchedImportJob'
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - success
-                - data
-                - message
-                - errors
-                properties:
-                  success:
-                    type: boolean
-                    enum:
-                    - true
-                  data:
-                    $ref: '#/components/schemas/ImportJob'
-                  message:
-                    type: string
-                  errors:
-                    type: object
-                    nullable: true
-                    additionalProperties: true
-          description: ''
-        '400':
-          description: Validation or business-rule failure; inspect code and errors.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Authentication is missing or invalid.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Tenant context, module enablement, or permission denied.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Resource not found in the caller's permitted scope.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-      x-error-codes:
-      - authentication_required
-      - authentication_failed
-      - tenant_mismatch
-      - module_disabled
-      - permission_denied
-      - not_found
-      - validation_error
-    delete:
-      operationId: import_jobs_destroy
-      description: |-
-        Delete import job.
-
-        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `import_job.delete` permission.
-
-        Tenant-owned results are scoped to the active institution.
-
-        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
-      summary: Delete import job
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this import job.
-        required: true
-      tags:
-      - import-jobs
-      security:
-      - jwtAuth: []
-      responses:
-        '204':
-          description: No response body
-        '401':
-          description: Authentication is missing or invalid.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Tenant context, module enablement, or permission denied.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Resource not found in the caller's permitted scope.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-      x-error-codes:
-      - authentication_required
-      - authentication_failed
-      - tenant_mismatch
-      - module_disabled
-      - permission_denied
-      - not_found
   /api/v1/import-jobs/{id}/confirm/:
     post:
       operationId: import_jobs_confirm_create
@@ -24378,265 +23799,6 @@ paths:
       - module_disabled
       - permission_denied
       - validation_error
-  /api/v1/institutions/search/:
-    get:
-      operationId: institutions_search_retrieve
-      description: |-
-        Get universal search view.
-
-        Requires an authenticated user, an active institution context, the `search.use` permission.
-
-        Tenant-owned results are scoped to the active institution.
-
-        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
-      summary: Get universal search view
-      tags:
-      - institutions
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - success
-                - data
-                - message
-                - errors
-                properties:
-                  success:
-                    type: boolean
-                    enum:
-                    - true
-                  data:
-                    type: object
-                    additionalProperties: {}
-                  message:
-                    type: string
-                  errors:
-                    type: object
-                    nullable: true
-                    additionalProperties: true
-          description: ''
-        '401':
-          description: Authentication is missing or invalid.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Tenant context, module enablement, or permission denied.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-      x-error-codes:
-      - authentication_required
-      - authentication_failed
-      - tenant_mismatch
-      - module_disabled
-      - permission_denied
-  /api/v1/institutions/search/entries/:
-    get:
-      operationId: institutions_search_entries_retrieve
-      description: |-
-        Recent and saved searches for the signed-in user.
-
-        Requires an authenticated user, an active institution context, the `search.use` permission.
-
-        Tenant-owned results are scoped to the active institution.
-
-        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
-      summary: Get search entries view
-      tags:
-      - institutions
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - success
-                - data
-                - message
-                - errors
-                properties:
-                  success:
-                    type: boolean
-                    enum:
-                    - true
-                  data:
-                    type: object
-                    additionalProperties: {}
-                  message:
-                    type: string
-                  errors:
-                    type: object
-                    nullable: true
-                    additionalProperties: true
-          description: ''
-        '401':
-          description: Authentication is missing or invalid.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Tenant context, module enablement, or permission denied.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-      x-error-codes:
-      - authentication_required
-      - authentication_failed
-      - tenant_mismatch
-      - module_disabled
-      - permission_denied
-    post:
-      operationId: institutions_search_entries_create
-      description: |-
-        Recent and saved searches for the signed-in user.
-
-        Requires an authenticated user, an active institution context, the `search.use` permission.
-
-        Tenant-owned results are scoped to the active institution.
-
-        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `validation_error`.
-      summary: Post search entries view
-      tags:
-      - institutions
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: {}
-          application/x-www-form-urlencoded:
-            schema:
-              type: object
-              additionalProperties: {}
-          multipart/form-data:
-            schema:
-              type: object
-              additionalProperties: {}
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - success
-                - data
-                - message
-                - errors
-                properties:
-                  success:
-                    type: boolean
-                    enum:
-                    - true
-                  data:
-                    type: object
-                    additionalProperties: {}
-                  message:
-                    type: string
-                  errors:
-                    type: object
-                    nullable: true
-                    additionalProperties: true
-          description: ''
-        '400':
-          description: Validation or business-rule failure; inspect code and errors.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '401':
-          description: Authentication is missing or invalid.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Tenant context, module enablement, or permission denied.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-      x-error-codes:
-      - authentication_required
-      - authentication_failed
-      - tenant_mismatch
-      - module_disabled
-      - permission_denied
-      - validation_error
-    delete:
-      operationId: institutions_search_entries_destroy
-      description: |-
-        Recent and saved searches for the signed-in user.
-
-        Requires an authenticated user, an active institution context, the `search.use` permission.
-
-        Tenant-owned results are scoped to the active institution.
-
-        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
-      summary: Delete search entries view
-      tags:
-      - institutions
-      security:
-      - jwtAuth: []
-      responses:
-        '200':
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                - success
-                - data
-                - message
-                - errors
-                properties:
-                  success:
-                    type: boolean
-                    enum:
-                    - true
-                  data:
-                    type: object
-                    additionalProperties: {}
-                  message:
-                    type: string
-                  errors:
-                    type: object
-                    nullable: true
-                    additionalProperties: true
-          description: ''
-        '401':
-          description: Authentication is missing or invalid.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Tenant context, module enablement, or permission denied.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-      x-error-codes:
-      - authentication_required
-      - authentication_failed
-      - tenant_mismatch
-      - module_disabled
-      - permission_denied
   /api/v1/institutions/settings/:
     get:
       operationId: institutions_settings_retrieve
@@ -30935,6 +30097,26 @@ paths:
         Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
       summary: Get notification list view
       parameters:
+      - in: query
+        name: archived
+        schema:
+          type: boolean
+        description: true lists the archive; default lists the inbox.
+      - in: query
+        name: module
+        schema:
+          type: string
+          enum:
+          - ACCOUNTING
+          - APPROVALS
+          - ATTENDANCE
+          - HR
+          - LEAVE
+          - PAYROLL
+          - RECRUITMENT
+          - REPORTS
+          - SECURITY
+          - SYSTEM
       - name: ordering
         required: false
         in: query
@@ -30959,6 +30141,10 @@ paths:
         description: A search term.
         schema:
           type: string
+      - in: query
+        name: unread
+        schema:
+          type: boolean
       tags:
       - notifications
       security:
@@ -31097,6 +30283,85 @@ paths:
       - permission_denied
       - not_found
       - validation_error
+  /api/v1/notifications/bulk/:
+    post:
+      operationId: notifications_bulk_create
+      description: |-
+        Mark read, archive or restore several of the caller's own notifications.
+
+        Requires an authenticated user, an active institution context, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `validation_error`.
+      summary: Post notification bulk action view
+      tags:
+      - notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationBulkAction'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NotificationBulkAction'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NotificationBulkAction'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - validation_error
   /api/v1/notifications/mark-all-read/:
     post:
       operationId: notifications_mark_all_read_create
@@ -31143,6 +30408,142 @@ paths:
                   data:
                     type: object
                     additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - validation_error
+  /api/v1/notifications/preferences/:
+    get:
+      operationId: notifications_preferences_retrieve
+      description: |-
+        Which modules also reach the member by email. In-app notifications cannot be muted.
+
+        Requires an authenticated user, an active institution context, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: Get notification preferences view
+      tags:
+      - notifications
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/NotificationPreferences'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+    put:
+      operationId: notifications_preferences_update
+      description: |-
+        Which modules also reach the member by email. In-app notifications cannot be muted.
+
+        Requires an authenticated user, an active institution context, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `validation_error`.
+      summary: Put notification preferences view
+      tags:
+      - notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationPreferences'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NotificationPreferences'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NotificationPreferences'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/NotificationPreferences'
                   message:
                     type: string
                   errors:
@@ -39316,57 +38717,6 @@ paths:
       - permission_denied
       - not_found
       - validation_error
-    delete:
-      operationId: recruitment_candidates_destroy
-      description: |-
-        Delete candidate.
-
-        Requires an authenticated user, an active institution context, the `RECRUITMENT` module enabled, the `candidate.delete` permission.
-
-        Tenant-owned results are scoped to the active institution.
-
-        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
-      summary: Delete candidate
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this candidate.
-        required: true
-      tags:
-      - recruitment
-      security:
-      - jwtAuth: []
-      responses:
-        '204':
-          description: No response body
-        '401':
-          description: Authentication is missing or invalid.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Tenant context, module enablement, or permission denied.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Resource not found in the caller's permitted scope.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-      x-error-codes:
-      - authentication_required
-      - authentication_failed
-      - tenant_mismatch
-      - module_disabled
-      - permission_denied
-      - not_found
   /api/v1/recruitment/candidates/{id}/documents/:
     get:
       operationId: recruitment_candidates_documents_retrieve
@@ -40514,57 +39864,6 @@ paths:
       - permission_denied
       - not_found
       - validation_error
-    delete:
-      operationId: recruitment_interviews_destroy
-      description: |-
-        Delete interview.
-
-        Requires an authenticated user, an active institution context, the `RECRUITMENT` module enabled, the `interview.delete` permission.
-
-        Tenant-owned results are scoped to the active institution.
-
-        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
-      summary: Delete interview
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this interview.
-        required: true
-      tags:
-      - recruitment
-      security:
-      - jwtAuth: []
-      responses:
-        '204':
-          description: No response body
-        '401':
-          description: Authentication is missing or invalid.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Tenant context, module enablement, or permission denied.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Resource not found in the caller's permitted scope.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-      x-error-codes:
-      - authentication_required
-      - authentication_failed
-      - tenant_mismatch
-      - module_disabled
-      - permission_denied
-      - not_found
   /api/v1/recruitment/interviews/{id}/reschedule/:
     post:
       operationId: recruitment_interviews_reschedule_create
@@ -41357,57 +40656,6 @@ paths:
       - permission_denied
       - not_found
       - validation_error
-    delete:
-      operationId: recruitment_job_postings_destroy
-      description: |-
-        Delete job posting.
-
-        Requires an authenticated user, an active institution context, the `RECRUITMENT` module enabled, the `job_posting.delete` permission.
-
-        Tenant-owned results are scoped to the active institution.
-
-        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
-      summary: Delete job posting
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this job posting.
-        required: true
-      tags:
-      - recruitment
-      security:
-      - jwtAuth: []
-      responses:
-        '204':
-          description: No response body
-        '401':
-          description: Authentication is missing or invalid.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Tenant context, module enablement, or permission denied.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Resource not found in the caller's permitted scope.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-      x-error-codes:
-      - authentication_required
-      - authentication_failed
-      - tenant_mismatch
-      - module_disabled
-      - permission_denied
-      - not_found
   /api/v1/recruitment/job-postings/{id}/activity/:
     get:
       operationId: recruitment_job_postings_activity_retrieve
@@ -42858,57 +42106,6 @@ paths:
       - permission_denied
       - not_found
       - validation_error
-    delete:
-      operationId: recruitment_offers_destroy
-      description: |-
-        Delete offer.
-
-        Requires an authenticated user, an active institution context, the `RECRUITMENT` module enabled, the `offer.delete` permission.
-
-        Tenant-owned results are scoped to the active institution.
-
-        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
-      summary: Delete offer
-      parameters:
-      - in: path
-        name: id
-        schema:
-          type: string
-          format: uuid
-        description: A UUID string identifying this offer.
-        required: true
-      tags:
-      - recruitment
-      security:
-      - jwtAuth: []
-      responses:
-        '204':
-          description: No response body
-        '401':
-          description: Authentication is missing or invalid.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '403':
-          description: Tenant context, module enablement, or permission denied.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-        '404':
-          description: Resource not found in the caller's permitted scope.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorEnvelope'
-      x-error-codes:
-      - authentication_required
-      - authentication_failed
-      - tenant_mismatch
-      - module_disabled
-      - permission_denied
-      - not_found
   /api/v1/recruitment/offers/{id}/accept/:
     post:
       operationId: recruitment_offers_accept_create
@@ -54658,7 +53855,16 @@ components:
         onboarding_status:
           type: string
         default_landing:
+          enum:
+          - EXECUTIVE
+          - INSIGHTS
+          - ME
           type: string
+          description: |-
+            * `EXECUTIVE` - EXECUTIVE
+            * `INSIGHTS` - INSIGHTS
+            * `ME` - ME
+          x-spec-enum-id: 311b912dddfd8772
         available_dashboards:
           type: array
           items:
@@ -59195,6 +58401,32 @@ components:
         notification_type:
           type: string
           readOnly: true
+        module:
+          enum:
+          - APPROVALS
+          - HR
+          - LEAVE
+          - ATTENDANCE
+          - PAYROLL
+          - RECRUITMENT
+          - ACCOUNTING
+          - REPORTS
+          - SECURITY
+          - SYSTEM
+          type: string
+          description: |-
+            * `APPROVALS` - APPROVALS
+            * `HR` - HR
+            * `LEAVE` - LEAVE
+            * `ATTENDANCE` - ATTENDANCE
+            * `PAYROLL` - PAYROLL
+            * `RECRUITMENT` - RECRUITMENT
+            * `ACCOUNTING` - ACCOUNTING
+            * `REPORTS` - REPORTS
+            * `SECURITY` - SECURITY
+            * `SYSTEM` - SYSTEM
+          x-spec-enum-id: af0115f866a09f99
+          readOnly: true
         title:
           type: string
           readOnly: true
@@ -59218,6 +58450,9 @@ components:
         is_read:
           type: boolean
           readOnly: true
+        is_archived:
+          type: boolean
+          readOnly: true
         route_hint:
           type: string
           nullable: true
@@ -59231,19 +58466,87 @@ components:
           format: date-time
           readOnly: true
           nullable: true
+        archived_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
         metadata:
           readOnly: true
       required:
+      - archived_at
       - created_at
       - id
+      - is_archived
       - is_read
       - message
       - metadata
+      - module
       - notification_type
       - read_at
       - route_hint
       - status
       - title
+    NotificationBulkAction:
+      type: object
+      properties:
+        ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+          maxItems: 200
+          minItems: 1
+        action:
+          enum:
+          - mark_read
+          - archive
+          - unarchive
+          type: string
+          description: |-
+            * `mark_read` - mark_read
+            * `archive` - archive
+            * `unarchive` - unarchive
+          x-spec-enum-id: 9d711f7983a80b53
+      required:
+      - action
+      - ids
+    NotificationPreferences:
+      type: object
+      properties:
+        email_modules:
+          type: array
+          items:
+            enum:
+            - APPROVALS
+            - HR
+            - LEAVE
+            - ATTENDANCE
+            - PAYROLL
+            - RECRUITMENT
+            - ACCOUNTING
+            - REPORTS
+            - SECURITY
+            - SYSTEM
+            type: string
+            description: |-
+              * `APPROVALS` - APPROVALS
+              * `HR` - HR
+              * `LEAVE` - LEAVE
+              * `ATTENDANCE` - ATTENDANCE
+              * `PAYROLL` - PAYROLL
+              * `RECRUITMENT` - RECRUITMENT
+              * `ACCOUNTING` - ACCOUNTING
+              * `REPORTS` - REPORTS
+              * `SECURITY` - SECURITY
+              * `SYSTEM` - SYSTEM
+            x-spec-enum-id: af0115f866a09f99
+        email_available:
+          type: boolean
+          readOnly: true
+      required:
+      - email_available
+      - email_modules
     Offer:
       type: object
       description: Runs model validation so domain invariants also protect non-form
@@ -62162,70 +61465,6 @@ components:
           type: string
           format: date-time
           readOnly: true
-    PatchedApprovalRequest:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-          readOnly: true
-        institution:
-          type: string
-          format: uuid
-          readOnly: true
-        workflow:
-          type: string
-          format: uuid
-        entity_type:
-          type: string
-          maxLength: 150
-        entity_id:
-          type: string
-          format: uuid
-        requested_by:
-          type: string
-          format: uuid
-          readOnly: true
-        current_step:
-          type: string
-          format: uuid
-          readOnly: true
-          nullable: true
-        status:
-          enum:
-          - PENDING
-          - APPROVED
-          - REJECTED
-          - RETURNED
-          - CANCELLED
-          type: string
-          description: |-
-            * `PENDING` - Pending
-            * `APPROVED` - Approved
-            * `REJECTED` - Rejected
-            * `RETURNED` - Returned for changes
-            * `CANCELLED` - Cancelled
-          x-spec-enum-id: a4ba95dbbcb36b55
-          readOnly: true
-        due_at:
-          type: string
-          format: date-time
-          readOnly: true
-          nullable: true
-        completed_at:
-          type: string
-          format: date-time
-          readOnly: true
-          nullable: true
-        metadata: {}
-        created_at:
-          type: string
-          format: date-time
-          readOnly: true
-        updated_at:
-          type: string
-          format: date-time
-          readOnly: true
     PatchedApprovalWorkflowDefinition:
       type: object
       description: Runs model validation so domain invariants also protect non-form
@@ -63233,61 +62472,6 @@ components:
           type: string
           format: date-time
           readOnly: true
-    PatchedExportJob:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-          readOnly: true
-        institution:
-          type: string
-          format: uuid
-          readOnly: true
-        export_type:
-          type: string
-          maxLength: 100
-        initiated_by:
-          type: string
-          format: uuid
-          readOnly: true
-          nullable: true
-        status:
-          enum:
-          - QUEUED
-          - RUNNING
-          - COMPLETED
-          - FAILED
-          - CANCELLED
-          type: string
-          description: |-
-            * `QUEUED` - Queued
-            * `RUNNING` - Running
-            * `COMPLETED` - Completed
-            * `FAILED` - Failed
-            * `CANCELLED` - Cancelled
-          x-spec-enum-id: 3ed63f59c92977fd
-          readOnly: true
-        result_reference:
-          type: string
-          readOnly: true
-        error_summary:
-          type: string
-          readOnly: true
-        completed_at:
-          type: string
-          format: date-time
-          readOnly: true
-          nullable: true
-        metadata: {}
-        created_at:
-          type: string
-          format: date-time
-          readOnly: true
-        updated_at:
-          type: string
-          format: date-time
-          readOnly: true
     PatchedFinancialReport:
       type: object
       properties:
@@ -63524,79 +62708,6 @@ components:
           type: string
         is_active:
           type: boolean
-        created_at:
-          type: string
-          format: date-time
-          readOnly: true
-        updated_at:
-          type: string
-          format: date-time
-          readOnly: true
-    PatchedImportJob:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-          readOnly: true
-        institution:
-          type: string
-          format: uuid
-          readOnly: true
-        import_type:
-          type: string
-          maxLength: 100
-        file_reference:
-          type: string
-          maxLength: 500
-        initiated_by:
-          type: string
-          format: uuid
-          readOnly: true
-          nullable: true
-        status:
-          enum:
-          - UPLOADED
-          - VALIDATING
-          - READY
-          - COMMITTING
-          - COMPLETED
-          - FAILED
-          - CANCELLED
-          type: string
-          description: |-
-            * `UPLOADED` - Uploaded
-            * `VALIDATING` - Validating
-            * `READY` - Ready
-            * `COMMITTING` - Committing
-            * `COMPLETED` - Completed
-            * `FAILED` - Failed
-            * `CANCELLED` - Cancelled
-          x-spec-enum-id: 8ea9042cd50caaef
-          readOnly: true
-        total_rows:
-          type: integer
-          readOnly: true
-        valid_rows:
-          type: integer
-          readOnly: true
-        invalid_rows:
-          type: integer
-          readOnly: true
-        error_summary:
-          type: string
-          readOnly: true
-        confirmed_at:
-          type: string
-          format: date-time
-          readOnly: true
-          nullable: true
-        completed_at:
-          type: string
-          format: date-time
-          readOnly: true
-          nullable: true
-        metadata: {}
         created_at:
           type: string
           format: date-time

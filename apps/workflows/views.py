@@ -56,6 +56,8 @@ class ApprovalRequestViewSet(TenantModelViewSet):
     model = ApprovalRequest
     serializer_class = ApprovalRequestSerializer
     permission_resource = "approval_request"
+    # Records are kept for audit: no hard DELETE route (W0-API-02).
+    http_method_names = ("get", "post", "head", "options")
 
     def perform_create(self, serializer):
         request = self.request

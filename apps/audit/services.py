@@ -27,3 +27,29 @@ def record_audit_event(
         ip_address=ip,
         user_agent=user_agent,
     )
+
+
+MASKED = "[changed]"
+
+
+def snapshot(instance, fields):
+    """Plain, JSON-safe values of ``fields`` for before/after comparison."""
+    values = {}
+    for name in fields:
+        value = getattr(instance, f"{name}_id", None) if hasattr(instance, f"{name}_id") else getattr(instance, name, None)
+        values[name] = None if value is None else str(value)
+    return values
+
+
+def field_changes(before, after, *, masked=()):
+    """The standard ``metadata.changes`` shape (W0-AUD-04): ``{field: [old, new]}``.
+
+    Fields in ``masked`` (personal identifiers and contact details) record only
+    that they changed, never their values.
+    """
+    changes = {}
+    for name in sorted(set(before) | set(after)):
+        old, new = before.get(name), after.get(name)
+        if old != new:
+            changes[name] = [MASKED, MASKED] if name in masked else [old, new]
+    return changes

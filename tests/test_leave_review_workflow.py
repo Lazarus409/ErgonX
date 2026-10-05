@@ -117,7 +117,7 @@ def test_comments_api_and_review_context(api_client, flow):
     assert body["is_requester"] is False
     codes = {check["code"]: check["status"] for check in body["policy_checks"]}
     assert codes["policy"] == "pass"
-    assert codes["balance"] in {"pass", "warn"}
+    assert codes["balance"] == "pass"
     assert "team_overlap" in codes
     assert body["queue"]["total"] == 1
 

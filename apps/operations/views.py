@@ -13,6 +13,8 @@ class ImportJobViewSet(TenantModelViewSet):
     model = ImportJob
     serializer_class = ImportJobSerializer
     permission_resource = "import_job"
+    # Records are kept for audit: no hard DELETE route (W0-API-02).
+    http_method_names = ("get", "post", "head", "options")
 
     def get_required_permission(self):
         if self.action == "confirm":
@@ -48,6 +50,8 @@ class ExportJobViewSet(TenantModelViewSet):
     model = ExportJob
     serializer_class = ExportJobSerializer
     permission_resource = "export_job"
+    # Records are kept for audit: no hard DELETE route (W0-API-02).
+    http_method_names = ("get", "post", "head", "options")
 
     def get_required_permission(self):
         if self.action == "download":

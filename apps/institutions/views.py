@@ -26,7 +26,8 @@ from apps.institutions.serializers import (
     InstitutionInvitationSerializer,
 )
 from apps.institutions.models import InstitutionInvitation, InstitutionMembership, InstitutionModule, InstitutionOnboarding, InstitutionOnboardingStep, InstitutionSetting, Permission, Role, UserPreference
-from apps.institutions.services import ONBOARDING_STEP_DEFINITIONS, set_module_enabled, clone_role, create_custom_role, create_invitation, invite_existing_user, reconcile_institution_onboarding, resume_institution_onboarding_step, revoke_invitation, skip_institution_onboarding_step, update_custom_role, update_membership, validate_institution_onboarding
+from apps.audit.services import record_audit_event
+from apps.institutions.services import ONBOARDING_STEP_DEFINITIONS, effective_permission_codes, governed_setting_permission, validate_governed_setting, set_module_enabled, clone_role, create_custom_role, create_invitation, invite_existing_user, reconcile_institution_onboarding, resume_institution_onboarding_step, revoke_invitation, skip_institution_onboarding_step, update_custom_role, update_membership, validate_institution_onboarding
 from apps.institutions.search import universal_search
 from apps.institutions.catalogues import locale_catalogues
 from common.serializers import call_validated_service
@@ -262,16 +263,28 @@ class InstitutionSettingsView(APIView):
 
     @extend_schema(request=InstitutionSettingSerializer, responses=InstitutionSettingSerializer)
     def put(self, request):
-        if "settings.institution.manage" not in request.membership.role.permissions.values_list("code", flat=True):
-            from rest_framework.exceptions import PermissionDenied
-            raise PermissionDenied("Your institution role does not grant this permission.")
+        from rest_framework.exceptions import PermissionDenied, ValidationError as DRFValidationError
+
         payload = InstitutionSettingSerializer(data=request.data)
         payload.is_valid(raise_exception=True)
+        key = payload.validated_data["key"].strip().lower()
+        value = payload.validated_data["value"]
+        # Each settings family has its own permission (W0-PERM-05).
+        required = governed_setting_permission(key)
+        if required not in effective_permission_codes(request.membership):
+            raise PermissionDenied("Your institution role does not grant this permission.")
+        problem = validate_governed_setting(key, value)
+        if problem:
+            raise DRFValidationError({"value": problem})
+        existing = InstitutionSetting.objects.filter(institution=request.institution, key=key).first()
+        before = existing.value if existing else None
         setting, _ = InstitutionSetting.objects.update_or_create(
             institution=request.institution,
-            key=payload.validated_data["key"].strip().lower(),
-            defaults={"value": payload.validated_data["value"], "updated_by": request.user},
+            key=key,
+            defaults={"value": value, "updated_by": request.user},
         )
+        if before != value:
+            record_audit_event(actor=request.user, institution=request.institution, entity=setting, action="institution.setting.updated", metadata={"key": key, "changes": {"value": [before, value]}})
         return Response(InstitutionSettingSerializer(setting).data)
 
 

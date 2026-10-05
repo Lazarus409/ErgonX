@@ -10,6 +10,7 @@ from apps.institutions.models import (
     InstitutionMembership,
     InstitutionOnboarding,
     InstitutionOnboardingStep,
+    InstitutionSetting,
     Permission,
     ReferenceSequence,
     Role,
@@ -425,7 +426,7 @@ ROLE_PERMISSION_CODES = {
         "journal.view",
         "financial_report.view",
         "budget.view",
-        "dashboard.executive.view",
+        # Auditors land on Insights, not the Executive dashboard (BQ-01).
         "dashboard.finance.view",
         "report.view",
         # Oversight is read-only: every report, but no approval queue.
@@ -499,6 +500,21 @@ def sync_system_role_permissions():
     return {code: {key: sorted(values) for key, values in change.items()} for code, change in changes.items()}
 
 
+def default_landing(permission_codes):
+    """Where a member lands after sign-in (decision BQ-01).
+
+    Executive dashboard for holders of ``dashboard.executive.view``; Insights
+    for anyone with an operational permission beyond plain self-service;
+    otherwise Employee Home (``/me``).
+    """
+    codes = set(permission_codes)
+    if "dashboard.executive.view" in codes:
+        return "EXECUTIVE"
+    if codes - set(ROLE_PERMISSION_CODES["EMPLOYEE"]):
+        return "INSIGHTS"
+    return "ME"
+
+
 def effective_permission_codes(membership):
     if membership is None or membership.status != InstitutionMembership.Status.ACTIVE:
         return ()
@@ -547,6 +563,51 @@ def _validate_delegable_permissions(permission_codes):
             api_code="permission_not_delegable",
         )
     return permissions
+
+
+# Institution settings are grouped by key namespace; each namespace has its
+# own permission (W0-PERM-05). Governed keys have a fixed value shape.
+SETTING_NAMESPACE_PERMISSIONS = {
+    "security.": "settings.security.manage",
+    "notifications.": "settings.notifications.manage",
+}
+GOVERNED_SETTINGS = {
+    # Separation of duties (BQ-04): preparer != approver, default ON.
+    "security.separation_of_duties": {"payroll": bool, "journals": bool},
+    # Whether members may receive notification copies by email.
+    "notifications.email_enabled": bool,
+}
+SETTING_DEFAULTS = {
+    "security.separation_of_duties": {"payroll": True, "journals": True},
+    "notifications.email_enabled": True,
+}
+
+
+def governed_setting_permission(key):
+    for prefix, permission in SETTING_NAMESPACE_PERMISSIONS.items():
+        if key.startswith(prefix):
+            return permission
+    return "settings.institution.manage"
+
+
+def validate_governed_setting(key, value):
+    """An error message when ``value`` does not fit a governed key, else None."""
+    shape = GOVERNED_SETTINGS.get(key)
+    if shape is None:
+        if any(key.startswith(prefix) for prefix in SETTING_NAMESPACE_PERMISSIONS):
+            return "Unknown setting."
+        return None
+    if shape is bool:
+        return None if isinstance(value, bool) else "Must be true or false."
+    if not isinstance(value, dict) or set(value) != set(shape) or not all(isinstance(value[name], kind) for name, kind in shape.items()):
+        return f"Must be an object with exactly: {', '.join(f'{name} ({kind.__name__})' for name, kind in shape.items())}."
+    return None
+
+
+def institution_setting(institution, key):
+    """A governed setting's stored value, or its default."""
+    row = InstitutionSetting.objects.filter(institution=institution, key=key).first()
+    return row.value if row is not None else SETTING_DEFAULTS.get(key)
 
 
 # A module may be enabled only while the modules it builds on are enabled

@@ -25,7 +25,7 @@ from apps.institutions.services import create_invitation, record_user_activity
 from apps.organization.models import Department, Grade, Location, Position
 from apps.documents.models import Document
 from apps.documents.serializers import DocumentSerializer
-from apps.audit.services import record_audit_event
+from apps.audit.services import field_changes, record_audit_event, snapshot
 from common.scoping import scope_to_employees
 from common.serializers import call_validated_service
 from common.viewsets import TenantModelViewSet
@@ -191,6 +191,16 @@ class SelfServiceDocumentDetailView(SelfServiceBaseView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+# Employee fields recorded in the audit trail. Personal identifiers and
+# contact details are masked: the trail shows that they changed, not the values.
+EMPLOYEE_AUDIT_FIELDS = (
+    "employee_number", "first_name", "middle_name", "last_name", "preferred_name", "work_email",
+    "personal_email", "phone", "mobile_phone", "office_location", "linkedin_url", "date_of_birth",
+    "gender", "hire_date", "status", "user",
+)
+EMPLOYEE_MASKED_FIELDS = frozenset({"personal_email", "phone", "mobile_phone", "date_of_birth", "linkedin_url"})
+
+
 class EmployeeViewSet(TenantModelViewSet):
     model = Employee
     serializer_class = EmployeeSerializer
@@ -217,6 +227,10 @@ class EmployeeViewSet(TenantModelViewSet):
 
     def perform_create(self, serializer):
         employee = serializer.save(institution=self.request.institution)
+        record_audit_event(
+            actor=self.request.user, institution=self.request.institution, entity=employee, action="employee.created",
+            metadata={"changes": field_changes({}, snapshot(employee, EMPLOYEE_AUDIT_FIELDS), masked=EMPLOYEE_MASKED_FIELDS)},
+        )
         record_user_activity(
             actor=self.request.user,
             institution=self.request.institution,
@@ -226,7 +240,11 @@ class EmployeeViewSet(TenantModelViewSet):
 
     def perform_update(self, serializer):
         ensure_not_self_hr_mutation(actor=self.request.user, employee=self.get_object())
-        serializer.save()
+        before = snapshot(serializer.instance, EMPLOYEE_AUDIT_FIELDS)
+        employee = serializer.save()
+        changes = field_changes(before, snapshot(employee, EMPLOYEE_AUDIT_FIELDS), masked=EMPLOYEE_MASKED_FIELDS)
+        if changes:
+            record_audit_event(actor=self.request.user, institution=self.request.institution, entity=employee, action="employee.updated", metadata={"changes": changes})
 
     def get_required_permission(self):
         if self.action == "me":
@@ -239,8 +257,11 @@ class EmployeeViewSet(TenantModelViewSet):
 
     def perform_destroy(self, instance):
         ensure_not_self_hr_mutation(actor=self.request.user, employee=instance)
+        previous = instance.status
         instance.status = Employee.Status.INACTIVE
         instance.save(update_fields=("status", "updated_at"))
+        if previous != instance.status:
+            record_audit_event(actor=self.request.user, institution=self.request.institution, entity=instance, action="employee.deactivated", metadata={"changes": {"status": [previous, instance.status]}})
 
     @action(detail=False, methods=("get",), url_path="me")
     def me(self, request):

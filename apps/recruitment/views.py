@@ -1,6 +1,6 @@
 from drf_spectacular.utils import extend_schema
 from rest_framework.decorators import action
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import MethodNotAllowed, NotFound
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
@@ -23,6 +23,13 @@ class JobPostingViewSet(RecruitmentViewSet):
     model = JobPosting
     serializer_class = JobPostingSerializer
     permission_resource = "job_posting"
+    # Records are kept for audit: DELETE serves only the nested actions below,
+    # never the record itself (W0-API-02).
+    http_method_names = ("get", "post", "put", "patch", "delete", "head", "options")
+
+    @extend_schema(exclude=True)
+    def destroy(self, request, *args, **kwargs):
+        raise MethodNotAllowed(request.method)
     filterset_fields = ("status", "department", "position", "location", "employment_type")
     search_fields = ("code", "title", "description")
     ordering_fields = ("code", "title", "opens_on", "closes_on", "created_at", "updated_at")
@@ -137,6 +144,13 @@ class CandidateViewSet(RecruitmentViewSet):
     model = Candidate
     serializer_class = CandidateSerializer
     permission_resource = "candidate"
+    # Records are kept for audit: DELETE serves only the nested actions below,
+    # never the record itself (W0-API-02).
+    http_method_names = ("get", "post", "put", "patch", "delete", "head", "options")
+
+    @extend_schema(exclude=True)
+    def destroy(self, request, *args, **kwargs):
+        raise MethodNotAllowed(request.method)
     filterset_fields = ("status", "source")
     search_fields = ("first_name", "middle_name", "last_name", "email", "phone")
     ordering_fields = ("first_name", "last_name", "email", "created_at", "updated_at")
@@ -356,6 +370,8 @@ class InterviewViewSet(RecruitmentViewSet):
     model = Interview
     serializer_class = InterviewSerializer
     permission_resource = "interview"
+    # Records are kept for audit: no hard DELETE route (W0-API-02).
+    http_method_names = ("get", "post", "put", "patch", "head", "options")
     filterset_fields = ("application", "interviewer", "status", "scheduled_at")
     search_fields = ("application__candidate__first_name", "application__candidate__last_name", "interview_type")
     ordering_fields = ("scheduled_at", "created_at", "updated_at")
@@ -435,6 +451,8 @@ class OfferViewSet(RecruitmentViewSet):
     model = Offer
     serializer_class = OfferSerializer
     permission_resource = "offer"
+    # Records are kept for audit: no hard DELETE route (W0-API-02).
+    http_method_names = ("get", "post", "put", "patch", "head", "options")
     filterset_fields = ("application", "status", "department", "position", "proposed_start_date")
     search_fields = ("application__candidate__first_name", "application__candidate__last_name", "application__job_posting__title")
     ordering_fields = ("proposed_start_date", "created_at", "updated_at")

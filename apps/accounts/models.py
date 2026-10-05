@@ -157,3 +157,21 @@ class AuthAttempt(BaseModel):
             models.Index(fields=("ip_address", "created_at")),
             models.Index(fields=("created_at",)),
         ]
+
+
+class UserSession(BaseModel):
+    """One signed-in browser or device; its id travels in tokens as the ``sid`` claim.
+
+    Revoking a session stops both its refresh and access tokens immediately
+    (checked on every request), not only when the access token expires.
+    """
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="sessions")
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=300, blank=True)
+    last_seen_at = models.DateTimeField()
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    revoked_reason = models.CharField(max_length=40, blank=True)
+
+    class Meta:
+        indexes = [models.Index(fields=("user", "revoked_at", "last_seen_at"))]

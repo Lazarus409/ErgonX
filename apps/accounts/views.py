@@ -29,6 +29,7 @@ from apps.accounts.platform import expire_stale_admin_invitations, record_platfo
 from apps.accounts.serializers import (
     AuthBootstrapSerializer,
     EmailTokenObtainPairSerializer,
+    SessionTokenRefreshSerializer,
     UserSerializer,
     SelfServiceRegistrationSerializer,
     InstitutionAdminInvitationCreateSerializer,
@@ -50,7 +51,8 @@ from apps.accounts.serializers import (
     email_otp_resend_wait,
     issue_email_otp,
 )
-from apps.accounts.models import AuthAttempt
+from apps.accounts.models import AuthAttempt, UserSession
+from apps.accounts.sessions import SESSION_CLAIM, active_sessions, revoke_sessions, start_session
 from apps.accounts.security import (
     client_ip,
     email_key,
@@ -143,8 +145,70 @@ class LogoutView(APIView):
                 token = None
             user = User.objects.filter(pk=token.payload.get("user_id")).first() if token else None
             if user is not None:
-                record_audit_event(actor=user, entity=user, action="account.logout", ip=client_ip(request)[0], metadata={"jti": token.payload.get("jti")})
+                sid = token.payload.get(SESSION_CLAIM)
+                if sid:
+                    UserSession.objects.filter(pk=sid, user=user, revoked_at__isnull=True).update(revoked_at=timezone.now(), revoked_reason="signed_out")
+                record_audit_event(actor=user, entity=user, action="account.logout", ip=client_ip(request)[0], metadata={"jti": token.payload.get("jti"), "session": sid})
         return Response({"logged_out": True})
+
+
+def _current_sid(request):
+    auth = getattr(request, "auth", None)
+    return auth.get(SESSION_CLAIM) if auth is not None else None
+
+
+class SessionListView(APIView):
+    """The signed-in user's active sessions (Security Center)."""
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
+    def get(self, request):
+        current = _current_sid(request)
+        rows = [
+            {
+                "id": str(session.id),
+                "ip_address": session.ip_address,
+                "user_agent": session.user_agent,
+                "created_at": session.created_at,
+                "last_seen_at": session.last_seen_at,
+                "current": str(session.id) == str(current),
+            }
+            for session in active_sessions(request.user)
+        ]
+        return Response({"sessions": rows})
+
+
+class SessionRevokeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(request=None, responses={200: OpenApiTypes.OBJECT})
+    def post(self, request, pk):
+        session = UserSession.objects.filter(pk=pk, user=request.user, revoked_at__isnull=True).first()
+        if session is None:
+            from rest_framework.exceptions import NotFound
+
+            raise NotFound("No active session with this id.")
+        revoke_sessions(request.user, actor=request.user, reason="revoked_by_user", only=session.pk)
+        return Response({"revoked": 1, "current": str(session.pk) == str(_current_sid(request))})
+
+
+class SessionRevokeOthersView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(request=None, responses={200: OpenApiTypes.OBJECT})
+    def post(self, request):
+        revoked = revoke_sessions(request.user, actor=request.user, reason="revoked_by_user", keep_sid=_current_sid(request))
+        return Response({"revoked": revoked})
+
+
+def _refresh_sid(raw_refresh, user):
+    """The session named by the caller's own refresh token (the BFF passes it on password change)."""
+    try:
+        token = RefreshToken(str(raw_refresh or ""))
+    except TokenError:
+        return None
+    return token.payload.get(SESSION_CLAIM) if str(token.payload.get("user_id")) == str(user.pk) else None
 
 
 def _session_jti(raw_refresh, user):
@@ -499,12 +563,12 @@ class InstitutionAdminInvitationAcceptanceView(APIView):
         invitation.institution = institution
         invitation.save(update_fields=("status", "accepted_at", "institution", "updated_at"))
         record_platform_event(actor=user, action="institution.created", institution=institution, entity=institution, metadata={"name": institution.name, "invitation": str(invitation.id)})
-        refresh = RefreshToken.for_user(user)
+        refresh = start_session(user, request)
         return Response({"access": str(refresh.access_token), "refresh": str(refresh), "user": UserSerializer(user).data, "institution": {"id": str(institution.id), "name": institution.name, "code": institution.code}}, status=201)
 
 
 class RefreshView(TokenRefreshView):
-    pass
+    serializer_class = SessionTokenRefreshSerializer
 
 
 class MeView(APIView):
@@ -541,6 +605,7 @@ class PasswordChangeView(APIView):
         request.user.save(update_fields=("password", "updated_at"))
         # Other sessions end; the BFF passes this session's refresh token so it survives.
         revoked = revoke_refresh_tokens(request.user, keep_jti=_session_jti(request.data.get("current_refresh"), request.user))
+        revoke_sessions(request.user, actor=request.user, reason="password_changed", keep_sid=_current_sid(request) or _refresh_sid(request.data.get("current_refresh"), request.user))
         record_audit_event(actor=request.user, entity=request.user, action="account.password.changed", metadata={"sessions_revoked": revoked})
         return Response({"changed": True})
 
@@ -584,6 +649,7 @@ class PasswordResetConfirmView(APIView):
         user.set_password(serializer.validated_data["new_password"])
         user.save(update_fields=("password", "updated_at"))
         revoked = revoke_refresh_tokens(user)
+        revoke_sessions(user, actor=user, reason="password_reset")
         record_audit_event(actor=user, entity=user, action="account.password.reset_completed", metadata={"sessions_revoked": revoked})
         return Response({"reset": True})
 

@@ -1,5 +1,9 @@
 from rest_framework import serializers
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenObtainSerializer, TokenRefreshSerializer
+from rest_framework_simplejwt.exceptions import InvalidToken
+from rest_framework_simplejwt.settings import api_settings as jwt_settings
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.contrib.auth.models import update_last_login
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework.exceptions import AuthenticationFailed, Throttled
@@ -189,7 +193,8 @@ class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
         return token
 
     def validate(self, attrs):
-        data = super().validate(attrs)
+        # Authenticate only; tokens are issued after MFA, bound to a new session.
+        data = TokenObtainSerializer.validate(self, attrs)
         mfa = UserMFA.objects.filter(user=self.user, is_enabled=True).first()
         if mfa and mfa.method == UserMFA.Method.EMAIL_OTP:
             code = str(attrs.get("mfa_code", "")).strip()
@@ -207,8 +212,30 @@ class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
                 raise AuthenticationFailed("The email verification code is invalid or expired.", code="email_otp_invalid")
         elif mfa and not verify_totp(mfa.secret, attrs.get("mfa_code", "")):
             raise MFARequired("Enter the six-digit authenticator code to continue.")
+        from apps.accounts.sessions import start_session
+
+        refresh = start_session(self.user, self.context.get("request"))
+        data["refresh"] = str(refresh)
+        data["access"] = str(refresh.access_token)
+        if jwt_settings.UPDATE_LAST_LOGIN:
+            update_last_login(None, self.user)
         data["user"] = UserSerializer(self.user).data
         return data
+
+
+class SessionTokenRefreshSerializer(TokenRefreshSerializer):
+    """Refuses refresh tokens of a revoked session and records the session as seen."""
+
+    def validate(self, attrs):
+        from apps.accounts.models import UserSession
+        from apps.accounts.sessions import SESSION_CLAIM
+
+        sid = RefreshToken(attrs["refresh"]).get(SESSION_CLAIM)
+        if sid:
+            updated = UserSession.objects.filter(pk=sid, revoked_at__isnull=True).update(last_seen_at=timezone.now())
+            if not updated:
+                raise InvalidToken({"detail": "This session has been signed out.", "code": "session_revoked"})
+        return super().validate(attrs)
 
 
 class MFASetupSerializer(serializers.Serializer):

@@ -78,6 +78,8 @@ function routeContext(pathname: string): { section: string; page?: string } {
     if (pathname.startsWith("/approvals")) return { section: "Approvals" };
     if (pathname.startsWith("/documents")) return { section: "Documents" };
     if (pathname.startsWith("/operations")) return { section: "Operations" };
+    if (pathname.startsWith("/records/")) return { section: "Home", page: "Record history" };
+    if (pathname.startsWith("/search")) return { section: "Home", page: "Search" };
     if (pathname.startsWith("/design/states")) return { section: "Home", page: "Empty, Error and Loading States" };
     return { section: "Workspace" };
   }

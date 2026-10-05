@@ -78,9 +78,18 @@ class Role(TenantOwnedModel):
     code = models.CharField(max_length=50)
     name = models.CharField(max_length=150)
     description = models.TextField(blank=True)
+    class DataScope(models.TextChoices):
+        INSTITUTION = "INSTITUTION", "Whole institution"
+        DEPARTMENT = "DEPARTMENT", "Own record and departments the member heads"
+        SELF = "SELF", "Own records only"
+
     is_system_role = models.BooleanField(default=False)
     is_custom = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
+    # Whose records the role works with, and whether it may change anything
+    # beyond self-service. Set per role (Wave 2, BQ-11), not inferred from codes.
+    data_scope = models.CharField(max_length=12, choices=DataScope.choices, default=DataScope.INSTITUTION)
+    is_read_only = models.BooleanField(default=False)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

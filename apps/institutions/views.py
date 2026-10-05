@@ -26,7 +26,7 @@ from apps.institutions.serializers import (
     InstitutionInvitationSerializer,
 )
 from apps.institutions.models import InstitutionInvitation, InstitutionMembership, InstitutionModule, InstitutionOnboarding, InstitutionOnboardingStep, InstitutionSetting, Permission, Role, UserPreference
-from apps.institutions.services import ONBOARDING_STEP_DEFINITIONS, clone_role, create_custom_role, create_invitation, invite_existing_user, reconcile_institution_onboarding, resume_institution_onboarding_step, revoke_invitation, skip_institution_onboarding_step, update_custom_role, update_membership, validate_institution_onboarding
+from apps.institutions.services import ONBOARDING_STEP_DEFINITIONS, set_module_enabled, clone_role, create_custom_role, create_invitation, invite_existing_user, reconcile_institution_onboarding, resume_institution_onboarding_step, revoke_invitation, skip_institution_onboarding_step, update_custom_role, update_membership, validate_institution_onboarding
 from apps.institutions.search import universal_search
 from apps.institutions.catalogues import locale_catalogues
 from common.serializers import call_validated_service
@@ -286,7 +286,9 @@ class InstitutionModuleViewSet(TenantModelViewSet):
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        module = serializer.save(enabled_by=request.user if serializer.validated_data.get("is_enabled") else instance.enabled_by)
+        module = instance
+        if "is_enabled" in serializer.validated_data:
+            module = call_validated_service(set_module_enabled, module=instance, institution=request.institution, actor=request.user, is_enabled=serializer.validated_data["is_enabled"])
         call_validated_service(validate_institution_onboarding, institution=request.institution, actor=request.user)
         return Response(self.get_serializer(module).data)
 

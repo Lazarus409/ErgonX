@@ -23,10 +23,6 @@ INSTITUTION = "INSTITUTION"
 DEPARTMENT = "DEPARTMENT"
 SELF = "SELF"
 
-ROLE_DATA_SCOPES = {
-    "EMPLOYEE": SELF,
-    "DEPARTMENT_HEAD": DEPARTMENT,
-}
 
 # Management permissions that grant institution-wide rows per record family.
 LEAVE_BROAD = ("leave.approve", "leave.reject", "leave.configure", "leave.balance.manage", "dashboard.leave.view")
@@ -38,7 +34,7 @@ def data_scope(request):
     membership = getattr(request, "membership", None)
     if membership is None:
         return SELF
-    return ROLE_DATA_SCOPES.get(membership.role.code, INSTITUTION)
+    return membership.role.data_scope or INSTITUTION
 
 
 def permission_codes(request):

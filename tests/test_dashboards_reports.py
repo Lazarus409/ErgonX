@@ -42,6 +42,8 @@ def test_hr_dashboard_and_csv_export_are_tenant_scoped(
     user = user_factory()
     membership_factory(user=user, institution=institution, role_code="HR_ADMIN", is_primary=True)
     employee_factory(foreign)
+    # CSV reports live under the Reports module (Wave 0 decision BQ-05).
+    institution.modules.filter(module_code="REPORTS").update(is_enabled=True)
 
     api_client.force_authenticate(user)
     api_client.credentials(HTTP_X_INSTITUTION_ID=str(institution.id))

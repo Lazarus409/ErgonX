@@ -52,6 +52,9 @@ class ReportsViewSet(ViewSet):
     def _respond(self, request, name):
         granted = set(effective_permission_codes(request.membership))
         # report.all (directors, auditors) opens every report read-only and institution-wide.
+        # REPORTS gates every reports surface, as well as the source module (Wave 0 BQ-05).
+        if not request.institution.modules.filter(module_code="REPORTS", is_enabled=True).exists():
+            raise PermissionDenied("The REPORTS module is disabled.", code="module_disabled")
         sees_all = "report.all" in granted
         if not sees_all and not all(granted & set(requirement) for requirement in REPORT_PERMISSIONS[name]):
             raise PermissionDenied("Your role does not include access to this report.")

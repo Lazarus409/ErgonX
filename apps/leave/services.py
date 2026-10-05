@@ -22,7 +22,7 @@ from apps.leave.models import (
     LeavePolicyLocationEligibility,
     LeaveRequest,
 )
-from apps.workflows.models import ApprovalWorkflowDefinition
+from apps.workflows.engine import Trigger, department_head_of, resolve_chain, resolve_definition
 from apps.notifications.models import Notification
 
 
@@ -170,59 +170,33 @@ def _department_head_approver(leave_request):
     department the search continues with the parent department's head.
     """
     employment = _employment_on(leave_request.employee, leave_request.start_date)
-    department = employment.department if employment else None
-    seen = set()
-    while department is not None and department.id not in seen:
-        seen.add(department.id)
-        head = department.head
-        if (
-            department.is_active
-            and head is not None
-            and head.id != leave_request.employee_id
-            and _is_active_member(head.user, leave_request.institution)
-        ):
-            return head.user
-        department = department.parent
-    return None
+    return department_head_of(
+        employment.department if employment else None,
+        exclude_employee_id=leave_request.employee_id,
+        institution=leave_request.institution,
+    )
 
 
 def _configured_approvers(leave_request):
-    definition = (
-        ApprovalWorkflowDefinition.objects.filter(
-            institution=leave_request.institution,
-            entity_type__in=("leave.LeaveRequest", "LeaveRequest"),
-            is_active=True,
-        )
-        .prefetch_related("steps__approver_user", "steps__approver_role")
-        .order_by("created_at")
-        .first()
+    employment = _employment_on(leave_request.employee, leave_request.start_date)
+    # The approval engine picks the leave workflow (department-specific first)
+    # and never returns the requester as their own approver.
+    definition = resolve_definition(
+        leave_request.institution,
+        Trigger.LEAVE_REQUEST,
+        department=employment.department if employment else None,
     )
-    if definition:
-        resolved = []
-        for step in definition.steps.order_by("order"):
-            approver = step.approver_user
-            if approver is None and step.approver_role_id and step.approver_role.code == "DEPARTMENT_HEAD":
-                # "Department Head" means the requester's own head, not any member holding the role.
-                approver = _department_head_approver(leave_request)
-            elif approver is None and step.approver_role_id:
-                membership = (
-                    InstitutionMembership.objects.filter(
-                        institution=leave_request.institution,
-                        role=step.approver_role,
-                        status=InstitutionMembership.Status.ACTIVE,
-                    )
-                    .select_related("user")
-                    .order_by("joined_at", "created_at")
-                    .first()
-                )
-                approver = membership.user if membership else None
-            if approver is None:
-                raise ValidationError(
-                    {"approval": f"No active approver is available for step {step.order}."}
-                )
-            resolved.append(approver)
-        if resolved:
-            return resolved
+    if definition and definition.steps.exists():
+        return [
+            approver
+            for _, approver in resolve_chain(
+                definition,
+                institution=leave_request.institution,
+                requester=leave_request.employee.user,
+                employment=employment,
+                employee_id=leave_request.employee_id,
+            )
+        ]
 
     requester = leave_request.employee.user
     fallback = []

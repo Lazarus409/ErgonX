@@ -17,3 +17,16 @@ class SessionJWTAuthentication(JWTAuthentication):
         if sid and not session_is_active(sid):
             raise InvalidToken({"detail": "This session has been signed out.", "code": "session_revoked"})
         return token
+
+
+try:
+    from drf_spectacular.contrib.rest_framework_simplejwt import SimpleJWTScheme
+except ImportError:  # pragma: no cover - schema tooling not installed
+    SimpleJWTScheme = None
+
+if SimpleJWTScheme is not None:
+
+    class SessionJWTScheme(SimpleJWTScheme):
+        """Document SessionJWTAuthentication as the same bearer scheme (``jwtAuth``)."""
+
+        target_class = "apps.accounts.authentication.SessionJWTAuthentication"

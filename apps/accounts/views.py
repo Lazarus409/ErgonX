@@ -69,7 +69,7 @@ from apps.documents.models import ImageAsset
 from apps.accounts.emails import send_institution_access_request_notice, send_institution_admin_invitation, send_password_reset
 from apps.audit.services import record_audit_event
 from common.scoping import data_scope
-from common.permissions import READ_ONLY_ROLES, TenantContextPermission
+from common.permissions import TenantContextPermission
 
 
 def _login_method(user):
@@ -708,7 +708,7 @@ class AuthBootstrapView(APIView):
                 # INSTITUTION, DEPARTMENT or SELF: whose records this member works with.
                 "data_scope": data_scope(request),
                 # Read-only roles may view what they are granted but not change it.
-                "read_only": request.membership.role.code in READ_ONLY_ROLES,
+                "read_only": request.membership.role.is_read_only,
             },
             "effective_permissions": list(permission_codes),
             "enabled_modules": enabled_modules,

@@ -9,6 +9,7 @@ import {
   House,
   LayoutDashboard,
   Network,
+  Receipt,
   Settings,
   ShieldCheck,
   Users,
@@ -207,6 +208,14 @@ export const selfServiceNavigation: NavigationItem[] = [
     icon: CircleDollarSign,
     module: "PAYROLL",
     permission: "payslip.view",
+    selfService: true,
+  },
+  {
+    label: "My Expenses",
+    href: "/me/expenses",
+    icon: Receipt,
+    module: "ACCOUNTING",
+    permission: "expense.claim_own",
     selfService: true,
   },
   {

@@ -12,7 +12,7 @@ export const APPROVAL_TRIGGER_LABELS: Record<ApprovalTrigger, string> = {
 };
 
 /** Triggers whose module already routes its approvals through these definitions. */
-export const CONNECTED_TRIGGERS: ReadonlySet<ApprovalTrigger> = new Set(["LEAVE_REQUEST"]);
+export const CONNECTED_TRIGGERS: ReadonlySet<ApprovalTrigger> = new Set(["LEAVE_REQUEST", "EXPENSE_CLAIM"]);
 
 export type ApproverType = "USER" | "ROLE" | "REQUESTER_DEPARTMENT_HEAD" | "REQUESTER_MANAGER";
 

@@ -59,6 +59,7 @@ export * as recruitmentApi from "./recruitment";
 export * as schedulingApi from "./scheduling";
 export * as searchApi from "./search";
 export * as workflowsApi from "./workflows";
+export * as expensesApi from "./expenses";
 export * as operationsApi from "./operations";
 export * as notificationsApi from "./notifications";
 export * as imagesApi from "./images";

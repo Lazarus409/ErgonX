@@ -14,7 +14,6 @@ import type { ReactNode } from "react";
 import { useAuth } from "@/components/guards/AuthProvider";
 import { getApiErrorMessage } from "@/lib/api";
 import type { SessionBootstrap } from "@/types/auth";
-import PasswordStrength from "@/components/ui/PasswordStrength";
 import AuthShell, { AuthHeading } from "@/components/brand/AuthShell";
 import Alert from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
@@ -150,7 +149,6 @@ export default function SignInForm({ variant = "workspace" }: { variant?: "works
               </button>
             }
           />
-          <PasswordStrength value={password} />
         </div>
         {mfaRequired && (
           <div>

@@ -133,7 +133,8 @@ export async function handler(request: NextRequest, context: RouteContext): Prom
   const isInvitationAcceptance = request.method === "POST" && /^auth\/institution-admin-invitations\/[^/]+$/.test(route);
 
   const headers = new Headers();
-  const acceptedHeaders = ["accept", "content-type", "x-institution-id"];
+  // user-agent lets the API name each signed-in session ("Chrome on Windows").
+  const acceptedHeaders = ["accept", "content-type", "x-institution-id", "user-agent"];
   for (const name of acceptedHeaders) {
     const value = request.headers.get(name);
     if (value) headers.set(name, value);

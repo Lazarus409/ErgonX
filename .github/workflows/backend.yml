@@ -38,4 +38,9 @@ jobs:
       - run: python manage.py makemigrations --check --dry-run
       - run: python manage.py migrate
       - run: python manage.py check
+      - name: OpenAPI schema is valid and committed
+        run: |
+          python manage.py spectacular --file /tmp/openapi.yml --validate 2>&1 | tee /tmp/spectacular.log
+          if grep -Eq "Errors: +[1-9]" /tmp/spectacular.log; then echo "OpenAPI schema has errors"; exit 1; fi
+          diff -q --strip-trailing-cr openapi-schema.yml /tmp/openapi.yml || { echo "openapi-schema.yml is stale: run manage.py spectacular --file openapi-schema.yml"; exit 1; }
       - run: pytest

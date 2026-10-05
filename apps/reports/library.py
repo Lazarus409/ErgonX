@@ -342,6 +342,7 @@ class AnalyticsItemWriteSerializer(serializers.Serializer):
         return {key: str(item) for key, item in value.items() if item not in (None, "")}
 
 
+@extend_schema(request=OpenApiTypes.OBJECT, responses={200: OpenApiTypes.OBJECT})
 class AnalyticsLibraryViewSet(ViewSet):
     """`/report-library/`: the Reports & Analytics catalogue."""
 
@@ -358,7 +359,7 @@ class AnalyticsLibraryViewSet(ViewSet):
                 return item, shared
         raise NotFound("This dashboard or report was not found.")
 
-    @extend_schema(responses={200: OpenApiTypes.OBJECT}, description="Every dashboard and report the caller may open, with sidebar counts.")
+    @extend_schema(responses={200: OpenApiTypes.OBJECT}, description="Every dashboard and report the caller may open, with sidebar counts.", operation_id="report_library_list")
     def list(self, request):
         viewer = Viewer(request)
         items, shared = visible_items(viewer)

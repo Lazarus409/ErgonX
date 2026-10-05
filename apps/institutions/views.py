@@ -411,6 +411,7 @@ class UniversalSearchView(APIView):
         return Response({"query": query, "results": results if full else results[:limit], "count": len(results), "groups": counts})
 
 
+@extend_schema(request=OpenApiTypes.OBJECT, responses={200: OpenApiTypes.OBJECT})
 class SearchEntriesView(APIView):
     """Recent and saved searches for the signed-in user."""
 

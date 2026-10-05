@@ -3,6 +3,7 @@ from rest_framework import serializers
 
 from apps.accounting.models import (
     Account,
+    BankReconciliationSession,
     AccountingPeriod,
     AccountingPreset,
     AccountingPresetVersion,
@@ -864,3 +865,13 @@ class BalanceSheetSerializer(serializers.Serializer):
     retained_result = serializers.DecimalField(max_digits=20, decimal_places=2)
     total_equity = serializers.DecimalField(max_digits=20, decimal_places=2)
     balanced = serializers.BooleanField()
+
+
+class BankReconciliationSessionSerializer(serializers.ModelSerializer):
+    bank_account_name = serializers.CharField(source="bank_account.name", read_only=True)
+
+    class Meta:
+        model = BankReconciliationSession
+        fields = ("id", "bank_account", "bank_account_name", "period_start", "period_end", "statement_opening_balance",
+                  "statement_closing_balance", "status", "completed_at", "last_imported_at", "created_at", "updated_at")
+        read_only_fields = ("id", "status", "completed_at", "last_imported_at", "created_at", "updated_at")

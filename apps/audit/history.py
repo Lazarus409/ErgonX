@@ -5,6 +5,7 @@ and its closely-linked records grouped into lifecycle stages, the predecessor
 and successor records it is linked to, and whether it is read-only. Everything
 is read from existing audit logs and relations; nothing is stored here.
 """
+from drf_spectacular.utils import OpenApiTypes, extend_schema
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -218,6 +219,7 @@ BUILDERS = {
 }
 
 
+@extend_schema(request=OpenApiTypes.OBJECT, responses={200: OpenApiTypes.OBJECT})
 class RecordHistoryView(APIView):
     permission_classes = [TenantContextPermission]
 

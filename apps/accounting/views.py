@@ -676,6 +676,7 @@ class InvoiceViewSet(RecordAttachmentsMixin, TenantModelViewSet):
                                    channel=str(request.data.get("channel", "EMAIL")), note=str(request.data.get("note", "")))
         return Response(_reminders(invoice), status=201 if request.method == "POST" else 200)
 
+    @extend_schema(operation_id="invoices_reminders_update")
     @action(detail=True, methods=("post",), filter_backends=(), url_path=r"reminders/(?P<reminder_id>[0-9a-f-]+)")
     def update_reminder(self, request, pk=None, reminder_id=None):
         from apps.accounting.services import update_invoice_reminder
@@ -1666,20 +1667,9 @@ class BankReconciliationSessionViewSet(TenantModelViewSet):
         return BankReconciliationSession
 
     def get_serializer_class(self):
-        from rest_framework import serializers
+        from apps.accounting.serializers import BankReconciliationSessionSerializer
 
-        from apps.accounting.models import BankReconciliationSession
-
-        class SessionSerializer(serializers.ModelSerializer):
-            bank_account_name = serializers.CharField(source="bank_account.name", read_only=True)
-
-            class Meta:
-                model = BankReconciliationSession
-                fields = ("id", "bank_account", "bank_account_name", "period_start", "period_end", "statement_opening_balance",
-                          "statement_closing_balance", "status", "completed_at", "last_imported_at", "created_at", "updated_at")
-                read_only_fields = ("id", "status", "completed_at", "last_imported_at", "created_at", "updated_at")
-
-        return SessionSerializer
+        return BankReconciliationSessionSerializer
 
     def get_queryset(self):
         return super().get_queryset().select_related("bank_account", "started_by", "completed_by", "last_imported_by")

@@ -59,16 +59,21 @@ ONBOARDING_STEP_DEFINITIONS = (
     ("ACCOUNTING_CONFIGURATION", 70, "ACCOUNTING"),
     ("PAYROLL_GL_MAPPING", 80, ""),
     ("RECRUITMENT_CONFIGURATION", 90, "RECRUITMENT"),
-    ("USERS_AND_ROLES", 100, "CORE_HR"),
+    ("USERS_AND_ROLES", 100, ""),
     ("VALIDATION", 110, ""),
 )
 
+# A setup owner is required only when one of its modules is enabled. Auditor
+# and Director are governance roles, so they are optional during setup.
+def system_role_name(code):
+    """Display name for a system role code; str.title() alone would give "Hr Admin"."""
+    return code.replace("_", " ").title().replace("Hr ", "HR ")
+
+
 ONBOARDING_SETUP_OWNER_ROLES = (
-    "HR_ADMIN",
-    "FINANCE_MANAGER",
-    "ACCOUNTANT",
-    "AUDITOR",
-    "DIRECTOR",
+    ("HR_ADMIN", frozenset({"CORE_HR", "LEAVE", "ATTENDANCE", "RECRUITMENT"})),
+    ("FINANCE_MANAGER", frozenset({"PAYROLL", "ACCOUNTING"})),
+    ("ACCOUNTANT", frozenset({"ACCOUNTING"})),
 )
 
 
@@ -710,23 +715,26 @@ def _onboarding_step_blocker(institution, step):
             role__code="INSTITUTION_ADMIN",
         ).exists():
             return ("ACTIVE_ADMIN_REQUIRED", "At least one active Institution Admin is required.")
+        enabled_modules = set(institution.modules.filter(is_enabled=True).values_list("module_code", flat=True))
+        required_roles = [code for code, modules in ONBOARDING_SETUP_OWNER_ROLES if modules & enabled_modules]
         assigned_owner_roles = set(
             InstitutionMembership.objects.filter(
                 institution=institution,
                 status__in=(InstitutionMembership.Status.INVITED, InstitutionMembership.Status.ACTIVE),
-                role__code__in=ONBOARDING_SETUP_OWNER_ROLES,
+                role__code__in=required_roles,
             ).values_list("role__code", flat=True)
         )
         pending_owner_roles = set(
             InstitutionInvitation.objects.filter(
                 institution=institution,
                 status=InstitutionInvitation.Status.PENDING,
-                role__code__in=ONBOARDING_SETUP_OWNER_ROLES,
+                role__code__in=required_roles,
             ).values_list("role__code", flat=True)
         )
+        role_names = dict(Role.objects.filter(institution=institution, code__in=required_roles).values_list("code", "name"))
         missing = [
-            code.replace("_", " ").title()
-            for code in ONBOARDING_SETUP_OWNER_ROLES
+            role_names.get(code) or system_role_name(code)
+            for code in required_roles
             if code not in assigned_owner_roles | pending_owner_roles
         ]
         if missing:
@@ -985,7 +993,7 @@ def bootstrap_institution(institution):
         role, _ = Role.objects.update_or_create(
             institution=institution,
             code=code,
-            defaults={"name": code.replace("_", " ").title(), "is_system_role": True, "is_custom": False},
+            defaults={"name": system_role_name(code), "is_system_role": True, "is_custom": False},
         )
         role.permissions.set(permissions[item] for item in permission_codes)
 

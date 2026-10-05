@@ -326,3 +326,17 @@ def test_turning_off_mfa_needs_the_current_password(api_client, user_factory):
     assert allowed.status_code == 200
     assert not UserMFA.objects.filter(user=user).exists()
     assert AuditLog.objects.filter(actor=user, action="account.mfa.disabled").exists()
+
+
+def test_sign_in_activity_lists_only_the_callers_events(api_client, user_factory):
+    user = user_factory(email="activity.owner@example.com")
+    other = user_factory(email="activity.other@example.com")
+    login(api_client, user.email, "wrong-password")
+    login(api_client, user.email)
+    login(api_client, other.email)
+    api_client.force_authenticate(user)
+
+    events = api_client.get("/api/v1/auth/security/activity/").json()["data"]["events"]
+
+    assert [event["action"] for event in events] == ["account.login.succeeded", "account.login.failed"]
+    assert all("code" not in str(event["detail"]).lower() for event in events)

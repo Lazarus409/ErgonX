@@ -7258,6 +7258,53 @@ paths:
                 $ref: '#/components/schemas/ErrorEnvelope'
       x-error-codes:
       - validation_error
+  /api/v1/auth/security/activity/:
+    get:
+      operationId: auth_security_activity_retrieve
+      description: The signed-in user's own recent sign-ins and security changes (S043).
+      summary: Get sign in activity view
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
   /api/v1/auth/security/mfa/:
     get:
       operationId: auth_security_mfa_retrieve

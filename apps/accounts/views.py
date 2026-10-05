@@ -179,6 +179,38 @@ class SessionListView(APIView):
         return Response({"sessions": rows})
 
 
+# Account events a member sees about themselves in the Security Center.
+SIGN_IN_ACTIVITY_ACTIONS = (
+    "account.login.succeeded", "account.login.failed", "account.logout",
+    "account.password.changed", "account.password.reset_completed",
+    "account.mfa.enabled", "account.mfa.disabled", "account.mfa.method_changed", "account.mfa.disable_refused",
+)
+
+
+class SignInActivityView(APIView):
+    """The signed-in user's own recent sign-ins and security changes (S043)."""
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
+    def get(self, request):
+        from apps.audit.models import AuditLog
+
+        events = AuditLog.objects.filter(actor=request.user, action__in=SIGN_IN_ACTIVITY_ACTIONS).order_by("-created_at")[:20]
+        return Response({"events": [
+            {
+                "id": str(event.id),
+                "action": event.action,
+                "created_at": event.created_at,
+                "ip_address": event.ip_address,
+                "user_agent": event.user_agent,
+                # Only the sign-in method or failure reason; never codes or tokens.
+                "detail": event.metadata.get("method") or event.metadata.get("reason") or "",
+            }
+            for event in events
+        ]})
+
+
 class SessionRevokeView(APIView):
     permission_classes = [IsAuthenticated]
 

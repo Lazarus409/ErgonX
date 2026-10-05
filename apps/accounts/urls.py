@@ -1,6 +1,6 @@
 from django.urls import path
 
-from apps.accounts.views import AccountProfileView, AuthBootstrapView, InstitutionAccessRequestDecisionView, InstitutionAccessRequestView, InstitutionAdminInvitationAcceptanceView, InstitutionAdminInvitationActionView, InstitutionAdminInvitationView, InvitationAcceptanceView, LoginView, LogoutView, MFASettingsView, SessionListView, SessionRevokeOthersView, SessionRevokeView, MeView, PasswordChangeView, PasswordResetConfirmView, PasswordResetRequestView, RefreshView, SelfServiceRegistrationView
+from apps.accounts.views import AccountProfileView, AuthBootstrapView, InstitutionAccessRequestDecisionView, InstitutionAccessRequestView, InstitutionAdminInvitationAcceptanceView, InstitutionAdminInvitationActionView, InstitutionAdminInvitationView, InvitationAcceptanceView, LoginView, LogoutView, MFASettingsView, SessionListView, SignInActivityView, SessionRevokeOthersView, SessionRevokeView, MeView, PasswordChangeView, PasswordResetConfirmView, PasswordResetRequestView, RefreshView, SelfServiceRegistrationView
 
 urlpatterns = [
     path("login/", LoginView.as_view(), name="login"),
@@ -14,6 +14,7 @@ urlpatterns = [
     path("refresh/", RefreshView.as_view(), name="refresh"),
     path("logout/", LogoutView.as_view(), name="logout"),
     path("sessions/", SessionListView.as_view(), name="sessions"),
+    path("security/activity/", SignInActivityView.as_view(), name="sign-in-activity"),
     path("sessions/revoke-others/", SessionRevokeOthersView.as_view(), name="sessions-revoke-others"),
     path("sessions/<uuid:pk>/revoke/", SessionRevokeView.as_view(), name="session-revoke"),
     path("me/", MeView.as_view(), name="me"),

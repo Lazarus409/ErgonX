@@ -287,3 +287,7 @@ export interface UserSessionRow { id: string; ip_address: string | null; user_ag
 export function listSessions(): Promise<{ sessions: UserSessionRow[] }> { return apiGet<{ sessions: UserSessionRow[] }>("/auth/sessions/"); }
 export function revokeSession(id: string): Promise<{ revoked: number; current: boolean }> { return apiPost<{ revoked: number; current: boolean }, Record<string, never>>(`/auth/sessions/${id}/revoke/`, {}); }
 export function revokeOtherSessions(): Promise<{ revoked: number }> { return apiPost<{ revoked: number }, Record<string, never>>("/auth/sessions/revoke-others/", {}); }
+
+/** One of the signed-in user's own sign-ins or security changes. */
+export interface SignInActivityEvent { id: string; action: string; created_at: string; ip_address: string | null; user_agent: string; detail: string; }
+export function listSignInActivity(): Promise<{ events: SignInActivityEvent[] }> { return apiGet<{ events: SignInActivityEvent[] }>("/auth/security/activity/"); }

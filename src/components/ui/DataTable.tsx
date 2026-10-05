@@ -96,7 +96,7 @@ export function DataTable<Row>({ columns, rows, rowKey, loading, error, onRetry,
                       aria-sort={active ? (sort.direction === "asc" ? "ascending" : "descending") : undefined}
                       style={column.width ? { width: column.width } : undefined}
                       className={cx(
-                        "sticky top-0 z-10 border-b border-line bg-surface-muted/90 text-left text-caption font-semibold text-ink-strong backdrop-blur",
+                        "sticky top-0 z-10 border-b border-line bg-canvas/95 text-left text-[0.6875rem] font-semibold uppercase tracking-[0.06em] text-ink-muted backdrop-blur",
                         density === "compact" ? "px-4 py-2.5" : "px-5 py-3",
                         column.numeric && "text-right",
                         column.hideBelow && hideClasses[column.hideBelow],

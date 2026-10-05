@@ -1,13 +1,9 @@
 import {
   Ban,
-  CheckCircle2,
-  Circle,
   CircleDashed,
-  CircleDot,
   Clock3,
   Lock,
   TriangleAlert,
-  XCircle,
   type LucideIcon,
 } from "lucide-react";
 
@@ -20,19 +16,9 @@ interface StatusBadgeProps {
 }
 
 /**
- * Canonical workflow/status chip. Meaning is carried by colour, icon and
- * label together so it never depends on colour alone.
+ * Canonical workflow/status chip: tinted pill, status dot and label (Stitch).
+ * The label always carries the meaning, so it never depends on colour alone.
  */
-const toneIcon: Record<BadgeTone, LucideIcon> = {
-  success: CheckCircle2,
-  warning: Clock3,
-  danger: XCircle,
-  info: CircleDot,
-  neutral: Circle,
-  brand: Lock,
-  violet: CircleDot,
-};
-
 const statusConfig: Record<string, { label: string; tone: BadgeTone; icon?: LucideIcon }> = {
   ACTIVE: { label: "Active", tone: "success" },
   INACTIVE: { label: "Inactive", tone: "neutral" },
@@ -107,7 +93,7 @@ export default function StatusBadge({ status, size = "md", className }: StatusBa
   const normalizedStatus = (status ?? "").toUpperCase();
   const config = statusConfig[normalizedStatus] ?? { label: humanize(status ?? ""), tone: "neutral" as BadgeTone };
   return (
-    <Badge tone={config.tone} icon={config.icon ?? toneIcon[config.tone]} size={size} className={className}>
+    <Badge tone={config.tone} icon={config.icon} dot size={size} className={className}>
       {config.label}
     </Badge>
   );

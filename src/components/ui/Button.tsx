@@ -6,28 +6,31 @@ import { Loader2 } from "lucide-react";
 
 import { cx } from "@/lib/cx";
 
-export type ButtonVariant = "primary" | "strong" | "secondary" | "ghost" | "danger" | "link" | "inverse";
+export type ButtonVariant = "primary" | "strong" | "accent" | "secondary" | "ghost" | "danger" | "link" | "inverse";
 export type ButtonSize = "sm" | "md" | "lg";
 
 const base =
-  "inline-flex shrink-0 select-none items-center justify-center gap-2 whitespace-nowrap font-medium transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-standard active:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50";
+  "inline-flex shrink-0 select-none items-center justify-center gap-2 whitespace-nowrap font-medium transition-[background-color,border-color,color,box-shadow,opacity] duration-150 ease-standard active:opacity-90 disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50";
 
 const variants: Record<ButtonVariant, string> = {
-  primary: "bg-primary text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.16),0_1px_2px_rgb(15_35_69/0.18),var(--glow-primary)] hover:bg-primary-hover active:bg-primary-active",
-  // Concept entry-screen call to action: deep navy.
-  strong: "bg-cta-strong text-white shadow-[0_10px_24px_-12px_rgb(11_27_61/0.6)] hover:bg-cta-strong-hover",
-  // Concept secondary action: blue outline on white.
-  secondary: "border border-primary/70 bg-surface text-primary-ink shadow-elevation-1 hover:border-primary hover:bg-primary-soft",
+  // Phase 2 (Stitch): page actions are midnight; royal blue is kept for focus,
+  // links, selection and the active navigation item.
+  primary: "bg-cta-strong text-white shadow-elevation-1 hover:bg-cta-strong-hover",
+  strong: "bg-cta-strong text-white shadow-elevation-1 hover:bg-cta-strong-hover",
+  // Conversion-funnel emphasis (e.g. "Save & post") where royal blue is wanted.
+  accent: "bg-primary text-white shadow-elevation-1 hover:bg-primary-hover active:bg-primary-active",
+  // White surface, slate border, dark text.
+  secondary: "border border-line bg-surface text-ink-strong shadow-elevation-1 hover:border-line-strong hover:bg-surface-hover",
   ghost: "text-ink hover:bg-surface-hover hover:text-ink-strong",
-  danger: "bg-danger text-white shadow-[inset_0_1px_0_rgb(255_255_255/0.14),0_1px_2px_rgb(15_35_69/0.18)] hover:brightness-95 active:brightness-90",
-  link: "h-auto px-0 text-primary-ink underline-offset-4 hover:underline active:translate-y-0",
+  danger: "border border-danger bg-surface text-danger hover:bg-danger-soft",
+  link: "h-auto px-0 text-primary-ink underline-offset-4 hover:underline active:opacity-100",
   inverse: "bg-white/10 text-white ring-1 ring-inset ring-white/20 hover:bg-white/16",
 };
 
 const sizes: Record<ButtonSize, string> = {
   sm: "h-8 rounded-lg px-3 text-support font-semibold",
-  md: "h-10 rounded-lg px-4 text-sm font-semibold",
-  lg: "h-12 rounded-lg px-5 text-[0.9375rem] font-semibold",
+  md: "h-9 rounded-lg px-4 text-sm font-semibold",
+  lg: "h-11 rounded-lg px-5 text-[0.9375rem] font-semibold",
 };
 
 export function buttonClasses({ variant = "primary", size = "md", block = false, className }: { variant?: ButtonVariant; size?: ButtonSize; block?: boolean; className?: string } = {}): string {

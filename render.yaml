@@ -26,6 +26,10 @@ services:
         value: "15"
       - key: JWT_REFRESH_DAYS
         value: "7"
+      # Shared with ergonx-web: lets the BFF forward the browser IP for per-IP
+      # sign-in limits and audit records. Generated once here, read by the web service.
+      - key: BFF_PROXY_SECRET
+        generateValue: true
 
   - type: web
     runtime: docker
@@ -39,6 +43,67 @@ services:
         sync: false
       - key: NEXT_PUBLIC_ENABLE_DEV_AUTH_BYPASS
         value: "false"
+      - key: BFF_PROXY_SECRET
+        fromService:
+          type: web
+          name: ergonx-api
+          envVarKey: BFF_PROXY_SECRET
+
+  # Scheduled jobs (Phase 2, W2/W8). Cron jobs are billed separately on Render.
+  - type: cron
+    runtime: docker
+    name: ergonx-approval-reminders
+    dockerfilePath: Ergonx-backend/Dockerfile
+    dockerContext: Ergonx-backend
+    # Hourly: notify approvers and escalation roles about overdue steps.
+    schedule: "0 * * * *"
+    dockerCommand: python manage.py send_approval_reminders
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.production
+      - key: DJANGO_SECRET_KEY
+        fromService:
+          type: web
+          name: ergonx-api
+          envVarKey: DJANGO_SECRET_KEY
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ergonx-postgres
+          property: connectionString
+      - key: DJANGO_ALLOWED_HOSTS
+        value: localhost
+      - key: FRONTEND_PUBLIC_URL
+        sync: false
+      - key: EMAIL_DELIVERY_ENABLED
+        value: "false"
+
+  - type: cron
+    runtime: docker
+    name: ergonx-scheduled-reports
+    dockerfilePath: Ergonx-backend/Dockerfile
+    dockerContext: Ergonx-backend
+    # Daily at 02:00 UTC: refresh scheduled financial reports.
+    schedule: "0 2 * * *"
+    dockerCommand: python manage.py run_scheduled_reports
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.production
+      - key: DJANGO_SECRET_KEY
+        fromService:
+          type: web
+          name: ergonx-api
+          envVarKey: DJANGO_SECRET_KEY
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ergonx-postgres
+          property: connectionString
+      - key: DJANGO_ALLOWED_HOSTS
+        value: localhost
+      - key: FRONTEND_PUBLIC_URL
+        sync: false
+      - key: EMAIL_DELIVERY_ENABLED
+        value: "false"
+
 
 databases:
   - name: ergonx-postgres

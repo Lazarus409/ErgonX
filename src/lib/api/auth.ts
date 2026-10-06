@@ -144,13 +144,25 @@ export interface InvitationDetails {
 export function getInvitation(token: string): Promise<InvitationDetails> { return apiGet<InvitationDetails>(`/auth/invitations/${token}/`); }
 export function acceptInvitation(token: string, payload: { password: string; first_name?: string; last_name?: string }): Promise<{ accepted: boolean; existing_account: boolean; access_preview: InvitationAccessPreview }> { return apiPost<{ accepted: boolean; existing_account: boolean; access_preview: InvitationAccessPreview }, typeof payload>(`/auth/invitations/${token}/`, payload); }
 
-export interface InstitutionAdminInvitationDetails { email: string; expires_at: string; }
+export interface InstitutionAdminInvitationDetails {
+  email: string;
+  expires_at: string;
+  /** Values from the access request this invitation came from, when there is one. */
+  prefill?: Partial<Record<"institution_name" | "first_name" | "last_name" | "phone" | "country_code" | "employee_size", string>>;
+  institution_types?: Array<{ value: string; label: string }>;
+}
 export interface InstitutionAdminInvitationPayload {
   first_name: string;
   last_name: string;
   password: string;
   institution_name: string;
-  country_code?: string;
+  institution_type: string;
+  country_code: string;
+  employee_size?: string;
+  website?: string;
+  phone?: string;
+  /** Must be true: the Terms of Service and Privacy Policy are accepted. */
+  accepted_terms: boolean;
   default_currency?: string;
   timezone?: string;
 }

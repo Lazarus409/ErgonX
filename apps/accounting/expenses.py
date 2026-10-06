@@ -92,7 +92,8 @@ def _transition(before, after, **metadata):
 
 
 def _lock(expense):
-    return Expense.objects.select_for_update().select_related("claimant__user", "institution").get(pk=expense.pk)
+    # Lock only the expense row: PostgreSQL refuses FOR UPDATE on the nullable claimant join.
+    return Expense.objects.select_for_update(of=("self",)).select_related("claimant__user", "institution").get(pk=expense.pk)
 
 
 def _claimant_name(expense):

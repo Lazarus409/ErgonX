@@ -4,17 +4,39 @@ from django.db import models
 
 from apps.institutions.models import Institution, Role
 from common.models import TenantOwnedModel
-from common.permissions import READ_ONLY_ROLES
 
 
 class ApprovalWorkflowDefinition(TenantOwnedModel):
+    class Trigger(models.TextChoices):
+        """Business events the approval engine supports (Wave 2, bounded engine)."""
+
+        LEAVE_REQUEST = "LEAVE_REQUEST", "Leave request"
+        ATTENDANCE_ADJUSTMENT = "ATTENDANCE_ADJUSTMENT", "Attendance adjustment"
+        EXPENSE_CLAIM = "EXPENSE_CLAIM", "Expense claim"
+        JOB_REQUISITION = "JOB_REQUISITION", "Job requisition"
+        OFFER = "OFFER", "Offer"
+        BUDGET = "BUDGET", "Budget"
+        VENDOR_BILL = "VENDOR_BILL", "Vendor bill"
+
     institution = models.ForeignKey(
         Institution, on_delete=models.CASCADE, related_name="approval_workflows"
     )
     code = models.CharField(max_length=80)
     name = models.CharField(max_length=150)
-    workflow_type = models.CharField(max_length=100)
-    entity_type = models.CharField(max_length=150)
+    workflow_type = models.CharField(max_length=100, blank=True)
+    entity_type = models.CharField(max_length=150, blank=True)
+    # Which business event uses this definition; null for legacy free-text definitions.
+    trigger = models.CharField(max_length=40, choices=Trigger.choices, null=True, blank=True)
+    # Optional conditions: requester's department and an amount band.
+    department = models.ForeignKey(
+        "organization.Department", on_delete=models.PROTECT, null=True, blank=True, related_name="approval_workflows"
+    )
+    min_amount = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True)
+    max_amount = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True)
+    # Holders of this role are told when a step passes its due time.
+    escalation_role = models.ForeignKey(
+        Role, on_delete=models.PROTECT, null=True, blank=True, related_name="escalation_workflows"
+    )
     is_active = models.BooleanField(default=True)
 
     class Meta:
@@ -26,6 +48,19 @@ class ApprovalWorkflowDefinition(TenantOwnedModel):
         ]
         indexes = [models.Index(fields=("institution", "is_active"))]
 
+    def clean(self):
+        errors = {}
+        if self.department_id and self.department.institution_id != self.institution_id:
+            errors["department"] = "Department must belong to the same institution."
+        if self.escalation_role_id and self.escalation_role.institution_id != self.institution_id:
+            errors["escalation_role"] = "Escalation role must belong to the same institution."
+        if self.min_amount is not None and self.max_amount is not None and self.min_amount > self.max_amount:
+            errors["max_amount"] = "The maximum must not be below the minimum."
+        if not self.trigger and not self.entity_type:
+            errors["trigger"] = "Choose the business event this workflow applies to."
+        if errors:
+            raise ValidationError(errors)
+
     def save(self, *args, **kwargs):
         self.code = self.code.strip().upper()
         super().save(*args, **kwargs)
@@ -35,6 +70,12 @@ class ApprovalWorkflowDefinition(TenantOwnedModel):
 
 
 class ApprovalWorkflowStep(TenantOwnedModel):
+    class ApproverType(models.TextChoices):
+        USER = "USER", "A named person"
+        ROLE = "ROLE", "Any member holding a role"
+        REQUESTER_DEPARTMENT_HEAD = "REQUESTER_DEPARTMENT_HEAD", "The requester's department head"
+        REQUESTER_MANAGER = "REQUESTER_MANAGER", "The requester's line manager"
+
     institution = models.ForeignKey(
         Institution, on_delete=models.CASCADE, related_name="approval_workflow_steps"
     )
@@ -57,6 +98,7 @@ class ApprovalWorkflowStep(TenantOwnedModel):
         blank=True,
         related_name="assigned_approval_steps",
     )
+    approver_type = models.CharField(max_length=30, choices=ApproverType.choices, default=ApproverType.ROLE)
     due_after_hours = models.PositiveIntegerField(null=True, blank=True)
 
     class Meta:
@@ -66,14 +108,18 @@ class ApprovalWorkflowStep(TenantOwnedModel):
                 fields=("workflow", "order"), name="uniq_step_order_per_workflow"
             ),
             models.CheckConstraint(
-                condition=models.Q(approver_role__isnull=False)
-                | models.Q(approver_user__isnull=False),
-                name="workflow_step_has_approver",
+                condition=(models.Q(approver_type="USER") & models.Q(approver_user__isnull=False))
+                | (models.Q(approver_type="ROLE") & models.Q(approver_role__isnull=False))
+                | models.Q(approver_type__in=("REQUESTER_DEPARTMENT_HEAD", "REQUESTER_MANAGER")),
+                name="workflow_step_approver_matches_type",
             ),
         ]
 
     def clean(self):
         errors = {}
+        if self.approver_type == self.ApproverType.ROLE and self.approver_user_id and not self.approver_role_id:
+            # Callers that name only a person (pre-Wave 2 clients) mean a USER step.
+            self.approver_type = self.ApproverType.USER
         if self.workflow_id and self.workflow.institution_id != self.institution_id:
             errors["workflow"] = "Workflow must belong to the same institution."
         if self.approver_role_id and self.approver_role.institution_id != self.institution_id:
@@ -83,10 +129,14 @@ class ApprovalWorkflowStep(TenantOwnedModel):
                 institution_id=self.institution_id
             ).exists():
                 errors["approver_user"] = "Approver must belong to the same institution."
-        if self.approver_role_id and self.approver_role.code in READ_ONLY_ROLES:
+        if self.approver_type == self.ApproverType.USER and not self.approver_user_id:
+            errors["approver_user"] = "Choose the person who approves this step."
+        if self.approver_type == self.ApproverType.ROLE and not self.approver_role_id:
+            errors["approver_role"] = "Choose the role that approves this step."
+        if self.approver_role_id and self.approver_role.is_read_only:
             errors["approver_role"] = "A read-only role cannot approve requests."
         if self.approver_user_id and self.institution_id and self.approver_user.memberships.filter(
-            institution_id=self.institution_id, role__code__in=READ_ONLY_ROLES
+            institution_id=self.institution_id, role__is_read_only=True
         ).exists():
             errors["approver_user"] = "This user has a read-only role and cannot approve requests."
         if errors:
@@ -98,6 +148,7 @@ class ApprovalRequest(TenantOwnedModel):
         PENDING = "PENDING", "Pending"
         APPROVED = "APPROVED", "Approved"
         REJECTED = "REJECTED", "Rejected"
+        RETURNED = "RETURNED", "Returned for changes"
         CANCELLED = "CANCELLED", "Cancelled"
 
     institution = models.ForeignKey(

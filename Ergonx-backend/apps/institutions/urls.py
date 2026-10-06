@@ -1,7 +1,7 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
-from apps.institutions.views import CurrentInstitutionView, InstitutionInvitationViewSet, InstitutionModuleViewSet, InstitutionOnboardingStepActionView, InstitutionOnboardingView, InstitutionSettingsView, LocaleCataloguesView, MembershipViewSet, MyMembershipsView, MyPreferencesView, PermissionCatalogView, RoleViewSet, UniversalSearchView, SearchEntriesView
+from apps.institutions.views import CurrentInstitutionView, InstitutionInvitationViewSet, InstitutionModuleViewSet, InstitutionOnboardingStepActionView, InstitutionOnboardingView, InstitutionSettingsView, LocaleCataloguesView, MembershipViewSet, MyMembershipsView, MyPreferencesView, PermissionCatalogView, RoleViewSet
 
 router = DefaultRouter()
 router.register("roles", RoleViewSet, basename="role")
@@ -9,6 +9,7 @@ router.register("members", MembershipViewSet, basename="membership")
 router.register("invitations", InstitutionInvitationViewSet, basename="institution-invitation")
 router.register("modules", InstitutionModuleViewSet, basename="institution-module")
 
+# Search is mounted once, at /api/v1/search/ (W0-API-03).
 urlpatterns = [
     path("current/", CurrentInstitutionView.as_view(), name="current"),
     path("memberships/", MyMembershipsView.as_view(), name="memberships"),
@@ -18,8 +19,6 @@ urlpatterns = [
     path("locale-catalogues/", LocaleCataloguesView.as_view(), name="locale-catalogues"),
     path("onboarding/", InstitutionOnboardingView.as_view(), name="institution-onboarding"),
     path("onboarding/<str:step_code>/<str:action_name>/", InstitutionOnboardingStepActionView.as_view(), name="institution-onboarding-step-action"),
-    path("search/", UniversalSearchView.as_view(), name="universal-search"),
-    path("search/entries/", SearchEntriesView.as_view(), name="search-entries"),
 ]
 
 urlpatterns += router.urls

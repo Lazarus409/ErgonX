@@ -278,6 +278,10 @@ def apply_accounting_preset(
                         },
                         api_code="duplicate_operation",
                     )
+                if template.system_mapping_code and not account.system_mapping_code:
+                    mapping = _free_mapping_code(institution, template.system_mapping_code)
+                    if mapping:
+                        Account.objects.filter(pk=account.pk).update(system_mapping_code=mapping)
                 reused.append(account)
             else:
                 account = Account(
@@ -289,6 +293,8 @@ def apply_accounting_preset(
                     normal_balance=template.normal_balance,
                     is_postable=template.is_postable,
                     is_active=True,
+                    # Durable provenance (BQ-09): posting resolves by mapping code, not account code.
+                    system_mapping_code=_free_mapping_code(institution, template.system_mapping_code),
                 )
                 account.save()
                 created.append(account)
@@ -355,6 +361,9 @@ def create_account(*, institution, actor, **values):
 def update_account(*, account, actor, **values):
     account = Account.objects.select_for_update().get(pk=account.pk)
     _require(actor, account.institution, "account.update")
+    if "system_mapping_code" in values:
+        # Re-pointing a system role (CASH, EMPLOYEE_PAYABLE, ...) changes where postings land.
+        _require(actor, account.institution, "accounting.configure")
     before = {field: getattr(account, field) for field in values}
     for field, value in values.items():
         setattr(account, field, value)
@@ -562,7 +571,13 @@ def submit_journal(*, journal, actor):
 
 
 @transaction.atomic
-def approve_journal(*, journal, actor):
+def approve_journal(*, journal, actor, system=False, upstream_approver=None):
+    """Approve a pending journal.
+
+    ``system`` marks journals generated from an already-governed record (bill,
+    invoice, payment, receipt, reversal, expense). They stay auto-approved and
+    record the upstream approver instead of applying separation of duties.
+    """
     journal = JournalEntry.objects.select_for_update().get(pk=journal.pk)
     _require(actor, journal.institution, "journal.approve")
     if journal.status == JournalEntry.Status.APPROVED:
@@ -573,6 +588,16 @@ def approve_journal(*, journal, actor):
             api_code="invalid_state_transition",
         )
     totals = _validate_balanced(journal)
+    # Separation of duties (BQ-04): the creator of a manual journal cannot approve
+    # it. Journals generated from governed records (payroll, AP, AR, expense,
+    # cash) are exempt and record the upstream approver instead.
+    from apps.institutions.services import institution_setting
+
+    if not system and journal.source == JournalEntry.Source.MANUAL and (institution_setting(journal.institution, "security.separation_of_duties") or {}).get("journals", True) and journal.created_by_id == actor.id:
+        raise CodedValidationError(
+            {"actor": "You created this journal, so someone else must approve it (separation of duties)."},
+            api_code="separation_of_duties",
+        )
     journal.status = JournalEntry.Status.APPROVED
     journal.approved_by = actor
     journal.save(update_fields=("status", "approved_by", "updated_at"))
@@ -589,7 +614,8 @@ def approve_journal(*, journal, actor):
         entity=journal,
         action="accounting.journal.approved",
         metadata=_transition(
-            "PENDING_APPROVAL", "APPROVED", **_audit_totals(totals)
+            "PENDING_APPROVAL", "APPROVED", **_audit_totals(totals),
+            **({"system_generated": True, "upstream_approver": str(upstream_approver.id) if upstream_approver else None} if system else {}),
         ),
     )
     return journal
@@ -1022,34 +1048,29 @@ def approve_vendor_bill(*, bill, actor):
     return bill
 
 
+def _free_mapping_code(institution, mapping_code):
+    """``mapping_code`` when no other account of the institution holds it yet."""
+    if not mapping_code or Account.objects.filter(institution=institution, system_mapping_code=mapping_code).exists():
+        return None
+    return mapping_code
+
+
 def _mapping_account(institution, mapping_code):
-    configuration = InstitutionAccountingConfiguration.objects.select_related(
-        "selected_accounting_preset_version"
-    ).filter(institution=institution).first()
-    preset_version = getattr(configuration, "selected_accounting_preset_version", None)
-    if preset_version is None:
-        raise CodedValidationError(
-            {"accounting_configuration": "Posting a vendor bill requires an applied accounting preset."},
-            api_code="policy_not_applicable",
-        )
-    templates = AccountTemplate.objects.filter(
-        coa_template__preset_version=preset_version,
-        system_mapping_code=mapping_code,
-    )
-    if templates.count() != 1:
-        raise CodedValidationError(
-            {"account_mapping": f"Expected one {mapping_code} mapping in the selected chart."},
-            api_code="policy_not_applicable",
-        )
-    account = Account.objects.filter(
-        institution=institution,
-        code=templates.get().code,
-        is_active=True,
-        is_postable=True,
-    ).first()
+    """The institution's active, postable account for a system role (BQ-09).
+
+    Resolved by ``Account.system_mapping_code`` (set from the applied preset or by
+    the institution), never by account code or ID. Missing or unusable mapping
+    fails closed.
+    """
+    account = Account.objects.filter(institution=institution, system_mapping_code=mapping_code).first()
     if account is None:
         raise CodedValidationError(
-            {"account_mapping": f"Mapped account {mapping_code} is unavailable."},
+            {"account_mapping": f"No account is mapped to {mapping_code}. Map one in the chart of accounts."},
+            api_code="policy_not_applicable",
+        )
+    if not (account.is_active and account.is_postable):
+        raise CodedValidationError(
+            {"account_mapping": f"Mapped account {mapping_code} ({account.code}) is inactive or not postable."},
             api_code="policy_not_applicable",
         )
     return account
@@ -1117,7 +1138,7 @@ def post_vendor_bill(*, bill, actor):
         reference=f"AP-BILL-{bill.id}",
     )
     journal = submit_journal(journal=journal, actor=actor)
-    journal = approve_journal(journal=journal, actor=actor)
+    journal = approve_journal(journal=journal, actor=actor, system=True, upstream_approver=bill.approved_by)
     journal = post_journal(journal=journal, actor=actor)
     bill.status = VendorBill.Status.POSTED
     bill.journal_entry = journal
@@ -1268,7 +1289,7 @@ def issue_invoice(*, invoice, actor):
     _refresh_invoice_totals(invoice)
     journal = _create_journal_record(institution=invoice.institution, actor=actor, lines=_invoice_journal_lines(invoice), source=JournalEntry.Source.AR, accounting_period=invoice.accounting_period, entry_date=invoice.invoice_date, description=f"Invoice {invoice.invoice_number}: {invoice.customer.name}", reference=f"AR-INVOICE-{invoice.id}")
     journal = submit_journal(journal=journal, actor=actor)
-    journal = approve_journal(journal=journal, actor=actor)
+    journal = approve_journal(journal=journal, actor=actor, system=True, upstream_approver=None)
     journal = post_journal(journal=journal, actor=actor)
     invoice.status = Invoice.Status.ISSUED
     invoice.journal_entry = journal
@@ -1481,7 +1502,7 @@ def create_payment(*, institution, actor, **values):
         ],
     )
     journal = submit_journal(journal=journal, actor=actor)
-    journal = approve_journal(journal=journal, actor=actor)
+    journal = approve_journal(journal=journal, actor=actor, system=True, upstream_approver=None)
     journal = post_journal(journal=journal, actor=actor)
     Payment.objects.filter(pk=payment.pk).update(journal_entry=journal, updated_at=timezone.now())
     payment.refresh_from_db()
@@ -1542,7 +1563,7 @@ def create_receipt(*, institution, actor, **values):
         ],
     )
     journal = submit_journal(journal=journal, actor=actor)
-    journal = approve_journal(journal=journal, actor=actor)
+    journal = approve_journal(journal=journal, actor=actor, system=True, upstream_approver=None)
     journal = post_journal(journal=journal, actor=actor)
     Receipt.objects.filter(pk=receipt.pk).update(journal_entry=journal, updated_at=timezone.now())
     receipt.refresh_from_db()
@@ -1573,7 +1594,7 @@ def _void_cash_transaction(*, transaction_record, actor, void_date, period, acti
         description=f"Void {transaction_record._meta.verbose_name} {transaction_record.pk}",
     )
     reversal = submit_journal(journal=reversal, actor=actor)
-    reversal = approve_journal(journal=reversal, actor=actor)
+    reversal = approve_journal(journal=reversal, actor=actor, system=True, upstream_approver=None)
     post_journal(journal=reversal, actor=actor)
     transaction_record.__class__.objects.filter(pk=transaction_record.pk).update(status=transaction_record.Status.VOID, updated_at=timezone.now())
     transaction_record.refresh_from_db()
@@ -1712,91 +1733,20 @@ def void_vat_withholding_certificate(*, certificate, actor):
     return certificate
 
 
-@transaction.atomic
-def create_expense(*, institution, actor, **values):
-    _require(actor, institution, "expense.create")
-    values["account"] = Account.objects.select_for_update().get(pk=values["account"].pk)
-    expense = Expense(institution=institution, created_by=actor, **values)
-    expense.save()
-    record_audit_event(actor=actor, institution=institution, entity=expense, action="accounting.expense.created")
-    return expense
-
-
-@transaction.atomic
-def update_draft_expense(*, expense, actor, **values):
-    expense = Expense.objects.select_for_update().get(pk=expense.pk)
-    _require(actor, expense.institution, "expense.create")
-    if expense.status != Expense.Status.DRAFT:
-        raise CodedValidationError({"status": "Only draft expenses can be edited."}, api_code="record_immutable")
-    if "account" in values:
-        values["account"] = Account.objects.select_for_update().get(pk=values["account"].pk)
-    for field, value in values.items():
-        setattr(expense, field, value)
-    expense.save()
-    record_audit_event(actor=actor, institution=expense.institution, entity=expense, action="accounting.expense.updated")
-    return expense
-
-
-@transaction.atomic
-def submit_expense(*, expense, actor):
-    expense = Expense.objects.select_for_update().get(pk=expense.pk)
-    _require(actor, expense.institution, "expense.create")
-    if expense.status == Expense.Status.PENDING:
-        return expense
-    if expense.status != Expense.Status.DRAFT:
-        raise CodedValidationError({"status": "Only draft expenses can be submitted."}, api_code="invalid_state_transition")
-    expense.status = Expense.Status.PENDING
-    expense.save(update_fields=("status", "updated_at"))
-    _notify_permission_holders(expense.institution, "expense.approve", "Expense approval required", f"Expense requires approval: {expense.description[:80]}", {"expense_id": str(expense.id)})
-    record_audit_event(actor=actor, institution=expense.institution, entity=expense, action="accounting.expense.submitted", metadata=_transition("DRAFT", "PENDING"))
-    return expense
-
-
-@transaction.atomic
-def approve_expense(*, expense, actor):
-    expense = Expense.objects.select_for_update().get(pk=expense.pk)
-    _require(actor, expense.institution, "expense.approve")
-    if expense.status == Expense.Status.APPROVED:
-        return expense
-    if expense.status != Expense.Status.PENDING:
-        raise CodedValidationError({"status": "Only pending expenses can be approved."}, api_code="invalid_state_transition")
-    expense.status, expense.approved_by = Expense.Status.APPROVED, actor
-    expense.save(update_fields=("status", "approved_by", "updated_at"))
-    record_audit_event(actor=actor, institution=expense.institution, entity=expense, action="accounting.expense.approved", metadata=_transition("PENDING", "APPROVED"))
-    return expense
-
-
-@transaction.atomic
-def reject_expense(*, expense, actor):
-    expense = Expense.objects.select_for_update().get(pk=expense.pk)
-    _require(actor, expense.institution, "expense.approve")
-    if expense.status == Expense.Status.REJECTED:
-        return expense
-    if expense.status != Expense.Status.PENDING:
-        raise CodedValidationError({"status": "Only pending expenses can be rejected."}, api_code="invalid_state_transition")
-    expense.status = Expense.Status.REJECTED
-    expense.save(update_fields=("status", "updated_at"))
-    record_audit_event(actor=actor, institution=expense.institution, entity=expense, action="accounting.expense.rejected", metadata=_transition("PENDING", "REJECTED"))
-    return expense
-
-
-@transaction.atomic
-def post_expense(*, expense, actor):
-    expense = Expense.objects.select_for_update().get(pk=expense.pk)
-    _require(actor, expense.institution, "expense.post")
-    if expense.status == Expense.Status.POSTED:
-        return expense
-    if expense.status != Expense.Status.APPROVED:
-        raise CodedValidationError({"status": "Only approved expenses can be posted."}, api_code="invalid_state_transition")
-    period = _cash_transaction_period(institution=expense.institution, transaction_date=expense.expense_date, field_name="expense_date")
-    journal = _create_journal_record(institution=expense.institution, actor=actor, source=JournalEntry.Source.EXPENSE, accounting_period=period, entry_date=expense.expense_date, description=f"Expense: {expense.description}", reference=f"EXPENSE-{expense.id}", lines=[{"account": expense.account, "description": expense.description, "debit": expense.amount, "credit": Decimal("0")}, {"account": _mapping_account(expense.institution, "CASH"), "description": "Cash expense", "debit": Decimal("0"), "credit": expense.amount}])
-    journal = submit_journal(journal=journal, actor=actor)
-    journal = approve_journal(journal=journal, actor=actor)
-    journal = post_journal(journal=journal, actor=actor)
-    expense.status, expense.journal_entry = Expense.Status.POSTED, journal
-    expense.save(update_fields=("status", "journal_entry", "updated_at"))
-    record_audit_event(actor=actor, institution=expense.institution, entity=expense, action="accounting.expense.posted", metadata=_transition("APPROVED", "POSTED", journal_entry_id=str(journal.id)))
-    return expense
+# Expense Management 2.0 lives in apps/accounting/expenses.py (Wave 6).
+from apps.accounting.expenses import (  # noqa: E402,F401
+    approve_expense,
+    create_expense,
+    decide_expense_step,
+    finance_review_expense,
+    policy_checks as expense_policy_checks,
+    post_expense,
+    reject_expense,
+    reverse_expense,
+    settle_expense,
+    submit_expense,
+    update_draft_expense,
+)
 
 
 @transaction.atomic

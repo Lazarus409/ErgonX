@@ -33,6 +33,8 @@ class Notification(TenantOwnedModel):
     read_at = models.DateTimeField(null=True, blank=True)
     sent_at = models.DateTimeField(null=True, blank=True)
     metadata = models.JSONField(default=dict, blank=True)
+    # Archived notifications leave the inbox but are kept (Notification Center, S056).
+    archived_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ("-created_at",)

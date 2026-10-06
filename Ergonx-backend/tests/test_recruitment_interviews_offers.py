@@ -22,7 +22,7 @@ from apps.recruitment.services import (
     submit_application,
     submit_offer_for_approval,
 )
-from tests.test_recruitment import recruitment_setup
+from tests.test_recruitment import approved, recruitment_setup
 
 pytestmark = pytest.mark.django_db
 ZONE = "Africa/Accra"
@@ -39,7 +39,7 @@ def setup(institution_factory, user_factory, membership_factory, organization_fa
     membership_factory(user=panelist, institution=institution, role_code="EMPLOYEE")
     department, position, grade, location, stage, posting, candidate, application = recruitment_setup(institution, organization_factory, assignment_dimensions_factory, hr)
     if posting.status != JobPosting.Status.OPEN:
-        publish_job_posting(job_posting=posting, actor=hr)
+        publish_job_posting(job_posting=approved(posting), actor=hr)
     submit_application(application=application, actor=hr)
     application.refresh_from_db()
     return {"institution": institution, "hr": hr, "approver": approver, "panelist": panelist, "application": application,

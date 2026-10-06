@@ -10,6 +10,7 @@ from apps.institutions.models import (
     InstitutionMembership,
     InstitutionOnboarding,
     InstitutionOnboardingStep,
+    InstitutionSetting,
     Permission,
     ReferenceSequence,
     Role,
@@ -59,16 +60,21 @@ ONBOARDING_STEP_DEFINITIONS = (
     ("ACCOUNTING_CONFIGURATION", 70, "ACCOUNTING"),
     ("PAYROLL_GL_MAPPING", 80, ""),
     ("RECRUITMENT_CONFIGURATION", 90, "RECRUITMENT"),
-    ("USERS_AND_ROLES", 100, "CORE_HR"),
+    ("USERS_AND_ROLES", 100, ""),
     ("VALIDATION", 110, ""),
 )
 
+# A setup owner is required only when one of its modules is enabled. Auditor
+# and Director are governance roles, so they are optional during setup.
+def system_role_name(code):
+    """Display name for a system role code; str.title() alone would give "Hr Admin"."""
+    return code.replace("_", " ").title().replace("Hr ", "HR ")
+
+
 ONBOARDING_SETUP_OWNER_ROLES = (
-    "HR_ADMIN",
-    "FINANCE_MANAGER",
-    "ACCOUNTANT",
-    "AUDITOR",
-    "DIRECTOR",
+    ("HR_ADMIN", frozenset({"CORE_HR", "LEAVE", "ATTENDANCE", "RECRUITMENT"})),
+    ("FINANCE_MANAGER", frozenset({"PAYROLL", "ACCOUNTING"})),
+    ("ACCOUNTANT", frozenset({"ACCOUNTING"})),
 )
 
 
@@ -117,6 +123,10 @@ ACCOUNTING_PERMISSIONS = {
     "expense.create": "Create and submit expenses",
     "expense.approve": "Approve or reject expenses",
     "expense.post": "Post approved expenses",
+    # Expense Management 2.0 (Wave 6).
+    "expense.claim_own": "Claim own expenses",
+    "expense.finance_review": "Finance-review expense claims",
+    "expense.settle": "Record expense claim settlements",
     "payroll_accounting.view": "View payroll accounting mappings",
     "payroll_accounting.configure": "Configure payroll accounting mappings",
     "bank_reconciliation.view": "View bank statement lines and reconciliation state",
@@ -251,6 +261,7 @@ SELF_SERVICE_PERMISSIONS = (
     "attendance.clock",
     "attendance.adjust",
     "payslip.view",
+    "expense.claim_own",
 )
 
 ROLE_PERMISSION_CODES = {
@@ -258,7 +269,8 @@ ROLE_PERMISSION_CODES = {
     "HR_ADMIN": tuple(
         code
         for code in PERMISSIONS
-        if code not in ACCOUNTING_PERMISSIONS
+        # HR staff still claim their own expenses.
+        if (code not in ACCOUNTING_PERMISSIONS or code == "expense.claim_own")
         and code not in {"dashboard.executive.view", "dashboard.finance.view"}
         and code not in {
             "settings.institution.manage",
@@ -325,12 +337,14 @@ ROLE_PERMISSION_CODES = {
         "payslip.view",
         "tax_relief.view",
         "tax_relief.claim",
+        "expense.claim_own",
     ),
     # Data is limited to the member and the departments they head; pay records
     # stay self-only (see common.scoping).
     "DEPARTMENT_HEAD": (
         "home.view",
         "search.use",
+        "expense.claim_own",
         "settings.profile.manage_self",
         "institution.view",
         "organization.view",
@@ -420,7 +434,7 @@ ROLE_PERMISSION_CODES = {
         "journal.view",
         "financial_report.view",
         "budget.view",
-        "dashboard.executive.view",
+        # Auditors land on Insights, not the Executive dashboard (BQ-01).
         "dashboard.finance.view",
         "report.view",
         # Oversight is read-only: every report, but no approval queue.
@@ -431,6 +445,27 @@ ROLE_PERMISSION_CODES = {
 
 ROLE_PERMISSION_CODES = {code: tuple(dict.fromkeys(codes)) for code, codes in ROLE_PERMISSION_CODES.items()}
 
+# Built-in role scope and read-only defaults (were inferred from role codes).
+SYSTEM_ROLE_DATA_SCOPES = {"EMPLOYEE": "SELF", "DEPARTMENT_HEAD": "DEPARTMENT"}
+SYSTEM_READ_ONLY_ROLES = frozenset({"AUDITOR"})
+
+# Administration, oversight and approval-configuration powers. Only a member
+# on a built-in role may grant them (Wave 0 decision PERM-03).
+PRIVILEGED_PERMISSIONS = frozenset({
+    "settings.institution.manage",
+    "settings.modules.manage",
+    "settings.users.manage",
+    "settings.roles.manage",
+    "settings.notifications.manage",
+    "settings.security.manage",
+    "onboarding.manage",
+    "audit.view",
+    "report.all",
+    "approval_workflow.create",
+    "approval_workflow.update",
+    "approval_workflow.delete",
+})
+
 
 def ensure_system_permissions():
     permissions = {}
@@ -440,6 +475,7 @@ def ensure_system_permissions():
             defaults={
                 "name": name,
                 "module_code": PERMISSION_MODULES.get(code, "CORE_HR"),
+                "classification": Permission.Classification.PRIVILEGED if code in PRIVILEGED_PERMISSIONS else Permission.Classification.NORMAL,
             },
         )
         permissions[code] = permission
@@ -457,6 +493,10 @@ def sync_system_role_permissions():
     permissions = {permission.code: permission for permission in Permission.objects.filter(code__in=PERMISSIONS)}
     changes = {}
     for role in Role.objects.filter(is_system_role=True, code__in=ROLE_PERMISSION_CODES).prefetch_related("permissions"):
+        scope = SYSTEM_ROLE_DATA_SCOPES.get(role.code, "INSTITUTION")
+        read_only = role.code in SYSTEM_READ_ONLY_ROLES
+        if role.data_scope != scope or role.is_read_only != read_only:
+            Role.objects.filter(pk=role.pk).update(data_scope=scope, is_read_only=read_only)
         wanted = {code for code in ROLE_PERMISSION_CODES[role.code] if code in permissions}
         current = {permission.code for permission in role.permissions.all()}
         if wanted == current:
@@ -466,6 +506,21 @@ def sync_system_role_permissions():
         change["added"] |= wanted - current
         change["removed"] |= current - wanted
     return {code: {key: sorted(values) for key, values in change.items()} for code, change in changes.items()}
+
+
+def default_landing(permission_codes):
+    """Where a member lands after sign-in (decision BQ-01).
+
+    Executive dashboard for holders of ``dashboard.executive.view``; Insights
+    for anyone with an operational permission beyond plain self-service;
+    otherwise Employee Home (``/me``).
+    """
+    codes = set(permission_codes)
+    if "dashboard.executive.view" in codes:
+        return "EXECUTIVE"
+    if codes - set(ROLE_PERMISSION_CODES["EMPLOYEE"]):
+        return "INSIGHTS"
+    return "ME"
 
 
 def effective_permission_codes(membership):
@@ -518,6 +573,127 @@ def _validate_delegable_permissions(permission_codes):
     return permissions
 
 
+# Institution settings are grouped by key namespace; each namespace has its
+# own permission (W0-PERM-05). Governed keys have a fixed value shape.
+SETTING_NAMESPACE_PERMISSIONS = {
+    "security.": "settings.security.manage",
+    "notifications.": "settings.notifications.manage",
+}
+GOVERNED_SETTINGS = {
+    # Separation of duties (BQ-04): preparer != approver, default ON.
+    "security.separation_of_duties": {"payroll": bool, "journals": bool},
+    # Whether members may receive notification copies by email.
+    "notifications.email_enabled": bool,
+}
+SETTING_DEFAULTS = {
+    "security.separation_of_duties": {"payroll": True, "journals": True},
+    "notifications.email_enabled": True,
+}
+
+
+def governed_setting_permission(key):
+    for prefix, permission in SETTING_NAMESPACE_PERMISSIONS.items():
+        if key.startswith(prefix):
+            return permission
+    return "settings.institution.manage"
+
+
+def validate_governed_setting(key, value):
+    """An error message when ``value`` does not fit a governed key, else None."""
+    shape = GOVERNED_SETTINGS.get(key)
+    if shape is None:
+        if any(key.startswith(prefix) for prefix in SETTING_NAMESPACE_PERMISSIONS):
+            return "Unknown setting."
+        return None
+    if shape is bool:
+        return None if isinstance(value, bool) else "Must be true or false."
+    if not isinstance(value, dict) or set(value) != set(shape) or not all(isinstance(value[name], kind) for name, kind in shape.items()):
+        return f"Must be an object with exactly: {', '.join(f'{name} ({kind.__name__})' for name, kind in shape.items())}."
+    return None
+
+
+def institution_setting(institution, key):
+    """A governed setting's stored value, or its default."""
+    row = InstitutionSetting.objects.filter(institution=institution, key=key).first()
+    return row.value if row is not None else SETTING_DEFAULTS.get(key)
+
+
+# A module may be enabled only while the modules it builds on are enabled
+# (Wave 2, MOD-01). Core HR is the foundation and cannot be turned off.
+MODULE_DEPENDENCIES = {
+    "LEAVE": ("CORE_HR",),
+    "ATTENDANCE": ("CORE_HR",),
+    "PAYROLL": ("CORE_HR",),
+    "RECRUITMENT": ("CORE_HR",),
+}
+ALWAYS_ENABLED_MODULES = frozenset({"CORE_HR"})
+
+
+@transaction.atomic
+def set_module_enabled(*, module, institution, actor, is_enabled):
+    """Enable or disable one module, refusing changes that would break a dependency."""
+    locked = InstitutionModule.objects.select_for_update().get(pk=module.pk, institution=institution)
+    if locked.is_enabled == is_enabled:
+        return locked
+    enabled = set(institution.modules.filter(is_enabled=True).values_list("module_code", flat=True))
+    names = dict(InstitutionModule.ModuleCode.choices)
+    if not is_enabled:
+        if locked.module_code in ALWAYS_ENABLED_MODULES:
+            raise CodedValidationError(f"{names[locked.module_code]} is the foundation for every other module and cannot be disabled.", api_code="module_dependency")
+        dependants = sorted(code for code, needs in MODULE_DEPENDENCIES.items() if locked.module_code in needs and code in enabled)
+        if dependants:
+            raise CodedValidationError(f"Disable {', '.join(names[code] for code in dependants)} first; it depends on {names[locked.module_code]}.", api_code="module_dependency")
+    else:
+        missing = [code for code in MODULE_DEPENDENCIES.get(locked.module_code, ()) if code not in enabled]
+        if missing:
+            raise CodedValidationError(f"Enable {', '.join(names[code] for code in missing)} first; {names[locked.module_code]} depends on it.", api_code="module_dependency")
+    locked.is_enabled = is_enabled
+    if is_enabled:
+        locked.enabled_at = timezone.now()
+        locked.enabled_by = actor
+    locked.save(update_fields=("is_enabled", "enabled_at", "enabled_by", "updated_at"))
+    record_audit_event(
+        actor=actor,
+        institution=institution,
+        entity=locked,
+        action="institution.module.enabled" if is_enabled else "institution.module.disabled",
+        metadata={"module": locked.module_code, "transition": {"from": not is_enabled, "to": is_enabled}},
+    )
+    return locked
+
+
+def _assert_can_grant(actor, institution, permission_codes):
+    """No escalation: grant only what you hold; privileged codes only from a built-in role."""
+    membership = (
+        actor.memberships.filter(institution=institution, status=InstitutionMembership.Status.ACTIVE)
+        .select_related("role")
+        .first()
+    )
+    if membership is None:
+        raise CodedValidationError("Actor must have an active membership.", api_code="membership_inactive")
+    codes = set(permission_codes)
+    held = set(membership.role.permissions.values_list("code", flat=True))
+    missing = sorted(codes - held)
+    if missing:
+        raise CodedValidationError(
+            f"You can only grant permissions your own role holds. Not held: {', '.join(missing)}.",
+            api_code="permission_not_delegable",
+        )
+    privileged = sorted(codes & PRIVILEGED_PERMISSIONS)
+    if privileged and not membership.role.is_system_role:
+        raise CodedValidationError(
+            f"Privileged permissions can only be granted by an administrator on a built-in role: {', '.join(privileged)}.",
+            api_code="permission_not_delegable",
+        )
+
+
+def _assert_can_assign_role(actor, institution, role):
+    """Assigning a role grants its permissions; self-only roles reach no one else's data."""
+    if role.data_scope == Role.DataScope.SELF:
+        return
+    _assert_can_grant(actor, institution, role.permissions.values_list("code", flat=True))
+
+
 def _ensure_admin_continuity(*, membership, next_role=None, next_status=None):
     role = next_role or membership.role
     status = next_status or membership.status
@@ -541,12 +717,13 @@ def _ensure_admin_continuity(*, membership, next_role=None, next_status=None):
 
 
 @transaction.atomic
-def create_custom_role(*, institution, actor, code, name, description="", permission_codes=()):
+def create_custom_role(*, institution, actor, code, name, description="", permission_codes=(), data_scope=Role.DataScope.INSTITUTION, is_read_only=False):
     _assert_active_actor(actor, institution)
     normalized_code = code.strip().upper()
     if normalized_code in RESERVED_ROLE_CODES:
         raise CodedValidationError("Reserved role codes cannot be created as custom roles.", api_code="role_protected")
     permissions = _validate_delegable_permissions(permission_codes)
+    _assert_can_grant(actor, institution, permission_codes)
     role = Role(
         institution=institution,
         code=normalized_code,
@@ -555,11 +732,13 @@ def create_custom_role(*, institution, actor, code, name, description="", permis
         is_system_role=False,
         is_custom=True,
         created_by=actor,
+        data_scope=data_scope,
+        is_read_only=is_read_only,
     )
     role.full_clean()
     role.save()
     role.permissions.set(permissions)
-    record_audit_event(actor=actor, institution=institution, entity=role, action="access.role.created", metadata={"permission_codes": sorted(item.code for item in permissions)})
+    record_audit_event(actor=actor, institution=institution, entity=role, action="access.role.created", metadata={"permission_codes": sorted(item.code for item in permissions), "data_scope": role.data_scope, "is_read_only": role.is_read_only})
     return role
 
 
@@ -574,11 +753,13 @@ def clone_role(*, source_role, institution, actor, code, name, description=""):
         name=name,
         description=description or source_role.description,
         permission_codes=list(source_role.permissions.values_list("code", flat=True)),
+        data_scope=source_role.data_scope,
+        is_read_only=source_role.is_read_only,
     )
 
 
 @transaction.atomic
-def update_custom_role(*, role, institution, actor, name=None, description=None, permission_codes=None, is_active=None):
+def update_custom_role(*, role, institution, actor, name=None, description=None, permission_codes=None, is_active=None, data_scope=None, is_read_only=None):
     _assert_active_actor(actor, institution)
     locked = Role.objects.select_for_update().get(pk=role.pk)
     if locked.institution_id != institution.id:
@@ -586,6 +767,11 @@ def update_custom_role(*, role, institution, actor, name=None, description=None,
     if locked.is_system_role or locked.code in RESERVED_ROLE_CODES:
         raise CodedValidationError("Reserved system roles cannot be changed.", api_code="role_protected")
     old_permissions = sorted(locked.permissions.values_list("code", flat=True))
+    old_access = {"data_scope": locked.data_scope, "is_read_only": locked.is_read_only}
+    if data_scope is not None:
+        locked.data_scope = data_scope
+    if is_read_only is not None:
+        locked.is_read_only = is_read_only
     if name is not None:
         locked.name = name.strip()
     if description is not None:
@@ -596,8 +782,14 @@ def update_custom_role(*, role, institution, actor, name=None, description=None,
     locked.save()
     if permission_codes is not None:
         permissions = _validate_delegable_permissions(permission_codes)
+        _assert_can_grant(actor, institution, set(permission_codes) - set(old_permissions))
         locked.permissions.set(permissions)
-    record_audit_event(actor=actor, institution=institution, entity=locked, action="access.role.updated", metadata={"old_permission_codes": old_permissions, "new_permission_codes": sorted(locked.permissions.values_list("code", flat=True))})
+    record_audit_event(actor=actor, institution=institution, entity=locked, action="access.role.updated", metadata={
+        "old_permission_codes": old_permissions,
+        "new_permission_codes": sorted(locked.permissions.values_list("code", flat=True)),
+        "old_access": old_access,
+        "new_access": {"data_scope": locked.data_scope, "is_read_only": locked.is_read_only},
+    })
     return locked
 
 
@@ -615,6 +807,8 @@ def update_membership(*, membership, institution, actor, role=None, status=None,
     if role is not None:
         if not role.is_active:
             raise ValidationError({"role": "An inactive role cannot be assigned."})
+        if role.pk != locked.role_id:
+            _assert_can_assign_role(actor, institution, role)
         locked.role = role
     if status is not None:
         locked.status = status
@@ -710,23 +904,26 @@ def _onboarding_step_blocker(institution, step):
             role__code="INSTITUTION_ADMIN",
         ).exists():
             return ("ACTIVE_ADMIN_REQUIRED", "At least one active Institution Admin is required.")
+        enabled_modules = set(institution.modules.filter(is_enabled=True).values_list("module_code", flat=True))
+        required_roles = [code for code, modules in ONBOARDING_SETUP_OWNER_ROLES if modules & enabled_modules]
         assigned_owner_roles = set(
             InstitutionMembership.objects.filter(
                 institution=institution,
                 status__in=(InstitutionMembership.Status.INVITED, InstitutionMembership.Status.ACTIVE),
-                role__code__in=ONBOARDING_SETUP_OWNER_ROLES,
+                role__code__in=required_roles,
             ).values_list("role__code", flat=True)
         )
         pending_owner_roles = set(
             InstitutionInvitation.objects.filter(
                 institution=institution,
                 status=InstitutionInvitation.Status.PENDING,
-                role__code__in=ONBOARDING_SETUP_OWNER_ROLES,
+                role__code__in=required_roles,
             ).values_list("role__code", flat=True)
         )
+        role_names = dict(Role.objects.filter(institution=institution, code__in=required_roles).values_list("code", "name"))
         missing = [
-            code.replace("_", " ").title()
-            for code in ONBOARDING_SETUP_OWNER_ROLES
+            role_names.get(code) or system_role_name(code)
+            for code in required_roles
             if code not in assigned_owner_roles | pending_owner_roles
         ]
         if missing:
@@ -985,7 +1182,13 @@ def bootstrap_institution(institution):
         role, _ = Role.objects.update_or_create(
             institution=institution,
             code=code,
-            defaults={"name": code.replace("_", " ").title(), "is_system_role": True, "is_custom": False},
+            defaults={
+                "name": system_role_name(code),
+                "is_system_role": True,
+                "is_custom": False,
+                "data_scope": SYSTEM_ROLE_DATA_SCOPES.get(code, "INSTITUTION"),
+                "is_read_only": code in SYSTEM_READ_ONLY_ROLES,
+            },
         )
         role.permissions.set(permissions[item] for item in permission_codes)
 
@@ -1055,6 +1258,7 @@ def invite_existing_user(*, email, institution, role, actor, is_primary=False):
         )
     if role.institution_id != institution.id or not role.is_active:
         raise ValidationError({"role": "Select an active role from this institution."})
+    _assert_can_assign_role(actor, institution, role)
     membership, created = InstitutionMembership.objects.select_for_update().get_or_create(
         institution=institution,
         user=user,
@@ -1078,6 +1282,7 @@ def create_invitation(*, email, institution, role, actor, expires_at, employee=N
     _assert_active_actor(actor, institution)
     if role.institution_id != institution.id or not role.is_active:
         raise ValidationError({"role": "Select an active role from this institution."})
+    _assert_can_assign_role(actor, institution, role)
     normalized_email = email.strip().lower()
     if employee is not None:
         if employee.institution_id != institution.id:

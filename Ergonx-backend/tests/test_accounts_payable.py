@@ -584,7 +584,11 @@ def test_expense_workflow_posts_a_balanced_cash_journal_and_rejects_invalid_tran
     with pytest.raises(ValidationError, match="Only approved expenses"):
         post_expense(expense=expense, actor=actor)
     expense = submit_expense(expense=expense, actor=actor)
-    expense = approve_expense(expense=expense, actor=actor)
+    # Whoever enters an expense cannot approve it (BQ-04).
+    with pytest.raises(ValidationError, match="separation of duties"):
+        approve_expense(expense=expense, actor=actor)
+    approver = _finance(institution, user_factory, membership_factory, "expense.approver@example.com")
+    expense = approve_expense(expense=expense, actor=approver)
     expense = post_expense(expense=expense, actor=actor)
     assert expense.status == Expense.Status.POSTED
     assert expense.journal_entry.source == "EXPENSE"

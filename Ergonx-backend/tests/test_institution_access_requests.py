@@ -140,3 +140,19 @@ def test_cannot_invite_an_email_that_already_has_an_account(api_client, user_fac
     assert response.status_code == 409
     access_request.refresh_from_db()
     assert access_request.status == InstitutionAccessRequest.Status.PENDING
+
+
+def test_request_details_and_terms_carry_into_the_invitation(api_client, user_factory):
+    assert api_client.post(LIST_URL, _payload(accepted_terms=False), format="json").status_code == 400
+    response = api_client.post(LIST_URL, _payload(institution_type="HEALTHCARE", website_url="https://voltahealth.example", accepted_terms=True), format="json")
+    assert response.status_code == 202, response.data
+    stored = InstitutionAccessRequest.objects.get()
+    assert (stored.institution_type, stored.website_url) == ("HEALTHCARE", "https://voltahealth.example")
+    assert stored.terms_accepted_at is not None
+
+    api_client.force_authenticate(user_factory(is_platform_admin=True))
+    token = api_client.post(_decision_url(stored, "approve"), {"expires_in_hours": 72}, format="json").data["invitation"]["acceptance_token"]
+    api_client.force_authenticate(None)
+    prefill = api_client.get(reverse("v1:institution-admin-invitation-acceptance", args=(token,))).data["prefill"]
+    assert prefill["institution_type"] == "HEALTHCARE" and prefill["website"] == "https://voltahealth.example"
+    assert (prefill["first_name"], prefill["last_name"]) == ("Akosua", "Darko")

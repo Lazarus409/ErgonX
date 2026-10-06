@@ -120,6 +120,10 @@ class InstitutionAccessRequest(BaseModel):
     phone = models.CharField(max_length=40, blank=True)
     country_code = models.CharField(max_length=2, default="GH")
     organization_size = models.CharField(max_length=10, choices=Size.choices, blank=True)
+    # Carried into the organization-creation form when the request is approved.
+    institution_type = models.CharField(max_length=20, blank=True)
+    website_url = models.URLField(max_length=255, blank=True)
+    terms_accepted_at = models.DateTimeField(null=True, blank=True)
     message = models.TextField(blank=True)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
     reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="reviewed_access_requests")
@@ -132,3 +136,46 @@ class InstitutionAccessRequest(BaseModel):
 
     def __str__(self):
         return f"Access request from {self.institution_name} ({self.email})"
+
+
+class AuthAttempt(BaseModel):
+    """One sign-in attempt, kept for a day to drive account lockout and IP limits.
+
+    Stored in the database (not the per-process cache) so every gunicorn worker
+    sees the same counts. The email is kept only as a keyed hash.
+    """
+
+    class Outcome(models.TextChoices):
+        SUCCEEDED = "SUCCEEDED", "Succeeded"
+        FAILED = "FAILED", "Failed"
+        CHALLENGED = "CHALLENGED", "MFA code requested"
+
+    email_key = models.CharField(max_length=64)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    outcome = models.CharField(max_length=12, choices=Outcome.choices)
+    reason = models.CharField(max_length=40, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=("email_key", "created_at")),
+            models.Index(fields=("ip_address", "created_at")),
+            models.Index(fields=("created_at",)),
+        ]
+
+
+class UserSession(BaseModel):
+    """One signed-in browser or device; its id travels in tokens as the ``sid`` claim.
+
+    Revoking a session stops both its refresh and access tokens immediately
+    (checked on every request), not only when the access token expires.
+    """
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="sessions")
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=300, blank=True)
+    last_seen_at = models.DateTimeField()
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    revoked_reason = models.CharField(max_length=40, blank=True)
+
+    class Meta:
+        indexes = [models.Index(fields=("user", "revoked_at", "last_seen_at"))]

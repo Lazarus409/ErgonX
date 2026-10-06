@@ -246,16 +246,51 @@ def _accounting(ctx):
                 blocked_reason="On hold — release the hold on the bill before approving." if bill.on_hold else "",
             ))
     if ctx.can("ACCOUNTING", "expense.approve"):
-        for expense in Expense.objects.for_institution(ctx.institution).filter(status=Expense.Status.PENDING).select_related("account", "created_by"):
+        # Finance-entered expenses (no claimant) keep the one-step approval.
+        for expense in Expense.objects.for_institution(ctx.institution).filter(status=Expense.Status.PENDING, claimant__isnull=True).select_related("account", "created_by"):
             base = f"/expenses/{expense.pk}"
             rows.append(_item(
                 kind="EXPENSE", module="ACCOUNTING", record=expense,
                 title=f"Expense · {expense.description}"[:160],
-                subtitle=f"{expense.account.name} · {expense.expense_date:%d %b %Y}",
-                requested_by=_name(expense.created_by), submitted_at=expense.updated_at,
+                subtitle=f"{expense.account.name if expense.account_id else 'Expense'} · {expense.expense_date:%d %b %Y}",
+                requested_by=_name(expense.created_by), submitted_at=expense.submitted_at or expense.updated_at,
                 amount=expense.amount, currency=expense.currency,
                 route="/accounting/expenses",
-                actions=(_approve(f"{base}/approve/"), _reject(f"{base}/reject/")),
+                actions=(_approve(f"{base}/approve/"), _reject(f"{base}/reject/", "comment")),
+                blocked_reason="You created this expense; another approver must decide it." if expense.created_by_id == ctx.user.id else "",
+            ))
+    if "ACCOUNTING" in ctx.enabled:
+        # Expense claims whose current manager step belongs to the caller (Expense 2.0).
+        from apps.accounting.models import ExpenseApproval
+
+        steps = ExpenseApproval.objects.filter(
+            institution=ctx.institution, approver=ctx.user, status=ExpenseApproval.Status.PENDING, expense__status=Expense.Status.PENDING,
+        ).select_related("expense__claimant")
+        for step in steps:
+            expense = step.expense
+            if expense.approvals.filter(status=ExpenseApproval.Status.PENDING, sequence__lt=step.sequence).exists():
+                continue  # an earlier step is still open
+            base = f"/expenses/{expense.pk}"
+            rows.append(_item(
+                kind="EXPENSE_CLAIM", module="ACCOUNTING", record=expense,
+                title=f"Expense claim · {expense.claimant.full_name}",
+                subtitle=f"{step.step_name} · {expense.description}"[:160],
+                requested_by=expense.claimant.full_name, submitted_at=expense.submitted_at or expense.updated_at,
+                amount=expense.amount, currency=expense.currency,
+                route="/approvals",
+                actions=(_approve(f"{base}/approve/"), _return(f"{base}/return/", "comment", "Return"), _reject(f"{base}/reject/", "comment", required=True)),
+            ))
+    if ctx.can("ACCOUNTING", "expense.finance_review"):
+        # Finance review recodes and checks policy on the record page.
+        for expense in Expense.objects.for_institution(ctx.institution).filter(status=Expense.Status.FINANCE_REVIEW).select_related("claimant"):
+            rows.append(_item(
+                kind="EXPENSE_CLAIM", module="ACCOUNTING", record=expense,
+                title=f"Finance review · {expense.claimant.full_name if expense.claimant_id else expense.description}"[:160],
+                subtitle=expense.description[:160],
+                requested_by=expense.claimant.full_name if expense.claimant_id else "", submitted_at=expense.submitted_at or expense.updated_at,
+                amount=expense.amount, currency=expense.currency,
+                route=f"/accounting/expenses?review={expense.pk}",
+                blocked_reason="You claimed this expense; another reviewer must decide it." if expense.claimant_id and expense.claimant.user_id == ctx.user.id else "",
             ))
     if ctx.can("ACCOUNTING", "budget.approve"):
         for budget in Budget.objects.for_institution(ctx.institution).filter(status=Budget.Status.PENDING_APPROVAL).select_related("fiscal_year", "department", "submitted_by"):
@@ -316,6 +351,10 @@ DECISION_ACTIONS = {
     "accounting.vendor_bill.rejected": ("VENDOR_BILL", "REJECTED"),
     "accounting.expense.approved": ("EXPENSE", "APPROVED"),
     "accounting.expense.rejected": ("EXPENSE", "REJECTED"),
+    "accounting.expense.manager_approved": ("EXPENSE_CLAIM", "APPROVED"),
+    "accounting.expense.step_approved": ("EXPENSE_CLAIM", "APPROVED"),
+    "accounting.expense.returned": ("EXPENSE_CLAIM", "RETURNED"),
+    "accounting.expense.finance_reviewed": ("EXPENSE_CLAIM", None),
     "accounting.budget.approved": ("BUDGET", "APPROVED"),
     "accounting.budget.returned": ("BUDGET", "RETURNED"),
     "APPROVAL_APPROVE": ("WORKFLOW_REQUEST", "APPROVED"),
@@ -335,6 +374,7 @@ KINDS = {
     "JOURNAL": ("ACCOUNTING", "journal.approve", "Journal", lambda pk: f"/accounting/journals/{pk}"),
     "VENDOR_BILL": ("ACCOUNTING", "vendor_bill.approve", "Vendor bill", lambda pk: f"/accounting/payables/bills/{pk}"),
     "EXPENSE": ("ACCOUNTING", "expense.approve", "Expense", lambda pk: "/accounting/expenses"),
+    "EXPENSE_CLAIM": ("ACCOUNTING", "expense.claim_own", "Expense claim", lambda pk: "/accounting/expenses"),
     "BUDGET": ("ACCOUNTING", "budget.approve", "Budget", lambda pk: f"/accounting/budgets/{pk}"),
     "WORKFLOW_REQUEST": ("WORKFLOW", None, "Workflow request", None),
 }

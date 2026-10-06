@@ -7,6 +7,7 @@ a deliberate change in Users & Access.
 from datetime import timedelta
 
 from django.utils import timezone
+from drf_spectacular.utils import OpenApiTypes, extend_schema
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -21,6 +22,7 @@ ADMIN_PERMISSION = "settings.users.manage"
 REPEAT_WINDOW = timedelta(hours=24)
 
 
+@extend_schema(request=OpenApiTypes.OBJECT, responses={200: OpenApiTypes.OBJECT})
 class AccessRequestView(APIView):
     permission_classes = [TenantContextPermission, TenantRBACPermission]
 

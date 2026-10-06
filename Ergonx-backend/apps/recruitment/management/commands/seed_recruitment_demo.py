@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 
 from django.conf import settings
+from django.utils import timezone
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
@@ -36,6 +37,10 @@ class Command(BaseCommand):
         RecruitmentStage.objects.get_or_create(institution=institution, sequence=2, defaults={"name": "Interview"})
         posting, _ = JobPosting.objects.get_or_create(institution=institution, code="REC-DEMO-001", defaults={"title": "HR Analyst", "department": department, "position": position, "location": location, "hiring_manager": admin, "employment_type": "PERMANENT", "description": "Deterministic Recruitment MVP demo posting."})
         if posting.status == JobPosting.Status.DRAFT:
+            # Demo history: the requisition was approved before publishing (BQ-06 removed
+            # the draft shortcut).
+            JobPosting.objects.filter(pk=posting.pk).update(status=JobPosting.Status.APPROVED, approved_by=admin, approved_at=timezone.now())
+            posting.refresh_from_db()
             publish_job_posting(job_posting=posting, actor=admin)
         candidate, _ = Candidate.objects.get_or_create(institution=institution, email="ada.applicant@ergonx.local", defaults={"first_name": "Ada", "last_name": "Applicant", "source": "DEMO"})
         application, _ = Application.objects.get_or_create(institution=institution, job_posting=posting, candidate=candidate)

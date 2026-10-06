@@ -269,10 +269,14 @@ def test_ghana_resident_paye_pension_deadlines_and_finalization_reminders(
     ).metadata["basis"] == "2835.00"
 
     run = submit_payroll_run_for_review(payroll_run=run, actor=hr)
-    run = approve_payroll_run(payroll_run=run, actor=hr)
+    approver = user_factory()
+    membership_factory(user=approver, institution=institution, role_code="FINANCE_MANAGER")
+    run = approve_payroll_run(payroll_run=run, actor=approver)
     finalize_payroll_run(payroll_run=run, actor=hr)
+    # Every payroll finalizer is reminded (the approver too); check HR's set.
     reminders = Notification.objects.filter(
         institution=institution,
+        user=hr,
         notification_type="PAYROLL_COMPLIANCE_DEADLINE",
     ).order_by("metadata__due_date")
     assert list(reminders.values_list("metadata__due_date", flat=True)) == [

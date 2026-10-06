@@ -110,7 +110,7 @@ def test_payroll_demo_seed_is_complete_and_idempotent():
     assert first_counts == second_counts
     assert first_counts == {
         "users": 3,
-        "memberships": 3,
+        "memberships": 4,  # + the payroll approver (BQ-04)
         "employees": 2,
         "profiles": 2,
         "periods": 1,
@@ -119,7 +119,7 @@ def test_payroll_demo_seed_is_complete_and_idempotent():
         "payslips": 2,
         "adjustments": 1,
         "claims": 1,
-        "notifications": 9,
+        "notifications": 15,  # the Finance Manager approver is notified too
         "audits": 18,
     }
     assert {

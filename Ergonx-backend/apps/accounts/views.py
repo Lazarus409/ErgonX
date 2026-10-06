@@ -19,6 +19,8 @@ from django.db import models, transaction
 from django.utils.text import slugify
 from urllib.parse import quote
 from uuid import uuid4
+from rest_framework.exceptions import AuthenticationFailed
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework_simplejwt.tokens import RefreshToken
 from drf_spectacular.utils import OpenApiTypes, extend_schema
@@ -27,6 +29,7 @@ from apps.accounts.platform import expire_stale_admin_invitations, record_platfo
 from apps.accounts.serializers import (
     AuthBootstrapSerializer,
     EmailTokenObtainPairSerializer,
+    SessionTokenRefreshSerializer,
     UserSerializer,
     SelfServiceRegistrationSerializer,
     InstitutionAdminInvitationCreateSerializer,
@@ -42,10 +45,23 @@ from apps.accounts.serializers import (
     PasswordResetRequestSerializer,
     MFASetupSerializer,
     EmailOTPDeliveryError,
+    EmailOTPRequired,
+    MFARequired,
     consume_email_otp,
+    email_otp_resend_wait,
     issue_email_otp,
 )
-from apps.institutions.services import create_membership, effective_permission_codes
+from apps.accounts.models import AuthAttempt, UserSession
+from apps.accounts.sessions import SESSION_CLAIM, active_sessions, revoke_sessions, start_session
+from apps.accounts.security import (
+    client_ip,
+    email_key,
+    ensure_login_allowed,
+    mask_email,
+    record_login_attempt,
+    revoke_refresh_tokens,
+)
+from apps.institutions.services import create_membership, default_landing, effective_permission_codes
 from apps.institutions.models import Institution, InstitutionInvitation, InstitutionMembership, InstitutionModule, Role
 from apps.accounts.models import InstitutionAccessRequest, InstitutionAdminInvitation, User, UserMFA
 from apps.employees.models import Employee
@@ -53,11 +69,187 @@ from apps.documents.models import ImageAsset
 from apps.accounts.emails import send_institution_access_request_notice, send_institution_admin_invitation, send_password_reset
 from apps.audit.services import record_audit_event
 from common.scoping import data_scope
-from common.permissions import READ_ONLY_ROLES, TenantContextPermission
+from common.permissions import TenantContextPermission
+
+
+def _login_method(user):
+    mfa = UserMFA.objects.filter(user=user, is_enabled=True).first()
+    if mfa is None:
+        return "password"
+    return "email_otp" if mfa.method == UserMFA.Method.EMAIL_OTP else "totp"
 
 
 class LoginView(TokenObtainPairView):
+    """Password sign-in with MFA challenge, account lockout and per-IP limits (Wave 0 BQ-10)."""
+
     serializer_class = EmailTokenObtainPairSerializer
+
+    def post(self, request, *args, **kwargs):
+        email = str(request.data.get("email") or "").strip()
+        key = email_key(email)
+        ip, ip_trusted = client_ip(request)
+        ensure_login_allowed(key=key, ip=ip, ip_trusted=ip_trusted)
+        code_given = bool(str(request.data.get("mfa_code") or "").strip())
+        serializer = self.get_serializer(data=request.data)
+        try:
+            serializer.is_valid(raise_exception=True)
+        except TokenError as exc:
+            raise InvalidToken(exc.args[0])
+        except (MFARequired, EmailOTPRequired) as exc:
+            # Without a code these only ask for one; with a code they mean it was wrong.
+            if code_given:
+                self._failed(key, ip, email, "mfa_invalid", getattr(serializer, "user", None))
+            else:
+                record_login_attempt(key=key, ip=ip, outcome=AuthAttempt.Outcome.CHALLENGED, reason=exc.api_code)
+            raise
+        except AuthenticationFailed as exc:
+            reason = getattr(exc, "api_code", None) or exc.get_codes()
+            reason = reason if isinstance(reason, str) else "authentication_failed"
+            reason = "invalid_credentials" if reason == "no_active_account" else reason
+            if reason != "email_otp_unavailable":
+                self._failed(key, ip, email, reason, getattr(serializer, "user", None))
+            raise
+        user = serializer.user
+        record_login_attempt(key=key, ip=ip, outcome=AuthAttempt.Outcome.SUCCEEDED)
+        record_audit_event(actor=user, entity=user, action="account.login.succeeded", ip=ip, metadata={"method": _login_method(user)})
+        return Response(serializer.validated_data, status=200)
+
+    @staticmethod
+    def _failed(key, ip, email, reason, user):
+        record_login_attempt(key=key, ip=ip, outcome=AuthAttempt.Outcome.FAILED, reason=reason)
+        user = user or User.objects.filter(email__iexact=email).first()
+        metadata = {"reason": reason}
+        if user is None:
+            metadata["email_key"] = key
+        record_audit_event(actor=user, entity=user, action="account.login.failed", ip=ip, metadata=metadata)
+
+
+class LogoutView(APIView):
+    """Blacklist the session's refresh token so it cannot mint new access tokens.
+
+    Called by the BFF on sign-out with the refresh token from its HttpOnly cookie.
+    Always answers 200 so a stale or foreign token reveals nothing.
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    @extend_schema(request=OpenApiTypes.OBJECT, responses={200: OpenApiTypes.OBJECT})
+    def post(self, request):
+        raw = str(request.data.get("refresh") or "")
+        if raw:
+            try:
+                token = RefreshToken(raw)
+                token.blacklist()
+            except TokenError:
+                token = None
+            user = User.objects.filter(pk=token.payload.get("user_id")).first() if token else None
+            if user is not None:
+                sid = token.payload.get(SESSION_CLAIM)
+                if sid:
+                    UserSession.objects.filter(pk=sid, user=user, revoked_at__isnull=True).update(revoked_at=timezone.now(), revoked_reason="signed_out")
+                record_audit_event(actor=user, entity=user, action="account.logout", ip=client_ip(request)[0], metadata={"jti": token.payload.get("jti"), "session": sid})
+        return Response({"logged_out": True})
+
+
+def _current_sid(request):
+    auth = getattr(request, "auth", None)
+    return auth.get(SESSION_CLAIM) if auth is not None else None
+
+
+class SessionListView(APIView):
+    """The signed-in user's active sessions (Security Center)."""
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
+    def get(self, request):
+        current = _current_sid(request)
+        rows = [
+            {
+                "id": str(session.id),
+                "ip_address": session.ip_address,
+                "user_agent": session.user_agent,
+                "created_at": session.created_at,
+                "last_seen_at": session.last_seen_at,
+                "current": str(session.id) == str(current),
+            }
+            for session in active_sessions(request.user)
+        ]
+        return Response({"sessions": rows})
+
+
+# Account events a member sees about themselves in the Security Center.
+SIGN_IN_ACTIVITY_ACTIONS = (
+    "account.login.succeeded", "account.login.failed", "account.logout",
+    "account.password.changed", "account.password.reset_completed",
+    "account.mfa.enabled", "account.mfa.disabled", "account.mfa.method_changed", "account.mfa.disable_refused",
+)
+
+
+class SignInActivityView(APIView):
+    """The signed-in user's own recent sign-ins and security changes (S043)."""
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
+    def get(self, request):
+        from apps.audit.models import AuditLog
+
+        events = AuditLog.objects.filter(actor=request.user, action__in=SIGN_IN_ACTIVITY_ACTIONS).order_by("-created_at")[:20]
+        return Response({"events": [
+            {
+                "id": str(event.id),
+                "action": event.action,
+                "created_at": event.created_at,
+                "ip_address": event.ip_address,
+                "user_agent": event.user_agent,
+                # Only the sign-in method or failure reason; never codes or tokens.
+                "detail": event.metadata.get("method") or event.metadata.get("reason") or "",
+            }
+            for event in events
+        ]})
+
+
+class SessionRevokeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(request=None, responses={200: OpenApiTypes.OBJECT})
+    def post(self, request, pk):
+        session = UserSession.objects.filter(pk=pk, user=request.user, revoked_at__isnull=True).first()
+        if session is None:
+            from rest_framework.exceptions import NotFound
+
+            raise NotFound("No active session with this id.")
+        revoke_sessions(request.user, actor=request.user, reason="revoked_by_user", only=session.pk)
+        return Response({"revoked": 1, "current": str(session.pk) == str(_current_sid(request))})
+
+
+class SessionRevokeOthersView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(request=None, responses={200: OpenApiTypes.OBJECT})
+    def post(self, request):
+        revoked = revoke_sessions(request.user, actor=request.user, reason="revoked_by_user", keep_sid=_current_sid(request))
+        return Response({"revoked": revoked})
+
+
+def _refresh_sid(raw_refresh, user):
+    """The session named by the caller's own refresh token (the BFF passes it on password change)."""
+    try:
+        token = RefreshToken(str(raw_refresh or ""))
+    except TokenError:
+        return None
+    return token.payload.get(SESSION_CLAIM) if str(token.payload.get("user_id")) == str(user.pk) else None
+
+
+def _session_jti(raw_refresh, user):
+    """The jti of the caller's own refresh token, so a password change keeps this session."""
+    try:
+        token = RefreshToken(str(raw_refresh or ""))
+    except TokenError:
+        return None
+    return token.payload.get("jti") if str(token.payload.get("user_id")) == str(user.pk) else None
 
 
 class MFAConflict(APIException):
@@ -106,7 +298,7 @@ class MFASettingsView(APIView):
         code = str(request.data.get("code") or "").strip()
         if not code:
             try:
-                challenge = issue_email_otp(request.user)
+                challenge = issue_email_otp(request.user, purpose="enrolment")
             except EmailOTPDeliveryError as exc:
                 raise MFAConflict(str(exc), api_code="email_otp_unavailable")
             current = UserMFA.objects.filter(user=request.user).first()
@@ -115,8 +307,9 @@ class MFASettingsView(APIView):
                 "pending": bool(current and not current.is_enabled),
                 "method": current.method if current else None,
                 "email_code_sent": True,
-                "email": request.user.email,
+                "email": mask_email(request.user.email),
                 "expires_at": challenge.expires_at,
+                "resend_available_in": email_otp_resend_wait(challenge),
             })
         if not consume_email_otp(request.user, code):
             raise ValidationError({"code": "The email verification code is invalid or expired."})
@@ -130,6 +323,10 @@ class MFASettingsView(APIView):
 
     def delete(self, request):
         mfa = UserMFA.objects.filter(user=request.user).first()
+        if mfa and mfa.is_enabled and not request.user.check_password(str(request.data.get("current_password") or "")):
+            # Step-up (W0-SEC-04): a stolen session alone cannot remove MFA.
+            record_audit_event(actor=request.user, institution=getattr(request, "institution", None), entity=mfa, action="account.mfa.disable_refused", metadata={"method": mfa.method})
+            raise ValidationError({"current_password": "Enter your current password to turn off multi-factor authentication."})
         if mfa:
             record_audit_event(actor=request.user, institution=getattr(request, "institution", None), entity=mfa, action="account.mfa.disabled", metadata={"method": mfa.method})
             mfa.delete()
@@ -215,7 +412,7 @@ class InstitutionAdminInvitationActionView(APIView):
 
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(request=InstitutionAccessRequestApproveSerializer, responses={200: OpenApiTypes.OBJECT})
+    @extend_schema(request=InstitutionAccessRequestApproveSerializer, responses={200: OpenApiTypes.OBJECT}, operation_id="auth_institution_admin_invitations_action")
     @transaction.atomic
     def post(self, request, pk, action):
         _assert_platform_admin(request)
@@ -288,6 +485,8 @@ class InstitutionAccessRequestView(APIView):
         serializer.is_valid(raise_exception=True)
         values = dict(serializer.validated_data)
         honeypot = values.pop("website", "")
+        if values.pop("accepted_terms", False):
+            values["terms_accepted_at"] = timezone.now()
         # The same answer is given whether the request was stored, was a
         # duplicate, or tripped the honeypot, so the endpoint reveals nothing.
         duplicate = InstitutionAccessRequest.objects.filter(email=values["email"], status=InstitutionAccessRequest.Status.PENDING).exists()
@@ -312,7 +511,7 @@ class InstitutionAccessRequestDecisionView(APIView):
 
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(request=InstitutionAccessRequestApproveSerializer, responses={200: OpenApiTypes.OBJECT})
+    @extend_schema(request=InstitutionAccessRequestApproveSerializer, responses={200: OpenApiTypes.OBJECT}, operation_id="auth_institution_access_requests_decide")
     @transaction.atomic
     def post(self, request, pk, decision):
         _assert_platform_admin(request)
@@ -378,7 +577,20 @@ class InstitutionAdminInvitationAcceptanceView(APIView):
         invitation = self._invitation(token)
         if invitation is None:
             return Response({"detail": "Invitation is invalid or expired."}, status=404)
-        return Response({"email": invitation.email, "expires_at": invitation.expires_at})
+        # Prefill from the access request this invitation came from, when there is one.
+        request_row = getattr(invitation, "access_request", None)
+        prefill = {}
+        if request_row is not None:
+            first, _, last = (request_row.contact_name or "").strip().partition(" ")
+            prefill = {
+                "institution_name": request_row.institution_name, "first_name": first, "last_name": last,
+                "phone": request_row.phone, "country_code": request_row.country_code, "employee_size": request_row.organization_size,
+                "institution_type": request_row.institution_type, "website": request_row.website_url,
+            }
+        return Response({
+            "email": invitation.email, "expires_at": invitation.expires_at, "prefill": prefill,
+            "institution_types": [{"value": value, "label": label} for value, label in Institution.InstitutionType.choices],
+        })
 
     @extend_schema(operation_id="auth_institution_admin_invitation_accept")
     @transaction.atomic
@@ -394,20 +606,24 @@ class InstitutionAdminInvitationAcceptanceView(APIView):
         if User.objects.filter(email=invitation.email).exists():
             return Response({"detail": "An account already exists for this email. Sign in or ask the platform administrator to issue a new invitation."}, status=409)
         user = User.objects.create_user(email=invitation.email, password=values["password"], first_name=values["first_name"].strip(), last_name=values["last_name"].strip())
-        institution = Institution.objects.create(name=values["institution_name"], code=self._institution_code(values["institution_name"]), country_code=values["country_code"].upper(), default_currency=values["default_currency"].upper(), timezone=values["timezone"], email=invitation.email)
+        institution = Institution.objects.create(
+            name=values["institution_name"], code=self._institution_code(values["institution_name"]), country_code=values["country_code"].upper(),
+            default_currency=values["default_currency"].upper(), timezone=values["timezone"], email=invitation.email,
+            institution_type=values["institution_type"], employee_size=values["employee_size"], website=values["website"], phone=values["phone"].strip(),
+        )
         role = Role.objects.get(institution=institution, code="INSTITUTION_ADMIN")
         create_membership(user=user, institution=institution, role=role, status=InstitutionMembership.Status.ACTIVE, is_primary=True, joined_at=timezone.now())
         invitation.status = InstitutionAdminInvitation.Status.ACCEPTED
         invitation.accepted_at = timezone.now()
         invitation.institution = institution
         invitation.save(update_fields=("status", "accepted_at", "institution", "updated_at"))
-        record_platform_event(actor=user, action="institution.created", institution=institution, entity=institution, metadata={"name": institution.name, "invitation": str(invitation.id)})
-        refresh = RefreshToken.for_user(user)
+        record_platform_event(actor=user, action="institution.created", institution=institution, entity=institution, metadata={"name": institution.name, "invitation": str(invitation.id), "terms_accepted_at": timezone.now().isoformat()})
+        refresh = start_session(user, request)
         return Response({"access": str(refresh.access_token), "refresh": str(refresh), "user": UserSerializer(user).data, "institution": {"id": str(institution.id), "name": institution.name, "code": institution.code}}, status=201)
 
 
 class RefreshView(TokenRefreshView):
-    pass
+    serializer_class = SessionTokenRefreshSerializer
 
 
 class MeView(APIView):
@@ -442,6 +658,10 @@ class PasswordChangeView(APIView):
         serializer.is_valid(raise_exception=True)
         request.user.set_password(serializer.validated_data["new_password"])
         request.user.save(update_fields=("password", "updated_at"))
+        # Other sessions end; the BFF passes this session's refresh token so it survives.
+        revoked = revoke_refresh_tokens(request.user, keep_jti=_session_jti(request.data.get("current_refresh"), request.user))
+        revoke_sessions(request.user, actor=request.user, reason="password_changed", keep_sid=_current_sid(request) or _refresh_sid(request.data.get("current_refresh"), request.user))
+        record_audit_event(actor=request.user, entity=request.user, action="account.password.changed", metadata={"sessions_revoked": revoked})
         return Response({"changed": True})
 
 
@@ -462,6 +682,8 @@ class PasswordResetRequestView(APIView):
                 send_password_reset(recipient_email=user.email, uid=uid, token=token)
             except (BadHeaderError, OSError, SMTPException):
                 pass
+            else:
+                record_audit_event(actor=user, entity=user, action="account.password.reset_requested")
         return Response({"requested": True}, status=202)
 
 
@@ -481,6 +703,9 @@ class PasswordResetConfirmView(APIView):
             return Response({"detail": "This password reset link is invalid or has expired."}, status=400)
         user.set_password(serializer.validated_data["new_password"])
         user.save(update_fields=("password", "updated_at"))
+        revoked = revoke_refresh_tokens(user)
+        revoke_sessions(user, actor=user, reason="password_reset")
+        record_audit_event(actor=user, entity=user, action="account.password.reset_completed", metadata={"sessions_revoked": revoked})
         return Response({"reset": True})
 
 
@@ -517,10 +742,8 @@ class AuthBootstrapView(APIView):
             for code in permission_codes
             if code.startswith("dashboard.") and code.endswith(".view")
         ]
-        # Home is the canonical post-login workspace for every institutional
-        # membership. Dashboards stay discoverable analytical destinations;
-        # role titles must not choose a user's landing route.
-        landing = "HOME"
+        # Landing follows effective permissions, never role titles (BQ-01).
+        landing = default_landing(permission_codes)
         payload = {
             "user": request.user,
             "active_institution": {
@@ -538,7 +761,7 @@ class AuthBootstrapView(APIView):
                 # INSTITUTION, DEPARTMENT or SELF: whose records this member works with.
                 "data_scope": data_scope(request),
                 # Read-only roles may view what they are granted but not change it.
-                "read_only": request.membership.role.code in READ_ONLY_ROLES,
+                "read_only": request.membership.role.is_read_only,
             },
             "effective_permissions": list(permission_codes),
             "enabled_modules": enabled_modules,

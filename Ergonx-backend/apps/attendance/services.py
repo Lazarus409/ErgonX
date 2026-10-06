@@ -12,6 +12,7 @@ from apps.attendance.models import AttendanceAdjustment, AttendanceRecord, Overt
 from apps.employees.models import Employment
 from apps.institutions.models import InstitutionMembership
 from apps.scheduling.services import schedule_assignment_for, schedule_expectation
+from common.exceptions import CodedValidationError
 
 
 def _membership(actor, institution):
@@ -331,6 +332,26 @@ def _coerce_datetime(value, field_name):
     return parsed
 
 
+def ensure_pay_not_finalized(institution, day):
+    """Refuse changes that would alter pay already finalized for ``day`` (LC-ATT-01).
+
+    Approved attendance feeds overtime pay; once the payroll covering a date
+    is finalized, that date's attendance can no longer change pay silently.
+    """
+    from apps.payroll.models import PayrollRun
+
+    if PayrollRun.objects.filter(
+        institution=institution,
+        status=PayrollRun.Status.FINALIZED,
+        payroll_period__start_date__lte=day,
+        payroll_period__end_date__gte=day,
+    ).exists():
+        raise CodedValidationError(
+            {"attendance_date": f"Payroll covering {day.isoformat()} is finalized. Record a correction in a later payroll instead."},
+            api_code="payroll_finalized",
+        )
+
+
 @transaction.atomic
 def decide_adjustment(*, adjustment, actor, approve, comment=""):
     adjustment = AttendanceAdjustment.objects.select_for_update().select_related(
@@ -342,6 +363,7 @@ def decide_adjustment(*, adjustment, actor, approve, comment=""):
     if adjustment.status != AttendanceAdjustment.Status.PENDING:
         raise ValidationError({"status": "Only pending adjustments can be decided."})
     if approve:
+        ensure_pay_not_finalized(adjustment.institution, adjustment.attendance_record.attendance_date)
         record = AttendanceRecord.objects.select_for_update().get(
             pk=adjustment.attendance_record_id
         )
@@ -389,6 +411,7 @@ def decide_overtime(*, overtime_record, actor, approve, approved_minutes=None):
     if overtime_record.employee.user_id == actor.id:
         raise ValidationError({"actor": "You cannot decide your own overtime."})
     if approve:
+        ensure_pay_not_finalized(overtime_record.institution, overtime_record.attendance_record.attendance_date)
         overtime_record.status = OvertimeRecord.Status.APPROVED
         overtime_record.approved_minutes = (
             overtime_record.calculated_minutes

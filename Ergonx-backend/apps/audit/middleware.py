@@ -1,3 +1,4 @@
+from apps.accounts.security import client_ip
 from apps.audit.context import (
     reset_audit_request_context,
     set_audit_request_context,
@@ -12,7 +13,7 @@ class AuditRequestContextMiddleware:
 
     def __call__(self, request):
         token = set_audit_request_context(
-            ip=request.META.get("REMOTE_ADDR"),
+            ip=client_ip(request)[0],
             user_agent=request.META.get("HTTP_USER_AGENT", ""),
         )
         try:

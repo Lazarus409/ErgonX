@@ -170,8 +170,30 @@ def test_every_accounting_operation_enforces_operation_permission(
         user=employee, institution=institution, role_code="EMPLOYEE", is_primary=True
     )
     api_client.force_authenticate(employee)
-    for method, url, data in _contract_operations():
+    # Staff claim their own expenses (expense.claim_own, Wave 6); those calls are
+    # authorized and scoped in the service, so they are checked separately below.
+    object_id = uuid4()
+    self_service = {
+        reverse("v1:expense-list"), reverse("v1:expense-detail", args=(object_id,)),
+        reverse("v1:expense-submit", args=(object_id,)), reverse("v1:expense-approve", args=(object_id,)),
+        reverse("v1:expense-reject", args=(object_id,)),
+    }
+    for method, url, data in _contract_operations(object_id):
+        if url in self_service:
+            continue
         _assert_error(_request(api_client, method, url, data), 403, "permission_denied")
+
+
+def test_employees_reach_only_their_own_expense_claims(api_client, institution_factory, user_factory, membership_factory):
+    institution = institution_factory(code="ACC-SELF")
+    _enable_accounting(institution)
+    employee = user_factory(email="self-claim@example.com")
+    membership_factory(user=employee, institution=institution, role_code="EMPLOYEE", is_primary=True)
+    api_client.force_authenticate(employee)
+    listed = api_client.get(reverse("v1:expense-list"))
+    assert listed.status_code == 200 and listed.data["results"] == []
+    assert api_client.get(reverse("v1:expense-detail", args=(uuid4(),))).status_code == 404
+    _assert_error(api_client.post(reverse("v1:expense-post", args=(uuid4(),)), {}, format="json"), 403, "permission_denied")
 
 
 def test_accounting_detail_operations_hide_cross_tenant_resources(

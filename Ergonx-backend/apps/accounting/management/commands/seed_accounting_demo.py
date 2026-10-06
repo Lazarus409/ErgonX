@@ -198,7 +198,7 @@ class Command(BaseCommand):
         if journal.status == JournalEntry.Status.DRAFT:
             journal = submit_journal(journal=journal, actor=actor)
         if journal.status == JournalEntry.Status.PENDING_APPROVAL:
-            journal = approve_journal(journal=journal, actor=actor)
+            journal = approve_journal(journal=journal, actor=actor, system=True)  # demo seed: recorded history, not a live approval
         if journal.status == JournalEntry.Status.APPROVED:
             journal = post_journal(journal=journal, actor=actor)
         if journal.status != JournalEntry.Status.POSTED:

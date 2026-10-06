@@ -35,7 +35,7 @@ class RoleSerializer(RoleSummarySerializer):
         model = Role
         fields = (
             "id", "code", "name", "description", "is_system_role", "is_custom",
-            "is_active", "permissions", "created_at", "updated_at",
+            "is_active", "data_scope", "is_read_only", "permissions", "created_at", "updated_at",
         )
         read_only_fields = ("id", "code", "is_system_role", "is_custom", "created_at", "updated_at")
 
@@ -47,6 +47,8 @@ class CustomRoleCreateSerializer(serializers.Serializer):
     permission_codes = serializers.ListField(
         child=serializers.CharField(max_length=100), required=False, default=list
     )
+    data_scope = serializers.ChoiceField(choices=Role.DataScope.choices, required=False, default=Role.DataScope.INSTITUTION)
+    is_read_only = serializers.BooleanField(required=False, default=False)
 
 
 class CloneRoleSerializer(CustomRoleCreateSerializer):
@@ -58,6 +60,8 @@ class CustomRoleUpdateSerializer(serializers.Serializer):
     description = serializers.CharField(required=False, allow_blank=True)
     permission_codes = serializers.ListField(child=serializers.CharField(max_length=100), required=False)
     is_active = serializers.BooleanField(required=False)
+    data_scope = serializers.ChoiceField(choices=Role.DataScope.choices, required=False)
+    is_read_only = serializers.BooleanField(required=False)
 
 
 class UserPreferenceSerializer(serializers.ModelSerializer):
@@ -151,10 +155,29 @@ class InstitutionProfileUpdateSerializer(serializers.ModelSerializer):
 
 
 class InstitutionModuleSerializer(serializers.ModelSerializer):
+    depends_on = serializers.SerializerMethodField()
+    required_by = serializers.SerializerMethodField()
+    can_disable = serializers.SerializerMethodField()
+
     class Meta:
         model = InstitutionModule
-        fields = ("id", "module_code", "is_enabled", "configuration_status")
+        fields = ("id", "module_code", "is_enabled", "configuration_status", "depends_on", "required_by", "can_disable")
         read_only_fields = ("id", "module_code", "configuration_status")
+
+    def get_depends_on(self, obj) -> list[str]:
+        from apps.institutions.services import MODULE_DEPENDENCIES
+
+        return list(MODULE_DEPENDENCIES.get(obj.module_code, ()))
+
+    def get_required_by(self, obj) -> list[str]:
+        from apps.institutions.services import MODULE_DEPENDENCIES
+
+        return sorted(code for code, needs in MODULE_DEPENDENCIES.items() if obj.module_code in needs)
+
+    def get_can_disable(self, obj) -> bool:
+        from apps.institutions.services import ALWAYS_ENABLED_MODULES
+
+        return obj.module_code not in ALWAYS_ENABLED_MODULES
 
 
 class InstitutionSettingSerializer(serializers.ModelSerializer):

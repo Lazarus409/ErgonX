@@ -24,7 +24,9 @@ class DocumentViewSet(TenantModelViewSet):
         category = self.request.data.get("category")
         if not category and self.kwargs.get("pk"):
             category = Document.objects.filter(id=self.kwargs["pk"], institution=self.request.institution).values_list("category", flat=True).first()
-        return "LEAVE" if category == "LEAVE_SUPPORTING" else None
+        if category == "LEAVE_SUPPORTING":
+            return "LEAVE"
+        return "ACCOUNTING" if category == "EXPENSE_RECEIPT" else None
 
     def get_required_permission(self):
         # Employee self-service may upload only a supporting document for its
@@ -36,6 +38,15 @@ class DocumentViewSet(TenantModelViewSet):
         if category == "LEAVE_SUPPORTING":
             if self.action in ("create", "retrieve", "download"):
                 return "leave.request" if self.action == "create" else "leave.view"
+        if category == "EXPENSE_RECEIPT" and self.action in ("create", "retrieve", "download"):
+            # Receipts for expense claims (Wave 6): claimants upload their own;
+            # finance reads them through expense.view.
+            from apps.institutions.services import effective_permission_codes
+
+            held = effective_permission_codes(getattr(self.request, "membership", None))
+            return "expense.view" if self.action != "create" and "expense.view" in held else "expense.claim_own"
+        if self.action == "download":
+            return "document.view"
         return super().get_required_permission()
 
     def get_queryset(self):
@@ -50,11 +61,22 @@ class DocumentViewSet(TenantModelViewSet):
         visible_requests = scope_to_employees(
             LeaveRequest.objects.for_institution(self.request.institution), self.request, broad=LEAVE_BROAD
         ).values("pk")
-        return queryset.filter(category="LEAVE_SUPPORTING").filter(
+        leave_documents = Q(category="LEAVE_SUPPORTING") & (
             Q(uploaded_by=self.request.user)
             | Q(leave_requests__in=visible_requests)
             | Q(leave_requests__approvals__approver=self.request.user)
-        ).distinct()
+        )
+        # Expense receipts: the uploader, the claimant and the claim's approvers;
+        # finance (expense.view) sees every receipt.
+        if membership is not None and membership.role.permissions.filter(code="expense.view").exists():
+            receipt_documents = Q(category="EXPENSE_RECEIPT")
+        else:
+            receipt_documents = Q(category="EXPENSE_RECEIPT") & (
+                Q(uploaded_by=self.request.user)
+                | Q(expense_lines__expense__claimant__user=self.request.user)
+                | Q(expense_lines__expense__approvals__approver=self.request.user)
+            )
+        return queryset.filter(leave_documents | receipt_documents).distinct()
 
     def perform_create(self, serializer):
         serializer.save(institution=self.request.institution, uploaded_by=self.request.user)

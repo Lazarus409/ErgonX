@@ -27,6 +27,13 @@ class Institution(BaseModel):
         max_length=20, choices=InstitutionType.choices, default=InstitutionType.PRIVATE
     )
     executive_title = models.CharField(max_length=80, default="Executive", blank=True)
+    # Captured when the first administrator creates the organization.
+    website = models.URLField(max_length=255, blank=True)
+    employee_size = models.CharField(
+        max_length=10,
+        blank=True,
+        choices=(("1-50", "1–50 employees"), ("51-200", "51–200 employees"), ("201-1000", "201–1,000 employees"), ("1000+", "More than 1,000 employees")),
+    )
     logo = models.CharField(max_length=500, blank=True)
     is_active = models.BooleanField(default=True)
     # Set by a platform administrator; an inactive institution refuses all tenant requests.
@@ -78,9 +85,18 @@ class Role(TenantOwnedModel):
     code = models.CharField(max_length=50)
     name = models.CharField(max_length=150)
     description = models.TextField(blank=True)
+    class DataScope(models.TextChoices):
+        INSTITUTION = "INSTITUTION", "Whole institution"
+        DEPARTMENT = "DEPARTMENT", "Own record and departments the member heads"
+        SELF = "SELF", "Own records only"
+
     is_system_role = models.BooleanField(default=False)
     is_custom = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
+    # Whose records the role works with, and whether it may change anything
+    # beyond self-service. Set per role (Wave 2, BQ-11), not inferred from codes.
+    data_scope = models.CharField(max_length=12, choices=DataScope.choices, default=DataScope.INSTITUTION)
+    is_read_only = models.BooleanField(default=False)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

@@ -60,7 +60,8 @@ def test_home_bootstrap_and_search_are_tenant_and_permission_scoped(
     assert bootstrap.status_code == 200
     assert bootstrap.data["active_institution"]["id"] == str(institution.id)
     assert "search.use" in bootstrap.data["effective_permissions"]
-    assert bootstrap.data["default_landing"] == "HOME"
+    # Landing follows effective permissions (BQ-01): HR operations land on Insights.
+    assert bootstrap.data["default_landing"] == "INSIGHTS"
 
     search = api_client.get("/api/v1/search/?q=EMP-ADA")
     assert search.status_code == 200

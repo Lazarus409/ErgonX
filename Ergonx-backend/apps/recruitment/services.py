@@ -52,13 +52,12 @@ def publish_job_posting(*, job_posting, actor):
     _active_member(actor, posting.institution)
     if posting.status == JobPosting.Status.OPEN:
         return posting
-    if posting.status not in {JobPosting.Status.DRAFT, JobPosting.Status.APPROVED}:
-        raise ValidationError({"status": "Only approved requisitions can be published."})
+    # No shortcut from DRAFT (BQ-06): a requisition is approved by someone
+    # other than its submitter before it can be published.
     if posting.status == JobPosting.Status.DRAFT:
-        if not _can(actor, posting.institution, "job_posting.approve"):
-            raise ValidationError({"status": "Submit the requisition for approval before publishing."})
-        posting.approved_by = actor
-        posting.approved_at = timezone.now()
+        raise ValidationError({"status": "Submit the requisition for approval before publishing."})
+    if posting.status != JobPosting.Status.APPROVED:
+        raise ValidationError({"status": "Only approved requisitions can be published."})
     posting.status = JobPosting.Status.OPEN
     if posting.opens_on is None:
         posting.opens_on = timezone.localdate()

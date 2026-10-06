@@ -1,8 +1,12 @@
 from rest_framework import serializers
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenObtainSerializer, TokenRefreshSerializer
+from rest_framework_simplejwt.exceptions import InvalidToken
+from rest_framework_simplejwt.settings import api_settings as jwt_settings
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.contrib.auth.models import update_last_login
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
-from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.exceptions import AuthenticationFailed, Throttled
 from django.conf import settings
 from django.utils import timezone
 from datetime import timedelta
@@ -14,7 +18,10 @@ import struct
 import time
 from apps.accounts.models import EmailOTPChallenge, InstitutionAccessRequest, InstitutionAdminInvitation, User, UserMFA
 from apps.documents.models import ImageAsset
+from apps.institutions.models import Institution
 from apps.accounts.emails import send_email_mfa_code
+from apps.accounts.security import mask_email
+from apps.audit.services import record_audit_event
 from django.utils.crypto import salted_hmac
 
 
@@ -34,29 +41,72 @@ def verify_totp(secret: str, code: str) -> bool:
 
 EMAIL_OTP_TTL = timedelta(minutes=5)
 EMAIL_OTP_MAX_ATTEMPTS = 5
+# A fresh code is sent at most once a minute and five times per 15 minutes
+# (Wave 0 decision BQ-10). Within the cooldown the open code stays valid.
+EMAIL_OTP_RESEND_COOLDOWN = timedelta(seconds=60)
+EMAIL_OTP_ISSUE_LIMIT = 5
+EMAIL_OTP_ISSUE_WINDOW = timedelta(minutes=15)
 
 
 class EmailOTPDeliveryError(Exception):
     """The email one-time code could not be issued or delivered."""
 
 
+class EmailOTPThrottled(Throttled):
+    api_code = "email_otp_throttled"
+
+
 def _email_otp_digest(code: str) -> str:
     return salted_hmac("ergonx-email-mfa", code).hexdigest()
 
 
-def issue_email_otp(user) -> EmailOTPChallenge:
-    """Revoke open challenges, then store and email a fresh six-digit code."""
+def email_otp_resend_wait(challenge) -> int:
+    """Seconds until a new code may be requested for this challenge."""
+    remaining = (challenge.sent_at + EMAIL_OTP_RESEND_COOLDOWN - timezone.now()).total_seconds()
+    return max(0, int(-(-remaining // 1)))
+
+
+def issue_email_otp(user, *, purpose="login") -> EmailOTPChallenge:
+    """Email a fresh six-digit code, or keep the open one while the resend cooldown runs.
+
+    A new code revokes earlier open codes. More than EMAIL_OTP_ISSUE_LIMIT codes
+    in EMAIL_OTP_ISSUE_WINDOW raises EmailOTPThrottled, so repeated sign-ins cannot
+    buy unlimited guesses or flood the mailbox.
+    """
     if not settings.EMAIL_DELIVERY_ENABLED:
         raise EmailOTPDeliveryError("Email MFA delivery is not configured.")
-    EmailOTPChallenge.objects.filter(user=user, consumed_at__isnull=True).update(consumed_at=timezone.now())
-    plain_code = f"{secrets.randbelow(1_000_000):06d}"
     now = timezone.now()
+    latest = EmailOTPChallenge.objects.filter(user=user).order_by("-created_at").first()
+    if (
+        latest
+        and latest.consumed_at is None
+        and latest.expires_at > now
+        and latest.attempts < EMAIL_OTP_MAX_ATTEMPTS
+        and latest.sent_at > now - EMAIL_OTP_RESEND_COOLDOWN
+    ):
+        return latest
+    recent = list(
+        EmailOTPChallenge.objects.filter(user=user, created_at__gte=now - EMAIL_OTP_ISSUE_WINDOW)
+        .order_by("-created_at")
+        .values_list("created_at", flat=True)[:EMAIL_OTP_ISSUE_LIMIT]
+    )
+    if len(recent) >= EMAIL_OTP_ISSUE_LIMIT:
+        wait = max(1, int((recent[-1] + EMAIL_OTP_ISSUE_WINDOW - now).total_seconds()))
+        raise EmailOTPThrottled(wait=wait, detail="Too many verification codes were requested. Wait a few minutes before asking for another.")
+    EmailOTPChallenge.objects.filter(user=user, consumed_at__isnull=True).update(consumed_at=now)
+    plain_code = f"{secrets.randbelow(1_000_000):06d}"
     challenge = EmailOTPChallenge.objects.create(user=user, code_digest=_email_otp_digest(plain_code), expires_at=now + EMAIL_OTP_TTL, sent_at=now)
     try:
         send_email_mfa_code(recipient_email=user.email, code=plain_code, expires_at=challenge.expires_at)
     except Exception as exc:
         challenge.delete()
         raise EmailOTPDeliveryError("Email MFA delivery failed.") from exc
+    record_audit_event(
+        actor=user,
+        entity=challenge,
+        action="account.mfa.email_otp.issued",
+        metadata={"purpose": purpose, "destination": mask_email(user.email), "expires_at": challenge.expires_at.isoformat()},
+    )
     return challenge
 
 
@@ -69,6 +119,8 @@ def consume_email_otp(user, code: str) -> bool:
     challenge.attempts += 1
     challenge.save(update_fields=("attempts", "updated_at"))
     if not hmac.compare_digest(challenge.code_digest, _email_otp_digest(code)):
+        if challenge.attempts >= EMAIL_OTP_MAX_ATTEMPTS:
+            record_audit_event(actor=user, entity=challenge, action="account.mfa.email_otp.locked", metadata={"attempts": challenge.attempts})
         return False
     challenge.consumed_at = timezone.now()
     challenge.save(update_fields=("consumed_at", "updated_at"))
@@ -129,7 +181,8 @@ class AuthBootstrapSerializer(serializers.Serializer):
     enabled_modules = serializers.ListField(child=serializers.CharField())
     onboarding_ready = serializers.BooleanField()
     onboarding_status = serializers.CharField()
-    default_landing = serializers.CharField()
+    # EXECUTIVE → /dashboard, INSIGHTS → /insights, ME → /me (BQ-01).
+    default_landing = serializers.ChoiceField(choices=("EXECUTIVE", "INSIGHTS", "ME"))
     available_dashboards = serializers.ListField(child=serializers.CharField())
 
 
@@ -142,22 +195,49 @@ class EmailTokenObtainPairSerializer(TokenObtainPairSerializer):
         return token
 
     def validate(self, attrs):
-        data = super().validate(attrs)
+        # Authenticate only; tokens are issued after MFA, bound to a new session.
+        data = TokenObtainSerializer.validate(self, attrs)
         mfa = UserMFA.objects.filter(user=self.user, is_enabled=True).first()
         if mfa and mfa.method == UserMFA.Method.EMAIL_OTP:
             code = str(attrs.get("mfa_code", "")).strip()
             if not code:
                 try:
-                    issue_email_otp(self.user)
+                    challenge = issue_email_otp(self.user)
                 except EmailOTPDeliveryError as exc:
                     raise AuthenticationFailed(str(exc), code="email_otp_unavailable")
-                raise EmailOTPRequired("Enter the verification code sent to your email.")
+                raise EmailOTPRequired({
+                    "detail": "Enter the verification code sent to your email.",
+                    "destination": mask_email(self.user.email),
+                    "resend_available_in": email_otp_resend_wait(challenge),
+                })
             if not consume_email_otp(self.user, code):
                 raise AuthenticationFailed("The email verification code is invalid or expired.", code="email_otp_invalid")
         elif mfa and not verify_totp(mfa.secret, attrs.get("mfa_code", "")):
             raise MFARequired("Enter the six-digit authenticator code to continue.")
+        from apps.accounts.sessions import start_session
+
+        refresh = start_session(self.user, self.context.get("request"))
+        data["refresh"] = str(refresh)
+        data["access"] = str(refresh.access_token)
+        if jwt_settings.UPDATE_LAST_LOGIN:
+            update_last_login(None, self.user)
         data["user"] = UserSerializer(self.user).data
         return data
+
+
+class SessionTokenRefreshSerializer(TokenRefreshSerializer):
+    """Refuses refresh tokens of a revoked session and records the session as seen."""
+
+    def validate(self, attrs):
+        from apps.accounts.models import UserSession
+        from apps.accounts.sessions import SESSION_CLAIM
+
+        sid = RefreshToken(attrs["refresh"]).get(SESSION_CLAIM)
+        if sid:
+            updated = UserSession.objects.filter(pk=sid, revoked_at__isnull=True).update(last_seen_at=timezone.now())
+            if not updated:
+                raise InvalidToken({"detail": "This session has been signed out.", "code": "session_revoked"})
+        return super().validate(attrs)
 
 
 class MFASetupSerializer(serializers.Serializer):
@@ -226,6 +306,23 @@ class InstitutionAdminInvitationAcceptanceSerializer(SelfServiceRegistrationSeri
     """Invitees establish their tenant and the first administrator account."""
 
     email = serializers.EmailField(read_only=True)
+    institution_type = serializers.ChoiceField(choices=Institution.InstitutionType.choices)
+    country_code = serializers.CharField(max_length=2)
+    employee_size = serializers.ChoiceField(choices=("1-50", "51-200", "201-1000", "1000+"), required=False, allow_blank=True, default="")
+    website = serializers.URLField(max_length=255, required=False, allow_blank=True, default="")
+    phone = serializers.CharField(max_length=30, required=False, allow_blank=True, default="")
+    accepted_terms = serializers.BooleanField()
+
+    def validate_country_code(self, value):
+        value = value.strip().upper()
+        if len(value) != 2 or not value.isalpha():
+            raise serializers.ValidationError("Choose a country.")
+        return value
+
+    def validate_accepted_terms(self, value):
+        if value is not True:
+            raise serializers.ValidationError("Agree to the Terms of Service and Privacy Policy to continue.")
+        return value
 
 
 class InstitutionAccessRequestCreateSerializer(serializers.ModelSerializer):
@@ -235,8 +332,17 @@ class InstitutionAccessRequestCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = InstitutionAccessRequest
-        fields = ("institution_name", "contact_name", "job_title", "email", "phone", "country_code", "organization_size", "message", "website")
+        fields = ("institution_name", "contact_name", "job_title", "email", "phone", "country_code", "organization_size", "institution_type", "website_url", "accepted_terms", "message", "website")
         extra_kwargs = {"message": {"max_length": 2000}}
+
+    institution_type = serializers.ChoiceField(choices=Institution.InstitutionType.choices, required=False, allow_blank=True, default="")
+    # Not required, so earlier API clients keep working; when sent it must be true.
+    accepted_terms = serializers.BooleanField(required=False, write_only=True)
+
+    def validate_accepted_terms(self, value):
+        if value is not True:
+            raise serializers.ValidationError("Agree to the Terms of Service and Privacy Policy to continue.")
+        return value
 
     def validate_email(self, value):
         return User.objects.normalize_email(value).lower()
@@ -266,7 +372,7 @@ class InstitutionAccessRequestSerializer(serializers.ModelSerializer):
         model = InstitutionAccessRequest
         fields = (
             "id", "institution_name", "contact_name", "job_title", "email", "phone", "country_code",
-            "organization_size", "message", "status", "reviewed_by_email", "reviewed_at", "decline_reason",
+            "organization_size", "institution_type", "website_url", "terms_accepted_at", "message", "status", "reviewed_by_email", "reviewed_at", "decline_reason",
             "invitation", "has_account", "created_at",
         )
         read_only_fields = fields

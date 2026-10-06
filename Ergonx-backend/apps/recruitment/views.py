@@ -1,6 +1,6 @@
 from drf_spectacular.utils import extend_schema
 from rest_framework.decorators import action
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import MethodNotAllowed, NotFound
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 
@@ -23,6 +23,13 @@ class JobPostingViewSet(RecruitmentViewSet):
     model = JobPosting
     serializer_class = JobPostingSerializer
     permission_resource = "job_posting"
+    # Records are kept for audit: DELETE serves only the nested actions below,
+    # never the record itself (W0-API-02).
+    http_method_names = ("get", "post", "put", "patch", "delete", "head", "options")
+
+    @extend_schema(exclude=True)
+    def destroy(self, request, *args, **kwargs):
+        raise MethodNotAllowed(request.method)
     filterset_fields = ("status", "department", "position", "location", "employment_type")
     search_fields = ("code", "title", "description")
     ordering_fields = ("code", "title", "opens_on", "closes_on", "created_at", "updated_at")
@@ -137,6 +144,13 @@ class CandidateViewSet(RecruitmentViewSet):
     model = Candidate
     serializer_class = CandidateSerializer
     permission_resource = "candidate"
+    # Records are kept for audit: DELETE serves only the nested actions below,
+    # never the record itself (W0-API-02).
+    http_method_names = ("get", "post", "put", "patch", "delete", "head", "options")
+
+    @extend_schema(exclude=True)
+    def destroy(self, request, *args, **kwargs):
+        raise MethodNotAllowed(request.method)
     filterset_fields = ("status", "source")
     search_fields = ("first_name", "middle_name", "last_name", "email", "phone")
     ordering_fields = ("first_name", "last_name", "email", "created_at", "updated_at")
@@ -199,7 +213,7 @@ class CandidateViewSet(RecruitmentViewSet):
     def get_required_permission(self):
         if self.action == "documents":
             return "candidate.update" if self.request.method == "POST" else "candidate.view"
-        if self.action in {"download_document", "document_categories"}:
+        if self.action in {"download_document", "document_categories", "scorecard"}:
             return "candidate.view"
         if self.action == "remove_document":
             return "candidate.update"
@@ -319,6 +333,9 @@ class ApplicationViewSet(RecruitmentViewSet):
         })
 
     def get_required_permission(self):
+        if self.action == "scorecard" and self.request.method == "POST":
+            # Recording an evaluation is its own grant, not "can view candidates" (W0-PERM-06).
+            return "candidate_evaluation.create"
         if self.action in {"scorecard", "overview"}:
             return "candidate.view"
         return {"create": "candidate.create", "submit": "candidate.create", "move_stage": "candidate.update", "withdraw": "candidate.update", "reject": "candidate.update", "stage_history": "candidate.view"}.get(self.action, "candidate.view")
@@ -356,6 +373,8 @@ class InterviewViewSet(RecruitmentViewSet):
     model = Interview
     serializer_class = InterviewSerializer
     permission_resource = "interview"
+    # Records are kept for audit: no hard DELETE route (W0-API-02).
+    http_method_names = ("get", "post", "put", "patch", "head", "options")
     filterset_fields = ("application", "interviewer", "status", "scheduled_at")
     search_fields = ("application__candidate__first_name", "application__candidate__last_name", "interview_type")
     ordering_fields = ("scheduled_at", "created_at", "updated_at")
@@ -435,6 +454,8 @@ class OfferViewSet(RecruitmentViewSet):
     model = Offer
     serializer_class = OfferSerializer
     permission_resource = "offer"
+    # Records are kept for audit: no hard DELETE route (W0-API-02).
+    http_method_names = ("get", "post", "put", "patch", "head", "options")
     filterset_fields = ("application", "status", "department", "position", "proposed_start_date")
     search_fields = ("application__candidate__first_name", "application__candidate__last_name", "application__job_posting__title")
     ordering_fields = ("proposed_start_date", "created_at", "updated_at")

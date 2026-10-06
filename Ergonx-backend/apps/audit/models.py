@@ -2,7 +2,26 @@ from django.conf import settings
 from django.db import models
 
 from apps.institutions.models import Institution
-from common.models import TenantOwnedModel
+from common.models import TenantManager, TenantOwnedModel, TenantQuerySet
+
+
+class AuditLogImmutable(Exception):
+    """Audit records are append-only."""
+
+
+class AuditLogQuerySet(TenantQuerySet):
+    def update(self, **kwargs):
+        # Deleting a user nulls the actor through on_delete=SET_NULL; nothing else may change.
+        if set(kwargs) == {"actor"} and kwargs["actor"] is None:
+            return super().update(**kwargs)
+        raise AuditLogImmutable("Audit records cannot be changed.")
+
+    def delete(self):
+        raise AuditLogImmutable("Audit records cannot be deleted.")
+
+
+class AuditLogManager(TenantManager.from_queryset(AuditLogQuerySet)):
+    pass
 
 
 class AuditLog(TenantOwnedModel):
@@ -27,6 +46,8 @@ class AuditLog(TenantOwnedModel):
     user_agent = models.TextField(blank=True)
     metadata = models.JSONField(default=dict, blank=True)
 
+    objects = AuditLogManager()
+
     class Meta:
         ordering = ("-created_at",)
         indexes = [
@@ -37,6 +58,14 @@ class AuditLog(TenantOwnedModel):
 
     def __str__(self):
         return f"{self.action} at {self.created_at}"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise AuditLogImmutable("Audit records cannot be changed.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        raise AuditLogImmutable("Audit records cannot be deleted.")
 
     @property
     def timestamp(self):

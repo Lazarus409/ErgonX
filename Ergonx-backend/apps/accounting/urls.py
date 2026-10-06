@@ -29,7 +29,7 @@ from apps.accounting.views import (
     BankStatementLineViewSet,
     VATWithholdingCertificateViewSet,
     GhanaComplianceReminderViewSet,
-    ExpenseViewSet,
+    ExpenseCategoryViewSet, ExpenseViewSet,
     PayrollAccountMappingTemplateViewSet,
     PayComponentAccountMappingViewSet,
 )
@@ -61,6 +61,7 @@ router.register("bank-statement-lines", BankStatementLineViewSet, basename="bank
 router.register("vat-withholding-certificates", VATWithholdingCertificateViewSet, basename="vat-withholding-certificate")
 router.register("ghana-compliance-reminders", GhanaComplianceReminderViewSet, basename="ghana-compliance-reminder")
 router.register("expenses", ExpenseViewSet, basename="expense")
+router.register("expense-categories", ExpenseCategoryViewSet, basename="expense-category")
 router.register("payroll-account-mapping-templates", PayrollAccountMappingTemplateViewSet, basename="payroll-account-mapping-template")
 router.register("pay-component-account-mappings", PayComponentAccountMappingViewSet, basename="pay-component-account-mapping")
 router.register(

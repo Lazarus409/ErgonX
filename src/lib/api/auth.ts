@@ -148,7 +148,7 @@ export interface InstitutionAdminInvitationDetails {
   email: string;
   expires_at: string;
   /** Values from the access request this invitation came from, when there is one. */
-  prefill?: Partial<Record<"institution_name" | "first_name" | "last_name" | "phone" | "country_code" | "employee_size", string>>;
+  prefill?: Partial<Record<"institution_name" | "first_name" | "last_name" | "phone" | "country_code" | "employee_size" | "institution_type" | "website", string>>;
   institution_types?: Array<{ value: string; label: string }>;
 }
 export interface InstitutionAdminInvitationPayload {
@@ -236,6 +236,11 @@ export interface InstitutionAccessRequestPayload {
   phone?: string;
   country_code: string;
   organization_size?: OrganizationSize | "";
+  institution_type?: string;
+  /** The organization's real website (``website`` below is the bot honeypot). */
+  website_url?: string;
+  /** Required by the Get Started form; the API records when it was accepted. */
+  accepted_terms?: boolean;
   message?: string;
   /** Honeypot: must stay empty. */
   website?: string;

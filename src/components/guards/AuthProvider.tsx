@@ -94,6 +94,7 @@ async function loadLiveSession(): Promise<{
     code: context.active_institution.code,
     logoImageId: context.active_institution.logo_image_id ?? null,
     enabledModules: context.enabled_modules,
+    timezone: context.active_institution.timezone,
   };
 
   const user: SessionUser = {

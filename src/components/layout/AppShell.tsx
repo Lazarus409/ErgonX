@@ -5,6 +5,8 @@ import Sidebar from "@/components/layout/Sidebar";
 import TopBar from "@/components/layout/TopBar";
 import AuthenticationGate from "@/components/guards/AuthenticationGate";
 import { cx } from "@/lib/cx";
+import { listMyPreferences } from "@/lib/api/institutions";
+import { applyDisplayPreferences, DISPLAY_PREFERENCE_KEY, normalizeDisplay, rememberDisplayPreferences } from "@/lib/displayPreferences";
 
 const COLLAPSE_KEY = "ergonx-sidebar-collapsed";
 const COLLAPSE_EVENT = "ergonx-sidebar-collapsed-change";
@@ -38,6 +40,19 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const breakpointMatchesRef = useRef<boolean | null>(null);
+
+  // Personal display preferences (S050): apply the browser copy now, then adopt the saved account copy.
+  useEffect(() => {
+    applyDisplayPreferences();
+    let active = true;
+    listMyPreferences()
+      .then((rows) => {
+        const saved = rows.find((row) => row.preference_key === DISPLAY_PREFERENCE_KEY);
+        if (active && saved) rememberDisplayPreferences(normalizeDisplay(saved.value_json));
+      })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     const desktopQuery = window.matchMedia("(min-width: 1024px)");

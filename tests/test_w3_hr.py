@@ -147,3 +147,16 @@ def test_adjustment_can_still_be_rejected_after_payroll_is_finalized(attendance)
 
 def test_adjustment_outside_finalized_payroll_is_approved(attendance):
     assert decide_adjustment(adjustment=attendance["adjustment"], actor=attendance["hr"], approve=True).status == AttendanceAdjustment.Status.APPROVED
+
+
+def test_my_employee_record_includes_a_current_employment_summary(api_client, institution_factory, user_factory, membership_factory, employee_factory, organization_factory, assignment_dimensions_factory):
+    from tests.test_scheduling_attendance import _employee_with_employment
+
+    institution = institution_factory()
+    user = user_factory()
+    membership_factory(user=user, institution=institution, role_code="EMPLOYEE", is_primary=True)
+    _employee_with_employment(institution, user=user, employee_factory=employee_factory, organization_factory=organization_factory, assignment_dimensions_factory=assignment_dimensions_factory)
+    api_client.force_authenticate(user)
+    api_client.credentials(HTTP_X_INSTITUTION_ID=str(institution.id))
+    summary = api_client.get("/api/v1/employees/me/").json()["data"]["current_employment"]
+    assert summary["department"] and summary["position"] and summary["employment_type"]

@@ -269,7 +269,19 @@ class EmployeeViewSet(TenantModelViewSet):
         employee = self.get_queryset().filter(user=request.user).first()
         if employee is None:
             return Response({"detail": "No employee record is linked to this account."}, status=404)
-        return Response(self.get_serializer(employee).data)
+        body = dict(self.get_serializer(employee).data)
+        # Read-only summary of the member's own current employment (My profile, S038).
+        employment = employee.employments.filter(is_current=True).select_related("department", "position", "grade", "location", "reports_to__employee").first()
+        body["current_employment"] = None if employment is None else {
+            "department": employment.department.name if employment.department_id else None,
+            "position": employment.position.title if employment.position_id else None,
+            "grade": employment.grade.name if employment.grade_id else None,
+            "location": employment.location.name if employment.location_id else None,
+            "employment_type": employment.employment_type,
+            "start_date": employment.start_date,
+            "manager": employment.reports_to.employee.full_name if employment.reports_to_id else None,
+        }
+        return Response(body)
 
     @extend_schema(operation_id="employees_invite_new_self_service")
     @action(detail=False, methods=("post",), url_path="invite-self-service")

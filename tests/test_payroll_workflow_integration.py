@@ -169,7 +169,8 @@ def test_run_approval_notifies_finalizers_and_is_audited_once_on_retry(
         payroll_period=period,
         run_number=1,
         status=PayrollRun.Status.UNDER_REVIEW,
-        started_by=hr,
+        # Prepared by the finalizer so HR, a different person, may approve (BQ-04).
+        started_by=finalizer,
         started_at=timezone.now(),
     )
     api_client.force_authenticate(hr)

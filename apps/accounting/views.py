@@ -1,13 +1,16 @@
 from decimal import Decimal
 from django.shortcuts import get_object_or_404
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiTypes, extend_schema
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 
+from apps.audit.services import record_audit_event
+
 from apps.accounting.models import (
     Account,
+    ExpenseCategory,
     AccountingPeriod,
     AccountingPreset,
     AccountingPresetVersion,
@@ -43,6 +46,11 @@ from apps.accounting.selectors import (
     trial_balance,
 )
 from apps.accounting.serializers import (
+    ExpenseCategorySerializer,
+    ExpenseFinanceReviewSerializer,
+    ExpenseReverseSerializer,
+    ExpenseSettleSerializer,
+    ExpenseStepDecisionSerializer,
     AccountSerializer,
     BalanceSheetSerializer,
     BalanceSheetQuerySerializer,
@@ -85,6 +93,10 @@ from apps.accounting.serializers import (
     PayrollMappingTemplateApplySerializer,
 )
 from apps.accounting.services import (
+    decide_expense_step,
+    finance_review_expense,
+    reverse_expense,
+    settle_expense,
     apply_accounting_preset,
     approve_journal,
     create_reversal,
@@ -1000,28 +1012,152 @@ class GhanaComplianceReminderViewSet(TenantModelViewSet):
         serializer.save(institution=self.request.institution)
 
 
+def _holds(request, code):
+    from apps.institutions.services import effective_permission_codes
+
+    return code in effective_permission_codes(getattr(request, "membership", None))
+
+
+class ExpenseCategoryViewSet(TenantModelViewSet):
+    """Expense categories and their GL accounts; claimants read them to fill a claim."""
+
+    model = ExpenseCategory
+    serializer_class = ExpenseCategorySerializer
+    required_module = "ACCOUNTING"
+    http_method_names = ("get", "post", "patch", "head", "options")
+    filterset_fields = ("is_active",)
+    search_fields = ("code", "name")
+
+    def get_required_permission(self):
+        if self.action in ("create", "partial_update"):
+            return "accounting.configure"
+        return "expense.view" if _holds(self.request, "expense.view") else "expense.claim_own"
+
+    def perform_create(self, serializer):
+        category = serializer.save(institution=self.request.institution)
+        record_audit_event(actor=self.request.user, institution=self.request.institution, entity=category, action="accounting.expense_category.created")
+
+    def perform_update(self, serializer):
+        category = serializer.save()
+        record_audit_event(actor=self.request.user, institution=self.request.institution, entity=category, action="accounting.expense_category.updated", metadata={"fields": sorted(serializer.validated_data)})
+
+
 class ExpenseViewSet(TenantModelViewSet):
+    """Expense claims (Expense Management 2.0). Paths are unchanged from the flat expense API."""
+
     model = Expense
     serializer_class = ExpenseSerializer
     required_module = "ACCOUNTING"
     http_method_names = ("get", "post", "patch", "head", "options")
-    filterset_fields = ("status", "currency", "account", "expense_date")
+    filterset_fields = ("status", "currency", "account", "expense_date", "claimant", "payment_method")
     search_fields = ("description",)
     ordering_fields = ("expense_date", "amount", "created_at")
-    schema_action_descriptions = {"submit": "Submit a draft expense", "approve": "Approve an expense", "reject": "Reject a pending expense", "post": "Post an approved cash expense journal"}
-    schema_action_error_codes = {"submit": ("invalid_state_transition",), "approve": ("invalid_state_transition",), "reject": ("invalid_state_transition",), "post": ("invalid_state_transition", "period_closed", "policy_not_applicable")}
+    schema_action_descriptions = {
+        "submit": "Submit a draft or returned expense", "approve": "Approve (manager step, or legacy one-step approval)",
+        "reject": "Reject a pending expense", "return_for_changes": "Return a claim to the claimant",
+        "finance_review": "Finance review: approve, return or reject, with optional recoding",
+        "post": "Post an approved expense to the ledger", "settle": "Record settlement of a posted reimbursable claim",
+        "reverse": "Reverse a posted claim (governed correction)", "policy_checks": "Policy checks for this claim",
+    }
+    schema_action_error_codes = {
+        "submit": ("invalid_state_transition", "policy_not_applicable"), "approve": ("invalid_state_transition", "separation_of_duties"),
+        "reject": ("invalid_state_transition",), "return_for_changes": ("invalid_state_transition",),
+        "finance_review": ("invalid_state_transition", "policy_not_applicable"),
+        "post": ("invalid_state_transition", "period_closed", "policy_not_applicable"),
+        "settle": ("invalid_state_transition", "period_closed", "policy_not_applicable"),
+        "reverse": ("invalid_state_transition", "period_closed"),
+    }
+
+    def get_queryset(self):
+        queryset = super().get_queryset().select_related("claimant", "claimant__user").prefetch_related("lines__category", "lines__account", "lines__receipts", "approvals__approver")
+        if getattr(self, "swagger_fake_view", False) or _holds(self.request, "expense.view"):
+            return queryset
+        # Self-service: your own claims, and claims waiting on (or decided by) you.
+        from django.db.models import Q
+
+        return queryset.filter(Q(claimant__user=self.request.user) | Q(created_by=self.request.user) | Q(approvals__approver=self.request.user)).distinct()
+
     def get_required_permission(self):
-        return {"create": "expense.create", "partial_update": "expense.create", "submit": "expense.create", "approve": "expense.approve", "reject": "expense.approve", "post": "expense.post"}.get(self.action, "expense.view")
+        own = "expense.claim_own"
+        creates = "expense.create" if _holds(self.request, "expense.create") else own
+        decides = "expense.approve" if _holds(self.request, "expense.approve") else own
+        mapping = {
+            "create": creates,
+            "partial_update": creates,
+            "submit": creates,
+            # Manager-stage decisions are authorized by step assignment in the service.
+            "approve": decides,
+            "reject": decides,
+            "return_for_changes": own,
+            "finance_review": "expense.finance_review",
+            "post": "expense.post",
+            "reverse": "expense.post",
+            "settle": "expense.settle",
+        }
+        if self.action in mapping:
+            return mapping[self.action]
+        return "expense.view" if _holds(self.request, "expense.view") else own
+
     def perform_create(self, serializer): serializer.save(institution=self.request.institution, actor=self.request.user)
     def perform_update(self, serializer): serializer.save(actor=self.request.user)
+
+    def _respond(self, expense):
+        return Response(ExpenseSerializer(expense, context=self.get_serializer_context()).data)
+
     @action(detail=True, methods=("post",), filter_backends=())
-    def submit(self, request, pk=None): return Response(ExpenseSerializer(call_validated_service(submit_expense, expense=self.get_object(), actor=request.user), context=self.get_serializer_context()).data)
+    def submit(self, request, pk=None): return self._respond(call_validated_service(submit_expense, expense=self.get_object(), actor=request.user))
+
+    @extend_schema(request=ExpenseStepDecisionSerializer)
     @action(detail=True, methods=("post",), filter_backends=())
-    def approve(self, request, pk=None): return Response(ExpenseSerializer(call_validated_service(approve_expense, expense=self.get_object(), actor=request.user), context=self.get_serializer_context()).data)
+    def approve(self, request, pk=None): return self._respond(call_validated_service(approve_expense, expense=self.get_object(), actor=request.user))
+
+    @extend_schema(request=ExpenseStepDecisionSerializer)
     @action(detail=True, methods=("post",), filter_backends=())
-    def reject(self, request, pk=None): return Response(ExpenseSerializer(call_validated_service(reject_expense, expense=self.get_object(), actor=request.user), context=self.get_serializer_context()).data)
+    def reject(self, request, pk=None):
+        payload = ExpenseStepDecisionSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        return self._respond(call_validated_service(reject_expense, expense=self.get_object(), actor=request.user, comment=payload.validated_data["comment"]))
+
+    @extend_schema(request=ExpenseStepDecisionSerializer)
+    @action(detail=True, methods=("post",), url_path="return", filter_backends=())
+    def return_for_changes(self, request, pk=None):
+        payload = ExpenseStepDecisionSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        return self._respond(call_validated_service(decide_expense_step, expense=self.get_object(), actor=request.user, decision="return", comment=payload.validated_data["comment"]))
+
+    @extend_schema(request=ExpenseFinanceReviewSerializer)
+    @action(detail=True, methods=("post",), url_path="finance-review", filter_backends=())
+    def finance_review(self, request, pk=None):
+        payload = ExpenseFinanceReviewSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        data = payload.validated_data
+        recodes = {str(key): str(value) for key, value in data["recodes"].items()}
+        return self._respond(call_validated_service(finance_review_expense, expense=self.get_object(), actor=request.user, decision=data["decision"], comment=data["comment"], recodes=recodes))
+
     @action(detail=True, methods=("post",), filter_backends=())
-    def post(self, request, pk=None): return Response(ExpenseSerializer(call_validated_service(post_expense, expense=self.get_object(), actor=request.user), context=self.get_serializer_context()).data)
+    def post(self, request, pk=None): return self._respond(call_validated_service(post_expense, expense=self.get_object(), actor=request.user))
+
+    @extend_schema(request=ExpenseSettleSerializer)
+    @action(detail=True, methods=("post",), filter_backends=())
+    def settle(self, request, pk=None):
+        payload = ExpenseSettleSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        data = payload.validated_data
+        return self._respond(call_validated_service(settle_expense, expense=self.get_object(), actor=request.user, settlement_account=str(data["settlement_account"]), settlement_date=data.get("settlement_date"), reference=data["reference"]))
+
+    @extend_schema(request=ExpenseReverseSerializer)
+    @action(detail=True, methods=("post",), filter_backends=())
+    def reverse(self, request, pk=None):
+        payload = ExpenseReverseSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        return self._respond(call_validated_service(reverse_expense, expense=self.get_object(), actor=request.user, reason=payload.validated_data["reason"], reversal_date=payload.validated_data.get("reversal_date")))
+
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
+    @action(detail=True, methods=("get",), url_path="policy-checks", filter_backends=())
+    def policy_checks(self, request, pk=None):
+        from apps.accounting.expenses import policy_checks
+
+        return Response({"checks": policy_checks(self.get_object())})
 
 
 class PayrollAccountMappingTemplateViewSet(viewsets.ReadOnlyModelViewSet):

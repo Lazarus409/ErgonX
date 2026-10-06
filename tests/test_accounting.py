@@ -287,9 +287,15 @@ def test_journal_lifecycle_reports_reversal_and_immutability(
     assert api_client.post(
         reverse("v1:journal-entry-submit", args=(reversal.id,))
     ).status_code == 200
+    # Separation of duties (BQ-04): whoever created the reversal cannot approve it.
+    assert api_client.post(reverse("v1:journal-entry-approve", args=(reversal.id,))).status_code == 400
+    controller = user_factory(email="controller@example.com")
+    membership_factory(user=controller, institution=institution, role_code="INSTITUTION_ADMIN")
+    api_client.force_authenticate(controller)
     assert api_client.post(
         reverse("v1:journal-entry-approve", args=(reversal.id,))
     ).status_code == 200
+    api_client.force_authenticate(finance)
     assert api_client.post(reverse("v1:journal-entry-post", args=(reversal.id,))).status_code == 200
     journal.refresh_from_db()
     assert journal.status == JournalEntry.Status.REVERSED
@@ -530,7 +536,8 @@ def test_accounting_openapi_is_operation_level_and_matches_action_shapes():
     # +6: account balances/activity, journal context/notes/attachments/attachment download.
     # +9: vendor bill reject/revise/hold/release/schedule-payment/context/summary/attachments/download.
     # +10: invoice hold/release/send/reminders (get+post)/reminder update/context/summary/attachments/download.
-    assert len(operations) == 121
+    # +5: expense claim return/finance-review/settle/reverse/policy-checks (Wave 6).
+    assert len(operations) == 126
 
     for action_name in ("submit", "approve", "post", "void"):
         operation = schema["paths"][

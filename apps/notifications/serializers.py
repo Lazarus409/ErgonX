@@ -14,7 +14,7 @@ class NotificationSerializer(serializers.ModelSerializer):
 
     ALLOWED_ROUTE_PREFIXES = (
         "/leave/requests/", "/payroll/runs/", "/recruitment/interviews/",
-        "/recruitment/applications/", "/accounting/journals/", "/attendance/", "/approvals",
+        "/recruitment/applications/", "/accounting/journals/", "/attendance/", "/approvals", "/me/expenses", "/accounting/expenses",
     )
 
     # Notifications addressed to the person the record is about open their own

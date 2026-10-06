@@ -347,13 +347,22 @@ class Account(TenantOwnedModel):
     normal_balance = models.CharField(max_length=6, choices=NormalBalance.choices)
     is_postable = models.BooleanField(default=True)
     is_active = models.BooleanField(default=True)
+    # Durable provenance (BQ-09 / ERD-005): which system role this account plays
+    # (CASH, TRADE_PAYABLES, EMPLOYEE_PAYABLE, ...). Set from the applied preset
+    # and overridable by the institution; account codes can change freely.
+    system_mapping_code = models.CharField(max_length=100, null=True, blank=True)
 
     class Meta:
         ordering = ("code",)
         constraints = [
             models.UniqueConstraint(
                 fields=("institution", "code"), name="uniq_account_code_per_institution"
-            )
+            ),
+            models.UniqueConstraint(
+                fields=("institution", "system_mapping_code"),
+                condition=models.Q(system_mapping_code__isnull=False),
+                name="uniq_account_mapping_per_institution",
+            ),
         ]
         indexes = [models.Index(fields=("institution", "account_type", "is_active"))]
 
@@ -371,11 +380,15 @@ class Account(TenantOwnedModel):
                         errors["parent"] = "Account hierarchy cannot contain a cycle."
                         break
                     ancestor = ancestor.parent
+        mapping = (self.system_mapping_code or "").strip().upper()
+        if mapping and Account.objects.filter(institution_id=self.institution_id, system_mapping_code=mapping).exclude(pk=self.pk).exists():
+            errors["system_mapping_code"] = f"Another account is already mapped to {mapping}."
         if errors:
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
         self.code = self.code.strip().upper()
+        self.system_mapping_code = (self.system_mapping_code or "").strip().upper() or None
         super().save(*args, **kwargs)
 
 
@@ -1599,25 +1612,92 @@ class GhanaComplianceReminder(TenantOwnedModel):
         ordering = ("due_date", "code")
 
 
+class ExpenseCategory(TenantOwnedModel):
+    """What a claim line is for. Claimants pick a category, never a GL account (E-04)."""
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="expense_categories")
+    code = models.CharField(max_length=50)
+    name = models.CharField(max_length=150)
+    expense_account = models.ForeignKey(Account, on_delete=models.PROTECT, related_name="expense_categories")
+    # Policy (E-05): a line above max_amount fails; above receipt_required_over it needs a receipt.
+    max_amount = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True)
+    receipt_required_over = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ("name",)
+        constraints = [models.UniqueConstraint(fields=("institution", "code"), name="uniq_expense_category_code")]
+
+    def clean(self):
+        self.code = (self.code or "").strip().upper()
+        errors = {}
+        if self.expense_account_id:
+            if self.expense_account.institution_id != self.institution_id:
+                errors["expense_account"] = "Account belongs to another institution."
+            elif self.expense_account.account_type != Account.AccountType.EXPENSE:
+                errors["expense_account"] = "Choose an expense account."
+        for field in ("max_amount", "receipt_required_over"):
+            value = getattr(self, field)
+            if value is not None and value < 0:
+                errors[field] = "Must not be negative."
+        if errors:
+            raise ValidationError(errors)
+
+    def __str__(self):
+        return self.name
+
+
 class Expense(TenantOwnedModel):
+    """An expense claim (header). Legacy single-line expenses keep ``account`` and ``amount``."""
+
     class Status(models.TextChoices):
         DRAFT = "DRAFT", "Draft"
-        PENDING = "PENDING", "Pending"
+        PENDING = "PENDING", "Submitted"
+        RETURNED = "RETURNED", "Returned for changes"
+        FINANCE_REVIEW = "FINANCE_REVIEW", "Finance review"
         APPROVED = "APPROVED", "Approved"
         POSTED = "POSTED", "Posted"
+        SETTLED = "SETTLED", "Settled"
         REJECTED = "REJECTED", "Rejected"
+        REVERSED = "REVERSED", "Reversed"
+
+    class PaymentMethod(models.TextChoices):
+        # Reimbursable: posted to the employee payable and settled later (BQ-03).
+        REIMBURSABLE = "REIMBURSABLE", "Reimburse the claimant"
+        # Petty cash: already paid out of cash; posting credits the CASH mapping.
+        PETTY_CASH = "PETTY_CASH", "Paid from petty cash"
 
     institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="expenses")
+    claimant = models.ForeignKey(Employee, on_delete=models.PROTECT, null=True, blank=True, related_name="expense_claims")
     expense_date = models.DateField()
-    account = models.ForeignKey(Account, on_delete=models.PROTECT, related_name="expenses")
+    account = models.ForeignKey(Account, on_delete=models.PROTECT, null=True, blank=True, related_name="expenses")
     amount = models.DecimalField(max_digits=20, decimal_places=2)
     currency = models.CharField(max_length=3)
     description = models.TextField()
+    payment_method = models.CharField(max_length=12, choices=PaymentMethod.choices, default=PaymentMethod.PETTY_CASH)
     attachment = models.ForeignKey(Document, on_delete=models.PROTECT, null=True, blank=True, related_name="expenses")
-    status = models.CharField(max_length=10, choices=Status.choices, default=Status.DRAFT)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.DRAFT)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="expenses_created")
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    decision_note = models.TextField(blank=True)
+    finance_reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="expenses_finance_reviewed")
+    finance_reviewed_at = models.DateTimeField(null=True, blank=True)
     approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="expenses_approved")
     journal_entry = models.ForeignKey(JournalEntry, on_delete=models.PROTECT, null=True, blank=True, related_name="expenses")
+    # Settlement recorded (never "money sent"; there is no payment rail).
+    settlement_account = models.ForeignKey(Account, on_delete=models.PROTECT, null=True, blank=True, related_name="expense_settlements")
+    settlement_date = models.DateField(null=True, blank=True)
+    settlement_reference = models.CharField(max_length=120, blank=True)
+    settlement_journal = models.ForeignKey(JournalEntry, on_delete=models.PROTECT, null=True, blank=True, related_name="settled_expenses")
+    settled_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="expenses_settled")
+    reversal_journal = models.ForeignKey(JournalEntry, on_delete=models.PROTECT, null=True, blank=True, related_name="reversed_expenses")
+    reversed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="expenses_reversed")
+
+    # Fields that may still change once a claim is POSTED: settlement and reversal.
+    POSTED_MUTABLE = frozenset({
+        "status", "settlement_account", "settlement_date", "settlement_reference", "settlement_journal",
+        "settled_by", "reversal_journal", "reversed_by", "updated_at",
+    })
 
     class Meta:
         ordering = ("-expense_date", "-created_at")
@@ -1634,24 +1714,87 @@ class Expense(TenantOwnedModel):
                 errors["account"] = "Expense account belongs to another institution."
             elif self.account.account_type != Account.AccountType.EXPENSE:
                 errors["account"] = "Account must be an expense account."
+        if self.claimant_id and self.claimant.institution_id != self.institution_id:
+            errors["claimant"] = "Claimant belongs to another institution."
         if self.attachment_id and self.attachment.institution_id != self.institution_id:
             errors["attachment"] = "Attachment belongs to another institution."
-        for field in ("created_by", "approved_by"):
+        for field in ("created_by", "approved_by", "finance_reviewed_by", "settled_by", "reversed_by"):
             user = getattr(self, field, None)
             if user and not user.memberships.filter(institution_id=self.institution_id, status="ACTIVE").exists():
                 errors[field] = "User must be an active institution member."
-        if self.journal_entry_id:
-            if self.journal_entry.institution_id != self.institution_id:
-                errors["journal_entry"] = "Journal belongs to another institution."
-            elif self.journal_entry.source != JournalEntry.Source.EXPENSE:
-                errors["journal_entry"] = "Expense journal must use the EXPENSE source."
+        for field in ("journal_entry", "settlement_journal", "reversal_journal"):
+            journal = getattr(self, field, None)
+            if journal is not None and journal.institution_id != self.institution_id:
+                errors[field] = "Journal belongs to another institution."
+        if self.journal_entry_id and self.journal_entry.source != JournalEntry.Source.EXPENSE:
+            errors["journal_entry"] = "Expense journal must use the EXPENSE source."
+        if self.settlement_account_id and self.settlement_account.institution_id != self.institution_id:
+            errors["settlement_account"] = "Settlement account belongs to another institution."
         if errors:
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
-        if self.pk and Expense.objects.filter(pk=self.pk, status__in=(self.Status.POSTED, self.Status.REJECTED)).exists():
-            raise ValidationError({"status": "Posted or rejected expenses are immutable."})
+        if self.pk:
+            stored = Expense.objects.filter(pk=self.pk).values_list("status", flat=True).first()
+            if stored in (self.Status.REJECTED, self.Status.SETTLED, self.Status.REVERSED):
+                raise ValidationError({"status": "Rejected, settled or reversed expenses are immutable."})
+            if stored == self.Status.POSTED:
+                update_fields = kwargs.get("update_fields")
+                if update_fields is None or not set(update_fields) <= self.POSTED_MUTABLE:
+                    raise ValidationError({"status": "Posted expenses change only through settlement or reversal."})
         super().save(*args, **kwargs)
+
+
+class ExpenseLine(TenantOwnedModel):
+    """One item on a claim (E-02). Finance may recode ``account`` during review."""
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="expense_lines")
+    expense = models.ForeignKey(Expense, on_delete=models.CASCADE, related_name="lines")
+    category = models.ForeignKey(ExpenseCategory, on_delete=models.PROTECT, related_name="lines")
+    account = models.ForeignKey(Account, on_delete=models.PROTECT, related_name="expense_lines")
+    expense_date = models.DateField()
+    description = models.CharField(max_length=255)
+    amount = models.DecimalField(max_digits=20, decimal_places=2)
+    receipts = models.ManyToManyField(Document, blank=True, related_name="expense_lines")
+    sequence = models.PositiveSmallIntegerField(default=1)
+
+    class Meta:
+        ordering = ("expense", "sequence", "created_at")
+        constraints = [models.CheckConstraint(condition=Q(amount__gt=0), name="expense_line_amount_positive")]
+
+    def clean(self):
+        errors = {}
+        for field in ("expense", "category", "account"):
+            related = getattr(self, field, None)
+            if related is not None and related.institution_id != self.institution_id:
+                errors[field] = "Belongs to another institution."
+        if self.account_id and self.account.account_type != Account.AccountType.EXPENSE:
+            errors["account"] = "Account must be an expense account."
+        if errors:
+            raise ValidationError(errors)
+
+
+class ExpenseApproval(TenantOwnedModel):
+    """A manager-stage approval step on a claim, resolved by the approval engine (E-08)."""
+
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        APPROVED = "APPROVED", "Approved"
+        RETURNED = "RETURNED", "Returned"
+        REJECTED = "REJECTED", "Rejected"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="expense_approvals")
+    expense = models.ForeignKey(Expense, on_delete=models.CASCADE, related_name="approvals")
+    sequence = models.PositiveSmallIntegerField()
+    step_name = models.CharField(max_length=150)
+    approver = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="expense_approval_steps")
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    comment = models.TextField(blank=True)
+    acted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("expense", "sequence")
+        constraints = [models.UniqueConstraint(fields=("expense", "sequence"), name="uniq_expense_approval_sequence")]
 
 
 class JournalEntryNote(TenantOwnedModel):

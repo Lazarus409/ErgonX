@@ -234,7 +234,8 @@ class Command(BaseCommand):
             if run.status == PayrollRun.Status.CALCULATED:
                 run = submit_payroll_run_for_review(payroll_run=run, actor=self.admin)
             if run.status == PayrollRun.Status.UNDER_REVIEW:
-                run = approve_payroll_run(payroll_run=run, actor=self.admin)
+                # Preparer != approver (BQ-04): the Finance Manager approves.
+                run = approve_payroll_run(payroll_run=run, actor=self.institution.memberships.select_related("user").get(role__code="FINANCE_MANAGER", status="ACTIVE").user)
             if run.status == PayrollRun.Status.APPROVED:
                 run = finalize_payroll_run(payroll_run=run, actor=self.admin)
                 self._count("payroll history")
@@ -243,7 +244,7 @@ class Command(BaseCommand):
             if journal.status == JournalEntry.Status.DRAFT:
                 journal = submit_journal(journal=journal, actor=self.admin)
             if journal.status == JournalEntry.Status.PENDING_APPROVAL:
-                journal = approve_journal(journal=journal, actor=self.admin)
+                journal = approve_journal(journal=journal, actor=self.admin, system=True)  # demo seed: recorded history, not a live approval
             if journal.status == JournalEntry.Status.APPROVED:
                 post_journal(journal=journal, actor=self.admin)
 
@@ -383,7 +384,8 @@ class Command(BaseCommand):
             try:
                 decide_overtime(overtime_record=record, actor=approver, approve=rng.random() < 0.85, approved_minutes=record.calculated_minutes)
             except SERVICE_ERRORS:
-                return
+                # e.g. the date's payroll is already finalized (LC-ATT-01): leave it pending.
+                continue
 
     # ------------------------------------------------------------- recruitment
 
@@ -549,7 +551,9 @@ class Command(BaseCommand):
                 expense = submit_expense(expense=expense, actor=admin)
                 recent = (self.today - expense_date).days < 6
                 if not recent:
-                    expense = approve_expense(expense=expense, actor=admin)
+                    # Whoever enters an expense cannot approve it (BQ-04): the Finance Manager approves.
+                    approver = institution.memberships.select_related("user").get(role__code="FINANCE_MANAGER", status="ACTIVE").user
+                    expense = approve_expense(expense=expense, actor=approver)
                     post_expense(expense=expense, actor=admin)
                 self._count("expenses")
 

@@ -642,6 +642,23 @@ def submit_payroll_run_for_review(*, payroll_run, actor):
 
 
 @transaction.atomic
+def _ensure_payroll_separation(run, actor):
+    """Preparer != approver when the institution's separation-of-duties setting is on (BQ-04)."""
+    from apps.audit.models import AuditLog
+    from apps.institutions.services import institution_setting
+
+    if not (institution_setting(run.institution, "security.separation_of_duties") or {}).get("payroll", True):
+        return
+    prepared = run.started_by_id == actor.id or AuditLog.objects.filter(
+        institution=run.institution, entity_id=run.id, actor=actor, action="payroll.run.submitted_for_review"
+    ).exists()
+    if prepared:
+        raise CodedValidationError(
+            {"actor": "You prepared this payroll run, so someone else must approve it (separation of duties)."},
+            api_code="separation_of_duties",
+        )
+
+
 def approve_payroll_run(*, payroll_run, actor):
     run = PayrollRun.objects.select_for_update().get(pk=payroll_run.pk)
     _membership_with_permission(actor, run.institution, "payroll.approve")
@@ -652,6 +669,7 @@ def approve_payroll_run(*, payroll_run, actor):
             {"status": "Only runs under review can be approved."},
             api_code="invalid_state_transition",
         )
+    _ensure_payroll_separation(run, actor)
     reconciliation = reconcile_payroll_run(run)
     if reconciliation["discrepancy_count"]:
         raise ValidationError({"reconciliation": "Payroll contains reconciliation discrepancies."})

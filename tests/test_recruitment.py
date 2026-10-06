@@ -20,6 +20,15 @@ from apps.recruitment.services import (
 )
 
 
+
+def approved(posting):
+    """Test setup: mark a requisition approved by someone else, as BQ-06 requires before publishing."""
+    from apps.recruitment.models import JobPosting
+
+    JobPosting.objects.filter(pk=posting.pk).update(status=JobPosting.Status.APPROVED)
+    posting.refresh_from_db()
+    return posting
+
 def recruitment_setup(institution, organization_factory, assignment_dimensions_factory, user):
     InstitutionModule.objects.filter(institution=institution, module_code="RECRUITMENT").update(is_enabled=True)
     department, position = organization_factory(institution)
@@ -37,7 +46,7 @@ def test_recruitment_state_transitions_and_idempotent_hire(institution_factory, 
     user = user_factory()
     membership_factory(user=user, institution=institution, role_code="HR_ADMIN", is_primary=True)
     department, position, grade, location, stage, posting, candidate, application = recruitment_setup(institution, organization_factory, assignment_dimensions_factory, user)
-    publish_job_posting(job_posting=posting, actor=user)
+    publish_job_posting(job_posting=approved(posting), actor=user)
     submit_application(application=application, actor=user)
     stage_two = RecruitmentStage.objects.create(institution=institution, name="Interview", sequence=2)
     move_application_stage(application=application, stage=stage_two, actor=user, comment="Shortlisted")
@@ -64,7 +73,7 @@ def test_hire_rolls_back_when_employee_number_conflicts(institution_factory, use
     user = user_factory()
     membership_factory(user=user, institution=institution, role_code="HR_ADMIN", is_primary=True)
     department, position, grade, location, _, posting, candidate, application = recruitment_setup(institution, organization_factory, assignment_dimensions_factory, user)
-    publish_job_posting(job_posting=posting, actor=user); submit_application(application=application, actor=user)
+    publish_job_posting(job_posting=approved(posting), actor=user); submit_application(application=application, actor=user)
     employee_factory(institution, employee_number="DUPLICATE")
     offer = Offer.objects.create(institution=institution, application=application, proposed_start_date=date.today(), employment_type=Employment.EmploymentType.PERMANENT, department=department, position=position, grade=grade, location=location)
     extend_offer(offer=offer, actor=user); decide_offer(offer=offer, actor=user, accepted=True)

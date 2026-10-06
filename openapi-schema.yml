@@ -13000,7 +13000,7 @@ paths:
       description: |-
         Download document.
 
-        Requires an authenticated user, an active institution context.
+        Requires an authenticated user, an active institution context, the `document.view` permission.
 
         Tenant-owned results are scoped to the active institution.
 
@@ -17360,13 +17360,343 @@ paths:
       - permission_denied
       - not_found
       - validation_error
+  /api/v1/expense-categories/:
+    get:
+      operationId: expense_categories_list
+      description: |-
+        Expense categories and their GL accounts; claimants read them to fill a claim.
+
+        Requires an authenticated user, an active institution context, the `ACCOUNTING` module enabled, the `expense.claim_own` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: List expense categorys
+      parameters:
+      - in: query
+        name: is_active
+        schema:
+          type: boolean
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - expense-categories
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/PaginatedExpenseCategoryList'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+    post:
+      operationId: expense_categories_create
+      description: |-
+        Expense categories and their GL accounts; claimants read them to fill a claim.
+
+        Requires an authenticated user, an active institution context, the `ACCOUNTING` module enabled, the `accounting.configure` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `validation_error`.
+      summary: Create expense category
+      tags:
+      - expense-categories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExpenseCategory'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ExpenseCategory'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ExpenseCategory'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/ExpenseCategory'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - validation_error
+  /api/v1/expense-categories/{id}/:
+    get:
+      operationId: expense_categories_retrieve
+      description: |-
+        Expense categories and their GL accounts; claimants read them to fill a claim.
+
+        Requires an authenticated user, an active institution context, the `ACCOUNTING` module enabled, the `expense.claim_own` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
+      summary: Retrieve expense category
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this expense category.
+        required: true
+      tags:
+      - expense-categories
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/ExpenseCategory'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+    patch:
+      operationId: expense_categories_partial_update
+      description: |-
+        Expense categories and their GL accounts; claimants read them to fill a claim.
+
+        Requires an authenticated user, an active institution context, the `ACCOUNTING` module enabled, the `accounting.configure` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Update expense category
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this expense category.
+        required: true
+      tags:
+      - expense-categories
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedExpenseCategory'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedExpenseCategory'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedExpenseCategory'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/ExpenseCategory'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
   /api/v1/expenses/:
     get:
       operationId: expenses_list
       description: |-
-        List expenses.
+        Expense claims (Expense Management 2.0). Paths are unchanged from the flat expense API.
 
-        Requires an authenticated user, an active institution context, the `ACCOUNTING` module enabled, the `expense.view` permission.
+        Requires an authenticated user, an active institution context, the `ACCOUNTING` module enabled, the `expense.claim_own` permission.
 
         Tenant-owned results are scoped to the active institution.
 
@@ -17375,6 +17705,11 @@ paths:
       parameters:
       - in: query
         name: account
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: claimant
         schema:
           type: string
           format: uuid
@@ -17405,6 +17740,17 @@ paths:
         description: Number of results to return per page.
         schema:
           type: integer
+      - in: query
+        name: payment_method
+        schema:
+          type: string
+          x-spec-enum-id: 54db8709d00e53dc
+          enum:
+          - PETTY_CASH
+          - REIMBURSABLE
+        description: |-
+          * `REIMBURSABLE` - Reimburse the claimant
+          * `PETTY_CASH` - Paid from petty cash
       - name: search
         required: false
         in: query
@@ -17415,19 +17761,27 @@ paths:
         name: status
         schema:
           type: string
-          x-spec-enum-id: 1811a540f90e0a0e
+          x-spec-enum-id: 51765a870cad6df9
           enum:
           - APPROVED
           - DRAFT
+          - FINANCE_REVIEW
           - PENDING
           - POSTED
           - REJECTED
+          - RETURNED
+          - REVERSED
+          - SETTLED
         description: |-
           * `DRAFT` - Draft
-          * `PENDING` - Pending
+          * `PENDING` - Submitted
+          * `RETURNED` - Returned for changes
+          * `FINANCE_REVIEW` - Finance review
           * `APPROVED` - Approved
           * `POSTED` - Posted
+          * `SETTLED` - Settled
           * `REJECTED` - Rejected
+          * `REVERSED` - Reversed
       tags:
       - expenses
       security:
@@ -17478,9 +17832,9 @@ paths:
     post:
       operationId: expenses_create
       description: |-
-        Create expense.
+        Expense claims (Expense Management 2.0). Paths are unchanged from the flat expense API.
 
-        Requires an authenticated user, an active institution context, the `ACCOUNTING` module enabled, the `expense.create` permission.
+        Requires an authenticated user, an active institution context, the `ACCOUNTING` module enabled, the `expense.claim_own` permission.
 
         Tenant-owned results are scoped to the active institution.
 
@@ -17556,9 +17910,9 @@ paths:
     get:
       operationId: expenses_retrieve
       description: |-
-        Retrieve expense.
+        Expense claims (Expense Management 2.0). Paths are unchanged from the flat expense API.
 
-        Requires an authenticated user, an active institution context, the `ACCOUNTING` module enabled, the `expense.view` permission.
+        Requires an authenticated user, an active institution context, the `ACCOUNTING` module enabled, the `expense.claim_own` permission.
 
         Tenant-owned results are scoped to the active institution.
 
@@ -17629,9 +17983,9 @@ paths:
     patch:
       operationId: expenses_partial_update
       description: |-
-        Update expense.
+        Expense claims (Expense Management 2.0). Paths are unchanged from the flat expense API.
 
-        Requires an authenticated user, an active institution context, the `ACCOUNTING` module enabled, the `expense.create` permission.
+        Requires an authenticated user, an active institution context, the `ACCOUNTING` module enabled, the `expense.claim_own` permission.
 
         Tenant-owned results are scoped to the active institution.
 
@@ -17721,13 +18075,13 @@ paths:
     post:
       operationId: expenses_approve_create
       description: |-
-        Approve an expense.
+        Approve (manager step, or legacy one-step approval).
 
-        Requires an authenticated user, an active institution context, the `ACCOUNTING` module enabled, the `expense.approve` permission.
+        Requires an authenticated user, an active institution context, the `ACCOUNTING` module enabled, the `expense.claim_own` permission.
 
         Tenant-owned results are scoped to the active institution.
 
-        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`, `invalid_state_transition`.
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`, `invalid_state_transition`, `separation_of_duties`.
       summary: Approve expense
       parameters:
       - in: path
@@ -17743,13 +18097,107 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Expense'
+              $ref: '#/components/schemas/ExpenseStepDecision'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/Expense'
+              $ref: '#/components/schemas/ExpenseStepDecision'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/Expense'
+              $ref: '#/components/schemas/ExpenseStepDecision'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/Expense'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+      - invalid_state_transition
+      - separation_of_duties
+  /api/v1/expenses/{id}/finance-review/:
+    post:
+      operationId: expenses_finance_review_create
+      description: |-
+        Finance review: approve, return or reject, with optional recoding.
+
+        Requires an authenticated user, an active institution context, the `ACCOUNTING` module enabled, the `expense.finance_review` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`, `invalid_state_transition`, `policy_not_applicable`.
+      summary: Finance review expense
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this expense.
+        required: true
+      tags:
+      - expenses
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExpenseFinanceReview'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ExpenseFinanceReview'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ExpenseFinanceReview'
         required: true
       security:
       - jwtAuth: []
@@ -17811,11 +18259,87 @@ paths:
       - not_found
       - validation_error
       - invalid_state_transition
+      - policy_not_applicable
+  /api/v1/expenses/{id}/policy-checks/:
+    get:
+      operationId: expenses_policy_checks_retrieve
+      description: |-
+        Policy checks for this claim.
+
+        Requires an authenticated user, an active institution context, the `ACCOUNTING` module enabled, the `expense.claim_own` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
+      summary: Policy checks expense
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this expense.
+        required: true
+      tags:
+      - expenses
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
   /api/v1/expenses/{id}/post/:
     post:
       operationId: expenses_post_create
       description: |-
-        Post an approved cash expense journal.
+        Post an approved expense to the ledger.
 
         Requires an authenticated user, an active institution context, the `ACCOUNTING` module enabled, the `expense.post` permission.
 
@@ -17913,7 +18437,7 @@ paths:
       description: |-
         Reject a pending expense.
 
-        Requires an authenticated user, an active institution context, the `ACCOUNTING` module enabled, the `expense.approve` permission.
+        Requires an authenticated user, an active institution context, the `ACCOUNTING` module enabled, the `expense.claim_own` permission.
 
         Tenant-owned results are scoped to the active institution.
 
@@ -17933,13 +18457,199 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Expense'
+              $ref: '#/components/schemas/ExpenseStepDecision'
           application/x-www-form-urlencoded:
             schema:
-              $ref: '#/components/schemas/Expense'
+              $ref: '#/components/schemas/ExpenseStepDecision'
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/Expense'
+              $ref: '#/components/schemas/ExpenseStepDecision'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/Expense'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+      - invalid_state_transition
+  /api/v1/expenses/{id}/return/:
+    post:
+      operationId: expenses_return_create
+      description: |-
+        Return a claim to the claimant.
+
+        Requires an authenticated user, an active institution context, the `ACCOUNTING` module enabled, the `expense.claim_own` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`, `invalid_state_transition`.
+      summary: Return for changes expense
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this expense.
+        required: true
+      tags:
+      - expenses
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExpenseStepDecision'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ExpenseStepDecision'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ExpenseStepDecision'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/Expense'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+      - invalid_state_transition
+  /api/v1/expenses/{id}/reverse/:
+    post:
+      operationId: expenses_reverse_create
+      description: |-
+        Reverse a posted claim (governed correction).
+
+        Requires an authenticated user, an active institution context, the `ACCOUNTING` module enabled, the `expense.post` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`, `invalid_state_transition`, `period_closed`.
+      summary: Reverse expense
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this expense.
+        required: true
+      tags:
+      - expenses
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExpenseReverse'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ExpenseReverse'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ExpenseReverse'
         required: true
       security:
       - jwtAuth: []
@@ -18001,17 +18711,114 @@ paths:
       - not_found
       - validation_error
       - invalid_state_transition
+      - period_closed
+  /api/v1/expenses/{id}/settle/:
+    post:
+      operationId: expenses_settle_create
+      description: |-
+        Record settlement of a posted reimbursable claim.
+
+        Requires an authenticated user, an active institution context, the `ACCOUNTING` module enabled, the `expense.settle` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`, `invalid_state_transition`, `period_closed`, `policy_not_applicable`.
+      summary: Settle expense
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this expense.
+        required: true
+      tags:
+      - expenses
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExpenseSettle'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ExpenseSettle'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ExpenseSettle'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/Expense'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+      - invalid_state_transition
+      - period_closed
+      - policy_not_applicable
   /api/v1/expenses/{id}/submit/:
     post:
       operationId: expenses_submit_create
       description: |-
-        Submit a draft expense.
+        Submit a draft or returned expense.
 
-        Requires an authenticated user, an active institution context, the `ACCOUNTING` module enabled, the `expense.create` permission.
+        Requires an authenticated user, an active institution context, the `ACCOUNTING` module enabled, the `expense.claim_own` permission.
 
         Tenant-owned results are scoped to the active institution.
 
-        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`, `invalid_state_transition`.
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`, `invalid_state_transition`, `policy_not_applicable`.
       summary: Submit expense
       parameters:
       - in: path
@@ -18095,6 +18902,7 @@ paths:
       - not_found
       - validation_error
       - invalid_state_transition
+      - policy_not_applicable
   /api/v1/export-jobs/:
     get:
       operationId: export_jobs_list
@@ -37923,7 +38731,7 @@ paths:
       description: |-
         Scorecard application.
 
-        Requires an authenticated user, an active institution context, the `RECRUITMENT` module enabled, the `candidate.view` permission.
+        Requires an authenticated user, an active institution context, the `RECRUITMENT` module enabled, the `candidate_evaluation.create` permission.
 
         Tenant-owned results are scoped to the active institution.
 
@@ -39074,7 +39882,7 @@ paths:
       description: |-
         Scorecard candidate.
 
-        Requires an authenticated user, an active institution context, the `RECRUITMENT` module enabled.
+        Requires an authenticated user, an active institution context, the `RECRUITMENT` module enabled, the `candidate.view` permission.
 
         Tenant-owned results are scoped to the active institution.
 
@@ -52856,6 +53664,10 @@ components:
           type: boolean
         is_active:
           type: boolean
+        system_mapping_code:
+          type: string
+          nullable: true
+          maxLength: 100
         created_at:
           type: string
           format: date-time
@@ -55574,12 +56386,21 @@ components:
           type: string
           format: uuid
           readOnly: true
+        claimant:
+          type: string
+          format: uuid
+          nullable: true
+        claimant_name:
+          type: string
+          nullable: true
+          readOnly: true
         expense_date:
           type: string
           format: date
         account:
           type: string
           format: uuid
+          nullable: true
         amount:
           type: string
           format: decimal
@@ -55589,6 +56410,15 @@ components:
           maxLength: 3
         description:
           type: string
+        payment_method:
+          enum:
+          - REIMBURSABLE
+          - PETTY_CASH
+          type: string
+          description: |-
+            * `REIMBURSABLE` - Reimburse the claimant
+            * `PETTY_CASH` - Paid from petty cash
+          x-spec-enum-id: 54db8709d00e53dc
         attachment:
           type: string
           format: uuid
@@ -55597,28 +56427,99 @@ components:
           enum:
           - DRAFT
           - PENDING
+          - RETURNED
+          - FINANCE_REVIEW
           - APPROVED
           - POSTED
+          - SETTLED
           - REJECTED
+          - REVERSED
           type: string
           description: |-
             * `DRAFT` - Draft
-            * `PENDING` - Pending
+            * `PENDING` - Submitted
+            * `RETURNED` - Returned for changes
+            * `FINANCE_REVIEW` - Finance review
             * `APPROVED` - Approved
             * `POSTED` - Posted
+            * `SETTLED` - Settled
             * `REJECTED` - Rejected
-          x-spec-enum-id: 1811a540f90e0a0e
+            * `REVERSED` - Reversed
+          x-spec-enum-id: 51765a870cad6df9
+          readOnly: true
+        status_label:
+          type: string
+          readOnly: true
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExpenseLine'
+        approvals:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExpenseApproval'
+          readOnly: true
+        submitted_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        decision_note:
+          type: string
           readOnly: true
         created_by:
           type: string
           format: uuid
           readOnly: true
+        finance_reviewed_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        finance_reviewed_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
         approved_by:
           type: string
           format: uuid
           readOnly: true
           nullable: true
         journal_entry:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        settlement_account:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        settlement_date:
+          type: string
+          format: date
+          readOnly: true
+          nullable: true
+        settlement_reference:
+          type: string
+          readOnly: true
+        settlement_journal:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        settled_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        reversal_journal:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        reversed_by:
           type: string
           format: uuid
           readOnly: true
@@ -55632,18 +56533,230 @@ components:
           format: date-time
           readOnly: true
       required:
-      - account
-      - amount
+      - approvals
       - approved_by
+      - claimant_name
       - created_at
       - created_by
-      - currency
+      - decision_note
       - description
-      - expense_date
+      - finance_reviewed_at
+      - finance_reviewed_by
       - id
       - journal_entry
+      - reversal_journal
+      - reversed_by
+      - settled_by
+      - settlement_account
+      - settlement_date
+      - settlement_journal
+      - settlement_reference
       - status
+      - status_label
+      - submitted_at
       - updated_at
+    ExpenseApproval:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        sequence:
+          type: integer
+          readOnly: true
+        step_name:
+          type: string
+          readOnly: true
+        approver:
+          type: string
+          format: uuid
+          readOnly: true
+        approver_name:
+          type: string
+          readOnly: true
+        status:
+          enum:
+          - PENDING
+          - APPROVED
+          - RETURNED
+          - REJECTED
+          type: string
+          description: |-
+            * `PENDING` - Pending
+            * `APPROVED` - Approved
+            * `RETURNED` - Returned
+            * `REJECTED` - Rejected
+          x-spec-enum-id: bc48d3d9c1037422
+          readOnly: true
+        comment:
+          type: string
+          readOnly: true
+        acted_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+      required:
+      - acted_at
+      - approver
+      - approver_name
+      - comment
+      - id
+      - sequence
+      - status
+      - step_name
+    ExpenseCategory:
+      type: object
+      description: Runs model validation so domain invariants also protect non-form
+        API writes.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        code:
+          type: string
+          maxLength: 50
+        name:
+          type: string
+          maxLength: 150
+        expense_account:
+          type: string
+          format: uuid
+        max_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,18}(?:\.\d{0,2})?$
+          nullable: true
+        receipt_required_over:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,18}(?:\.\d{0,2})?$
+          nullable: true
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - code
+      - created_at
+      - expense_account
+      - id
+      - name
+      - updated_at
+    ExpenseFinanceReview:
+      type: object
+      properties:
+        decision:
+          enum:
+          - approve
+          - return
+          - reject
+          type: string
+          description: |-
+            * `approve` - approve
+            * `return` - return
+            * `reject` - reject
+          x-spec-enum-id: 000e9d57b658cf4f
+        comment:
+          type: string
+          default: ''
+        recodes:
+          type: object
+          additionalProperties:
+            type: string
+            format: uuid
+          description: Line id -> expense account id.
+      required:
+      - decision
+    ExpenseLine:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        category:
+          type: string
+          format: uuid
+        category_name:
+          type: string
+          readOnly: true
+        account:
+          type: string
+          format: uuid
+          readOnly: true
+        account_code:
+          type: string
+          readOnly: true
+        account_name:
+          type: string
+          readOnly: true
+        expense_date:
+          type: string
+          format: date
+        description:
+          type: string
+          maxLength: 255
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,18}(?:\.\d{0,2})?$
+        receipts:
+          type: array
+          items:
+            type: string
+            format: uuid
+        sequence:
+          type: integer
+          readOnly: true
+      required:
+      - account
+      - account_code
+      - account_name
+      - amount
+      - category
+      - category_name
+      - id
+      - sequence
+    ExpenseReverse:
+      type: object
+      properties:
+        reason:
+          type: string
+        reversal_date:
+          type: string
+          format: date
+      required:
+      - reason
+    ExpenseSettle:
+      type: object
+      properties:
+        settlement_account:
+          type: string
+          format: uuid
+        settlement_date:
+          type: string
+          format: date
+        reference:
+          type: string
+          default: ''
+          maxLength: 120
+      required:
+      - settlement_account
+    ExpenseStepDecision:
+      type: object
+      properties:
+        comment:
+          type: string
+          default: ''
     ExportJob:
       type: object
       properties:
@@ -59702,6 +60815,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Employment'
+    PaginatedExpenseCategoryList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExpenseCategory'
     PaginatedExpenseList:
       type: object
       required:
@@ -61349,6 +62485,10 @@ components:
           type: boolean
         is_active:
           type: boolean
+        system_mapping_code:
+          type: string
+          nullable: true
+          maxLength: 100
         created_at:
           type: string
           format: date-time
@@ -62462,12 +63602,21 @@ components:
           type: string
           format: uuid
           readOnly: true
+        claimant:
+          type: string
+          format: uuid
+          nullable: true
+        claimant_name:
+          type: string
+          nullable: true
+          readOnly: true
         expense_date:
           type: string
           format: date
         account:
           type: string
           format: uuid
+          nullable: true
         amount:
           type: string
           format: decimal
@@ -62477,6 +63626,15 @@ components:
           maxLength: 3
         description:
           type: string
+        payment_method:
+          enum:
+          - REIMBURSABLE
+          - PETTY_CASH
+          type: string
+          description: |-
+            * `REIMBURSABLE` - Reimburse the claimant
+            * `PETTY_CASH` - Paid from petty cash
+          x-spec-enum-id: 54db8709d00e53dc
         attachment:
           type: string
           format: uuid
@@ -62485,22 +63643,60 @@ components:
           enum:
           - DRAFT
           - PENDING
+          - RETURNED
+          - FINANCE_REVIEW
           - APPROVED
           - POSTED
+          - SETTLED
           - REJECTED
+          - REVERSED
           type: string
           description: |-
             * `DRAFT` - Draft
-            * `PENDING` - Pending
+            * `PENDING` - Submitted
+            * `RETURNED` - Returned for changes
+            * `FINANCE_REVIEW` - Finance review
             * `APPROVED` - Approved
             * `POSTED` - Posted
+            * `SETTLED` - Settled
             * `REJECTED` - Rejected
-          x-spec-enum-id: 1811a540f90e0a0e
+            * `REVERSED` - Reversed
+          x-spec-enum-id: 51765a870cad6df9
+          readOnly: true
+        status_label:
+          type: string
+          readOnly: true
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExpenseLine'
+        approvals:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExpenseApproval'
+          readOnly: true
+        submitted_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        decision_note:
+          type: string
           readOnly: true
         created_by:
           type: string
           format: uuid
           readOnly: true
+        finance_reviewed_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        finance_reviewed_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
         approved_by:
           type: string
           format: uuid
@@ -62511,6 +63707,77 @@ components:
           format: uuid
           readOnly: true
           nullable: true
+        settlement_account:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        settlement_date:
+          type: string
+          format: date
+          readOnly: true
+          nullable: true
+        settlement_reference:
+          type: string
+          readOnly: true
+        settlement_journal:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        settled_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        reversal_journal:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        reversed_by:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedExpenseCategory:
+      type: object
+      description: Runs model validation so domain invariants also protect non-form
+        API writes.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        code:
+          type: string
+          maxLength: 50
+        name:
+          type: string
+          maxLength: 150
+        expense_account:
+          type: string
+          format: uuid
+        max_amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,18}(?:\.\d{0,2})?$
+          nullable: true
+        receipt_required_over:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,18}(?:\.\d{0,2})?$
+          nullable: true
+        is_active:
+          type: boolean
         created_at:
           type: string
           format: date-time

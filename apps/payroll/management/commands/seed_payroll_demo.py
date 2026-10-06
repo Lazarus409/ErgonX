@@ -54,6 +54,7 @@ from apps.payroll.services import (
 
 DEMO_INSTITUTION_CODE = "ERGONX-DEMO-GH"
 DEMO_ADMIN_EMAIL = "demo.admin@ergonx.local"
+DEMO_APPROVER_EMAIL = "payroll.approver@ergonx.local"
 DEMO_RESIDENT_EMAIL = "demo.resident@ergonx.local"
 DEMO_NON_RESIDENT_EMAIL = "demo.nonresident@ergonx.local"
 DEMO_RUN_KEY = "ergonx-demo-gh-2026-09-regular-v1"
@@ -293,6 +294,9 @@ class Command(BaseCommand):
             last_name="Diallo",
         )
         self._ensure_membership(admin, institution, "INSTITUTION_ADMIN")
+        # A second person approves payroll: preparer != approver (BQ-04).
+        approver = self._ensure_user(DEMO_APPROVER_EMAIL, password, first_name="Efua", last_name="Approver")
+        self._ensure_membership(approver, institution, "FINANCE_MANAGER")
         self._ensure_membership(resident_user, institution, "EMPLOYEE")
         self._ensure_membership(non_resident_user, institution, "EMPLOYEE")
 
@@ -561,7 +565,7 @@ class Command(BaseCommand):
         if run.status == PayrollRun.Status.CALCULATED:
             run = submit_payroll_run_for_review(payroll_run=run, actor=admin)
         if run.status == PayrollRun.Status.UNDER_REVIEW:
-            run = approve_payroll_run(payroll_run=run, actor=admin)
+            run = approve_payroll_run(payroll_run=run, actor=run.institution.memberships.select_related("user").get(role__code="FINANCE_MANAGER", status="ACTIVE").user)
         if run.status == PayrollRun.Status.APPROVED:
             run = finalize_payroll_run(payroll_run=run, actor=admin)
         if run.status != PayrollRun.Status.FINALIZED:

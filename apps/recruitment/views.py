@@ -213,7 +213,7 @@ class CandidateViewSet(RecruitmentViewSet):
     def get_required_permission(self):
         if self.action == "documents":
             return "candidate.update" if self.request.method == "POST" else "candidate.view"
-        if self.action in {"download_document", "document_categories"}:
+        if self.action in {"download_document", "document_categories", "scorecard"}:
             return "candidate.view"
         if self.action == "remove_document":
             return "candidate.update"
@@ -333,6 +333,9 @@ class ApplicationViewSet(RecruitmentViewSet):
         })
 
     def get_required_permission(self):
+        if self.action == "scorecard" and self.request.method == "POST":
+            # Recording an evaluation is its own grant, not "can view candidates" (W0-PERM-06).
+            return "candidate_evaluation.create"
         if self.action in {"scorecard", "overview"}:
             return "candidate.view"
         return {"create": "candidate.create", "submit": "candidate.create", "move_stage": "candidate.update", "withdraw": "candidate.update", "reject": "candidate.update", "stage_history": "candidate.view"}.get(self.action, "candidate.view")

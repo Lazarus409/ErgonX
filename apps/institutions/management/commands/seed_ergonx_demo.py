@@ -626,6 +626,10 @@ class Command(BaseCommand):
                 defaults={"title": title, "department": institution.departments.get(code=department_code), "position": institution.positions.get(code=position_code), "location": institution.locations.get(code=location_code), "hiring_manager": admin, "employment_type": "PERMANENT", "description": "CSA-DEMO recruitment scenario."},
             )
             if posting.status == JobPosting.Status.DRAFT:
+                # Demo history: the requisition was approved before publishing (BQ-06 removed
+                # the draft shortcut).
+                JobPosting.objects.filter(pk=posting.pk).update(status=JobPosting.Status.APPROVED, approved_by=admin, approved_at=timezone.now())
+                posting.refresh_from_db()
                 publish_job_posting(job_posting=posting, actor=admin)
             postings[code] = posting
 
@@ -810,6 +814,10 @@ class Command(BaseCommand):
         )
 
     def _ensure_payroll_run(self, institution, admin):
+        # The 12 September overtime (EMP-000113) is paid through payroll adjustment
+        # PADJ-2026-00011 below, so the attendance overtime row stays undecided:
+        # approving it as well would pay it twice, and approved attendance cannot
+        # change once September payroll is finalized (LC-ATT-01).
         period, _ = PayrollPeriod.objects.get_or_create(
             institution=institution, start_date=date(2026, 9, 1), end_date=date(2026, 9, 30),
             defaults={"name": "September 2026", "pay_date": date(2026, 9, 30), "status": PayrollPeriod.Status.OPEN},
@@ -833,19 +841,10 @@ class Command(BaseCommand):
         if run.status == PayrollRun.Status.CALCULATED:
             run = submit_payroll_run_for_review(payroll_run=run, actor=admin)
         if run.status == PayrollRun.Status.UNDER_REVIEW:
-            run = approve_payroll_run(payroll_run=run, actor=admin)
+            # Preparer != approver (BQ-04): the Finance Manager approves.
+            run = approve_payroll_run(payroll_run=run, actor=institution.memberships.select_related("user").get(role__code="FINANCE_MANAGER", status="ACTIVE").user)
         if run.status == PayrollRun.Status.APPROVED:
             run = finalize_payroll_run(payroll_run=run, actor=admin)
-        # The rolling activity seed creates additional overtime records for this
-        # employee.  The integrated fixture must only decide its fixed September
-        # payroll scenario, not whichever record happens to be returned first.
-        overtime = OvertimeRecord.objects.get(
-            institution=institution,
-            attendance_record__employee__employee_number="EMP-000113",
-            attendance_record__attendance_date=date(2026, 9, 12),
-        )
-        if overtime.status == OvertimeRecord.Status.PENDING:
-            decide_overtime(overtime_record=overtime, actor=institution.employees.get(employee_number="EMP-000115").user, approve=True, approved_minutes=240)
 
     def _ensure_accounting_foundation(self, institution, admin):
         version = AccountingPresetVersion.objects.select_related("accounting_preset").get(
@@ -898,7 +897,7 @@ class Command(BaseCommand):
         if journal.status == journal.Status.DRAFT:
             journal = submit_journal(journal=journal, actor=admin)
         if journal.status == journal.Status.PENDING_APPROVAL:
-            journal = approve_journal(journal=journal, actor=admin)
+            journal = approve_journal(journal=journal, actor=admin, system=True)  # demo seed: recorded history, not a live approval
         if journal.status == journal.Status.APPROVED:
             post_journal(journal=journal, actor=admin)
 

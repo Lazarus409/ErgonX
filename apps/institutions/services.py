@@ -123,6 +123,10 @@ ACCOUNTING_PERMISSIONS = {
     "expense.create": "Create and submit expenses",
     "expense.approve": "Approve or reject expenses",
     "expense.post": "Post approved expenses",
+    # Expense Management 2.0 (Wave 6).
+    "expense.claim_own": "Claim own expenses",
+    "expense.finance_review": "Finance-review expense claims",
+    "expense.settle": "Record expense claim settlements",
     "payroll_accounting.view": "View payroll accounting mappings",
     "payroll_accounting.configure": "Configure payroll accounting mappings",
     "bank_reconciliation.view": "View bank statement lines and reconciliation state",
@@ -257,6 +261,7 @@ SELF_SERVICE_PERMISSIONS = (
     "attendance.clock",
     "attendance.adjust",
     "payslip.view",
+    "expense.claim_own",
 )
 
 ROLE_PERMISSION_CODES = {
@@ -264,7 +269,8 @@ ROLE_PERMISSION_CODES = {
     "HR_ADMIN": tuple(
         code
         for code in PERMISSIONS
-        if code not in ACCOUNTING_PERMISSIONS
+        # HR staff still claim their own expenses.
+        if (code not in ACCOUNTING_PERMISSIONS or code == "expense.claim_own")
         and code not in {"dashboard.executive.view", "dashboard.finance.view"}
         and code not in {
             "settings.institution.manage",
@@ -331,12 +337,14 @@ ROLE_PERMISSION_CODES = {
         "payslip.view",
         "tax_relief.view",
         "tax_relief.claim",
+        "expense.claim_own",
     ),
     # Data is limited to the member and the departments they head; pay records
     # stay self-only (see common.scoping).
     "DEPARTMENT_HEAD": (
         "home.view",
         "search.use",
+        "expense.claim_own",
         "settings.profile.manage_self",
         "institution.view",
         "organization.view",

@@ -7,7 +7,7 @@ from apps.compensation.models import SalaryStructure
 from apps.employees.models import Employment
 from apps.recruitment.models import Offer
 from apps.recruitment.services import decide_offer, extend_offer, hire_candidate, publish_job_posting, submit_application
-from tests.test_recruitment import recruitment_setup
+from tests.test_recruitment import approved, recruitment_setup
 
 pytestmark = pytest.mark.django_db
 
@@ -17,7 +17,7 @@ def test_application_history_links_to_employee_and_back(api_client, institution_
     hr = user_factory(email="hist.hr@example.com")
     membership_factory(user=hr, institution=institution, role_code="HR_ADMIN", is_primary=True)
     department, position, grade, location, stage, posting, candidate, application = recruitment_setup(institution, organization_factory, assignment_dimensions_factory, hr)
-    publish_job_posting(job_posting=posting, actor=hr)
+    publish_job_posting(job_posting=approved(posting), actor=hr)
     submit_application(application=application, actor=hr)
     structure = SalaryStructure.objects.create(institution=institution, name="Standard", code="STD-HIST")
     offer = Offer.objects.create(institution=institution, application=application, proposed_start_date=date.today() + timedelta(days=14), employment_type=Employment.EmploymentType.PERMANENT,

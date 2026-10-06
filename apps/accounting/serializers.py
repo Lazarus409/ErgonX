@@ -3,6 +3,9 @@ from rest_framework import serializers
 
 from apps.accounting.models import (
     Account,
+    ExpenseApproval,
+    ExpenseCategory,
+    ExpenseLine,
     BankReconciliationSession,
     AccountingPeriod,
     AccountingPreset,
@@ -420,25 +423,122 @@ class GhanaComplianceReminderSerializer(serializers.ModelSerializer):
         read_only_fields = ("institution", "completed_by", "completed_at", "created_at", "updated_at")
 
 
-class ExpenseSerializer(ValidatedModelSerializer):
+class ExpenseCategorySerializer(ValidatedModelSerializer):
     class Meta:
-        model = Expense
-        fields = ("id", "expense_date", "account", "amount", "currency", "description", "attachment", "status", "created_by", "approved_by", "journal_entry", "created_at", "updated_at")
-        read_only_fields = ("id", "status", "created_by", "approved_by", "journal_entry", "created_at", "updated_at")
+        model = ExpenseCategory
+        fields = ("id", "code", "name", "expense_account", "max_amount", "receipt_required_over", "is_active", "created_at", "updated_at")
+        read_only_fields = ("id", "created_at", "updated_at")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         institution = getattr(self.context.get("request"), "institution", None)
         if institution:
-            self.fields["account"].queryset = Account.objects.for_institution(institution)
+            self.fields["expense_account"].queryset = Account.objects.for_institution(institution)
+
+
+class ExpenseLineSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source="category.name", read_only=True)
+    account_code = serializers.CharField(source="account.code", read_only=True)
+    account_name = serializers.CharField(source="account.name", read_only=True)
+
+    class Meta:
+        model = ExpenseLine
+        fields = ("id", "category", "category_name", "account", "account_code", "account_name", "expense_date", "description", "amount", "receipts", "sequence")
+        read_only_fields = ("id", "account", "account_code", "account_name", "sequence")
+        extra_kwargs = {"expense_date": {"required": False}, "description": {"required": False}, "receipts": {"required": False}}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        institution = getattr(self.context.get("request"), "institution", None)
+        if institution:
             from apps.documents.models import Document
+
+            self.fields["category"].queryset = ExpenseCategory.objects.for_institution(institution).filter(is_active=True)
+            self.fields["receipts"].child_relation.queryset = Document.objects.for_institution(institution)
+
+
+class ExpenseApprovalSerializer(serializers.ModelSerializer):
+    approver_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ExpenseApproval
+        fields = ("id", "sequence", "step_name", "approver", "approver_name", "status", "comment", "acted_at")
+        read_only_fields = fields
+
+    def get_approver_name(self, obj) -> str:
+        return obj.approver.get_full_name() or obj.approver.email
+
+
+class ExpenseSerializer(ValidatedModelSerializer):
+    lines = ExpenseLineSerializer(many=True, required=False)
+    approvals = ExpenseApprovalSerializer(many=True, read_only=True)
+    claimant_name = serializers.SerializerMethodField()
+    status_label = serializers.CharField(source="get_status_display", read_only=True)
+
+    class Meta:
+        model = Expense
+        fields = (
+            "id", "claimant", "claimant_name", "expense_date", "account", "amount", "currency", "description", "payment_method",
+            "attachment", "status", "status_label", "lines", "approvals", "submitted_at", "decision_note",
+            "created_by", "finance_reviewed_by", "finance_reviewed_at", "approved_by", "journal_entry",
+            "settlement_account", "settlement_date", "settlement_reference", "settlement_journal", "settled_by",
+            "reversal_journal", "reversed_by", "created_at", "updated_at",
+        )
+        read_only_fields = (
+            "id", "status", "status_label", "submitted_at", "decision_note", "created_by", "finance_reviewed_by",
+            "finance_reviewed_at", "approved_by", "journal_entry", "settlement_account", "settlement_date",
+            "settlement_reference", "settlement_journal", "settled_by", "reversal_journal", "reversed_by", "created_at", "updated_at",
+        )
+        extra_kwargs = {"amount": {"required": False}, "currency": {"required": False}, "expense_date": {"required": False}, "account": {"required": False}}
+
+    def get_claimant_name(self, obj) -> str | None:
+        return obj.claimant.full_name if obj.claimant_id else None
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        institution = getattr(self.context.get("request"), "institution", None)
+        if institution:
+            from apps.documents.models import Document
+            from apps.employees.models import Employee
+
+            self.fields["account"].queryset = Account.objects.for_institution(institution)
             self.fields["attachment"].queryset = Document.objects.for_institution(institution)
+            self.fields["claimant"].queryset = Employee.objects.for_institution(institution)
+
+    def validate(self, attrs):
+        # Model clean runs in the service; lines are validated there too.
+        return attrs
 
     def create(self, validated_data):
-        return call_validated_service(create_expense, **validated_data)
+        lines = validated_data.pop("lines", None)
+        if lines is None and validated_data.get("account") is None:
+            raise serializers.ValidationError({"lines": "Add at least one expense line, or choose an account for a finance-entered expense."})
+        return call_validated_service(create_expense, lines=lines, **validated_data)
 
     def update(self, instance, validated_data):
-        return call_validated_service(update_draft_expense, expense=instance, actor=validated_data.pop("actor"), **validated_data)
+        lines = validated_data.pop("lines", None)
+        return call_validated_service(update_draft_expense, expense=instance, actor=validated_data.pop("actor"), lines=lines, **validated_data)
+
+
+class ExpenseStepDecisionSerializer(serializers.Serializer):
+    comment = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class ExpenseFinanceReviewSerializer(serializers.Serializer):
+    decision = serializers.ChoiceField(choices=("approve", "return", "reject"))
+    comment = serializers.CharField(required=False, allow_blank=True, default="")
+    recodes = serializers.DictField(child=serializers.UUIDField(), required=False, default=dict, help_text="Line id -> expense account id.")
+
+
+class ExpenseSettleSerializer(serializers.Serializer):
+    settlement_account = serializers.UUIDField()
+    settlement_date = serializers.DateField(required=False)
+    reference = serializers.CharField(required=False, allow_blank=True, default="", max_length=120)
+
+
+class ExpenseReverseSerializer(serializers.Serializer):
+    reason = serializers.CharField()
+    reversal_date = serializers.DateField(required=False)
 
 
 class PayrollAccountMappingTemplateSerializer(serializers.ModelSerializer):
@@ -563,6 +663,7 @@ class AccountSerializer(ValidatedModelSerializer):
             "normal_balance",
             "is_postable",
             "is_active",
+            "system_mapping_code",
             "created_at",
             "updated_at",
         )

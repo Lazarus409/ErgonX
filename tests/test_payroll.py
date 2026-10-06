@@ -8,6 +8,7 @@ from django.utils import timezone
 from drf_spectacular.generators import SchemaGenerator
 
 from apps.audit.models import AuditLog
+from common.exceptions import CodedValidationError
 from apps.attendance.models import AttendanceRecord, OvertimeRecord
 from apps.compensation.models import EmployeeCompensation, PayComponent, SalaryStructure
 from apps.accounting.models import (
@@ -602,7 +603,12 @@ def test_generic_payroll_calculation_lifecycle_snapshot_and_immutability(
     assert reconcile_payroll_run(run)["discrepancy_count"] == 0
 
     run = submit_payroll_run_for_review(payroll_run=run, actor=hr)
-    run = approve_payroll_run(payroll_run=run, actor=hr)
+    # Separation of duties (BQ-04): the preparer cannot approve.
+    with pytest.raises(CodedValidationError, match="separation of duties"):
+        approve_payroll_run(payroll_run=run, actor=hr)
+    approver = user_factory(email="payroll.approver@example.com")
+    membership_factory(user=approver, institution=institution, role_code="FINANCE_MANAGER")
+    run = approve_payroll_run(payroll_run=run, actor=approver)
     run = finalize_payroll_run(payroll_run=run, actor=hr)
     retry = finalize_payroll_run(payroll_run=run, actor=hr)
     record.refresh_from_db()

@@ -20,6 +20,8 @@ export interface SessionInstitution {
   code: string;
   /** Uploaded institution logo (image asset id), when one exists. */
   logoImageId?: string | null;
+  /** IANA time zone of the institution. */
+  timezone?: string;
   /**
    * Enabled backend module codes (`CORE_HR`, `LEAVE`, ...). The development
    * bypass uses the short label `HR`; compare with `hasModule` from

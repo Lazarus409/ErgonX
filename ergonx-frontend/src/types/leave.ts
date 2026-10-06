@@ -181,7 +181,8 @@ export interface LeaveRequestComment {
 export interface LeavePolicyCheck {
   code: string;
   label: string;
-  status: "pass" | "warn" | "fail" | "unavailable" | string;
+  /** "not_evaluated" when a rule could not be checked (never treated as compliant). */
+  status: "pass" | "warn" | "fail" | "not_evaluated" | string;
   detail: string;
 }
 

@@ -17,6 +17,7 @@ import type {
   InstitutionOnboarding,
   InstitutionRole,
   InstitutionSetting,
+  RoleDataScope,
   PermissionDefinition,
   UserPreference,
 } from "@/types/institutions";
@@ -172,6 +173,8 @@ export interface CustomRolePayload {
   name: string;
   description?: string;
   permission_codes: string[];
+  data_scope?: RoleDataScope;
+  is_read_only?: boolean;
 }
 
 export interface CustomRoleUpdatePayload {
@@ -179,6 +182,8 @@ export interface CustomRoleUpdatePayload {
   description?: string;
   permission_codes?: string[];
   is_active?: boolean;
+  data_scope?: RoleDataScope;
+  is_read_only?: boolean;
 }
 
 export function createInstitutionRole(payload: CustomRolePayload): Promise<InstitutionRole> {

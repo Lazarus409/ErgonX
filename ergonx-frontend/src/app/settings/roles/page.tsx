@@ -8,10 +8,11 @@ import EmptyState from "@/components/ui/EmptyState";
 import ErrorState from "@/components/ui/ErrorState";
 import LoadingState from "@/components/ui/LoadingState";
 import PageHeader from "@/components/ui/PageHeader";
+import { Badge } from "@/components/ui/Badge";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { getApiErrorMessage, institutionsApi } from "@/lib/api";
 import { useApiResource } from "@/lib/useApiResource";
-import type { InstitutionRole } from "@/types/institutions";
+import type { InstitutionRole, RoleDataScope } from "@/types/institutions";
 import { buttonClasses } from "@/components/ui/Button";
 
 function moduleLabel(code: string): string {
@@ -25,6 +26,8 @@ export default function RoleSettingsPage() {
   const [description, setDescription] = useState("");
   const [permissionCodes, setPermissionCodes] = useState<string[]>([]);
   const [isActive, setIsActive] = useState(true);
+  const [dataScope, setDataScope] = useState<RoleDataScope>("INSTITUTION");
+  const [isReadOnly, setIsReadOnly] = useState(false);
   const [saving, setSaving] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -47,10 +50,10 @@ export default function RoleSettingsPage() {
   }
 
   const openCreate = () => {
-    setEditorRole(null); setName(""); setCode(""); setDescription(""); setPermissionCodes([]); setIsActive(true); setActionError(null);
+    setEditorRole(null); setName(""); setCode(""); setDescription(""); setPermissionCodes([]); setIsActive(true); setDataScope("INSTITUTION"); setIsReadOnly(false); setActionError(null);
   };
   const openEdit = (role: InstitutionRole) => {
-    setEditorRole(role); setName(role.name); setCode(role.code); setDescription(role.description); setPermissionCodes(role.permissions); setIsActive(role.is_active); setActionError(null);
+    setEditorRole(role); setName(role.name); setCode(role.code); setDescription(role.description); setPermissionCodes(role.permissions); setIsActive(role.is_active); setDataScope(role.data_scope); setIsReadOnly(role.is_read_only); setActionError(null);
   };
   const togglePermission = (permissionCode: string) => {
     setPermissionCodes((current) => current.includes(permissionCode) ? current.filter((item) => item !== permissionCode) : [...current, permissionCode]);
@@ -64,9 +67,9 @@ export default function RoleSettingsPage() {
     setSaving(true); setActionError(null);
     try {
       if (editorRole === null) {
-        await institutionsApi.createInstitutionRole({ code: code.trim().toUpperCase(), name: name.trim(), description: description.trim(), permission_codes: permissionCodes });
+        await institutionsApi.createInstitutionRole({ code: code.trim().toUpperCase(), name: name.trim(), description: description.trim(), permission_codes: permissionCodes, data_scope: dataScope, is_read_only: isReadOnly });
       } else if (editorRole) {
-        await institutionsApi.updateInstitutionRole(editorRole.id, { name: name.trim(), description: description.trim(), permission_codes: permissionCodes, is_active: isActive });
+        await institutionsApi.updateInstitutionRole(editorRole.id, { name: name.trim(), description: description.trim(), permission_codes: permissionCodes, is_active: isActive, data_scope: dataScope, is_read_only: isReadOnly });
       }
       setConfirming(false); setEditorRole(undefined); reload();
     } catch (caught) { setActionError(getApiErrorMessage(caught)); setConfirming(false); } finally { setSaving(false); }
@@ -108,7 +111,7 @@ export default function RoleSettingsPage() {
             </div>
             <button type="button" onClick={() => setEditorRole(undefined)} className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-strong" aria-label="Cancel"><X className="h-5 w-5" /></button>
           </div>
-          <div className="mt-6 grid gap-4 md:grid-cols-2"><label className="text-sm font-semibold text-ink-strong">Role name<input value={name} onChange={(event) => setName(event.target.value)} className="mt-1.5 h-10 w-full rounded-lg border border-line-strong px-3 font-normal" /></label><label className="text-sm font-semibold text-ink-strong">Role code<input value={code} disabled={Boolean(editorRole)} onChange={(event) => setCode(event.target.value.toUpperCase())} placeholder="PEOPLE_MANAGER" className="mt-1.5 h-10 w-full rounded-lg border border-line-strong px-3 font-normal disabled:bg-surface-muted" /></label><label className="text-sm font-semibold text-ink-strong md:col-span-2">Description<textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={2} className="mt-1.5 w-full rounded-lg border border-line-strong bg-surface-muted/50 px-3 py-2.5 font-normal" /></label></div>
+          <div className="mt-6 grid gap-4 md:grid-cols-2"><label className="text-sm font-semibold text-ink-strong">Role name<input value={name} onChange={(event) => setName(event.target.value)} className="mt-1.5 h-10 w-full rounded-lg border border-line-strong px-3 font-normal" /></label><label className="text-sm font-semibold text-ink-strong">Role code<input value={code} disabled={Boolean(editorRole)} onChange={(event) => setCode(event.target.value.toUpperCase())} placeholder="PEOPLE_MANAGER" className="mt-1.5 h-10 w-full rounded-lg border border-line-strong px-3 font-normal disabled:bg-surface-muted" /></label><label className="text-sm font-semibold text-ink-strong">Records this role works with<select value={dataScope} onChange={(event) => setDataScope(event.target.value as RoleDataScope)} className="mt-1.5 h-9 w-full rounded-lg border border-line-strong px-3 font-normal"><option value="INSTITUTION">Whole institution (within its permissions)</option><option value="DEPARTMENT">Own records and departments the member heads</option><option value="SELF">Own records only</option></select></label><label className="flex items-start gap-3 rounded-lg border border-line px-3 py-2.5 text-sm"><input type="checkbox" checked={isReadOnly} onChange={(event) => setIsReadOnly(event.target.checked)} className="mt-0.5 h-4 w-4" /><span><span className="font-semibold text-ink-strong">Read-only</span><span className="block text-caption text-ink-muted">Can view what it is granted but change nothing except the member&apos;s own self-service records.</span></span></label><label className="text-sm font-semibold text-ink-strong md:col-span-2">Description<textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={2} className="mt-1.5 w-full rounded-lg border border-line-strong bg-surface-muted/50 px-3 py-2.5 font-normal" /></label></div>
           {editorRole && <label className="mt-4 inline-flex items-center gap-2 text-sm text-ink"><input type="checkbox" checked={isActive} onChange={(event) => setIsActive(event.target.checked)} /> Active role</label>}
           <fieldset className="mt-6">
             <legend className="flex items-start gap-3">
@@ -156,7 +159,9 @@ export default function RoleSettingsPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-bold text-headline">{role.name}</p>
                     <StatusBadge status={role.is_active ? "ACTIVE" : "INACTIVE"} />
-                    {role.is_system_role && <span className="inline-flex items-center gap-1 rounded-full bg-surface-muted px-2.5 py-0.5 text-caption font-semibold text-ink-muted"><Lock className="h-3 w-3" aria-hidden="true" />System role (read-only)</span>}
+                    {role.is_system_role && <span className="inline-flex items-center gap-1 rounded-full bg-surface-muted px-2.5 py-0.5 text-caption font-semibold text-ink-muted"><Lock className="h-3 w-3" aria-hidden="true" />Built-in role</span>}
+                    {role.data_scope !== "INSTITUTION" && <Badge tone="info" size="sm">{role.data_scope === "SELF" ? "Own records only" : "Own + headed departments"}</Badge>}
+                    {role.is_read_only && <Badge tone="warning" size="sm">View only</Badge>}
                     {role.is_custom && <span className="rounded-full bg-mod-recruitment-soft px-2.5 py-0.5 text-caption font-semibold text-mod-recruitment">Custom role</span>}
                   </div>
                   <p className="mt-1 text-sm text-ink-muted">{role.description || role.code}</p>
@@ -170,15 +175,29 @@ export default function RoleSettingsPage() {
 
       <ConfirmDialog open={confirming} title={editorRole ? "Update custom role?" : "Create custom role?"} description={editorRole ? "The selected permissions and status will immediately apply to memberships using this custom role." : "The new role will be available for institution membership assignment."} confirmLabel={editorRole ? "Update role" : "Create role"} loading={saving} onConfirm={() => void save()} onCancel={() => setConfirming(false)} />
 
-      <section className="rounded-2xl border border-line bg-surface p-5 shadow-elevation-1">
-        <h2 className="text-card-title font-bold text-headline">Permission catalogue</h2>
-        <p className="mt-1 text-sm text-ink-muted">Available permissions by module. This is read-only so current access can be reviewed safely.</p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {Object.entries(permissionGroups).map(([module, count]) => (
-            <span key={module} className="rounded-full bg-primary-soft px-3 py-1.5 text-sm font-medium text-primary-ink">
-              {moduleLabel(module)} · {count}
-            </span>
-          ))}
+      <section className="overflow-hidden rounded-xl border border-line bg-surface shadow-elevation-1" aria-labelledby="matrix-overview">
+        <div className="border-b border-line-soft p-5">
+          <h2 id="matrix-overview" className="text-card-title font-semibold text-ink-strong">Matrix overview</h2>
+          <p className="mt-1 text-sm text-ink-muted">Permissions each role holds per module, out of what the module offers. Read-only; edit a custom role to change it.</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[40rem] text-left text-sm">
+            <thead className="bg-surface-muted/60 text-caption uppercase tracking-[0.06em] text-ink-muted">
+              <tr><th className="px-4 py-2.5 font-semibold">Role</th>{Object.entries(permissionGroups).map(([module, count]) => <th key={module} className="px-3 py-2.5 text-center font-semibold">{moduleLabel(module)}<span className="block font-normal normal-case tracking-normal">{count} available</span></th>)}</tr>
+            </thead>
+            <tbody className="divide-y divide-line-soft">
+              {data.roles.filter((role) => role.is_active).map((role) => (
+                <tr key={role.id}>
+                  <td className="px-4 py-2.5 font-semibold text-ink-strong">{role.name}{role.is_read_only && <span className="ml-2 text-caption font-normal text-warning-ink">view only</span>}</td>
+                  {Object.entries(permissionsByModule).map(([module, permissions]) => {
+                    const held = permissions.filter((permission) => role.permissions.includes(permission.code)).length;
+                    const share = permissions.length ? held / permissions.length : 0;
+                    return <td key={module} className="px-3 py-2.5 text-center"><span className={held === 0 ? "text-ink-subtle" : share === 1 ? "rounded bg-primary px-1.5 py-0.5 font-semibold text-white" : "rounded bg-primary-soft px-1.5 py-0.5 font-semibold text-primary-ink"}>{held === 0 ? "—" : `${held}/${permissions.length}`}</span></td>;
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </section>
     </div>

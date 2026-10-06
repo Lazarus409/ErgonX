@@ -5,6 +5,9 @@ import {
   ChevronDown,
   ChevronUp,
   ClipboardList,
+  PauseCircle,
+  UserCheck,
+  UserX,
   Copy,
   ExternalLink,
   Eye,
@@ -24,7 +27,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import Alert from "@/components/ui/Alert";
 import { Button, ButtonLink, IconButton } from "@/components/ui/Button";
-import { Avatar } from "@/components/ui/Card";
+import { Avatar, MetricCard } from "@/components/ui/Card";
+import { useApiResource } from "@/lib/useApiResource";
 import { DataTable, Pagination } from "@/components/ui/DataTable";
 import { Field, Input, Select } from "@/components/ui/Field";
 import { Dialog, Menu, MenuItem } from "@/components/ui/Overlay";
@@ -280,6 +284,14 @@ export default function EmployeesPage() {
   const selected = employees.find((employee) => employee.id === selectedId) ?? employees[0] ?? null;
   const activeFilterCount = [status, employmentType, department, location].filter((value) => value !== ALL).length;
 
+  // Status tiles (S015): counts straight from the scoped employee list endpoint.
+  const loadCounts = useCallback(async () => {
+    const count = (params: Record<string, string>) => employeesApi.listEmployees({ ...params, page_size: 1 }).then((page) => page.count);
+    const [total, active, suspended, inactive, terminated] = await Promise.all([count({}), count({ status: "ACTIVE" }), count({ status: "SUSPENDED" }), count({ status: "INACTIVE" }), count({ status: "TERMINATED" })]);
+    return { total, active, suspended, inactive: inactive + terminated };
+  }, []);
+  const { data: counts } = useApiResource(loadCounts);
+
   /** Wide screens preview the row beside the table; smaller screens open the record. */
   const openRow = (employee: Employee) => {
     if (window.matchMedia("(min-width: 1280px)").matches) setSelectedId(employee.id);
@@ -311,6 +323,13 @@ export default function EmployeesPage() {
           </>
         }
       />
+
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Employee status">
+        <MetricCard label="Total employees" value={counts ? counts.total.toLocaleString() : EM_DASH} icon={Users} accent="hr" loading={!counts} />
+        <MetricCard label="Active" value={counts ? counts.active.toLocaleString() : EM_DASH} description={counts?.total ? `${Math.round((counts.active / counts.total) * 1000) / 10}% of records` : undefined} icon={UserCheck} accent="accounting" loading={!counts} />
+        <MetricCard label="Suspended" value={counts ? counts.suspended.toLocaleString() : EM_DASH} icon={PauseCircle} accent="leave" loading={!counts} />
+        <MetricCard label="Inactive" value={counts ? counts.inactive.toLocaleString() : EM_DASH} description="Inactive or terminated" icon={UserX} accent="audit" loading={!counts} />
+      </section>
 
       <Dialog
         open={inviteOpen}

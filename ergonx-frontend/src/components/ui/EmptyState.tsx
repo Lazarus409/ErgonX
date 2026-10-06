@@ -5,13 +5,14 @@ import { Button } from "@/components/ui/Button";
 import { TechnicalDetails } from "@/components/ui/StateBanner";
 
 import { cx } from "@/lib/cx";
-import { moduleAccents, type ModuleAccent } from "@/lib/moduleTheme";
+import type { ModuleAccent } from "@/lib/moduleTheme";
 
 interface EmptyStateProps {
   title: string;
   description?: ReactNode;
   action?: ReactNode;
   icon?: LucideIcon;
+  /** Ignored since Phase 2: empty states use the neutral slate treatment. Kept so callers compile. */
   accent?: ModuleAccent;
   /** `compact` for use inside cards and tables. */
   size?: "default" | "compact";
@@ -20,17 +21,18 @@ interface EmptyStateProps {
   className?: string;
 }
 
-export default function EmptyState({ title, description, action, icon: Icon = Inbox, accent = "brand", size = "default", details, className }: EmptyStateProps) {
+export default function EmptyState({ title, description, action, icon: Icon = Inbox, size = "default", details, className }: EmptyStateProps) {
   const compact = size === "compact";
   return (
     <div className={cx("flex flex-col items-center justify-center text-center", compact ? "px-4 py-8" : "rounded-2xl border border-line bg-surface px-6 py-14", className)}>
       {/* Concept governed empty state: soft circular halo around the icon. */}
-      <span className={cx("relative inline-flex items-center justify-center rounded-full ring-8 ring-primary-soft/50", compact ? "h-14 w-14" : "h-20 w-20", moduleAccents[accent].tile)} aria-hidden="true">
-        <Icon className={compact ? "h-6 w-6" : "h-8 w-8"} />
+      {/* Stitch governed empty state: 48px slate circle, 24px slate icon. */}
+      <span className={cx("relative inline-flex items-center justify-center rounded-full bg-surface-muted text-ink-muted", compact ? "h-11 w-11" : "h-12 w-12")} aria-hidden="true">
+        <Icon className={compact ? "h-5 w-5" : "h-6 w-6"} />
       </span>
-      <h3 className={cx("font-bold text-ink-strong", compact ? "mt-4 text-[0.9375rem]" : "mt-5 text-card-title")}>{title}</h3>
-      {description && <p className="mt-1.5 max-w-md text-support text-ink-muted">{description}</p>}
-      {action && <div className="mt-5 flex flex-wrap justify-center gap-2">{action}</div>}
+      <h3 className={cx("text-[0.9375rem] font-semibold text-ink-strong", compact ? "mt-3" : "mt-4")}>{title}</h3>
+      {description && <p className="mt-1 max-w-md text-support text-ink-muted">{description}</p>}
+      {action && <div className="mt-4 flex flex-wrap justify-center gap-2">{action}</div>}
       {details && <TechnicalDetails>{details}</TechnicalDetails>}
     </div>
   );

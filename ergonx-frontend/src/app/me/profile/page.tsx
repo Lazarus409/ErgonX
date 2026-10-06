@@ -2,7 +2,8 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Image from "next/image";
-import { Save, UserRound } from "lucide-react";
+import { Briefcase, Save, UserRound } from "lucide-react";
+import { formatDate, humanizeEnum } from "@/lib/format";
 
 import Alert from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
@@ -107,6 +108,28 @@ export default function MyProfilePage() {
           <Button type="submit" loading={saving} loadingLabel="Saving…" leadingIcon={<Save className="h-4 w-4" />} disabled={!employee}>Save changes</Button>
         </div>
       </Card>
+
+      {employee && (
+        <Card title="Employment summary" description="Managed by HR. Ask HR to correct anything here." icon={Briefcase} accent="hr">
+          {employee.current_employment ? (
+            <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {([
+                ["Employee number", employee.employee_number],
+                ["Department / functional area", employee.current_employment.department],
+                ["Position", employee.current_employment.position],
+                ["Grade", employee.current_employment.grade],
+                ["Location", employee.current_employment.location],
+                ["Employment type", humanizeEnum(employee.current_employment.employment_type)],
+                ["Manager", employee.current_employment.manager],
+                ["In this role since", formatDate(employee.current_employment.start_date)],
+                ["Hire date", formatDate(employee.hire_date)],
+              ] as Array<[string, string | null | undefined]>).map(([label, value]) => (
+                <div key={label} className="rounded-lg bg-surface-muted/70 p-3"><dt className="text-caption text-ink-muted">{label}</dt><dd className="mt-0.5 text-sm font-semibold text-ink-strong">{value || "—"}</dd></div>
+              ))}
+            </dl>
+          ) : <p className="text-support text-ink-muted">No current employment is recorded for you yet.</p>}
+        </Card>
+      )}
     </div>
   );
 }

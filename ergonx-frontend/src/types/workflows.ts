@@ -1,12 +1,75 @@
+/** Business events the approval engine supports (bounded engine, Wave 2). */
+export type ApprovalTrigger = "LEAVE_REQUEST" | "ATTENDANCE_ADJUSTMENT" | "EXPENSE_CLAIM" | "JOB_REQUISITION" | "OFFER" | "BUDGET" | "VENDOR_BILL";
+
+export const APPROVAL_TRIGGER_LABELS: Record<ApprovalTrigger, string> = {
+  LEAVE_REQUEST: "Leave request",
+  ATTENDANCE_ADJUSTMENT: "Attendance adjustment",
+  EXPENSE_CLAIM: "Expense claim",
+  JOB_REQUISITION: "Job requisition",
+  OFFER: "Offer",
+  BUDGET: "Budget",
+  VENDOR_BILL: "Vendor bill",
+};
+
+/** Triggers whose module already routes its approvals through these definitions. */
+export const CONNECTED_TRIGGERS: ReadonlySet<ApprovalTrigger> = new Set(["LEAVE_REQUEST", "EXPENSE_CLAIM"]);
+
+export type ApproverType = "USER" | "ROLE" | "REQUESTER_DEPARTMENT_HEAD" | "REQUESTER_MANAGER";
+
+export const APPROVER_TYPE_LABELS: Record<ApproverType, string> = {
+  USER: "A named person",
+  ROLE: "Any member holding a role",
+  REQUESTER_DEPARTMENT_HEAD: "The requester's department head",
+  REQUESTER_MANAGER: "The requester's line manager",
+};
+
+export interface ApprovalWorkflowStep {
+  id: string;
+  order: number;
+  name: string;
+  approver_type: ApproverType;
+  approver_role: string | null;
+  approver_user: string | null;
+  due_after_hours: number | null;
+}
+
 export interface ApprovalWorkflow {
   id: string;
   code: string;
   name: string;
+  /** Null for legacy free-text definitions. */
+  trigger: ApprovalTrigger | null;
   workflow_type: string;
   entity_type: string;
+  department: string | null;
+  min_amount: string | null;
+  max_amount: string | null;
+  escalation_role: string | null;
   is_active: boolean;
+  steps: ApprovalWorkflowStep[];
   created_at: string;
   updated_at: string;
+}
+
+export interface ApprovalWorkflowPayload {
+  code: string;
+  name: string;
+  trigger: ApprovalTrigger;
+  department: string | null;
+  min_amount: string | null;
+  max_amount: string | null;
+  escalation_role: string | null;
+  is_active: boolean;
+}
+
+export interface ApprovalWorkflowStepPayload {
+  workflow: string;
+  order: number;
+  name: string;
+  approver_type: ApproverType;
+  approver_role: string | null;
+  approver_user: string | null;
+  due_after_hours: number | null;
 }
 
 export interface ApprovalRequest {

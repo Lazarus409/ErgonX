@@ -71,12 +71,12 @@ export function Field({ label, children, helper, error, required, optional, clas
 export type ControlSize = "sm" | "md" | "lg";
 
 const controlBase =
-  "w-full min-w-0 rounded-lg border border-line-strong bg-surface text-ink-strong shadow-elevation-1 transition-[border-color,box-shadow,background-color] duration-150 placeholder:text-ink-subtle hover:border-ink-subtle/70 focus:border-primary focus:outline-none focus:ring-[3px] focus:ring-primary/15 disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-ink-muted aria-[invalid=true]:border-danger aria-[invalid=true]:focus:ring-danger/15 read-only:bg-surface-muted";
+  "w-full min-w-0 rounded-lg border border-line-strong bg-surface text-ink-strong transition-[border-color,box-shadow,background-color] duration-150 placeholder:text-ink-subtle hover:border-ink-subtle/70 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/15 disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-ink-muted aria-[invalid=true]:border-danger aria-[invalid=true]:focus:ring-danger/15 read-only:bg-surface-muted";
 
 const controlSizes: Record<ControlSize, string> = {
   sm: "h-8 px-2.5 text-support",
-  md: "h-10 px-3 text-sm",
-  lg: "h-14 rounded-xl px-4 text-[0.9375rem]",
+  md: "h-9 px-3 text-sm",
+  lg: "h-12 px-4 text-[0.9375rem]",
 };
 
 export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "size"> {

@@ -2,7 +2,7 @@ import { apiAction, apiDownload, apiGet, apiGetList, apiPatch, apiPost, apiPostM
 import type { ListParams, PaginatedData } from "@/types/api";
 import type { BatchJob, BulkPreview, ReportRun, ReportRuns, SavedReport, BudgetDetail, BudgetOverview, BudgetPayload, BudgetRecord, ReconciliationAccount, ReconciliationDetail, ReconciliationSuggestion, InvoiceContext, InvoiceReminder, ReceivablesSummary, PayablesSummary, VendorBillContext, RecordAttachment, AccountActivity, JournalContext, Account, AccountingConfiguration, AccountingConfigurationPayload, AccountingPeriod, AccountingPresetApplicationResult, AccountingSetupChoices, BalanceSheet, BankAccount, BankStatementLine, Customer, Expense, GhanaComplianceReminder, IncomeStatement, Invoice, InvoiceLine, JournalEntry, PayComponentAccountMapping, PayComponentAccountMappingPayload, PayrollAccountMappingTemplate, Payment, Receipt, TaxCode, TaxComponent, TrialBalance, Vendor, VendorBill, VendorBillLine, WithholdingRule } from "@/types/accounting";
 
-export type AccountPayload = Pick<Account, "code" | "name" | "account_type" | "parent" | "normal_balance" | "is_postable" | "is_active">;
+export type AccountPayload = Pick<Account, "code" | "name" | "account_type" | "parent" | "normal_balance" | "is_postable" | "is_active"> & { system_mapping_code?: string | null };
 
 export function listAccounts(params?: ListParams & { account_type?: string; normal_balance?: string; parent?: string; is_postable?: boolean; is_active?: boolean }): Promise<PaginatedData<Account>> {
   return apiGetList<Account>("/accounts/", params);
@@ -65,7 +65,8 @@ export function listBankAccounts(params?: ListParams & { is_active?: boolean; cu
 export type BankAccountPayload = Pick<BankAccount, "name" | "bank_name" | "masked_account_number" | "currency" | "ledger_account" | "is_active">;
 export function createBankAccount(payload: BankAccountPayload): Promise<BankAccount> { return apiPost<BankAccount, BankAccountPayload>("/bank-accounts/", payload); }
 export function listExpenses(params?: ListParams & { status?: string; currency?: string; account?: string; expense_date?: string }): Promise<PaginatedData<Expense>> { return apiGetList<Expense>("/expenses/", params); }
-export type ExpensePayload = Pick<Expense, "expense_date" | "account" | "amount" | "currency" | "description" | "attachment">;
+/** A finance-entered (petty-cash) expense; currency defaults to the base currency. */
+export type ExpensePayload = Pick<Expense, "expense_date" | "account" | "amount" | "description"> & { currency?: string; attachment?: string | null };
 export function createExpense(payload: ExpensePayload): Promise<Expense> { return apiPost<Expense, ExpensePayload>("/expenses/", payload); }
 export function submitExpense(id: string): Promise<Expense> { return apiAction<Expense>(`/expenses/${id}/submit/`); }
 export function approveExpense(id: string): Promise<Expense> { return apiAction<Expense>(`/expenses/${id}/approve/`); }

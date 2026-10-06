@@ -4,39 +4,55 @@ import { AdaptiveLogo } from "@/components/brand/Logo";
 import { cx } from "@/lib/cx";
 
 /**
- * Public / authentication frame (concept: Login option 2, Get Started option 3).
+ * Public / authentication frame (Phase 2 Stitch S001/S002).
  *
- * A light canvas carries the brand's translucent X ribbons; the form sits
- * directly on it under the primary lockup. Passing `intro` switches to the
- * split layout: brand, heading and help on the left, the task in a white card
- * on the right.
+ * A soft aurora canvas. Without `intro` the task sits in a centred 440px card
+ * with the logo inside it (sign-in, password reset, invitations); `width="lg"`
+ * widens the card for longer forms. Passing `intro` switches to the split
+ * layout: brand, heading and help on the left, the task in a card on the right.
  */
 export default function AuthShell({ children, width = "md", intro }: { children: ReactNode; width?: "md" | "lg"; intro?: ReactNode }) {
   return (
     <main className="relative isolate min-h-screen overflow-hidden bg-auth-canvas">
-      <AuthBackdrop variant={intro ? "wide" : "right"} />
+      <AuthAurora />
       {intro ? (
-        <div className="mx-auto grid min-h-screen w-full max-w-[1320px] items-start gap-10 px-5 py-10 sm:px-8 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:gap-14 lg:px-12 xl:gap-20">
-          <div className="animate-slide-up lg:sticky lg:top-16 lg:self-start lg:pt-6">
-            <AdaptiveLogo height={56} priority />
+        <div className="mx-auto grid min-h-screen w-full max-w-[1280px] items-start gap-10 px-5 py-10 sm:px-8 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:items-center lg:gap-14 lg:px-12 xl:gap-16">
+          <div className="animate-slide-up lg:sticky lg:top-16 lg:self-start lg:pt-24">
+            <AdaptiveLogo height={44} priority />
             <div className="mt-8 lg:mt-10">{intro}</div>
           </div>
-          <div className="min-w-0 animate-slide-up rounded-3xl border border-line-soft bg-surface/95 p-5 shadow-[0_24px_60px_-28px_rgb(15_35_69/0.28)] backdrop-blur-sm sm:p-8 xl:p-10">
+          <div className={cx(authCard, "min-w-0 animate-slide-up p-6 sm:p-10")}>
             {children}
           </div>
         </div>
       ) : (
-        <div className="flex min-h-screen flex-col px-5 py-10 sm:px-10 lg:px-[7vw]">
-          <div className="flex flex-1 flex-col justify-center py-4">
-            <div className={cx("w-full animate-slide-up", width === "md" ? "max-w-[34rem]" : "max-w-2xl")}>
-              <AdaptiveLogo height={60} priority />
-              <div className={cx("mt-10 sm:mt-14", width === "lg" && "rounded-3xl border border-line-soft bg-surface/95 p-5 shadow-[0_24px_60px_-28px_rgb(15_35_69/0.28)] backdrop-blur-sm sm:p-8")}>{children}</div>
+        <div className="flex min-h-screen flex-col items-center px-4 py-8 sm:px-6">
+          <div className="flex w-full flex-1 items-center justify-center py-6">
+            <div className={cx(authCard, "w-full animate-slide-up p-8 sm:p-10", width === "md" ? "max-w-[440px]" : "max-w-2xl")}>
+              <AdaptiveLogo height={36} priority />
+              <div className="mt-8">{children}</div>
             </div>
           </div>
           <p className="text-caption text-ink-subtle">© {new Date().getFullYear()} ErgonX</p>
         </div>
       )}
     </main>
+  );
+}
+
+const authCard = "rounded-2xl border border-line-soft bg-surface/95 shadow-[0_20px_25px_-5px_rgb(15_23_42/0.08),0_8px_10px_-6px_rgb(15_23_42/0.04)] backdrop-blur-md";
+
+/** Stitch entry-screen aurora: two soft blue glows and a faint contour line. */
+export function AuthAurora() {
+  return (
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden dark:opacity-40">
+      <div className="absolute -right-[18%] -top-[25%] h-[85vh] w-[70vw] rounded-full bg-[radial-gradient(closest-side,rgb(96_165_250/0.55),rgb(56_189_248/0.25)_55%,transparent)] blur-2xl" />
+      <div className="absolute -bottom-[30%] -left-[15%] h-[70vh] w-[55vw] rounded-full bg-[radial-gradient(closest-side,rgb(147_197_253/0.35),transparent)] blur-2xl" />
+      <svg className="absolute right-[8%] top-0 h-full w-[45%] opacity-60" viewBox="0 0 600 1000" preserveAspectRatio="none" fill="none">
+        <path d="M120 -20 C 420 220 520 520 300 1020" stroke="rgb(96 165 250 / 0.45)" strokeWidth="1.5" strokeDasharray="6 8" />
+        <path d="M40 -20 C 300 260 380 560 160 1020" stroke="rgb(255 255 255 / 0.7)" strokeWidth="1" />
+      </svg>
+    </div>
   );
 }
 
@@ -102,10 +118,10 @@ export function AuthBackdrop({ variant = "right" }: { variant?: "right" | "wide"
 /** Form header used inside AuthShell. */
 export function AuthHeading({ eyebrow, title, description }: { eyebrow?: ReactNode; title: ReactNode; description?: ReactNode }) {
   return (
-    <div className="mb-8">
-      {eyebrow && <p className="mb-2 text-support font-semibold text-primary-ink">{eyebrow}</p>}
-      <h1 className="text-[2.125rem] font-bold leading-tight tracking-tight text-ink-strong sm:text-[2.625rem]">{title}</h1>
-      {description && <p className="mt-3 text-[1.0625rem] leading-7 text-ink-muted">{description}</p>}
+    <div className="mb-7">
+      {eyebrow && <p className="mb-2 text-caption font-semibold uppercase tracking-[0.08em] text-primary-ink">{eyebrow}</p>}
+      <h1 className="text-2xl font-bold leading-snug tracking-tight text-ink-strong sm:text-[1.75rem]">{title}</h1>
+      {description && <p className="mt-1.5 text-sm leading-relaxed text-ink-muted">{description}</p>}
     </div>
   );
 }

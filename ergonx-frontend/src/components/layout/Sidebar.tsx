@@ -77,7 +77,7 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
   // In the mobile drawer the sidebar is always rendered expanded.
   const renderPanel = (compact: boolean, mobile: boolean) => (
     <div className="flex h-full flex-col">
-      <div className={cx("flex h-[5.25rem] shrink-0 items-center justify-between gap-2 overflow-hidden", compact ? "justify-center px-0" : "pl-7 pr-3")}>
+      <div className={cx("flex h-20 shrink-0 items-center justify-between gap-2 overflow-hidden border-b border-white/[0.08]", compact ? "justify-center px-0" : "pl-6 pr-3")}>
         <Link
           href="/"
           onClick={(event) => {
@@ -111,6 +111,15 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
         ) : null}
       </div>
 
+      <div className={cx("shrink-0 border-b border-white/[0.08]", compact ? "p-3" : "p-3")}>
+        <InstitutionPanel
+          compact={compact}
+          name={institution?.name ?? "No active institution"}
+          code={institution?.code}
+          logoSrc={institution?.logoImageId ? imageContentUrl(institution.logoImageId) : null}
+        />
+      </div>
+
       <nav aria-label="Primary navigation" className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-3 [scrollbar-color:rgb(255_255_255/0.18)_transparent]">
         <ul className="space-y-1">
           {visibleNavigation.map((item) => {
@@ -119,7 +128,7 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
             const expanded = toggled[item.href] ?? groupActive;
             return (
               <li key={item.href}>
-                <NavRow item={item} active={isActive(item.href)} groupActive={groupActive} compact={compact} onNavigate={closeMobile}
+                <NavRow item={item} active={isActive(item.href)} groupActive={groupActive} compact={compact} section={childItems.length > 0} onNavigate={closeMobile}
                   expander={!compact && childItems.length > 0 ? (
                     <button
                       type="button"
@@ -135,7 +144,7 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
                 {!compact && childItems.length > 0 && (
                   <div className={cx("grid transition-[grid-template-rows] duration-200 ease-standard", expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
                     <ul className="overflow-hidden" aria-label={`${item.label} sections`}>
-                      <li className="relative ml-3 mt-1 space-y-0.5 pb-1">
+                      <li className="relative ml-3 mt-0.5 space-y-0.5 border-l border-white/10 pb-2 pl-2">
                         {childItems.map((child) => {
                           const active = childActive(item.href, child.href);
                           return (
@@ -147,10 +156,9 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
                               aria-current={active ? "page" : undefined}
                               className={cx(
                                 "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150",
-                                active ? "bg-primary/25 text-white" : "text-white/75 hover:bg-white/[0.05] hover:text-white",
+                                active ? "bg-primary text-white shadow-elevation-1" : "text-white/70 hover:bg-white/[0.06] hover:text-white",
                               )}
                             >
-                              <span aria-hidden="true" className={cx("h-1.5 w-1.5 shrink-0 rounded-full", active ? "bg-accent-sky" : "bg-white/70")} />
                               <span className="truncate">{child.label}</span>
                             </Link>
                           );
@@ -184,6 +192,7 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
                 <li>
                   <NavRow
                     item={{ ...(selfServiceHome ?? visibleSelfService[0]), label: "My workspace" }}
+                    section={selfServicePages.length > 0}
                     active={selfServiceHome ? isActive(selfServiceHome.href) : false}
                     groupActive={selfServiceActive}
                     compact={false}
@@ -203,7 +212,7 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
                   {selfServicePages.length > 0 && (
                     <div className={cx("grid transition-[grid-template-rows] duration-200 ease-standard", selfServiceExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]")}>
                       <ul className="overflow-hidden" aria-label="My workspace pages">
-                        <li className="relative ml-3 mt-1 space-y-0.5 pb-1">
+                        <li className="relative ml-3 mt-0.5 space-y-0.5 border-l border-white/10 pb-2 pl-2">
                           {selfServicePages.map((page) => {
                             const active = isActive(page.href);
                             return (
@@ -215,10 +224,9 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
                                 aria-current={active ? "page" : undefined}
                                 className={cx(
                                   "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150",
-                                  active ? "bg-primary/25 text-white" : "text-white/75 hover:bg-white/[0.05] hover:text-white",
+                                  active ? "bg-primary text-white shadow-elevation-1" : "text-white/70 hover:bg-white/[0.06] hover:text-white",
                                 )}
                               >
-                                <span aria-hidden="true" className={cx("h-1.5 w-1.5 shrink-0 rounded-full", active ? "bg-accent-sky" : "bg-white/70")} />
                                 <span className="truncate">{page.label}</span>
                               </Link>
                             );
@@ -233,15 +241,6 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
           </div>
         )}
       </nav>
-
-      <div className={cx("shrink-0 border-t border-white/[0.08]", compact ? "p-3" : "px-4 pt-3 pb-2")}>
-        <InstitutionPanel
-          compact={compact}
-          name={institution?.name ?? "No active institution"}
-          code={institution?.code}
-          logoSrc={institution?.logoImageId ? imageContentUrl(institution.logoImageId) : null}
-        />
-      </div>
 
     </div>
   );
@@ -278,20 +277,28 @@ export default function Sidebar({ collapsed, onCollapsedChange, mobileOpen = fal
   );
 }
 
-function NavRow({ item, active, groupActive, compact, onNavigate, expander }: { item: NavigationItem; active: boolean; groupActive: boolean; compact: boolean; onNavigate: () => void; expander?: React.ReactNode }) {
+function NavRow({ item, active, groupActive, compact, section = false, onNavigate, expander }: { item: NavigationItem; active: boolean; groupActive: boolean; compact: boolean; section?: boolean; onNavigate: () => void; expander?: React.ReactNode }) {
   const Icon = item.icon;
-  // Concept: plain white icons; the active area gets a lifted row and a bright blue edge.
+  // Phase 2 (Stitch): a group with sub-pages reads as an uppercase section
+  // label; the page you are on is a solid royal-blue row.
+  const sectionLabel = section && !compact;
+  const filled = active || (compact && groupActive);
   return (
-    <div className={cx("group/nav relative flex items-center rounded-lg transition-colors duration-150", groupActive ? "bg-white/[0.09]" : "hover:bg-white/[0.05]")}>
-      {groupActive && <span aria-hidden="true" className="absolute -left-3 top-1.5 bottom-1.5 w-1 rounded-r-full bg-accent-sky" />}
+    <div className={cx("group/nav relative flex items-center rounded-lg transition-colors duration-150", filled ? "bg-primary shadow-elevation-1" : !sectionLabel && "hover:bg-white/[0.06]", sectionLabel && "mt-3")}>
       <Link
         href={item.href}
         onClick={onNavigate}
         aria-current={active ? "page" : undefined}
         aria-label={compact ? item.label : undefined}
-        className={cx("flex min-w-0 flex-1 items-center rounded-lg text-[0.9375rem] font-medium", compact ? "h-11 justify-center" : "h-11 gap-3.5 px-3", groupActive ? "text-white" : "text-white/80 group-hover/nav:text-white")}
+        className={cx(
+          "flex min-w-0 flex-1 items-center rounded-lg",
+          compact ? "h-11 justify-center" : sectionLabel ? "h-8 px-3" : "h-10 gap-3 px-3",
+          sectionLabel
+            ? cx("text-[0.8125rem] font-bold uppercase tracking-[0.06em]", groupActive || active ? "text-white" : "text-white/80 group-hover/nav:text-white")
+            : cx("text-sm font-medium", filled ? "text-white" : "text-white/75 group-hover/nav:text-white"),
+        )}
       >
-        <Icon className={cx("h-5 w-5 shrink-0", groupActive ? "text-white" : "text-white/80 group-hover/nav:text-white")} aria-hidden="true" />
+        {!sectionLabel && <Icon className={cx("h-[1.125rem] w-[1.125rem] shrink-0", filled ? "text-white" : "text-white/65 group-hover/nav:text-white")} aria-hidden="true" />}
         {!compact && <span className="truncate">{item.label}</span>}
       </Link>
       {expander}
@@ -312,28 +319,28 @@ function NavRow({ item, active, groupActive, compact, onNavigate, expander }: { 
 function InstitutionPanel({ compact, name, code, logoSrc }: { compact: boolean; name: string; code?: string | null; logoSrc: string | null }) {
   const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "E";
   return (
-    <div className={cx("flex items-center border border-white/[0.12] bg-white/[0.04] shadow-[0_8px_24px_rgb(0_0_0/0.12)]", compact ? "justify-center rounded-xl p-2" : "gap-3.5 rounded-[22px] px-4 py-3.5")} title={compact ? name : undefined}>
+    <div className={cx("flex items-center border border-white/10 bg-white/[0.05]", compact ? "justify-center rounded-lg p-1.5" : "gap-3 rounded-lg px-3 py-2.5")} title={compact ? name : undefined}>
       {logoSrc ? (
-        <span className={cx("flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white p-0.5", compact ? "h-9 w-9" : "h-[52px] w-[52px]")} aria-hidden="true">
+        <span className={cx("flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white p-0.5", compact ? "h-9 w-9" : "h-10 w-10")} aria-hidden="true">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={logoSrc} alt="" className="h-full w-full object-contain" />
         </span>
       ) : (
-        <span className={cx("flex shrink-0 items-center justify-center rounded-xl bg-primary font-bold text-white", compact ? "h-9 w-9 text-caption" : "h-[52px] w-[52px] text-base")} aria-hidden="true">
+        <span className={cx("flex shrink-0 items-center justify-center rounded-lg bg-primary font-bold text-white", compact ? "h-9 w-9 text-caption" : "h-10 w-10 text-sm")} aria-hidden="true">
           {initials}
         </span>
       )}
       {!compact && (
         <div className="min-w-0 flex-1 leading-tight">
           <p className="hidden text-xs font-medium text-white/55">Active institution</p>
-          <p className="truncate text-[0.9375rem] font-semibold text-white">{name}</p>
+          <p className="truncate text-sm font-semibold text-white">{name}</p>
           {logoSrc ? (
             <p className="hidden items-center gap-1 text-caption text-white/50">
               {code && <span className="truncate">{code} ·</span>}
               <span className="inline-flex shrink-0 items-center gap-1">on <Logo variant="mono-white" height={9} alt="ErgonX" className="opacity-75" /></span>
             </p>
           ) : (
-            code && <p className="hidden truncate text-caption text-white/50">{code}</p>
+            code && <p className="truncate text-caption font-medium text-white/55">{code}</p>
           )}
         </div>
       )}

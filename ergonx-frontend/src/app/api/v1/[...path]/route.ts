@@ -64,6 +64,42 @@ function safeAuthPayload(payload: unknown): { body: unknown; access?: string; re
   return { body: { ...outer, data: safeData }, access, refresh };
 }
 
+/**
+ * The browser's IP as seen by the hosting proxy. Render appends the connecting
+ * address as the last X-Forwarded-For entry; earlier entries are client-supplied.
+ */
+function clientIp(request: NextRequest): string | null {
+  const forwarded = request.headers.get("x-forwarded-for");
+  const last = forwarded?.split(",").map((part) => part.trim()).filter(Boolean).pop();
+  return last || request.headers.get("x-real-ip");
+}
+
+/**
+ * Lets Django apply per-IP sign-in limits and record the real client address in
+ * the audit trail. Sent only with the shared BFF_PROXY_SECRET so a direct caller
+ * cannot choose its own IP.
+ */
+function setProxyIdentity(request: NextRequest, headers: Headers): void {
+  const secret = process.env.BFF_PROXY_SECRET;
+  const ip = clientIp(request);
+  if (!secret || !ip) return;
+  headers.set("x-ergonx-proxy-secret", secret);
+  headers.set("x-ergonx-client-ip", ip);
+}
+
+/** Server-side sign-out: blacklist the refresh token so it cannot mint new access tokens. */
+async function revokeRefreshToken(request: NextRequest): Promise<void> {
+  const refresh = request.cookies.get(REFRESH_COOKIE)?.value;
+  if (!refresh) return;
+  const headers = new Headers({ "content-type": "application/json", accept: "application/json" });
+  setProxyIdentity(request, headers);
+  try {
+    await fetch(`${backendOrigin()}${API_PREFIX}auth/logout/`, { method: "POST", headers, body: JSON.stringify({ refresh }), cache: "no-store" });
+  } catch {
+    // The cookies are cleared regardless; an unreachable API only leaves the token to expire.
+  }
+}
+
 export async function handler(request: NextRequest, context: RouteContext): Promise<NextResponse> {
   const { path } = await context.params;
   const route = path.join("/");
@@ -88,6 +124,7 @@ export async function handler(request: NextRequest, context: RouteContext): Prom
   }
 
   if (route === "auth/logout" && request.method === "POST") {
+    await revokeRefreshToken(request);
     return clearSession(request, jsonResponse({ success: true, data: { logged_out: true } }, 200));
   }
 
@@ -96,12 +133,14 @@ export async function handler(request: NextRequest, context: RouteContext): Prom
   const isInvitationAcceptance = request.method === "POST" && /^auth\/institution-admin-invitations\/[^/]+$/.test(route);
 
   const headers = new Headers();
-  const acceptedHeaders = ["accept", "content-type", "x-institution-id"];
+  // user-agent lets the API name each signed-in session ("Chrome on Windows").
+  const acceptedHeaders = ["accept", "content-type", "x-institution-id", "user-agent"];
   for (const name of acceptedHeaders) {
     const value = request.headers.get(name);
     if (value) headers.set(name, value);
   }
   headers.set("accept", headers.get("accept") || "application/json");
+  setProxyIdentity(request, headers);
 
   // The acceptance is anonymous; a stale or expired cookie from an earlier
   // session must not be sent, or JWT authentication rejects the request.
@@ -121,6 +160,19 @@ export async function handler(request: NextRequest, context: RouteContext): Prom
         body = JSON.stringify(credentials);
       } catch {
         remember = false;
+        body = raw;
+      }
+    } else if (route === "auth/profile/password") {
+      // A password change signs out every other session; naming this session's
+      // refresh token keeps the browser that made the change signed in.
+      const raw = await request.text();
+      const refresh = request.cookies.get(REFRESH_COOKIE)?.value;
+      try {
+        const payload = JSON.parse(raw) as Record<string, unknown>;
+        delete payload.current_refresh;
+        if (refresh) payload.current_refresh = refresh;
+        body = JSON.stringify(payload);
+      } catch {
         body = raw;
       }
     } else if (route === "auth/refresh") {

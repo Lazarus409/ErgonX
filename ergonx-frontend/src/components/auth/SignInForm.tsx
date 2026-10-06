@@ -14,18 +14,28 @@ import type { ReactNode } from "react";
 import { useAuth } from "@/components/guards/AuthProvider";
 import { getApiErrorMessage } from "@/lib/api";
 import type { SessionBootstrap } from "@/types/auth";
-import PasswordStrength from "@/components/ui/PasswordStrength";
 import AuthShell, { AuthHeading } from "@/components/brand/AuthShell";
 import Alert from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Checkbox, Field, Input } from "@/components/ui/Field";
 import { IDLE_MINUTES } from "@/components/guards/IdleSignOut";
 
+/** Landing chosen by the API from effective permissions (decision BQ-01). */
+const LANDING_ROUTES: Record<string, string> = {
+  PLATFORM: "/platform",
+  EXECUTIVE: "/dashboard",
+  INSIGHTS: "/insights",
+  ME: "/me",
+  HOME: "/",
+};
+
 function resolvePostLoginHref(bootstrap: SessionBootstrap): string {
-  if (bootstrap.defaultLanding === "PLATFORM") {
-    return "/platform";
-  }
-  return "/";
+  return LANDING_ROUTES[bootstrap.defaultLanding] ?? "/";
+}
+
+/** Only same-origin paths: "//host" and "/\host" would leave the site. */
+function safeNext(next: string | null): string | null {
+  return next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : null;
 }
 
 /**
@@ -80,8 +90,8 @@ export default function SignInForm({ variant = "workspace" }: { variant?: "works
         router.replace("/platform");
         return;
       }
-      const next = new URLSearchParams(window.location.search).get("next");
-      router.replace(next?.startsWith("/") ? next : resolvePostLoginHref(bootstrap));
+      const next = safeNext(new URLSearchParams(window.location.search).get("next"));
+      router.replace(next ?? resolvePostLoginHref(bootstrap));
     } catch (err: unknown) {
       const apiError = err as { code?: string };
       if (apiError.code === "mfa_required") { setMfaRequired(true); setEmailOtp(false); setError("Enter the six-digit code from your authenticator app."); }
@@ -104,7 +114,14 @@ export default function SignInForm({ variant = "workspace" }: { variant?: "works
       setLoading(true);
       await login(email, password, undefined, remember);
     } catch (err: unknown) {
-      if ((err as { code?: string }).code === "email_otp_required") setError("Enter the six-digit verification code sent to your email. A new code was sent; earlier codes no longer work.");
+      const apiError = err as { code?: string; fieldErrors?: Record<string, unknown> | null };
+      if (apiError.code === "email_otp_required") {
+        // The API keeps the open code for a minute after sending it instead of mailing another.
+        const wait = Number(apiError.fieldErrors?.resend_available_in ?? 0);
+        setError(wait > 0 && wait < 55
+          ? `Your last code is still valid. You can request a new one in ${wait} seconds.`
+          : "Enter the six-digit verification code sent to your email. A new code was sent; earlier codes no longer work.");
+      }
       else setError(getApiErrorMessage(err));
     } finally {
       setLoading(false);
@@ -143,7 +160,6 @@ export default function SignInForm({ variant = "workspace" }: { variant?: "works
               </button>
             }
           />
-          <PasswordStrength value={password} />
         </div>
         {mfaRequired && (
           <div>

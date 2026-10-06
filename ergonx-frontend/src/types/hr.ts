@@ -39,6 +39,17 @@ export type StaffCategory = "JUNIOR" | "SENIOR" | "OTHER";
 
 export type EmploymentStatus = "ACTIVE" | "ENDED" | "SUSPENDED";
 
+/** Read-only summary of the signed-in member's current employment (from /employees/me/). */
+export interface CurrentEmploymentSummary {
+  department: string | null;
+  position: string | null;
+  grade: string | null;
+  location: string | null;
+  employment_type: string;
+  start_date: string;
+  manager: string | null;
+}
+
 export interface Employee {
   id: string;
   user: string | null;
@@ -61,6 +72,8 @@ export interface Employee {
   status: EmployeeStatus | string;
   created_at: string;
   updated_at: string;
+  /** Present only on /employees/me/. */
+  current_employment?: CurrentEmploymentSummary | null;
 }
 
 export interface EmployeePayload {

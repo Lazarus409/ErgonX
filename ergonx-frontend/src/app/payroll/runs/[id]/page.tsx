@@ -209,6 +209,9 @@ export default function PayrollRunDetailPage() {
               {actionCopy[primary].label}
             </Button>
           )}
+          {primary === "approve" && user?.id === run.started_by && (
+            <p className="basis-full text-right text-caption text-ink-muted">You started this run. With separation of duties on (the default), another approver must approve it.</p>
+          )}
         </div>
       </header>
 

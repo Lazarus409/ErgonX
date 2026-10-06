@@ -28,7 +28,7 @@ import LoadingState from "@/components/ui/LoadingState";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { getApiErrorMessage, institutionsApi } from "@/lib/api";
 import { useApiResource } from "@/lib/useApiResource";
-import type { InstitutionOnboardingStep } from "@/types/institutions";
+import { MODULE_LABELS, type InstitutionOnboardingStep, type ModuleCode } from "@/types/institutions";
 import { cx } from "@/lib/cx";
 
 type StepAction = { href: string; label: string };
@@ -150,7 +150,7 @@ export default function OnboardingPage() {
         <Alert tone="warning" title="Attention needed before setup can be completed">
           <p>Resolve these server-identified requirements, then validate again.</p>
           <ul className="mt-3 space-y-1.5">
-            {blockers.map((blocker) => <li key={`${blocker.step}-${blocker.code}`} className="rounded-lg bg-surface/70 px-3 py-2"><span className="font-semibold text-ink-strong">{formatStep(blocker.step)}:</span> {blocker.message}</li>)}
+            {blockers.map((blocker) => <li key={`${blocker.step}-${blocker.code}`} className="rounded-lg bg-surface/70 px-3 py-2"><span className="font-semibold text-ink-strong">{stepPresentation[blocker.step]?.title ?? formatStep(blocker.step)}:</span> {blocker.message}</li>)}
           </ul>
         </Alert>
       )}
@@ -188,7 +188,7 @@ function SetupStepCard({ index, step, validating, canValidate, onValidate }: { i
       <h3 className="text-card-title font-bold text-ink-strong">{presentation.title}</h3>
       <p className="mt-1 text-support text-ink-muted">{presentation.description}</p>
       {step.blocker_message && <p className="mt-2 text-support font-medium text-danger-ink">{step.blocker_message}</p>}
-      {step.required_module && <p className="mt-2 text-caption text-ink-subtle">Required for {formatStep(step.required_module)}</p>}
+      {step.required_module && <p className="mt-2 text-caption text-ink-subtle">Required for {MODULE_LABELS[step.required_module as ModuleCode] ?? formatStep(step.required_module)}</p>}
       <div className="mt-auto pt-5">
         {step.code === "VALIDATION" && !complete && canValidate ? (
           <button type="button" disabled={validating} onClick={() => void onValidate()} className={cx(linkClass, "disabled:opacity-60")}>{validating ? "Validating…" : "Validate setup"} <ArrowRight className="h-4 w-4" aria-hidden="true" /></button>

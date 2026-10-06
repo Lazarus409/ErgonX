@@ -111,7 +111,8 @@ export default function RequisitionDetailPage() {
   const canUpdate = can("job_posting.update");
   const canApprove = can("job_posting.approve");
   const editable = canUpdate && ["DRAFT", "APPROVED", "OPEN"].includes(posting.status);
-  const publishable = canUpdate && (posting.status === "APPROVED" || (posting.status === "DRAFT" && canApprove));
+  // Only an approved requisition can be published; drafts go through approval first (BQ-06).
+  const publishable = canUpdate && posting.status === "APPROVED";
   const isSubmitter = Boolean(user?.id && posting.submitted_by === user.id);
   const salary = posting.salary_min || posting.salary_max
     ? `${formatAmount(posting.salary_min, posting.salary_currency)} – ${formatAmount(posting.salary_max, posting.salary_currency)}`
@@ -324,7 +325,7 @@ export default function RequisitionDetailPage() {
       <ConfirmDialog
         open={action !== null}
         title={action === "publish" ? "Publish requisition?" : action === "submit" ? "Submit for approval?" : action === "cancel" ? "Cancel requisition?" : "Close requisition?"}
-        description={action === "publish" ? (posting.status === "DRAFT" ? "Publishing a draft directly records you as its approver and opens it for applications." : "This opens the requisition for applications.") : action === "submit" ? "Approvers will be notified. You can't edit it while it's pending." : "No further applications will be accepted."}
+        description={action === "publish" ? "This opens the requisition for applications." : action === "submit" ? "Approvers will be notified. You can't edit it while it's pending." : "No further applications will be accepted."}
         confirmLabel={action === "publish" ? "Publish" : action === "submit" ? "Submit" : action === "cancel" ? "Cancel requisition" : "Close requisition"}
         destructive={action === "cancel"}
         loading={saving}

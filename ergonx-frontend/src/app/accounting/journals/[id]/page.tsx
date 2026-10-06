@@ -43,7 +43,7 @@ const AUDIT_LABELS: Record<string, string> = {
 /** Concept "Journal entry detail". */
 export default function JournalDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { can } = useAccess();
+  const { can, user } = useAccess();
   const load = useCallback(async () => {
     const [journal, context, periods] = await Promise.all([
       accountingApi.getJournalEntry(id),
@@ -69,6 +69,8 @@ export default function JournalDetailPage() {
   const candidates: Action[] = journal.status === "DRAFT" ? ["submit", "void"] : journal.status === "PENDING_APPROVAL" ? ["approve", "void"] : journal.status === "APPROVED" ? ["post", "void"] : journal.status === "POSTED" && !journal.reversal_of ? ["reverse"] : [];
   const actions = candidates.filter((action) => can(ACTION_COPY[action].permission));
   const primary = actions.find((action) => action !== "void" && action !== "reverse") ?? null;
+  // Separation of duties (BQ-04, default on): a journal's creator does not approve it; the API enforces this.
+  const ownJournalAwaitingApproval = journal.status === "PENDING_APPROVAL" && journal.source === "MANUAL" && user?.id === journal.created_by;
   const debit = Number(journal.total_debit ?? 0);
   const credit = Number(journal.total_credit ?? 0);
   const balanced = Math.abs(debit - credit) < 0.005 && debit > 0;
@@ -117,6 +119,7 @@ export default function JournalDetailPage() {
             )}
           </Menu>
           {primary && <Button size="lg" onClick={() => { setProblem(null); setPending(primary); }}>{ACTION_COPY[primary].label}</Button>}
+          {ownJournalAwaitingApproval && <p className="basis-full text-right text-caption text-ink-muted">You created this journal. With separation of duties on (the default), another approver must approve it.</p>}
         </div>
       </header>
 

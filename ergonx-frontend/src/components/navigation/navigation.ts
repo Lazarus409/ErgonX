@@ -9,6 +9,7 @@ import {
   House,
   LayoutDashboard,
   Network,
+  Receipt,
   Settings,
   ShieldCheck,
   Users,
@@ -104,7 +105,7 @@ export const navigation: NavigationItem[] = [
     ],
   },
   {
-    label: "HR",
+    label: "Human Resources",
     href: "/hr",
     icon: Users,
     // HR is the people workspace umbrella. Its own setup pages and each
@@ -118,6 +119,8 @@ export const navigation: NavigationItem[] = [
     ],
     scopes: INSTITUTION_WIDE,
     children: [
+      { label: "HR Dashboard", href: "/hr/dashboard", module: "HR", permission: "dashboard.hr.view" },
+      { label: "Employees", href: "/hr/employees", module: "HR", permission: "employee.view" },
       { label: "Recruitment", href: "/recruitment", module: "RECRUITMENT", anyPermissions: moduleWorkspacePermissions.RECRUITMENT },
       { label: "Leave", href: "/leave", module: "LEAVE", anyPermissions: moduleWorkspacePermissions.LEAVE },
       { label: "Attendance", href: "/attendance", module: "ATTENDANCE", anyPermissions: moduleWorkspacePermissions.ATTENDANCE },
@@ -207,6 +210,14 @@ export const selfServiceNavigation: NavigationItem[] = [
     icon: CircleDollarSign,
     module: "PAYROLL",
     permission: "payslip.view",
+    selfService: true,
+  },
+  {
+    label: "My Expenses",
+    href: "/me/expenses",
+    icon: Receipt,
+    module: "ACCOUNTING",
+    permission: "expense.claim_own",
     selfService: true,
   },
   {

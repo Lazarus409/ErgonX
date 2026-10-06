@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { Contact, Phone, Plus, Trash2 } from "lucide-react";
+import { Contact, Phone, Plus, Trash2, ShieldCheck } from "lucide-react";
 
 import Alert from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
@@ -64,6 +64,10 @@ export default function EmergencyContactsPage() {
         </div>
         <Button type="submit" className="mt-5" loading={saving} loadingLabel="Adding…" leadingIcon={<Plus className="h-4 w-4" />}>Add contact</Button>
       </Card>
+      <section className="flex gap-3 rounded-xl border border-line bg-surface p-5 shadow-elevation-1">
+        <ShieldCheck className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+        <div><h2 className="text-sm font-semibold text-ink-strong">Your information is confidential</h2><p className="mt-1 text-caption text-ink-muted">Only you and HR staff with access to your record can see these contacts. They are used only in an emergency.</p></div>
+      </section>
     </div>
   );
 }

@@ -1,3 +1,5 @@
+import { getDisplayPreferences, numberLocale } from "@/lib/displayPreferences";
+
 /**
  * Display formatting helpers.
  *
@@ -33,11 +35,15 @@ export function formatDate(value: string | null | undefined): string {
     return value;
   }
 
-  return parsed.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+  return datePart(parsed);
+}
+
+/** The member's date style (S050 personal preferences); default `12 Jan 2023`. */
+function datePart(parsed: Date): string {
+  const style = getDisplayPreferences().dateStyle;
+  if (style === "iso") return toISODate(parsed);
+  if (style === "numeric") return parsed.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
+  return parsed.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 export function formatDateTime(value: string | null | undefined): string {
@@ -51,13 +57,8 @@ export function formatDateTime(value: string | null | undefined): string {
     return value;
   }
 
-  return parsed.toLocaleString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const time = parsed.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: getDisplayPreferences().hour12 });
+  return `${datePart(parsed)}, ${time}`;
 }
 
 /**
@@ -79,7 +80,7 @@ export function formatAmount(
     return String(value);
   }
 
-  const formatted = Math.abs(numeric).toLocaleString("en-GB", {
+  const formatted = Math.abs(numeric).toLocaleString(numberLocale(), {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
@@ -114,7 +115,7 @@ export function formatNumber(
 
   const numeric = typeof value === "number" ? value : Number(value);
 
-  return Number.isNaN(numeric) ? String(value) : numeric.toLocaleString("en-GB");
+  return Number.isNaN(numeric) ? String(value) : numeric.toLocaleString(numberLocale());
 }
 
 /** Turns a backend enum such as `PART_PAID` into `Part Paid`. */

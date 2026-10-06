@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Plus_Jakarta_Sans } from "next/font/google";
+import { Hanken_Grotesk, Manrope } from "next/font/google";
 import "./globals.css";
 import AuthProvider from "@/components/guards/AuthProvider";
 import InstitutionProvider from "@/components/context/InstitutionContext";
@@ -7,9 +7,16 @@ import ServiceWorkerRegistration from "@/components/pwa/ServiceWorkerRegistratio
 import ThemeProvider, { THEME_INIT_SCRIPT } from "@/components/context/ThemeProvider";
 import ToastProvider from "@/components/ui/ToastProvider";
 
-const brandFont = Plus_Jakarta_Sans({
+// Phase 2 design system: Manrope for body and controls, Hanken Grotesk for headings.
+const brandFont = Manrope({
   subsets: ["latin"],
   variable: "--font-brand",
+  display: "swap",
+});
+
+const displayFont = Hanken_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-display-face",
   display: "swap",
 });
 
@@ -30,7 +37,7 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#0f2345" },
+    { media: "(prefers-color-scheme: light)", color: "#0b192c" },
     { media: "(prefers-color-scheme: dark)", color: "#07132a" },
   ],
 };
@@ -41,7 +48,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={brandFont.variable} suppressHydrationWarning>
+    <html lang="en" className={`${brandFont.variable} ${displayFont.variable}`} suppressHydrationWarning>
       <head>
         {/* Applies the saved theme before first paint to avoid a light flash. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />

@@ -7,11 +7,13 @@ import { Ban, BookOpen, Briefcase, Check, CheckCircle2, ChevronDown, ChevronRigh
 
 import ErrorState from "@/components/ui/ErrorState";
 import LoadingState from "@/components/ui/LoadingState";
+import LifecycleStepper from "@/components/ui/LifecycleStepper";
 import StatusBadge from "@/components/ui/StatusBadge";
 import Tabs from "@/components/ui/Tabs";
 import { apiGet } from "@/lib/api/client";
 import { cx } from "@/lib/cx";
 import { formatDate, formatDateTime } from "@/lib/format";
+import { lifecycles } from "@/lib/lifecycles";
 import { useApiResource } from "@/lib/useApiResource";
 
 type LinkRow = { reference: string; label: string; date: string | null; href: string | null };
@@ -71,6 +73,8 @@ export default function RecordHistoryPage() {
           <Link href={data.record.href} className="inline-flex h-11 items-center rounded-lg border border-line-strong px-4 text-sm font-semibold text-ink-strong hover:bg-surface-hover">{data.record.href_label}</Link>
         </div>
       </section>
+
+      {lifecycles[data.record.type] && <LifecycleStepper lifecycle={lifecycles[data.record.type]} status={data.record.status} />}
 
       <Tabs label="Record sections" value={tab} onChange={(value) => setTab(value as typeof tab)} items={[{ value: "history", label: "History & Lineage" }, { value: "details", label: "Record Details" }, { value: "related", label: "Related Records", count: related.length }]} />
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback } from "react";
+import { useCallback, type ReactNode } from "react";
 import {
   ArrowRight,
   Bell,
@@ -20,18 +20,17 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import HomeHero, { HeroStat } from "@/components/home/HomeHero";
 import ChartCard from "@/components/charts/ChartCard";
 import { BarsChart, DonutChart, TrendChart, donutLegend } from "@/components/charts/Charts";
 import { Timeline } from "@/components/charts/Visuals";
 import { ButtonLink } from "@/components/ui/Button";
-import { AttentionItem, Card, IconTile, SectionHeading, SummaryList } from "@/components/ui/Card";
+import { AttentionItem, Card, SummaryList } from "@/components/ui/Card";
 import ErrorState from "@/components/ui/ErrorState";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { attendanceApi, employeesApi, homeApi, leaveApi, notificationsApi, payrollApi } from "@/lib/api";
 import { useAccess } from "@/lib/access";
 import { useApiResource } from "@/lib/useApiResource";
-import { EM_DASH, formatAmount, formatDate, formatDateTime, formatNumber, toISODate } from "@/lib/format";
+import { EM_DASH, formatAmount, formatDate, formatNumber, toISODate } from "@/lib/format";
 import { cx } from "@/lib/cx";
 import type { ModuleAccent } from "@/lib/moduleTheme";
 import { MAX_PAGE_SIZE } from "@/types/api";
@@ -134,55 +133,134 @@ export default function SelfServiceHome() {
     { href: "/me/documents", label: "My documents", description: "Your shared documents", icon: FileText, accent: "settings", show: true },
   ];
 
+  const visibleActions = quickActions.filter((action) => action.show).slice(0, 4);
+  const anniversary = workAnniversary(employee?.hire_date);
+  const dateChip = new Date().toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+
   return (
-    <div className="mx-auto max-w-7xl space-y-8">
-      <HomeHero
-        eyebrow="Employee Home"
-        title={<>{greeting} <span aria-hidden="true">👋</span></>}
-        subtitle="Here's your workday at a glance."
-        aside={
-          showAttendance ? (
-            <div className="rounded-2xl border border-primary/15 bg-primary-soft/70 p-5">
-              <p className="flex items-center gap-1.5 text-caption font-semibold text-primary-ink"><Clock3 className="h-3.5 w-3.5" aria-hidden="true" />Today</p>
-              <p className="mt-2 text-heading font-semibold text-ink-strong first-letter:uppercase">{loading && !data ? "Loading…" : todayStatus}</p>
-              <dl className="mt-3 grid grid-cols-2 gap-3 text-support">
-                <div><dt className="text-ink-muted">Check-in</dt><dd className="font-semibold text-ink-strong tabular-nums">{clockTime(today?.check_in)}</dd></div>
-                <div><dt className="text-ink-muted">Check-out</dt><dd className="font-semibold text-ink-strong tabular-nums">{clockTime(today?.check_out)}</dd></div>
-              </dl>
-              <Link href="/me/attendance" className="mt-4 inline-flex items-center gap-1.5 text-support font-semibold text-ink-strong hover:underline">Open attendance<ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
-            </div>
-          ) : undefined
-        }
-      >
-        <div className="grid max-w-xl grid-cols-3 gap-3">
-          {showLeave && <HeroStat label="Leave days available" value={data ? formatNumber(leaveAvailable) : "–"} />}
-          {showSchedule && <HeroStat label="Next shift" value={data ? shiftLabel(nextShift) : "–"} />}
-          {showPayroll && <HeroStat label="Latest net pay" value={latestPayslip ? formatAmount(latestPayslip.payload.net_pay, latestPayslip.payload.currency) : data ? EM_DASH : "–"} />}
-          {!showAttendance && !showLeave && !showPayroll && <HeroStat label="Employee number" value={employee?.employee_number ?? "–"} />}
+    <div className="mx-auto max-w-7xl space-y-6">
+      {/* Employee Home (Stitch S047): greeting, status tiles, quick actions, schedule, activity, attention, milestones. */}
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-caption font-semibold uppercase tracking-[0.08em] text-ink-muted">Self service · Employee Home</p>
+          <h1 className="mt-1 text-page-title font-bold text-ink-strong">{greeting}</h1>
+          <p className="mt-1 text-support text-ink-muted">Your key information at a glance.</p>
         </div>
-      </HomeHero>
+        <span className="inline-flex items-center gap-2 rounded-full bg-primary-soft px-3 py-1.5 text-caption font-semibold text-primary-ink"><CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />{dateChip}</span>
+      </header>
 
       {error && <ErrorState variant="inline" title="Unable to load your workspace" message={error} onRetry={reload} />}
       {!loading && data && !employee && (
         <ErrorState variant="inline" title="No employee record is linked to your account" message="Ask your HR administrator to link your user account to your employee record to see attendance, leave and pay." />
       )}
 
-      {/* Personal quick actions */}
-      <section aria-labelledby="my-actions" className="space-y-4">
-        <SectionHeading title={<span id="my-actions">What would you like to do?</span>} />
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {quickActions.filter((action) => action.show).map((action) => (
-            <Link key={action.href + action.label} href={action.href} className="group flex items-center gap-4 rounded-2xl border border-line bg-surface p-4 shadow-elevation-1 transition-[box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-elevation-2">
-              <IconTile icon={action.icon} accent={action.accent} />
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold text-ink-strong">{action.label}</span>
-                <span className="block truncate text-caption text-ink-muted">{action.description}</span>
-              </span>
-              <ArrowRight className="h-4 w-4 text-ink-subtle transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+      <section aria-label="Today at a glance" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {showAttendance && (
+          <StatusTile label="Today's attendance" icon={Clock3} value={loading && !data ? "…" : todayStatus} footer={today?.check_in ? <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-primary" aria-hidden="true" />In {clockTime(today.check_in)}{today.check_out ? ` · out ${clockTime(today.check_out)}` : ""}</span> : <Link href="/me/attendance" className="font-semibold text-primary-ink hover:underline">Open attendance</Link>} />
+        )}
+        {showSchedule && (
+          <StatusTile label="Next shift" icon={CalendarClock} value={data ? (nextShift ? dayLabel(nextShift.date) : "None scheduled") : "…"} footer={nextShift ? (nextShift.flexible ? `Flexible · ${hours(nextShift.required_minutes)}h` : `${clockTime(nextShift.start)} – ${clockTime(nextShift.end)}`) : "Schedules are assigned by your manager or HR."} />
+        )}
+        {showLeave && (
+          <StatusTile label="Leave balance" icon={CalendarDays} value={data ? <>{formatNumber(leaveAvailable)} <span className="text-support font-medium text-ink-muted">days</span></> : "…"} footer={`Available in ${new Date().getFullYear()}`} />
+        )}
+        {showPayroll && (
+          <StatusTile label="Latest payslip" icon={FileText} value={latestPayslip ? latestPayslip.payroll_period.name : data ? "None yet" : "…"} footer={latestPayslip ? <span className="flex items-center justify-between gap-2">Paid {formatDate(latestPayslip.payroll_period.pay_date)}<Link href={`/payroll/payslips/${latestPayslip.id}`} className="inline-flex items-center gap-1 font-semibold text-primary-ink hover:underline">View payslip<ArrowRight className="h-3.5 w-3.5" aria-hidden="true" /></Link></span> : "Appears after your first finalized payroll."} />
+        )}
+        {!showAttendance && !showLeave && !showPayroll && <StatusTile label="Employee number" icon={UserRound} value={employee?.employee_number ?? "–"} footer={employee?.work_email ?? ""} />}
+      </section>
+
+      <section aria-labelledby="my-actions" className="rounded-xl border border-line bg-surface p-5 shadow-elevation-1">
+        <div className="flex items-center justify-between gap-3"><h2 id="my-actions" className="text-card-title font-semibold text-ink-strong">Quick actions</h2><span className="text-caption font-semibold uppercase tracking-[0.08em] text-ink-muted">Frequently used</span></div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {visibleActions.map((action, index) => (
+            <Link key={action.href + action.label} href={action.href} className={cx("group flex items-center gap-3 rounded-lg px-4 py-3 transition-colors", index === 0 ? "bg-ink-strong text-surface hover:bg-ink" : "bg-surface-muted text-ink-strong hover:bg-surface-hover")}>
+              <span className={cx("flex h-9 w-9 shrink-0 items-center justify-center rounded-md", index === 0 ? "bg-surface/15" : "bg-surface")} aria-hidden="true"><action.icon className="h-4 w-4" /></span>
+              <span className="min-w-0"><span className="block text-sm font-semibold">{action.label}</span><span className={cx("block truncate text-caption", index === 0 ? "text-surface/75" : "text-ink-muted")}>{action.description}</span></span>
             </Link>
           ))}
         </div>
       </section>
+
+      {employee && (
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+          {showSchedule ? (
+            <Card title="Upcoming schedule" description={upcomingShifts[0] ? `Your next seven days on ${upcomingShifts[0].schedule}.` : "Your shifts for the next seven days."} icon={CalendarClock} accent="attendance" actions={<Link href="/me/attendance" className="text-support font-semibold text-primary-ink hover:underline">View full schedule</Link>}>
+              {upcomingShifts.length ? (
+                <ul className="divide-y divide-line-soft">
+                  {upcomingShifts.slice(0, 5).map((shift) => {
+                    const date = new Date(`${shift.date}T00:00:00`);
+                    const near = dayLabel(shift.date);
+                    return (
+                      <li key={shift.date} className="flex items-center gap-4 py-3 first:pt-0 last:pb-0">
+                        <span className="flex w-11 shrink-0 flex-col items-center rounded-lg bg-surface-muted py-1"><span className="text-[0.625rem] font-bold uppercase text-primary-ink">{date.toLocaleDateString("en-GB", { month: "short" })}</span><span className="text-heading font-bold leading-none text-ink-strong">{date.getDate()}</span></span>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center gap-2 text-sm font-semibold text-ink-strong">{shift.off_day ? "Day off" : "Work shift"}{(near === "Today" || near === "Tomorrow") && <span className="rounded bg-primary-soft px-1.5 py-0.5 text-[0.625rem] font-bold text-primary-ink">{near}</span>}</span>
+                          <span className="block text-caption text-ink-muted">{shift.off_day ? shift.schedule : shift.flexible ? `Flexible · ${hours(shift.required_minutes)}h between ${clockTime(shift.start)} and ${clockTime(shift.end)}` : `${clockTime(shift.start)} – ${clockTime(shift.end)}`}</span>
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <p className="text-support text-ink-muted">{loading && !data ? "Loading…" : "No schedule is assigned to you for the coming week. Your manager or HR assigns schedules."}</p>
+              )}
+            </Card>
+          ) : <span className="hidden lg:block" />}
+          <Card title="Recent activity" description="Your latest notifications." icon={Bell} accent="brand" actions={<Link href="/notifications" className="text-support font-semibold text-primary-ink hover:underline">View all activity</Link>}>
+            {data?.updates?.length ? (
+              <ul className="divide-y divide-line-soft">
+                {data.updates.map((item) => (
+                  <li key={item.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+                    <span className={cx("mt-1.5 h-2 w-2 shrink-0 rounded-full", item.is_read ? "bg-line-strong" : "bg-primary")} aria-hidden="true" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-ink-strong">{item.title}<span className="sr-only">{item.is_read ? "" : " (unread)"}</span></p>
+                      <p className="line-clamp-1 text-support text-ink-muted">{item.message}</p>
+                    </div>
+                    <time className="shrink-0 text-caption text-ink-subtle" dateTime={item.created_at}>{formatDate(item.created_at)}</time>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-support text-ink-muted">{loading && !data ? "Loading…" : "You're all caught up."}</p>
+            )}
+          </Card>
+        </div>
+      )}
+
+      {employee && (
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+          <Card title="Requiring your attention" description="Things waiting on you or about you." icon={CheckCircle2} accent="brand" actions={snapshot?.attention.length ? <span className="rounded-full bg-danger-soft px-2 py-0.5 text-caption font-semibold text-danger-ink">{snapshot.attention.length} pending</span> : undefined}>
+            {snapshot?.attention.length ? (
+              <div className="-mx-3 space-y-1">
+                {snapshot.attention.map((item) => (
+                  <AttentionItem key={item.code} title={item.title} description={item.description} severity={item.severity === "HIGH" ? "high" : "info"} href={item.route} />
+                ))}
+              </div>
+            ) : (
+              <p className="text-support text-ink-muted">{loading && !data ? "Loading…" : "Nothing needs your attention right now."}</p>
+            )}
+          </Card>
+          <Card title="Your milestones" description="From your employment record." icon={CalendarPlus} accent="hr">
+            {anniversary ? (
+              <div className="flex items-center justify-between gap-3 rounded-lg bg-surface-muted/70 p-4">
+                <div><p className="text-sm font-semibold text-ink-strong">Work anniversary</p><p className="text-caption text-ink-muted">{anniversary.years ? `${anniversary.years} year${anniversary.years === 1 ? "" : "s"} of service completed` : "Your first year of service is under way"}</p></div>
+                <span className="shrink-0 rounded-full bg-primary-soft px-2.5 py-1 text-caption font-semibold text-primary-ink">{anniversary.next}</span>
+              </div>
+            ) : <p className="text-support text-ink-muted">Your hire date is not recorded yet.</p>}
+            {snapshot && (
+              <SummaryList
+                className="mt-4"
+                items={[
+                  ...(snapshot.activity.leave_requests_this_year !== undefined ? [{ label: "Leave requests this year", value: formatNumber(snapshot.activity.leave_requests_this_year) }] : []),
+                  ...(snapshot.activity.attendance_corrections_pending !== undefined ? [{ label: "Attendance corrections pending", value: formatNumber(snapshot.activity.attendance_corrections_pending) }] : []),
+                  { label: "Documents on file", value: formatNumber(snapshot.activity.documents_on_file) },
+                ]}
+              />
+            )}
+          </Card>
+        </div>
+      )}
 
       {/* Attendance */}
       {showAttendance && employee && (
@@ -294,86 +372,22 @@ export default function SelfServiceHome() {
         </div>
       )}
 
-      {/* Schedule + overtime */}
-      {employee && (showSchedule || showAttendance) && (
-        <div className={cx("grid gap-5", showSchedule && showAttendance && "lg:grid-cols-2")}>
-          {showSchedule && (
-            <Card title="Upcoming schedule" description={upcomingShifts[0] ? `Your next seven days on ${upcomingShifts[0].schedule}.` : "Your shifts for the next seven days."} icon={CalendarClock} accent="attendance">
-              {upcomingShifts.length ? (
-                <Timeline items={upcomingShifts.map((shift) => ({ id: shift.date, title: dayLabel(shift.date), time: shift.off_day ? "Day off" : shift.flexible ? `Flexible · ${hours(shift.required_minutes)}h` : `${clockTime(shift.start)} – ${clockTime(shift.end)}`, description: shift.off_day ? undefined : shift.flexible ? `Between ${clockTime(shift.start)} and ${clockTime(shift.end)}` : undefined, tone: shift.off_day ? ("neutral" as const) : ("brand" as const) }))} />
-              ) : (
-                <p className="text-support text-ink-muted">{loading && !data ? "Loading…" : "No schedule is assigned to you for the coming week. Your manager or HR assigns schedules."}</p>
-              )}
-            </Card>
-          )}
-          {showAttendance && (
-            <ChartCard
-              title="Overtime by week"
-              description="Recorded overtime hours in each of your recent weeks."
-              accent="attendance"
-              icon={Timer}
-              loading={loading && !data}
-              error={!data && error ? "This data is unavailable right now." : null}
-              empty={!overtimeWeeks.some((week) => week.overtime > 0)}
-              emptyTitle="No overtime recorded"
-              emptyDescription="Overtime you work will appear here."
-              data={{ columns: ["Week of", "Overtime (h)"], rows: overtimeWeeks.map((week) => [week.label, week.overtime]) }}
-            >
-              <BarsChart data={overtimeWeeks} xKey="label" height={220} series={[{ key: "overtime", label: "Overtime (h)", color: "var(--chart-3)" }]} />
-            </ChartCard>
-          )}
-        </div>
-      )}
-
-      {/* Attention + updates */}
-      {employee && (
-        <div className="grid gap-5 lg:grid-cols-2">
-          <Card title="Needs your attention" description="Things waiting on you or about you." icon={CheckCircle2} accent="brand">
-            {snapshot?.attention.length ? (
-              <div className="-mx-3 space-y-1">
-                {snapshot.attention.map((item) => (
-                  <AttentionItem key={item.code} title={item.title} description={item.description} severity={item.severity === "HIGH" ? "high" : "info"} href={item.route} />
-                ))}
-              </div>
-            ) : (
-              <p className="text-support text-ink-muted">{loading && !data ? "Loading…" : "Nothing needs your attention right now."}</p>
-            )}
-            {snapshot && (
-              <SummaryList
-                className="mt-4 border-t border-line-soft pt-4"
-                items={[
-                  ...(snapshot.activity.leave_requests_this_year !== undefined ? [{ label: "Leave requests this year", value: formatNumber(snapshot.activity.leave_requests_this_year) }] : []),
-                  ...(snapshot.activity.attendance_corrections_pending !== undefined ? [{ label: "Attendance corrections pending", value: formatNumber(snapshot.activity.attendance_corrections_pending) }] : []),
-                  { label: "Documents on file", value: formatNumber(snapshot.activity.documents_on_file) },
-                ]}
-              />
-            )}
-          </Card>
-          <Card
-            title="Recent updates"
-            description="Your latest notifications."
-            icon={Bell}
-            accent="brand"
-            actions={<Link href="/notifications" className="text-support font-semibold text-primary-ink hover:underline">View all</Link>}
-          >
-            {data?.updates?.length ? (
-              <ul className="divide-y divide-line-soft">
-                {data.updates.map((item) => (
-                  <li key={item.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
-                    <span className={cx("mt-1.5 h-2 w-2 shrink-0 rounded-full", item.is_read ? "bg-line-strong" : "bg-primary")} aria-hidden="true" />
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-ink-strong">{item.title}<span className="sr-only">{item.is_read ? "" : " (unread)"}</span></p>
-                      <p className="line-clamp-2 text-support text-ink-muted">{item.message}</p>
-                      <p className="mt-0.5 text-caption text-ink-subtle">{formatDateTime(item.created_at)}</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-support text-ink-muted">{loading && !data ? "Loading…" : "You're all caught up."}</p>
-            )}
-          </Card>
-        </div>
+      {/* Overtime trend */}
+      {employee && showAttendance && (
+        <ChartCard
+          title="Overtime by week"
+          description="Recorded overtime hours in each of your recent weeks."
+          accent="attendance"
+          icon={Timer}
+          loading={loading && !data}
+          error={!data && error ? "This data is unavailable right now." : null}
+          empty={!overtimeWeeks.some((week) => week.overtime > 0)}
+          emptyTitle="No overtime recorded"
+          emptyDescription="Overtime you work will appear here."
+          data={{ columns: ["Week of", "Overtime (h)"], rows: overtimeWeeks.map((week) => [week.label, week.overtime]) }}
+        >
+          <BarsChart data={overtimeWeeks} xKey="label" height={220} series={[{ key: "overtime", label: "Overtime (h)", color: "var(--chart-3)" }]} />
+        </ChartCard>
       )}
 
       {/* Profile summary */}
@@ -393,6 +407,30 @@ export default function SelfServiceHome() {
       </Card>
     </div>
   );
+}
+
+function StatusTile({ label, icon: Icon, value, footer }: { label: string; icon: LucideIcon; value: ReactNode; footer?: ReactNode }) {
+  return (
+    <div className="flex min-h-36 flex-col rounded-xl border border-line bg-surface p-5 shadow-elevation-1">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0"><p className="text-caption font-semibold uppercase tracking-[0.08em] text-ink-muted">{label}</p><p className="mt-2 truncate text-heading font-bold text-ink-strong first-letter:uppercase">{value}</p></div>
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-ink" aria-hidden="true"><Icon className="h-5 w-5" /></span>
+      </div>
+      {footer && <div className="mt-auto pt-4 text-caption text-ink-muted">{footer}</div>}
+    </div>
+  );
+}
+
+/** Completed years of service and the next anniversary date, from the hire date. */
+function workAnniversary(hireDate: string | null | undefined): { years: number; next: string } | null {
+  if (!hireDate) return null;
+  const hired = new Date(`${hireDate}T00:00:00`);
+  if (Number.isNaN(hired.getTime())) return null;
+  const today = new Date();
+  let years = today.getFullYear() - hired.getFullYear();
+  if (new Date(today.getFullYear(), hired.getMonth(), hired.getDate()) > today) years -= 1;
+  const next = new Date(hired.getFullYear() + Math.max(years, 0) + 1, hired.getMonth(), hired.getDate());
+  return { years: Math.max(years, 0), next: next.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) };
 }
 
 function Detail({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
@@ -462,13 +500,6 @@ function AttendanceCalendar({ records, todayIso }: { records: AttendanceRecord[]
       </ul>
     </div>
   );
-}
-
-/** "Today 08:00", "Tomorrow 08:00", "Tue 08:00", or a flexible window. */
-function shiftLabel(shift: { date: string; start: string | null; flexible: boolean } | undefined): string {
-  if (!shift) return "None scheduled";
-  const day = dayLabel(shift.date, true);
-  return shift.flexible ? `${day}, flexible` : `${day} ${clockTime(shift.start)}`;
 }
 
 function dayLabel(iso: string, short = false): string {

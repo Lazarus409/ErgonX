@@ -91,7 +91,8 @@ export async function getCurrentUser(): Promise<AuthUser> {
 export function getMFAStatus(): Promise<MFAStatus> { return apiGet<MFAStatus>("/auth/security/mfa/"); }
 export function beginMFASetup(): Promise<MFAStatus> { return apiPost<MFAStatus, Record<string, never>>("/auth/security/mfa/", {}); }
 export function confirmMFASetup(code: string): Promise<MFAStatus> { return apiPut<MFAStatus, { code: string }>("/auth/security/mfa/", { code }); }
-export async function disableMFA(): Promise<MFAStatus> { await apiDelete("/auth/security/mfa/"); return { enabled: false, pending: false }; }
+/** Turning MFA off needs the current password (step-up), not just a session. */
+export async function disableMFA(currentPassword: string): Promise<MFAStatus> { await apiDelete("/auth/security/mfa/", { data: { current_password: currentPassword } }); return { enabled: false, pending: false }; }
 /** Without `code`, emails a verification code; with `code`, confirms it and switches to email OTP. */
 export function setMFAMethod(method: MFAMethod, code?: string): Promise<MFAStatus> { return apiPatch<MFAStatus, { method: MFAMethod; code?: string }>("/auth/security/mfa/", code ? { method, code } : { method }); }
 
@@ -143,13 +144,25 @@ export interface InvitationDetails {
 export function getInvitation(token: string): Promise<InvitationDetails> { return apiGet<InvitationDetails>(`/auth/invitations/${token}/`); }
 export function acceptInvitation(token: string, payload: { password: string; first_name?: string; last_name?: string }): Promise<{ accepted: boolean; existing_account: boolean; access_preview: InvitationAccessPreview }> { return apiPost<{ accepted: boolean; existing_account: boolean; access_preview: InvitationAccessPreview }, typeof payload>(`/auth/invitations/${token}/`, payload); }
 
-export interface InstitutionAdminInvitationDetails { email: string; expires_at: string; }
+export interface InstitutionAdminInvitationDetails {
+  email: string;
+  expires_at: string;
+  /** Values from the access request this invitation came from, when there is one. */
+  prefill?: Partial<Record<"institution_name" | "first_name" | "last_name" | "phone" | "country_code" | "employee_size" | "institution_type" | "website", string>>;
+  institution_types?: Array<{ value: string; label: string }>;
+}
 export interface InstitutionAdminInvitationPayload {
   first_name: string;
   last_name: string;
   password: string;
   institution_name: string;
-  country_code?: string;
+  institution_type: string;
+  country_code: string;
+  employee_size?: string;
+  website?: string;
+  phone?: string;
+  /** Must be true: the Terms of Service and Privacy Policy are accepted. */
+  accepted_terms: boolean;
   default_currency?: string;
   timezone?: string;
 }
@@ -223,6 +236,11 @@ export interface InstitutionAccessRequestPayload {
   phone?: string;
   country_code: string;
   organization_size?: OrganizationSize | "";
+  institution_type?: string;
+  /** The organization's real website (``website`` below is the bot honeypot). */
+  website_url?: string;
+  /** Required by the Get Started form; the API records when it was accepted. */
+  accepted_terms?: boolean;
   message?: string;
   /** Honeypot: must stay empty. */
   website?: string;
@@ -280,3 +298,13 @@ export function displayName(user: AuthUser | null | undefined): string {
 
   return name || user.email;
 }
+
+/** A signed-in browser or device (Security Center). */
+export interface UserSessionRow { id: string; ip_address: string | null; user_agent: string; created_at: string; last_seen_at: string; current: boolean; }
+export function listSessions(): Promise<{ sessions: UserSessionRow[] }> { return apiGet<{ sessions: UserSessionRow[] }>("/auth/sessions/"); }
+export function revokeSession(id: string): Promise<{ revoked: number; current: boolean }> { return apiPost<{ revoked: number; current: boolean }, Record<string, never>>(`/auth/sessions/${id}/revoke/`, {}); }
+export function revokeOtherSessions(): Promise<{ revoked: number }> { return apiPost<{ revoked: number }, Record<string, never>>("/auth/sessions/revoke-others/", {}); }
+
+/** One of the signed-in user's own sign-ins or security changes. */
+export interface SignInActivityEvent { id: string; action: string; created_at: string; ip_address: string | null; user_agent: string; detail: string; }
+export function listSignInActivity(): Promise<{ events: SignInActivityEvent[] }> { return apiGet<{ events: SignInActivityEvent[] }>("/auth/security/activity/"); }

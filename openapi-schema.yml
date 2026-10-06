@@ -57615,6 +57615,18 @@ components:
             * `1000+` - More than 1,000 employees
           x-spec-enum-id: bacd2d745de0752e
           readOnly: true
+        institution_type:
+          type: string
+          readOnly: true
+        website_url:
+          type: string
+          format: uri
+          readOnly: true
+        terms_accepted_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
         message:
           type: string
           readOnly: true
@@ -57663,6 +57675,7 @@ components:
       - has_account
       - id
       - institution_name
+      - institution_type
       - invitation
       - job_title
       - message
@@ -57671,6 +57684,8 @@ components:
       - reviewed_at
       - reviewed_by_email
       - status
+      - terms_accepted_at
+      - website_url
     InstitutionAccessRequestApprove:
       type: object
       properties:
@@ -57717,6 +57732,37 @@ components:
             * `201-1000` - 201–1,000 employees
             * `1000+` - More than 1,000 employees
           x-spec-enum-id: bacd2d745de0752e
+        institution_type:
+          enum:
+          - PRIVATE
+          - SME
+          - GOVERNMENT
+          - NGO
+          - EDUCATION
+          - HEALTHCARE
+          - OTHER
+          - ''
+          type: string
+          description: |-
+            * `PRIVATE` - Private / Commercial
+            * `SME` - SME
+            * `GOVERNMENT` - Government / Public Sector
+            * `NGO` - NGO / Nonprofit
+            * `EDUCATION` - Educational Institution
+            * `HEALTHCARE` - Healthcare Institution
+            * `OTHER` - Other
+          x-spec-enum-id: 91b0d2c737a4e92e
+          default: ''
+        website_url:
+          oneOf:
+          - type: string
+            format: uri
+            maxLength: 255
+          - type: string
+            maxLength: 0
+        accepted_terms:
+          type: boolean
+          writeOnly: true
         message:
           type: string
           maxLength: 2000

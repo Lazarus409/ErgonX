@@ -332,8 +332,17 @@ class InstitutionAccessRequestCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = InstitutionAccessRequest
-        fields = ("institution_name", "contact_name", "job_title", "email", "phone", "country_code", "organization_size", "message", "website")
+        fields = ("institution_name", "contact_name", "job_title", "email", "phone", "country_code", "organization_size", "institution_type", "website_url", "accepted_terms", "message", "website")
         extra_kwargs = {"message": {"max_length": 2000}}
+
+    institution_type = serializers.ChoiceField(choices=Institution.InstitutionType.choices, required=False, allow_blank=True, default="")
+    # Not required, so earlier API clients keep working; when sent it must be true.
+    accepted_terms = serializers.BooleanField(required=False, write_only=True)
+
+    def validate_accepted_terms(self, value):
+        if value is not True:
+            raise serializers.ValidationError("Agree to the Terms of Service and Privacy Policy to continue.")
+        return value
 
     def validate_email(self, value):
         return User.objects.normalize_email(value).lower()
@@ -363,7 +372,7 @@ class InstitutionAccessRequestSerializer(serializers.ModelSerializer):
         model = InstitutionAccessRequest
         fields = (
             "id", "institution_name", "contact_name", "job_title", "email", "phone", "country_code",
-            "organization_size", "message", "status", "reviewed_by_email", "reviewed_at", "decline_reason",
+            "organization_size", "institution_type", "website_url", "terms_accepted_at", "message", "status", "reviewed_by_email", "reviewed_at", "decline_reason",
             "invitation", "has_account", "created_at",
         )
         read_only_fields = fields

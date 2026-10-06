@@ -485,6 +485,8 @@ class InstitutionAccessRequestView(APIView):
         serializer.is_valid(raise_exception=True)
         values = dict(serializer.validated_data)
         honeypot = values.pop("website", "")
+        if values.pop("accepted_terms", False):
+            values["terms_accepted_at"] = timezone.now()
         # The same answer is given whether the request was stored, was a
         # duplicate, or tripped the honeypot, so the endpoint reveals nothing.
         duplicate = InstitutionAccessRequest.objects.filter(email=values["email"], status=InstitutionAccessRequest.Status.PENDING).exists()
@@ -583,6 +585,7 @@ class InstitutionAdminInvitationAcceptanceView(APIView):
             prefill = {
                 "institution_name": request_row.institution_name, "first_name": first, "last_name": last,
                 "phone": request_row.phone, "country_code": request_row.country_code, "employee_size": request_row.organization_size,
+                "institution_type": request_row.institution_type, "website": request_row.website_url,
             }
         return Response({
             "email": invitation.email, "expires_at": invitation.expires_at, "prefill": prefill,

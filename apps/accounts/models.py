@@ -120,6 +120,10 @@ class InstitutionAccessRequest(BaseModel):
     phone = models.CharField(max_length=40, blank=True)
     country_code = models.CharField(max_length=2, default="GH")
     organization_size = models.CharField(max_length=10, choices=Size.choices, blank=True)
+    # Carried into the organization-creation form when the request is approved.
+    institution_type = models.CharField(max_length=20, blank=True)
+    website_url = models.URLField(max_length=255, blank=True)
+    terms_accepted_at = models.DateTimeField(null=True, blank=True)
     message = models.TextField(blank=True)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
     reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="reviewed_access_requests")

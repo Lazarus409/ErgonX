@@ -294,7 +294,7 @@ function NavRow({ item, active, groupActive, compact, section = false, onNavigat
           "flex min-w-0 flex-1 items-center rounded-lg",
           compact ? "h-11 justify-center" : sectionLabel ? "h-8 px-3" : "h-10 gap-3 px-3",
           sectionLabel
-            ? cx("text-[0.6875rem] font-bold uppercase tracking-[0.08em]", groupActive || active ? "text-white" : "text-white/55 group-hover/nav:text-white/85")
+            ? cx("text-[0.8125rem] font-bold uppercase tracking-[0.06em]", groupActive || active ? "text-white" : "text-white/80 group-hover/nav:text-white")
             : cx("text-sm font-medium", filled ? "text-white" : "text-white/75 group-hover/nav:text-white"),
         )}
       >

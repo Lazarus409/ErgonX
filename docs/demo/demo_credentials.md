@@ -17,13 +17,28 @@ synthetic CSA-DEMO users to the command's `--password` value.
 
 Key personas:
 
-- `kwame.mensah@csa.test` ? Institution Admin
-- `ama.owusu@csa.test` ? HR Admin
-- `abena.asare@csa.test` ? Recruitment Officer
-- `yaw.osei@csa.test` ? Finance Manager
-- `akosua.acheampong@csa.test` ? Accountant
-- `kojo.addo@csa.test` ? Payroll Officer
-- `efua.agyeman@csa.test` ? Department Head
-- `nana.nyarko@csa.test` ? Employee self-service
-- `sandra.appiah@csa.test` ? Auditor
-- `evelyn.darko@csa.test` ? Director
+- `kwame.mensah@csa.test` — Institution Admin
+- `ama.owusu@csa.test` — HR Admin
+- `abena.asare@csa.test` — Recruitment Officer
+- `yaw.osei@csa.test` — Finance Manager
+- `akosua.acheampong@csa.test` — Accountant
+- `kojo.addo@csa.test` — Payroll Officer
+- `efua.agyeman@csa.test` — Department Head
+- `nana.nyarko@csa.test` — Employee self-service
+- `sandra.appiah@csa.test` — Auditor
+- `evelyn.darko@csa.test` — Director
+
+Who decides what (Phase 2 rules; the API enforces them):
+
+- Nobody approves their own work: a payroll run is approved by someone other
+  than its preparer, a manual journal by someone other than its creator, and an
+  expense by someone other than its claimant or creator. Use
+  `yaw.osei@csa.test` (Finance Manager) to approve what `kwame.mensah@csa.test`
+  prepared, and the reverse.
+- Expense claims: staff claim under My expenses; the line manager or department
+  head approves first, then a Finance Manager reviews, posts and records the
+  settlement.
+- Requisitions are published only after another approver has approved them.
+- Landing after sign-in: Institution Admin and Director open the Executive
+  dashboard, operational roles (HR, Finance, Auditor) open Insights, and
+  employees open Employee Home.

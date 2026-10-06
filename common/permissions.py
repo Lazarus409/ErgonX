@@ -10,6 +10,7 @@ SELF_SERVICE_ACTIONS = frozenset({
     "attendance.clock",
     "attendance.adjust",
     "tax_relief.claim",
+    "expense.claim_own",
 })
 
 

@@ -175,15 +175,29 @@ export default function RoleSettingsPage() {
 
       <ConfirmDialog open={confirming} title={editorRole ? "Update custom role?" : "Create custom role?"} description={editorRole ? "The selected permissions and status will immediately apply to memberships using this custom role." : "The new role will be available for institution membership assignment."} confirmLabel={editorRole ? "Update role" : "Create role"} loading={saving} onConfirm={() => void save()} onCancel={() => setConfirming(false)} />
 
-      <section className="rounded-2xl border border-line bg-surface p-5 shadow-elevation-1">
-        <h2 className="text-card-title font-bold text-headline">Permission catalogue</h2>
-        <p className="mt-1 text-sm text-ink-muted">Available permissions by module. This is read-only so current access can be reviewed safely.</p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {Object.entries(permissionGroups).map(([module, count]) => (
-            <span key={module} className="rounded-full bg-primary-soft px-3 py-1.5 text-sm font-medium text-primary-ink">
-              {moduleLabel(module)} · {count}
-            </span>
-          ))}
+      <section className="overflow-hidden rounded-xl border border-line bg-surface shadow-elevation-1" aria-labelledby="matrix-overview">
+        <div className="border-b border-line-soft p-5">
+          <h2 id="matrix-overview" className="text-card-title font-semibold text-ink-strong">Matrix overview</h2>
+          <p className="mt-1 text-sm text-ink-muted">Permissions each role holds per module, out of what the module offers. Read-only; edit a custom role to change it.</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[40rem] text-left text-sm">
+            <thead className="bg-surface-muted/60 text-caption uppercase tracking-[0.06em] text-ink-muted">
+              <tr><th className="px-4 py-2.5 font-semibold">Role</th>{Object.entries(permissionGroups).map(([module, count]) => <th key={module} className="px-3 py-2.5 text-center font-semibold">{moduleLabel(module)}<span className="block font-normal normal-case tracking-normal">{count} available</span></th>)}</tr>
+            </thead>
+            <tbody className="divide-y divide-line-soft">
+              {data.roles.filter((role) => role.is_active).map((role) => (
+                <tr key={role.id}>
+                  <td className="px-4 py-2.5 font-semibold text-ink-strong">{role.name}{role.is_read_only && <span className="ml-2 text-caption font-normal text-warning-ink">view only</span>}</td>
+                  {Object.entries(permissionsByModule).map(([module, permissions]) => {
+                    const held = permissions.filter((permission) => role.permissions.includes(permission.code)).length;
+                    const share = permissions.length ? held / permissions.length : 0;
+                    return <td key={module} className="px-3 py-2.5 text-center"><span className={held === 0 ? "text-ink-subtle" : share === 1 ? "rounded bg-primary px-1.5 py-0.5 font-semibold text-white" : "rounded bg-primary-soft px-1.5 py-0.5 font-semibold text-primary-ink"}>{held === 0 ? "—" : `${held}/${permissions.length}`}</span></td>;
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </section>
     </div>

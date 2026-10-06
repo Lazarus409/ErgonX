@@ -575,7 +575,19 @@ class InstitutionAdminInvitationAcceptanceView(APIView):
         invitation = self._invitation(token)
         if invitation is None:
             return Response({"detail": "Invitation is invalid or expired."}, status=404)
-        return Response({"email": invitation.email, "expires_at": invitation.expires_at})
+        # Prefill from the access request this invitation came from, when there is one.
+        request_row = getattr(invitation, "access_request", None)
+        prefill = {}
+        if request_row is not None:
+            first, _, last = (request_row.contact_name or "").strip().partition(" ")
+            prefill = {
+                "institution_name": request_row.institution_name, "first_name": first, "last_name": last,
+                "phone": request_row.phone, "country_code": request_row.country_code, "employee_size": request_row.organization_size,
+            }
+        return Response({
+            "email": invitation.email, "expires_at": invitation.expires_at, "prefill": prefill,
+            "institution_types": [{"value": value, "label": label} for value, label in Institution.InstitutionType.choices],
+        })
 
     @extend_schema(operation_id="auth_institution_admin_invitation_accept")
     @transaction.atomic
@@ -591,14 +603,18 @@ class InstitutionAdminInvitationAcceptanceView(APIView):
         if User.objects.filter(email=invitation.email).exists():
             return Response({"detail": "An account already exists for this email. Sign in or ask the platform administrator to issue a new invitation."}, status=409)
         user = User.objects.create_user(email=invitation.email, password=values["password"], first_name=values["first_name"].strip(), last_name=values["last_name"].strip())
-        institution = Institution.objects.create(name=values["institution_name"], code=self._institution_code(values["institution_name"]), country_code=values["country_code"].upper(), default_currency=values["default_currency"].upper(), timezone=values["timezone"], email=invitation.email)
+        institution = Institution.objects.create(
+            name=values["institution_name"], code=self._institution_code(values["institution_name"]), country_code=values["country_code"].upper(),
+            default_currency=values["default_currency"].upper(), timezone=values["timezone"], email=invitation.email,
+            institution_type=values["institution_type"], employee_size=values["employee_size"], website=values["website"], phone=values["phone"].strip(),
+        )
         role = Role.objects.get(institution=institution, code="INSTITUTION_ADMIN")
         create_membership(user=user, institution=institution, role=role, status=InstitutionMembership.Status.ACTIVE, is_primary=True, joined_at=timezone.now())
         invitation.status = InstitutionAdminInvitation.Status.ACCEPTED
         invitation.accepted_at = timezone.now()
         invitation.institution = institution
         invitation.save(update_fields=("status", "accepted_at", "institution", "updated_at"))
-        record_platform_event(actor=user, action="institution.created", institution=institution, entity=institution, metadata={"name": institution.name, "invitation": str(invitation.id)})
+        record_platform_event(actor=user, action="institution.created", institution=institution, entity=institution, metadata={"name": institution.name, "invitation": str(invitation.id), "terms_accepted_at": timezone.now().isoformat()})
         refresh = start_session(user, request)
         return Response({"access": str(refresh.access_token), "refresh": str(refresh), "user": UserSerializer(user).data, "institution": {"id": str(institution.id), "name": institution.name, "code": institution.code}}, status=201)
 

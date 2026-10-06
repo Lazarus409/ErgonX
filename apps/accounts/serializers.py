@@ -18,6 +18,7 @@ import struct
 import time
 from apps.accounts.models import EmailOTPChallenge, InstitutionAccessRequest, InstitutionAdminInvitation, User, UserMFA
 from apps.documents.models import ImageAsset
+from apps.institutions.models import Institution
 from apps.accounts.emails import send_email_mfa_code
 from apps.accounts.security import mask_email
 from apps.audit.services import record_audit_event
@@ -305,6 +306,23 @@ class InstitutionAdminInvitationAcceptanceSerializer(SelfServiceRegistrationSeri
     """Invitees establish their tenant and the first administrator account."""
 
     email = serializers.EmailField(read_only=True)
+    institution_type = serializers.ChoiceField(choices=Institution.InstitutionType.choices)
+    country_code = serializers.CharField(max_length=2)
+    employee_size = serializers.ChoiceField(choices=("1-50", "51-200", "201-1000", "1000+"), required=False, allow_blank=True, default="")
+    website = serializers.URLField(max_length=255, required=False, allow_blank=True, default="")
+    phone = serializers.CharField(max_length=30, required=False, allow_blank=True, default="")
+    accepted_terms = serializers.BooleanField()
+
+    def validate_country_code(self, value):
+        value = value.strip().upper()
+        if len(value) != 2 or not value.isalpha():
+            raise serializers.ValidationError("Choose a country.")
+        return value
+
+    def validate_accepted_terms(self, value):
+        if value is not True:
+            raise serializers.ValidationError("Agree to the Terms of Service and Privacy Policy to continue.")
+        return value
 
 
 class InstitutionAccessRequestCreateSerializer(serializers.ModelSerializer):

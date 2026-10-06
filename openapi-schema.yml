@@ -57883,7 +57883,6 @@ components:
           maxLength: 255
         country_code:
           type: string
-          default: GH
           maxLength: 2
         default_currency:
           type: string
@@ -57893,10 +57892,61 @@ components:
           type: string
           default: Africa/Accra
           maxLength: 64
+        institution_type:
+          enum:
+          - PRIVATE
+          - SME
+          - GOVERNMENT
+          - NGO
+          - EDUCATION
+          - HEALTHCARE
+          - OTHER
+          type: string
+          description: |-
+            * `PRIVATE` - Private / Commercial
+            * `SME` - SME
+            * `GOVERNMENT` - Government / Public Sector
+            * `NGO` - NGO / Nonprofit
+            * `EDUCATION` - Educational Institution
+            * `HEALTHCARE` - Healthcare Institution
+            * `OTHER` - Other
+          x-spec-enum-id: 91b0d2c737a4e92e
+        employee_size:
+          enum:
+          - 1-50
+          - 51-200
+          - 201-1000
+          - 1000+
+          - ''
+          type: string
+          description: |-
+            * `1-50` - 1-50
+            * `51-200` - 51-200
+            * `201-1000` - 201-1000
+            * `1000+` - 1000+
+          x-spec-enum-id: d16513ab74788414
+          default: ''
+        website:
+          oneOf:
+          - type: string
+            format: uri
+            default: ''
+            maxLength: 255
+          - type: string
+            maxLength: 0
+        phone:
+          type: string
+          default: ''
+          maxLength: 30
+        accepted_terms:
+          type: boolean
       required:
+      - accepted_terms
+      - country_code
       - email
       - first_name
       - institution_name
+      - institution_type
       - last_name
       - password
     InstitutionAdminInvitationCreate:

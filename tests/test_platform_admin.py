@@ -166,15 +166,21 @@ def test_accepting_an_invitation_links_the_new_organization(api_client, platform
     token = api_client.post(INVITATIONS_URL, {"email": "founder@org.example", "expires_in_hours": 24}, format="json").data["acceptance_token"]
     api_client.force_authenticate(None)
 
-    accepted = api_client.post(
-        reverse("v1:institution-admin-invitation-acceptance", args=(token,)),
-        {"first_name": "Kofi", "last_name": "Mensah", "password": "StrongPass123!x", "institution_name": "Kofi Farms", "country_code": "GH", "default_currency": "GHS", "timezone": "Africa/Accra"},
-        format="json",
-    )
+    url = reverse("v1:institution-admin-invitation-acceptance", args=(token,))
+    payload = {"first_name": "Kofi", "last_name": "Mensah", "password": "StrongPass123!x", "institution_name": "Kofi Farms", "institution_type": "SME", "country_code": "GH", "employee_size": "51-200", "website": "https://kofifarms.example", "phone": "+233200000099", "default_currency": "GHS", "timezone": "Africa/Accra"}
+    preview = api_client.get(url)
+    assert preview.status_code == 200 and preview.data["email"] == "founder@org.example"
+    assert {"value": "SME", "label": "SME"} in preview.data["institution_types"]
+    # The terms must be accepted explicitly.
+    assert api_client.post(url, payload, format="json").status_code == 400
+    assert api_client.post(url, {**payload, "accepted_terms": False}, format="json").status_code == 400
+
+    accepted = api_client.post(url, {**payload, "accepted_terms": True}, format="json")
 
     assert accepted.status_code == 201, accepted.data
     invitation = InstitutionAdminInvitation.objects.get()
     assert invitation.institution.name == "Kofi Farms"
+    assert (invitation.institution.institution_type, invitation.institution.employee_size, invitation.institution.website, invitation.institution.phone) == ("SME", "51-200", "https://kofifarms.example", "+233200000099")
     assert AuditLog.objects.filter(action="platform.institution.created", institution=invitation.institution).exists()
 
     api_client.force_authenticate(platform_admin)

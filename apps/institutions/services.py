@@ -187,6 +187,8 @@ PERMISSIONS = {
     "training.manage": "Manage training courses and enrol employees",
     "performance.view": "View performance review cycles and results",
     "performance.manage": "Run review cycles and sign off performance reviews",
+    "complaint.view": "View employee complaints, except any that name you",
+    "complaint.manage": "Handle employee complaints: assign, investigate, resolve and close",
     "report.view": "View and export institution reports",
     "report.all": "View every report institution-wide, read-only, without the underlying module permissions",
     "report.publish": "Publish saved dashboards and reports to everyone with access",
@@ -330,6 +332,7 @@ ROLE_PERMISSION_CODES = {
         "document_requirement.view",
         "training.view",
         "performance.view",
+        "complaint.view",
     ),
     "EMPLOYEE": (
         "home.view",
@@ -454,6 +457,7 @@ ROLE_PERMISSION_CODES = {
         "document_requirement.view",
         "training.view",
         "performance.view",
+        "complaint.view",
     ),
 }
 

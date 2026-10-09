@@ -10781,6 +10781,1202 @@ paths:
       - module_disabled
       - permission_denied
       - not_found
+  /api/v1/complaints/:
+    get:
+      operationId: complaints_list
+      description: |-
+        HR sees every complaint except one that names them; everyone else sees only their own.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: List complaints
+      parameters:
+      - in: query
+        name: assigned_to
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: category
+        schema:
+          type: string
+          x-spec-enum-id: 10922e254d280b60
+          enum:
+          - BULLYING
+          - DISCRIMINATION
+          - HARASSMENT
+          - HEALTH_SAFETY
+          - MANAGEMENT
+          - MISCONDUCT
+          - OTHER
+          - PAY_BENEFITS
+          - WORKING_CONDITIONS
+        description: |-
+          * `HARASSMENT` - Harassment (including sexual harassment)
+          * `BULLYING` - Bullying or intimidation
+          * `DISCRIMINATION` - Discrimination
+          * `MISCONDUCT` - Misconduct or unethical behaviour
+          * `HEALTH_SAFETY` - Health and safety
+          * `PAY_BENEFITS` - Pay, allowances or benefits
+          * `WORKING_CONDITIONS` - Working conditions or hours
+          * `MANAGEMENT` - Management or supervision
+          * `OTHER` - Other
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: priority
+        schema:
+          type: string
+          x-spec-enum-id: 0ffc5d7e9878ba58
+          enum:
+          - HIGH
+          - LOW
+          - NORMAL
+          - URGENT
+        description: |-
+          * `LOW` - Low
+          * `NORMAL` - Normal
+          * `HIGH` - High
+          * `URGENT` - Urgent
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      - in: query
+        name: status
+        schema:
+          type: string
+          x-spec-enum-id: 34dd392ac66439cb
+          enum:
+          - CLOSED
+          - INVESTIGATING
+          - RESOLVED
+          - SUBMITTED
+          - UNDER_REVIEW
+          - WITHDRAWN
+        description: |-
+          * `SUBMITTED` - Submitted
+          * `UNDER_REVIEW` - Under review
+          * `INVESTIGATING` - Investigating
+          * `RESOLVED` - Resolved
+          * `CLOSED` - Closed
+          * `WITHDRAWN` - Withdrawn
+      tags:
+      - complaints
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/PaginatedComplaintListList'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+    post:
+      operationId: complaints_create
+      description: |-
+        HR sees every complaint except one that names them; everyone else sees only their own.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `validation_error`.
+      summary: Create complaint
+      tags:
+      - complaints
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FileComplaint'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/FileComplaint'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/FileComplaint'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/Complaint'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - validation_error
+  /api/v1/complaints/{id}/:
+    get:
+      operationId: complaints_retrieve
+      description: |-
+        HR sees every complaint except one that names them; everyone else sees only their own.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
+      summary: Retrieve complaint
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this complaint.
+        required: true
+      tags:
+      - complaints
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/Complaint'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+  /api/v1/complaints/{id}/assign/:
+    post:
+      operationId: complaints_assign_create
+      description: |-
+        HR sees every complaint except one that names them; everyone else sees only their own.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `complaint.manage` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Assign complaint
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this complaint.
+        required: true
+      tags:
+      - complaints
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Assign'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Assign'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Assign'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/Complaint'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+  /api/v1/complaints/{id}/close/:
+    post:
+      operationId: complaints_close_create
+      description: |-
+        HR sees every complaint except one that names them; everyone else sees only their own.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `complaint.manage` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Close complaint
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this complaint.
+        required: true
+      tags:
+      - complaints
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/Complaint'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+  /api/v1/complaints/{id}/investigate/:
+    post:
+      operationId: complaints_investigate_create
+      description: |-
+        HR sees every complaint except one that names them; everyone else sees only their own.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `complaint.manage` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Investigate complaint
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this complaint.
+        required: true
+      tags:
+      - complaints
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/Complaint'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+  /api/v1/complaints/{id}/notes/:
+    post:
+      operationId: complaints_notes_create
+      description: |-
+        HR sees every complaint except one that names them; everyone else sees only their own.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Notes complaint
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this complaint.
+        required: true
+      tags:
+      - complaints
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NoteInput'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NoteInput'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NoteInput'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/Complaint'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+  /api/v1/complaints/{id}/priority/:
+    post:
+      operationId: complaints_priority_create
+      description: |-
+        HR sees every complaint except one that names them; everyone else sees only their own.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `complaint.manage` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Priority complaint
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this complaint.
+        required: true
+      tags:
+      - complaints
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Priority'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Priority'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Priority'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/Complaint'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+  /api/v1/complaints/{id}/reopen/:
+    post:
+      operationId: complaints_reopen_create
+      description: |-
+        HR sees every complaint except one that names them; everyone else sees only their own.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `complaint.manage` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Reopen complaint
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this complaint.
+        required: true
+      tags:
+      - complaints
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Text'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Text'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Text'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/Complaint'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+  /api/v1/complaints/{id}/resolve/:
+    post:
+      operationId: complaints_resolve_create
+      description: |-
+        HR sees every complaint except one that names them; everyone else sees only their own.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `complaint.manage` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Resolve complaint
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this complaint.
+        required: true
+      tags:
+      - complaints
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Text'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Text'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Text'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/Complaint'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+  /api/v1/complaints/{id}/withdraw/:
+    post:
+      operationId: complaints_withdraw_create
+      description: |-
+        HR sees every complaint except one that names them; everyone else sees only their own.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Withdraw complaint
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this complaint.
+        required: true
+      tags:
+      - complaints
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Text'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Text'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Text'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/Complaint'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+  /api/v1/complaints/colleagues/:
+    get:
+      operationId: complaints_colleagues_retrieve
+      description: |-
+        Name search for "who is this about": name, staff number and department only, at most 20.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: Colleagues complaint
+      tags:
+      - complaints
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+  /api/v1/complaints/handlers/:
+    get:
+      operationId: complaints_handlers_retrieve
+      description: |-
+        Members who can be assigned complaints.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `complaint.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: Handlers complaint
+      tags:
+      - complaints
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+  /api/v1/complaints/overview/:
+    get:
+      operationId: complaints_overview_retrieve
+      description: |-
+        HR sees every complaint except one that names them; everyone else sees only their own.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `complaint.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: Overview complaint
+      tags:
+      - complaints
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
   /api/v1/compliance-deadlines/:
     get:
       operationId: compliance_deadlines_list
@@ -58184,6 +59380,14 @@ components:
       - order
       - updated_at
       - workflow
+    Assign:
+      type: object
+      properties:
+        assignee:
+          type: string
+          format: uuid
+      required:
+      - assignee
     AttendanceAdjustment:
       type: object
       description: Runs model validation so domain invariants also protect non-form
@@ -59278,6 +60482,321 @@ components:
       - id
       - is_active
       - name
+    Complaint:
+      type: object
+      description: The employee who filed a complaint sees it without HR's internal
+        notes.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        code:
+          type: string
+          readOnly: true
+        category:
+          enum:
+          - HARASSMENT
+          - BULLYING
+          - DISCRIMINATION
+          - MISCONDUCT
+          - HEALTH_SAFETY
+          - PAY_BENEFITS
+          - WORKING_CONDITIONS
+          - MANAGEMENT
+          - OTHER
+          type: string
+          description: |-
+            * `HARASSMENT` - Harassment (including sexual harassment)
+            * `BULLYING` - Bullying or intimidation
+            * `DISCRIMINATION` - Discrimination
+            * `MISCONDUCT` - Misconduct or unethical behaviour
+            * `HEALTH_SAFETY` - Health and safety
+            * `PAY_BENEFITS` - Pay, allowances or benefits
+            * `WORKING_CONDITIONS` - Working conditions or hours
+            * `MANAGEMENT` - Management or supervision
+            * `OTHER` - Other
+          x-spec-enum-id: 10922e254d280b60
+          readOnly: true
+        category_label:
+          type: string
+          readOnly: true
+        subject:
+          type: string
+          readOnly: true
+        status:
+          enum:
+          - SUBMITTED
+          - UNDER_REVIEW
+          - INVESTIGATING
+          - RESOLVED
+          - CLOSED
+          - WITHDRAWN
+          type: string
+          description: |-
+            * `SUBMITTED` - Submitted
+            * `UNDER_REVIEW` - Under review
+            * `INVESTIGATING` - Investigating
+            * `RESOLVED` - Resolved
+            * `CLOSED` - Closed
+            * `WITHDRAWN` - Withdrawn
+          x-spec-enum-id: 34dd392ac66439cb
+          readOnly: true
+        priority:
+          enum:
+          - LOW
+          - NORMAL
+          - HIGH
+          - URGENT
+          type: string
+          description: |-
+            * `LOW` - Low
+            * `NORMAL` - Normal
+            * `HIGH` - High
+            * `URGENT` - Urgent
+          x-spec-enum-id: 0ffc5d7e9878ba58
+          readOnly: true
+        complainant:
+          type: string
+          format: uuid
+          readOnly: true
+        complainant_name:
+          type: string
+          readOnly: true
+        complainant_number:
+          type: string
+          readOnly: true
+        respondent:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+          description: The colleague the complaint is about, if any.
+        respondent_name:
+          type: string
+          readOnly: true
+        assigned_to:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        assigned_to_name:
+          type: string
+          readOnly: true
+        incident_date:
+          type: string
+          format: date
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        resolved_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        description:
+          type: string
+          readOnly: true
+        incident_location:
+          type: string
+          readOnly: true
+        respondent_description:
+          type: string
+          readOnly: true
+        resolution:
+          type: string
+          readOnly: true
+        resolved_by_name:
+          type: string
+          readOnly: true
+        closed_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        withdrawn_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        notes:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+          readOnly: true
+        viewer:
+          type: object
+          additionalProperties: {}
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - assigned_to
+      - assigned_to_name
+      - category
+      - category_label
+      - closed_at
+      - code
+      - complainant
+      - complainant_name
+      - complainant_number
+      - created_at
+      - description
+      - id
+      - incident_date
+      - incident_location
+      - notes
+      - priority
+      - resolution
+      - resolved_at
+      - resolved_by_name
+      - respondent
+      - respondent_description
+      - respondent_name
+      - status
+      - subject
+      - updated_at
+      - viewer
+      - withdrawn_at
+    ComplaintList:
+      type: object
+      description: The employee who filed a complaint sees it without HR's internal
+        notes.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        code:
+          type: string
+          readOnly: true
+        category:
+          enum:
+          - HARASSMENT
+          - BULLYING
+          - DISCRIMINATION
+          - MISCONDUCT
+          - HEALTH_SAFETY
+          - PAY_BENEFITS
+          - WORKING_CONDITIONS
+          - MANAGEMENT
+          - OTHER
+          type: string
+          description: |-
+            * `HARASSMENT` - Harassment (including sexual harassment)
+            * `BULLYING` - Bullying or intimidation
+            * `DISCRIMINATION` - Discrimination
+            * `MISCONDUCT` - Misconduct or unethical behaviour
+            * `HEALTH_SAFETY` - Health and safety
+            * `PAY_BENEFITS` - Pay, allowances or benefits
+            * `WORKING_CONDITIONS` - Working conditions or hours
+            * `MANAGEMENT` - Management or supervision
+            * `OTHER` - Other
+          x-spec-enum-id: 10922e254d280b60
+          readOnly: true
+        category_label:
+          type: string
+          readOnly: true
+        subject:
+          type: string
+          readOnly: true
+        status:
+          enum:
+          - SUBMITTED
+          - UNDER_REVIEW
+          - INVESTIGATING
+          - RESOLVED
+          - CLOSED
+          - WITHDRAWN
+          type: string
+          description: |-
+            * `SUBMITTED` - Submitted
+            * `UNDER_REVIEW` - Under review
+            * `INVESTIGATING` - Investigating
+            * `RESOLVED` - Resolved
+            * `CLOSED` - Closed
+            * `WITHDRAWN` - Withdrawn
+          x-spec-enum-id: 34dd392ac66439cb
+          readOnly: true
+        priority:
+          enum:
+          - LOW
+          - NORMAL
+          - HIGH
+          - URGENT
+          type: string
+          description: |-
+            * `LOW` - Low
+            * `NORMAL` - Normal
+            * `HIGH` - High
+            * `URGENT` - Urgent
+          x-spec-enum-id: 0ffc5d7e9878ba58
+          readOnly: true
+        complainant:
+          type: string
+          format: uuid
+          readOnly: true
+        complainant_name:
+          type: string
+          readOnly: true
+        complainant_number:
+          type: string
+          readOnly: true
+        respondent:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+          description: The colleague the complaint is about, if any.
+        respondent_name:
+          type: string
+          readOnly: true
+        assigned_to:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        assigned_to_name:
+          type: string
+          readOnly: true
+        incident_date:
+          type: string
+          format: date
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        resolved_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+      required:
+      - assigned_to
+      - assigned_to_name
+      - category
+      - category_label
+      - code
+      - complainant
+      - complainant_name
+      - complainant_number
+      - created_at
+      - id
+      - incident_date
+      - priority
+      - resolved_at
+      - respondent
+      - respondent_name
+      - status
+      - subject
     CompleteEnrollment:
       type: object
       properties:
@@ -60794,6 +62313,57 @@ components:
       - result_reference
       - status
       - updated_at
+    FileComplaint:
+      type: object
+      properties:
+        category:
+          enum:
+          - HARASSMENT
+          - BULLYING
+          - DISCRIMINATION
+          - MISCONDUCT
+          - HEALTH_SAFETY
+          - PAY_BENEFITS
+          - WORKING_CONDITIONS
+          - MANAGEMENT
+          - OTHER
+          type: string
+          description: |-
+            * `HARASSMENT` - Harassment (including sexual harassment)
+            * `BULLYING` - Bullying or intimidation
+            * `DISCRIMINATION` - Discrimination
+            * `MISCONDUCT` - Misconduct or unethical behaviour
+            * `HEALTH_SAFETY` - Health and safety
+            * `PAY_BENEFITS` - Pay, allowances or benefits
+            * `WORKING_CONDITIONS` - Working conditions or hours
+            * `MANAGEMENT` - Management or supervision
+            * `OTHER` - Other
+          x-spec-enum-id: 10922e254d280b60
+        subject:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+        incident_date:
+          type: string
+          format: date
+          nullable: true
+        incident_location:
+          type: string
+          default: ''
+          maxLength: 200
+        respondent:
+          type: string
+          format: uuid
+          nullable: true
+        respondent_description:
+          type: string
+          default: ''
+          maxLength: 200
+      required:
+      - category
+      - description
+      - subject
     FinancialReport:
       type: object
       properties:
@@ -63651,6 +65221,16 @@ components:
       - first_name
       - id
       - last_name
+    NoteInput:
+      type: object
+      properties:
+        body:
+          type: string
+        is_internal:
+          type: boolean
+          default: false
+      required:
+      - body
     Notification:
       type: object
       description: Safe, recipient-scoped representation for the in-app notification
@@ -64641,6 +66221,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Competency'
+    PaginatedComplaintListList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComplaintList'
     PaginatedComplianceDeadlineList:
       type: object
       required:
@@ -72155,6 +73758,24 @@ components:
       - id
       - title
       - updated_at
+    Priority:
+      type: object
+      properties:
+        priority:
+          enum:
+          - LOW
+          - NORMAL
+          - HIGH
+          - URGENT
+          type: string
+          description: |-
+            * `LOW` - Low
+            * `NORMAL` - Normal
+            * `HIGH` - High
+            * `URGENT` - Urgent
+          x-spec-enum-id: 0ffc5d7e9878ba58
+      required:
+      - priority
     RatingInput:
       type: object
       properties:
@@ -73408,6 +75029,12 @@ components:
       - name
       - preset_version
       - updated_at
+    Text:
+      type: object
+      properties:
+        text:
+          type: string
+          default: ''
     TrainingCourse:
       type: object
       description: Runs model validation so domain invariants also protect non-form

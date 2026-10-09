@@ -59,6 +59,7 @@ _TYPE_PREFIXES = (
     ("DOCUMENT", "HR"),
     ("TRAINING", "HR"),
     ("PERFORMANCE", "HR"),
+    ("COMPLAINT", "HR"),
 )
 _METADATA_KEYS = (
     ("approval_request_id", "APPROVALS"),

@@ -1,5 +1,6 @@
 import {
   CalendarDays,
+  Banknote,
   CircleDollarSign,
   ClipboardCheck,
   Contact,
@@ -92,7 +93,9 @@ export const INSIGHT_PERMISSIONS = ["dashboard.executive.view", "dashboard.hr.vi
 export const APPROVAL_PERMISSIONS = ["approval_request.view", "leave.approve", "attendance.approve", "payroll.approve", "tax_relief.approve", "job_posting.approve", "offer.approve", "journal.approve", "vendor_bill.approve", "expense.approve", "budget.approve"];
 
 export const navigation: NavigationItem[] = [
+  // Ordered by how often people need each area: daily work first, oversight and setup last.
   { label: "Home", href: "/", icon: House, permission: "home.view" },
+  { label: "Executive Dashboard", href: "/dashboard", icon: LayoutDashboard, permission: "dashboard.executive.view" },
   {
     label: "My Department / Functional Area",
     href: "/department",
@@ -105,18 +108,17 @@ export const navigation: NavigationItem[] = [
       { label: "Team leave calendar", href: "/leave/calendar", permission: "leave.view", module: "LEAVE" },
     ],
   },
+  { label: "Approvals", href: "/approvals", icon: GitPullRequest, anyPermissions: APPROVAL_PERMISSIONS },
   {
     label: "Human Resources",
     href: "/hr",
     icon: Users,
-    // HR is the people workspace umbrella. Its own setup pages and each
-    // people-related module remain individually gated below.
+    // Every HR workspace sits in this one menu; each child keeps its own gate.
     anyPermissions: [
       ...moduleWorkspacePermissions.HR,
       ...moduleWorkspacePermissions.RECRUITMENT,
       ...moduleWorkspacePermissions.LEAVE,
       ...moduleWorkspacePermissions.ATTENDANCE,
-      ...moduleWorkspacePermissions.PAYROLL,
       "document_requirement.view",
       "training.view",
       "training.manage",
@@ -127,13 +129,32 @@ export const navigation: NavigationItem[] = [
     children: [
       { label: "HR Dashboard", href: "/hr/dashboard", module: "HR", permission: "dashboard.hr.view" },
       { label: "Employees", href: "/hr/employees", module: "HR", permission: "employee.view" },
-      { label: "Recruitment", href: "/recruitment", module: "RECRUITMENT", anyPermissions: moduleWorkspacePermissions.RECRUITMENT },
       { label: "Leave", href: "/leave", module: "LEAVE", anyPermissions: moduleWorkspacePermissions.LEAVE },
       { label: "Attendance", href: "/attendance", module: "ATTENDANCE", anyPermissions: moduleWorkspacePermissions.ATTENDANCE },
-      { label: "Document Checklist", href: "/hr/documents", module: "HR", permission: "document_requirement.view" },
-      { label: "Training", href: "/training", module: "HR", anyPermissions: ["training.view", "training.manage"] },
       { label: "Performance", href: "/performance", module: "HR", anyPermissions: ["performance.view", "performance.manage"] },
-      { label: "Payroll", href: "/payroll", module: "PAYROLL", anyPermissions: moduleWorkspacePermissions.PAYROLL },
+      { label: "Training", href: "/training", module: "HR", anyPermissions: ["training.view", "training.manage"] },
+      { label: "Recruitment", href: "/recruitment", module: "RECRUITMENT", anyPermissions: moduleWorkspacePermissions.RECRUITMENT },
+      { label: "Document Checklist", href: "/hr/documents", module: "HR", permission: "document_requirement.view" },
+      { label: "Organization", href: "/hr/organization", module: "HR", anyPermissions: ["organization.view", "organization.create", "organization.update"] },
+    ],
+  },
+  {
+    label: "Payroll",
+    href: "/payroll",
+    icon: Banknote,
+    module: "PAYROLL",
+    anyPermissions: moduleWorkspacePermissions.PAYROLL,
+    scopes: INSTITUTION_WIDE,
+    children: [
+      { label: "Payroll Dashboard", href: "/payroll/dashboard", permission: "dashboard.payroll.view" },
+      { label: "Payroll Runs", href: "/payroll/runs", permission: "payroll.view" },
+      { label: "Payslips", href: "/payroll/payslips", permission: "payroll.view" },
+      { label: "Adjustments", href: "/payroll/adjustments", permission: "payroll.view" },
+      { label: "Employee Payroll Profiles", href: "/payroll/employee-profiles", permission: "payroll.view" },
+      { label: "Payroll Periods", href: "/payroll/periods", permission: "payroll.view" },
+      { label: "Salary Structures", href: "/payroll/salary-structures", permission: "payroll.view" },
+      { label: "Pay Components", href: "/payroll/components", permission: "payroll.view" },
+      { label: "Payroll Configuration", href: "/payroll/configuration", permission: "payroll.configure" },
     ],
   },
   {
@@ -163,7 +184,6 @@ export const navigation: NavigationItem[] = [
     anyPermissions: moduleWorkspacePermissions.REPORTS,
     scopes: INSTITUTION_WIDE,
   },
-  { label: "Approvals", href: "/approvals", icon: GitPullRequest, anyPermissions: APPROVAL_PERMISSIONS },
   { label: "Audit Trail", href: "/audit", icon: ShieldCheck, permission: "audit.view" },
   { label: "Users & Access", href: "/settings/users", icon: Users, permission: "settings.users.manage" },
   // Everyone keeps Settings for their own security and notifications; the page filters its cards.

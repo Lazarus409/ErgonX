@@ -9,7 +9,7 @@ import Alert from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
 import { Button, IconButton } from "@/components/ui/Button";
 import { DataTable } from "@/components/ui/DataTable";
-import { Field, Input, Select, Textarea } from "@/components/ui/Field";
+import { Field, FileInput, Input, Select, Textarea } from "@/components/ui/Field";
 import { Dialog } from "@/components/ui/Overlay";
 import PageHeader from "@/components/ui/PageHeader";
 import { complaintsApi, getApiErrorMessage } from "@/lib/api";
@@ -38,6 +38,7 @@ export default function MyComplaintsPage() {
   const [respondent, setRespondent] = useState<Colleague | null>(null);
   const [query, setQuery] = useState("");
   const [matches, setMatches] = useState<Colleague[]>([]);
+  const [files, setFiles] = useState<File[]>([]);
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -50,7 +51,7 @@ export default function MyComplaintsPage() {
     return () => { active = false; window.clearTimeout(timer); };
   }, [open, query, respondent]);
 
-  const start = () => { setForm(emptyForm); setRespondent(null); setQuery(""); setMatches([]); setFormError(""); setOpen(true); };
+  const start = () => { setForm(emptyForm); setRespondent(null); setQuery(""); setMatches([]); setFiles([]); setFormError(""); setOpen(true); };
   const submit = async () => {
     if (!form.category || !form.subject.trim() || !form.description.trim()) { setFormError("Choose a category, give a subject and describe what happened."); return; }
     setSaving(true);
@@ -65,6 +66,10 @@ export default function MyComplaintsPage() {
         respondent: respondent?.id ?? null,
         respondent_description: respondent ? "" : form.respondent_description.trim(),
       });
+      // Files go up once the complaint exists; any that fail can be attached again from the complaint page.
+      for (const item of files) {
+        try { await complaintsApi.uploadAttachment(complaint.id, item); } catch { /* shown as missing on the complaint page */ }
+      }
       setOpen(false);
       reload();
       router.push(`/complaints/${complaint.id}`);
@@ -118,6 +123,9 @@ export default function MyComplaintsPage() {
             <Field label="When did it happen" optional><Input type="date" max={today()} value={form.incident_date} onChange={(event) => setForm({ ...form, incident_date: event.target.value })} /></Field>
             <Field label="Where" optional><Input value={form.incident_location} maxLength={200} onChange={(event) => setForm({ ...form, incident_location: event.target.value })} placeholder="Office, site, online…" /></Field>
           </div>
+          <Field label="Supporting files" optional helper="Photos, screenshots, letters or other evidence. Only HR handlers can open them.">
+            <FileInput multiple fileName={files.length ? files.map((item) => item.name).join(", ") : null} hint="Up to 25 MB each" onChange={(event) => setFiles(Array.from(event.target.files ?? []))} />
+          </Field>
           <Field label="Who is it about" optional helper="Search for a colleague, or describe the person if they are not an employee. Leave empty if it is not about a person.">
             {respondent ? (
               <div className="flex items-center justify-between rounded-lg border border-line bg-surface-muted px-3 py-2">

@@ -3,7 +3,7 @@
  * Mirrors `apps/complaints`.
  */
 
-import { apiGet, apiGetList, apiPost } from "./client";
+import { apiDownload, apiGet, apiGetList, apiPost, apiPostMultipart } from "./client";
 import { MAX_PAGE_SIZE } from "@/types/api";
 import type { ListParams, PaginatedData } from "@/types/api";
 
@@ -57,6 +57,17 @@ export interface ComplaintNote {
   created_at: string;
 }
 
+export interface ComplaintAttachment {
+  id: string;
+  original_filename: string;
+  content_type: string;
+  size_bytes: number;
+  is_internal: boolean;
+  uploaded_by_name: string;
+  from_hr: boolean;
+  created_at: string;
+}
+
 export interface Complaint extends ComplaintSummary {
   description: string;
   incident_location: string;
@@ -66,6 +77,7 @@ export interface Complaint extends ComplaintSummary {
   closed_at: string | null;
   withdrawn_at: string | null;
   notes: ComplaintNote[];
+  attachments: ComplaintAttachment[];
   viewer: { is_complainant: boolean; is_staff: boolean; can_manage: boolean; can_withdraw: boolean; can_message: boolean };
   updated_at: string;
 }
@@ -136,4 +148,13 @@ export function withdraw(id: string, text: string): Promise<Complaint> {
 }
 export function addNote(id: string, body: string, isInternal: boolean): Promise<Complaint> {
   return apiPost<Complaint, { body: string; is_internal: boolean }>(`/complaints/${id}/notes/`, { body, is_internal: isInternal });
+}
+export function uploadAttachment(id: string, file: File, isInternal = false): Promise<Complaint> {
+  const body = new FormData();
+  body.append("file", file);
+  body.append("is_internal", String(isInternal));
+  return apiPostMultipart<Complaint>(`/complaints/${id}/attachments/`, body);
+}
+export function downloadAttachment(id: string, attachmentId: string): Promise<Blob> {
+  return apiDownload(`/complaints/${id}/attachments/${attachmentId}/download/`);
 }

@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import { CheckCircle2, Lock, MessageSquare, MessageSquareWarning, RotateCcw, Search, Send, Undo2, UserCheck, XCircle } from "lucide-react";
+import { CheckCircle2, Download, Lock, Paperclip, Upload, MessageSquare, MessageSquareWarning, RotateCcw, Search, Send, Undo2, UserCheck, XCircle } from "lucide-react";
 
 import Alert from "@/components/ui/Alert";
 import BackNavigation from "@/components/ui/BackNavigation";
@@ -29,6 +29,10 @@ import { lifecycles } from "@/lib/lifecycles";
 import { useApiResource } from "@/lib/useApiResource";
 
 type DialogKind = "resolve" | "reopen" | "withdraw" | "assign" | null;
+
+function fileSize(bytes: number) {
+  return bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
 
 /** One complaint: the employee who filed it follows and messages HR; HR investigates and records the outcome. */
 export default function ComplaintPage() {
@@ -66,6 +70,25 @@ function ComplaintBody({ complaint, reload }: { complaint: Complaint; reload: ()
   const sendNote = async () => {
     if (!note.trim()) return;
     if (await run(() => complaintsApi.addNote(id, note.trim(), viewer.is_staff && internal), viewer.is_staff && internal ? "Internal note added." : "Message sent.")) setNote("");
+  };
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [internalFile, setInternalFile] = useState(false);
+  const uploadFiles = async (files: FileList | null) => {
+    if (!files?.length) return;
+    const list = Array.from(files);
+    await run(async () => { for (const item of list) await complaintsApi.uploadAttachment(id, item, viewer.is_staff && internalFile); }, list.length === 1 ? "File attached." : `${list.length} files attached.`);
+    if (fileRef.current) fileRef.current.value = "";
+  };
+  const download = async (attachmentId: string, name: string) => {
+    try {
+      const blob = await complaintsApi.downloadAttachment(id, attachmentId);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = name;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (caught) { setActionError(getApiErrorMessage(caught)); }
   };
   const isOpen = OPEN_COMPLAINT_STATUSES.includes(complaint.status);
   const back = viewer.is_staff ? "/complaints" : "/me/complaints";
@@ -127,6 +150,27 @@ function ComplaintBody({ complaint, reload }: { complaint: Complaint; reload: ()
           {viewer.can_withdraw && <Button variant="ghost" className="mt-4 text-danger-ink" leadingIcon={<Undo2 className="h-4 w-4" />} onClick={() => open("withdraw")}>Withdraw complaint</Button>}
         </Card>
       </div>
+
+      <Card title="Files" icon={Paperclip} actions={viewer.can_message ? <Button size="sm" variant="secondary" leadingIcon={<Upload className="h-4 w-4" />} loading={saving} onClick={() => fileRef.current?.click()}>Attach files</Button> : undefined}>
+        <input ref={fileRef} type="file" multiple className="sr-only" aria-label="Attach files" onChange={(event) => void uploadFiles(event.target.files)} />
+        {viewer.is_staff && viewer.can_message && <Checkbox className="mb-3" label="HR only (internal evidence the employee does not see)" checked={internalFile} onChange={(event) => setInternalFile(event.target.checked)} />}
+        {complaint.attachments.length === 0 ? <p className="text-support text-ink-muted">{viewer.is_complainant ? "No files yet. You can attach photos, screenshots, letters or other evidence." : "No files attached."}</p> : (
+          <ul className="divide-y divide-line rounded-lg border border-line">
+            {complaint.attachments.map((item) => (
+              <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
+                <span className="min-w-0">
+                  <span className="block truncate font-medium text-ink-strong">{item.original_filename}</span>
+                  <span className="text-caption text-ink-muted">{fileSize(item.size_bytes)} · {item.from_hr ? item.uploaded_by_name || "HR" : viewer.is_complainant ? "You" : item.uploaded_by_name} · {formatDateTime(item.created_at)}</span>
+                </span>
+                <span className="flex items-center gap-2">
+                  {item.is_internal && <Badge size="sm" tone="warning">HR only</Badge>}
+                  <Button size="sm" variant="ghost" leadingIcon={<Download className="h-4 w-4" />} onClick={() => void download(item.id, item.original_filename)}>Download</Button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
 
       <Card title={viewer.is_staff ? "Notes and messages" : "Messages with HR"} icon={MessageSquare}>
         {complaint.notes.length === 0 ? <p className="text-support text-ink-muted">No messages yet.</p> : (

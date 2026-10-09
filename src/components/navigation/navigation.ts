@@ -131,11 +131,11 @@ export const navigation: NavigationItem[] = [
       { label: "Leave", href: "/leave", module: "LEAVE", anyPermissions: moduleWorkspacePermissions.LEAVE },
       { label: "Attendance", href: "/attendance", module: "ATTENDANCE", anyPermissions: moduleWorkspacePermissions.ATTENDANCE },
       { label: "Payroll", href: "/payroll", module: "PAYROLL", anyPermissions: moduleWorkspacePermissions.PAYROLL },
+      { label: "Recruitment", href: "/recruitment", module: "RECRUITMENT", anyPermissions: moduleWorkspacePermissions.RECRUITMENT },
+      { label: "Organization", href: "/hr/organization", module: "HR", anyPermissions: ["organization.view", "organization.create", "organization.update"] },
       { label: "Performance", href: "/performance", module: "HR", anyPermissions: ["performance.view", "performance.manage"] },
       { label: "Training", href: "/training", module: "HR", anyPermissions: ["training.view", "training.manage"] },
-      { label: "Recruitment", href: "/recruitment", module: "RECRUITMENT", anyPermissions: moduleWorkspacePermissions.RECRUITMENT },
       { label: "Document Checklist", href: "/hr/documents", module: "HR", permission: "document_requirement.view" },
-      { label: "Organization", href: "/hr/organization", module: "HR", anyPermissions: ["organization.view", "organization.create", "organization.update"] },
     ],
   },
   {

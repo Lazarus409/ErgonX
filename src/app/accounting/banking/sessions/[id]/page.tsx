@@ -98,7 +98,7 @@ export default function ReconciliationSessionPage() {
             <div className="flex flex-wrap gap-2">
               <input ref={fileRef} type="file" accept=".csv,text/csv" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importFile(file); }} />
               <Menu label="Import statement" trigger={(props) => <Button {...props} variant="secondary" disabled={!canManage || locked} loading={busy} leadingIcon={<Upload className="h-4 w-4" />} trailingIcon={<ChevronDown className="h-4 w-4" />}>Import statement</Button>}>
-                {(close) => <div className="p-1.5"><MenuItem icon={<Upload className="h-4 w-4" />} description="Columns: date, description, reference, amount" onSelect={() => { close(); fileRef.current?.click(); }}>Upload CSV statement</MenuItem></div>}
+                {(close) => <div className="p-1.5"><MenuItem icon={<Upload className="h-4 w-4" />} description="Your bank's CSV export: a date column plus amount or debit/credit columns" onSelect={() => { close(); fileRef.current?.click(); }}>Upload CSV statement</MenuItem></div>}
               </Menu>
               {canManage && !locked && (detail.can_complete
                 ? <Button leadingIcon={<CheckCircle2 className="h-4 w-4" />} onClick={() => setConfirmComplete(true)}>Mark as reconciled</Button>

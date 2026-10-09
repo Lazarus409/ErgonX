@@ -5,7 +5,11 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.audit.services import record_audit_event
-from apps.complaints.models import Complaint, ComplaintNote
+import mimetypes
+
+from django.conf import settings
+
+from apps.complaints.models import Complaint, ComplaintAttachment, ComplaintNote
 from apps.employees.models import Employee
 from apps.institutions.models import InstitutionMembership
 from apps.notifications.models import Notification
@@ -198,20 +202,53 @@ def withdraw_complaint(*, complaint, actor, reason=""):
     return complaint
 
 
+def _require_participant(complaint, actor, internal):
+    """The employee who filed it may add shared items while it is open or resolved; HR handlers until it is withdrawn."""
+    if complaint.complainant.user_id == actor.id:
+        if internal:
+            raise ValidationError({"is_internal": "What you add is always shared with HR."})
+        if complaint.status not in (*Complaint.OPEN_STATUSES, Status.RESOLVED):
+            raise ValidationError({"status": "This complaint is no longer open for messages."})
+        return True
+    _require_handler(complaint, actor)
+    if complaint.status == Status.WITHDRAWN:
+        raise ValidationError({"status": "This complaint was withdrawn."})
+    return False
+
+
+@transaction.atomic
+def add_attachment(*, complaint, actor, uploaded_file, internal=False):
+    complaint = _lock(complaint)
+    is_complainant = _require_participant(complaint, actor, internal)
+    max_bytes = settings.DOCUMENT_UPLOAD_MAX_BYTES
+    if uploaded_file.size > max_bytes:
+        raise ValidationError({"file": f"Files must be {max_bytes // (1024 * 1024)} MB or smaller."})
+    if complaint.attachments.count() >= ComplaintAttachment.MAX_PER_COMPLAINT:
+        raise ValidationError({"file": f"A complaint can hold at most {ComplaintAttachment.MAX_PER_COMPLAINT} files."})
+    name = (uploaded_file.name or "file").replace("\\", "/").rsplit("/", 1)[-1][:255] or "file"
+    content_type = (uploaded_file.content_type or "").lower().split(";")[0].strip()
+    if not content_type or content_type == "application/octet-stream":
+        content_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
+    attachment = ComplaintAttachment.objects.create(
+        institution=complaint.institution, complaint=complaint, stored_file=uploaded_file, original_filename=name,
+        content_type=content_type[:150], size_bytes=uploaded_file.size, uploaded_by=actor, is_internal=internal,
+    )
+    # The file name can itself be revealing, so only its type and size are audited.
+    _audit(complaint, actor, "attachment_added", internal=internal, content_type=attachment.content_type, size_bytes=attachment.size_bytes)
+    if not internal:
+        if is_complainant:
+            for user in [complaint.assigned_to] if complaint.assigned_to_id else handlers(complaint.institution, complaint):
+                _notify(user, complaint, "COMPLAINT_MESSAGE", "New file on a complaint", f"{complaint.code}: the employee attached a file.")
+        else:
+            _notify(complaint.complainant.user, complaint, "COMPLAINT_MESSAGE", "HR shared a file on your complaint", f"{complaint.code}: HR attached a file.")
+    return attachment
+
+
 @transaction.atomic
 def add_note(*, complaint, actor, body, internal=False):
     """HR adds internal or shared notes; the employee who filed it adds shared notes while it is open."""
     complaint = _lock(complaint)
-    is_complainant = complaint.complainant.user_id == actor.id
-    if is_complainant:
-        if internal:
-            raise ValidationError({"is_internal": "Your messages are always shared with HR."})
-        if complaint.status not in (*Complaint.OPEN_STATUSES, Status.RESOLVED):
-            raise ValidationError({"status": "This complaint is no longer open for messages."})
-    else:
-        _require_handler(complaint, actor)
-        if complaint.status == Status.WITHDRAWN:
-            raise ValidationError({"status": "This complaint was withdrawn."})
+    is_complainant = _require_participant(complaint, actor, internal)
     note = ComplaintNote.objects.create(institution=complaint.institution, complaint=complaint, author=actor, body=body, is_internal=internal)
     _audit(complaint, actor, "note_added", internal=internal)
     if not internal:

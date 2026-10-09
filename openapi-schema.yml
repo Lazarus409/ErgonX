@@ -11173,6 +11173,156 @@ paths:
       - permission_denied
       - not_found
       - validation_error
+  /api/v1/complaints/{id}/attachments/:
+    post:
+      operationId: complaints_attachments_create
+      description: |-
+        HR sees every complaint except one that names them; everyone else sees only their own.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Attachments complaint
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this complaint.
+        required: true
+      tags:
+      - complaints
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AttachmentUpload'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/Complaint'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+  /api/v1/complaints/{id}/attachments/{attachment_id}/download/:
+    get:
+      operationId: complaints_attachments_download_retrieve
+      description: |-
+        HR sees every complaint except one that names them; everyone else sees only their own.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
+      summary: Download attachment complaint
+      parameters:
+      - in: path
+        name: attachment_id
+        schema:
+          type: string
+          pattern: ^[0-9a-f-]+$
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this complaint.
+        required: true
+      tags:
+      - complaints
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
   /api/v1/complaints/{id}/close/:
     post:
       operationId: complaints_close_create
@@ -59388,6 +59538,17 @@ components:
           format: uuid
       required:
       - assignee
+    AttachmentUpload:
+      type: object
+      properties:
+        file:
+          type: string
+          format: uri
+        is_internal:
+          type: boolean
+          default: false
+      required:
+      - file
     AttendanceAdjustment:
       type: object
       description: Runs model validation so domain invariants also protect non-form
@@ -60628,6 +60789,12 @@ components:
             type: object
             additionalProperties: {}
           readOnly: true
+        attachments:
+          type: array
+          items:
+            type: object
+            additionalProperties: {}
+          readOnly: true
         viewer:
           type: object
           additionalProperties: {}
@@ -60639,6 +60806,7 @@ components:
       required:
       - assigned_to
       - assigned_to_name
+      - attachments
       - category
       - category_label
       - closed_at

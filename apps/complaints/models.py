@@ -118,3 +118,31 @@ class ComplaintNote(TenantOwnedModel):
             raise ValidationError({"body": "Write a note."})
         if self.complaint_id and self.complaint.institution_id != self.institution_id:
             raise ValidationError({"complaint": "Referenced record must belong to the same institution."})
+
+
+class ComplaintAttachment(TenantOwnedModel):
+    """A file attached to a complaint (photos, messages, letters).
+
+    Kept apart from apps.documents on purpose: anyone holding document.view can
+    list every Document, so complaint evidence would leak. These files are only
+    reachable through the complaint, which applies its own visibility rules.
+    """
+
+    MAX_PER_COMPLAINT = 20
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="+")
+    complaint = models.ForeignKey(Complaint, on_delete=models.CASCADE, related_name="attachments")
+    stored_file = models.FileField(upload_to="complaints/%Y/%m/")
+    original_filename = models.CharField(max_length=255)
+    content_type = models.CharField(max_length=150, blank=True)
+    size_bytes = models.PositiveBigIntegerField(default=0)
+    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    # Internal attachments are HR's own evidence; shared ones are visible to the employee too.
+    is_internal = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ("created_at",)
+
+    def clean(self):
+        if self.complaint_id and self.complaint.institution_id != self.institution_id:
+            raise ValidationError({"complaint": "Referenced record must belong to the same institution."})

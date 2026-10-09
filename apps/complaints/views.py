@@ -1,15 +1,18 @@
 from django.db.models import Q
+from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiTypes, extend_schema
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 
 from apps.accounts.models import User
-from apps.complaints.models import Complaint
+from apps.complaints.models import Complaint, ComplaintAttachment
 from apps.complaints.serializers import (
     AssignSerializer,
+    AttachmentUploadSerializer,
     ComplaintListSerializer,
     ComplaintSerializer,
     FileComplaintSerializer,
@@ -18,6 +21,7 @@ from apps.complaints.serializers import (
     TextSerializer,
 )
 from apps.complaints.services import (
+    add_attachment,
     add_note,
     assign_complaint,
     close_complaint,
@@ -36,7 +40,7 @@ from common.serializers import call_validated_service
 from common.viewsets import TenantModelViewSet
 
 # Every employee files, follows, messages and withdraws their own complaints.
-SELF_SERVICE = ("list", "retrieve", "create", "withdraw", "notes", "colleagues")
+SELF_SERVICE = ("list", "retrieve", "create", "withdraw", "notes", "colleagues", "attachments", "download_attachment")
 STAFF = {"complaint.view", "complaint.manage"}
 
 
@@ -152,6 +156,27 @@ class ComplaintViewSet(TenantModelViewSet):
         complaint = self.get_object()
         call_validated_service(add_note, complaint=complaint, actor=request.user, body=payload.validated_data["body"], internal=payload.validated_data["is_internal"])
         return self._respond(complaint)
+
+    @extend_schema(request={"multipart/form-data": AttachmentUploadSerializer}, responses=ComplaintSerializer)
+    @action(detail=True, methods=("post",), parser_classes=(MultiPartParser, FormParser))
+    def attachments(self, request, pk=None):
+        payload = AttachmentUploadSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        complaint = self.get_object()
+        call_validated_service(add_attachment, complaint=complaint, actor=request.user, uploaded_file=payload.validated_data["file"], internal=payload.validated_data["is_internal"])
+        return self._respond(complaint)
+
+    @extend_schema(responses={(200, "application/octet-stream"): OpenApiTypes.BINARY})
+    @action(detail=True, methods=("get",), url_path=r"attachments/(?P<attachment_id>[0-9a-f-]+)/download")
+    def download_attachment(self, request, pk=None, attachment_id=None):
+        complaint = self.get_object()  # Applies complaint visibility first.
+        attachment = get_object_or_404(ComplaintAttachment, pk=attachment_id, complaint=complaint)
+        is_staff = bool(permission_codes(request) & STAFF) and complaint.complainant.user_id != request.user.id
+        if attachment.is_internal and not is_staff:
+            raise NotFound("File not found.")
+        response = FileResponse(attachment.stored_file.open("rb"), as_attachment=True, filename=attachment.original_filename, content_type=attachment.content_type or "application/octet-stream")
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
 
     @extend_schema(responses={200: OpenApiTypes.OBJECT})
     @action(detail=False, methods=("get",))

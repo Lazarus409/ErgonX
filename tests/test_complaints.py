@@ -153,3 +153,41 @@ def test_colleague_search_is_minimal(people):
     assert any(row["id"] == str(colleague.id) for row in rows)
     assert set(rows[0]) == {"id", "name", "employee_number", "department"}
     assert all(row["id"] != str(employee_of(people["staff"]).id) for row in rows)
+
+
+def test_attachments_are_confidential(people, settings, tmp_path):
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    from apps.documents.models import Document
+
+    settings.MEDIA_ROOT = str(tmp_path)
+    data = file(people, respondent="colleague")
+    client = people["client"]
+    url = f"{COMPLAINTS}{data['id']}/"
+
+    def upload(user, name, internal=False):
+        client.force_authenticate(people[user])
+        return client.post(url + "attachments/", {"file": SimpleUploadedFile(name, b"evidence-" + name.encode(), content_type="image/png"), "is_internal": internal}, format="multipart")
+
+    shared = upload("staff", "screenshot.png")
+    assert shared.status_code == 200, shared.data
+    assert upload("staff", "x.png", internal=True).status_code == 400
+    internal = upload("hr", "interview-notes.png", internal=True).data
+    assert len(internal["attachments"]) == 2
+    # Never stored as a general Document, so document.view holders cannot list it.
+    assert not Document.objects.exists()
+
+    client.force_authenticate(people["staff"])
+    visible = client.get(url).data["attachments"]
+    assert [item["original_filename"] for item in visible] == ["screenshot.png"]
+    download = client.get(url + f"attachments/{visible[0]['id']}/download/")
+    assert download.status_code == 200 and b"".join(download.streaming_content) == b"evidence-screenshot.png"
+    hidden = next(item for item in internal["attachments"] if item["is_internal"])
+    assert client.get(url + f"attachments/{hidden['id']}/download/").status_code == 404
+
+    client.force_authenticate(people["colleague"])  # The person the complaint is about.
+    assert client.get(url + f"attachments/{visible[0]['id']}/download/").status_code == 404
+    client.force_authenticate(people["hr"])
+    assert client.get(url + f"attachments/{hidden['id']}/download/").status_code == 200
+    log = AuditLog.objects.filter(action="complaint.attachment_added").first()
+    assert "screenshot" not in str(log.metadata)

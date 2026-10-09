@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from apps.complaints.models import Complaint, ComplaintNote
+from apps.complaints.models import Complaint, ComplaintAttachment, ComplaintNote
 
 
 def _name(user):
@@ -58,15 +58,32 @@ class ComplaintNoteSerializer(serializers.ModelSerializer):
         return obj.author_id != obj.complaint.complainant.user_id
 
 
+class ComplaintAttachmentSerializer(serializers.ModelSerializer):
+    uploaded_by_name = serializers.SerializerMethodField()
+    from_hr = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ComplaintAttachment
+        fields = ("id", "original_filename", "content_type", "size_bytes", "is_internal", "uploaded_by_name", "from_hr", "created_at")
+        read_only_fields = fields
+
+    def get_uploaded_by_name(self, obj) -> str:
+        return _name(obj.uploaded_by)
+
+    def get_from_hr(self, obj) -> bool:
+        return obj.uploaded_by_id != obj.complaint.complainant.user_id
+
+
 class ComplaintSerializer(ComplaintListSerializer):
     respondent_description = serializers.CharField(read_only=True)
     resolved_by_name = serializers.SerializerMethodField()
     notes = serializers.SerializerMethodField()
+    attachments = serializers.SerializerMethodField()
     viewer = serializers.SerializerMethodField()
 
     class Meta(ComplaintListSerializer.Meta):
         fields = ComplaintListSerializer.Meta.fields + (
-            "description", "incident_location", "respondent_description", "resolution", "resolved_by_name", "closed_at", "withdrawn_at", "notes", "viewer", "updated_at",
+            "description", "incident_location", "respondent_description", "resolution", "resolved_by_name", "closed_at", "withdrawn_at", "notes", "attachments", "viewer", "updated_at",
         )
         read_only_fields = fields
 
@@ -79,6 +96,13 @@ class ComplaintSerializer(ComplaintListSerializer):
         if not is_staff:
             notes = [note for note in notes if not note.is_internal]
         return ComplaintNoteSerializer(notes, many=True).data
+
+    def get_attachments(self, obj) -> list[dict]:
+        _, is_staff, _ = self.viewer(obj)
+        attachments = obj.attachments.select_related("uploaded_by", "complaint__complainant").all()
+        if not is_staff:
+            attachments = [item for item in attachments if not item.is_internal]
+        return ComplaintAttachmentSerializer(attachments, many=True).data
 
     def get_viewer(self, obj) -> dict:
         is_complainant, is_staff, is_handler = self.viewer(obj)
@@ -104,6 +128,11 @@ class FileComplaintSerializer(serializers.Serializer):
 
 class NoteInputSerializer(serializers.Serializer):
     body = serializers.CharField()
+    is_internal = serializers.BooleanField(default=False)
+
+
+class AttachmentUploadSerializer(serializers.Serializer):
+    file = serializers.FileField()
     is_internal = serializers.BooleanField(default=False)
 
 

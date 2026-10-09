@@ -2104,29 +2104,21 @@ def complete_reconciliation_session(*, session, actor):
 
 @transaction.atomic
 def import_statement_csv(*, session, actor, content):
-    """Import statement lines from CSV with headers date, description, reference, amount[, external_id]."""
-    import csv
-    import io
-    from datetime import date as date_type
+    """Import statement lines from a bank's CSV export (layouts: apps.accounting.statement_import)."""
+    from apps.accounting.statement_import import parse_statement
 
     _require(actor, session.institution, "bank_reconciliation.manage")
-    reader = csv.DictReader(io.StringIO(content))
-    headers = {(name or "").strip().lower() for name in (reader.fieldnames or [])}
-    if not {"date", "amount"} <= headers:
-        raise CodedValidationError({"file": "The CSV needs at least 'date' and 'amount' columns."}, api_code="validation_error")
-    created, skipped, errors = 0, 0, []
-    for index, raw in enumerate(reader, start=2):
-        row = {(key or "").strip().lower(): (value or "").strip() for key, value in raw.items()}
-        try:
-            statement_date = date_type.fromisoformat(row["date"])
-            amount = Decimal(row["amount"].replace(",", ""))
-        except Exception:  # noqa: BLE001 - reported per row
-            errors.append(f"Row {index}: use YYYY-MM-DD dates and numeric amounts.")
-            continue
-        if amount == 0:
-            errors.append(f"Row {index}: amount cannot be zero.")
-            continue
-        external_id = row.get("external_id") or f"{statement_date:%Y%m%d}-{row.get('reference') or index}-{amount}"
+    try:
+        rows, errors, _ = parse_statement(content)
+    except ValueError:
+        raise CodedValidationError(
+            {"file": "No column header found. The statement needs a date column and either an amount column or debit/credit columns."},
+            api_code="validation_error",
+        )
+    created, skipped = 0, 0
+    for row in rows:
+        index, statement_date, amount = row["row"], row["date"], row["amount"]
+        external_id = (row["external_id"] or f"{statement_date:%Y%m%d}-{row['reference'] or index}-{amount}")[:120]
         before = BankStatementLine.objects.filter(bank_account=session.bank_account, external_id=external_id.strip().upper()).exists()
         try:
             create_bank_statement_line(

@@ -1,6 +1,6 @@
 "use client";
 
-import { Banknote, Briefcase, Building2, CalendarDays, Clock3, FileCheck2, GraduationCap, LayoutDashboard, Target, Users } from "lucide-react";
+import { Banknote, Briefcase, Building2, CalendarDays, Clock3, FileCheck2, GraduationCap, LayoutDashboard, MessageSquareWarning, Target, Users } from "lucide-react";
 
 import ModuleLanding from "@/components/home/ModuleLanding";
 
@@ -16,6 +16,7 @@ const areas = [
   { title: "Performance", description: "Review cycles, self-assessments, manager reviews and sign-off.", href: "/performance", icon: Target, permission: "performance.view" },
   { title: "Training", description: "Courses, enrolments and certificates to renew.", href: "/training", icon: GraduationCap, permission: "training.view" },
   { title: "Document Checklist", description: "Required documents and who is still missing them.", href: "/hr/documents", icon: FileCheck2, permission: "document_requirement.view" },
+  { title: "Complaints", description: "Confidential employee complaints, investigations and outcomes.", href: "/complaints", icon: MessageSquareWarning, permission: "complaint.view" },
 ];
 
 export default function HRHomePage() {

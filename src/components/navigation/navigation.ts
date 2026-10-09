@@ -9,6 +9,7 @@ import {
   FileBarChart,
   House,
   LayoutDashboard,
+  MessageSquareWarning,
   Network,
   Receipt,
   Settings,
@@ -123,6 +124,8 @@ export const navigation: NavigationItem[] = [
       "training.manage",
       "performance.view",
       "performance.manage",
+      "complaint.view",
+      "complaint.manage",
     ],
     scopes: INSTITUTION_WIDE,
     children: [
@@ -136,6 +139,7 @@ export const navigation: NavigationItem[] = [
       { label: "Performance", href: "/performance", module: "HR", anyPermissions: ["performance.view", "performance.manage"] },
       { label: "Training", href: "/training", module: "HR", anyPermissions: ["training.view", "training.manage"] },
       { label: "Document Checklist", href: "/hr/documents", module: "HR", permission: "document_requirement.view" },
+      { label: "Complaints", href: "/complaints", module: "HR", anyPermissions: ["complaint.view", "complaint.manage"] },
     ],
   },
   {
@@ -256,6 +260,13 @@ export const selfServiceNavigation: NavigationItem[] = [
     label: "My Documents",
     href: "/me/documents",
     icon: FileText,
+    permission: "home.view",
+    selfService: true,
+  },
+  {
+    label: "My Complaints",
+    href: "/me/complaints",
+    icon: MessageSquareWarning,
     permission: "home.view",
     selfService: true,
   },

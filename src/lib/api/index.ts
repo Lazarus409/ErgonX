@@ -67,3 +67,4 @@ export * as reportLibraryApi from "./reportLibrary";
 export * as documentChecklistApi from "./documentChecklist";
 export * as trainingApi from "./training";
 export * as performanceApi from "./performance";
+export * as complaintsApi from "./complaints";

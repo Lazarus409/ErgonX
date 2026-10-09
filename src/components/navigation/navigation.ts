@@ -5,6 +5,7 @@ import {
   Contact,
   FileText,
   GitPullRequest,
+  GraduationCap,
   FileBarChart,
   House,
   LayoutDashboard,
@@ -12,6 +13,7 @@ import {
   Receipt,
   Settings,
   ShieldCheck,
+  Target,
   Users,
   Wallet,
 } from "lucide-react";
@@ -91,7 +93,6 @@ export const APPROVAL_PERMISSIONS = ["approval_request.view", "leave.approve", "
 
 export const navigation: NavigationItem[] = [
   { label: "Home", href: "/", icon: House, permission: "home.view" },
-  { label: "Executive Dashboard", href: "/dashboard", icon: LayoutDashboard, permission: "dashboard.executive.view" },
   {
     label: "My Department / Functional Area",
     href: "/department",
@@ -116,6 +117,11 @@ export const navigation: NavigationItem[] = [
       ...moduleWorkspacePermissions.LEAVE,
       ...moduleWorkspacePermissions.ATTENDANCE,
       ...moduleWorkspacePermissions.PAYROLL,
+      "document_requirement.view",
+      "training.view",
+      "training.manage",
+      "performance.view",
+      "performance.manage",
     ],
     scopes: INSTITUTION_WIDE,
     children: [
@@ -124,6 +130,9 @@ export const navigation: NavigationItem[] = [
       { label: "Recruitment", href: "/recruitment", module: "RECRUITMENT", anyPermissions: moduleWorkspacePermissions.RECRUITMENT },
       { label: "Leave", href: "/leave", module: "LEAVE", anyPermissions: moduleWorkspacePermissions.LEAVE },
       { label: "Attendance", href: "/attendance", module: "ATTENDANCE", anyPermissions: moduleWorkspacePermissions.ATTENDANCE },
+      { label: "Document Checklist", href: "/hr/documents", module: "HR", permission: "document_requirement.view" },
+      { label: "Training", href: "/training", module: "HR", anyPermissions: ["training.view", "training.manage"] },
+      { label: "Performance", href: "/performance", module: "HR", anyPermissions: ["performance.view", "performance.manage"] },
       { label: "Payroll", href: "/payroll", module: "PAYROLL", anyPermissions: moduleWorkspacePermissions.PAYROLL },
     ],
   },
@@ -202,6 +211,20 @@ export const selfServiceNavigation: NavigationItem[] = [
     icon: ClipboardCheck,
     module: "ATTENDANCE",
     permission: "attendance.view",
+    selfService: true,
+  },
+  {
+    label: "My Performance",
+    href: "/me/performance",
+    icon: Target,
+    permission: "home.view",
+    selfService: true,
+  },
+  {
+    label: "My Training",
+    href: "/me/training",
+    icon: GraduationCap,
+    permission: "home.view",
     selfService: true,
   },
   {

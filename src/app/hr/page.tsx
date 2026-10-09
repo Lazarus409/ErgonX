@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, GraduationCap, LayoutDashboard, MapPin, Users, UserRoundCog } from "lucide-react";
+import { Building2, FileCheck2, GraduationCap, LayoutDashboard, MapPin, Target, Users, UserRoundCog } from "lucide-react";
 
 import ModuleLanding from "@/components/home/ModuleLanding";
 
@@ -11,6 +11,9 @@ const areas = [
   { title: "Positions", description: "Add job positions and the department / functional area each belongs to.", href: "/hr/positions", icon: UserRoundCog, permission: "organization.view" },
   { title: "Grades", description: "Set up the grade levels used for employees and pay.", href: "/hr/grades", icon: GraduationCap, permission: "organization.view" },
   { title: "Locations", description: "Add offices, sites and remote arrangements.", href: "/hr/locations", icon: MapPin, permission: "organization.view" },
+  { title: "Document Checklist", description: "Required documents and who is still missing them.", href: "/hr/documents", icon: FileCheck2, permission: "document_requirement.view" },
+  { title: "Training", description: "Courses, enrolments and certificates to renew.", href: "/training", icon: GraduationCap, permission: "training.view" },
+  { title: "Performance", description: "Review cycles, self-assessments, manager reviews and sign-off.", href: "/performance", icon: Target, permission: "performance.view" },
 ];
 
 export default function HRHomePage() {

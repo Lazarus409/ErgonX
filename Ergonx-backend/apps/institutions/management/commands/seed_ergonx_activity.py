@@ -71,7 +71,7 @@ from apps.payroll.services import approve_payroll_run, calculate_payroll_run, cr
 from apps.recruitment.models import Application, Candidate, Interview, JobPosting, Offer, RecruitmentStage
 from apps.recruitment.services import decide_offer, extend_offer, move_application_stage, reject_application, submit_application
 from apps.scheduling.services import schedule_assignment_for, schedule_expectation
-from apps.institutions.management.commands.seed_ergonx_demo import DEMO_ADMIN_EMAIL, DEMO_INSTITUTION_CODE
+from apps.institutions.management.commands.seed_ergonx_demo import DEMO_ADMIN_EMAIL, DEMO_INSTITUTION_CODE, DEMO_SEED_REFUSAL, demo_seed_allowed
 
 SERVICE_ERRORS = (DjangoValidationError, ApiValidationError)
 ATTENDANCE_DAYS = 35
@@ -114,8 +114,8 @@ class Command(BaseCommand):
         parser.add_argument("--days", type=int, default=ATTENDANCE_DAYS, help="Days of attendance history to maintain (default 35).")
 
     def handle(self, *args, **options):
-        if not settings.DEBUG:
-            raise CommandError("seed_ergonx_activity is development-only and refuses to run when DEBUG=False.")
+        if not demo_seed_allowed():
+            raise CommandError(DEMO_SEED_REFUSAL.format("seed_ergonx_activity"))
         institution = Institution.objects.filter(code=DEMO_INSTITUTION_CODE).first()
         if institution is None:
             raise CommandError("APEX-DEMO does not exist. Run `python manage.py seed_ergonx_demo` first.")

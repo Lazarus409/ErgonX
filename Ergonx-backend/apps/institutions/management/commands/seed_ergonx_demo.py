@@ -5,6 +5,7 @@ workbook at runtime; the reviewed workbook is represented by deterministic
 constants and domain-service calls.
 """
 
+import os
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
@@ -63,6 +64,19 @@ DEMO_DIRECTOR_EMAIL = f"evelyn.darko@{DEMO_EMAIL_DOMAIN}"
 # the onboarding/demo documentation and local UI smoke tests. This is only for
 # synthetic development accounts; production seeding is explicitly blocked.
 DEFAULT_DEMO_PASSWORD = "ErgonxDemo!2026"
+
+def demo_seed_allowed():
+    """Demo seeds run in development, or on a server that opts in explicitly.
+
+    Setting ERGONX_ALLOW_DEMO_SEED=true lets a hosted demo be populated. The
+    seeds only ever write to the APEX-DEMO institution; other tenants are not
+    touched. Remove the variable again once the demo is seeded.
+    """
+    return settings.DEBUG or os.environ.get("ERGONX_ALLOW_DEMO_SEED", "").strip().lower() == "true"
+
+
+DEMO_SEED_REFUSAL = "{} is development-only. On a hosted demo, set ERGONX_ALLOW_DEMO_SEED=true for the run."
+
 
 MODULE_CODES = (
     InstitutionModule.ModuleCode.CORE_HR,
@@ -231,8 +245,8 @@ class Command(BaseCommand):
         parser.add_argument("--validate-only", action="store_true", help="Validate the current APEX-DEMO foundation without writing data.")
 
     def handle(self, *args, **options):
-        if not settings.DEBUG:
-            raise CommandError("seed_ergonx_demo is development-only and refuses to run when DEBUG=False.")
+        if not demo_seed_allowed():
+            raise CommandError(DEMO_SEED_REFUSAL.format("seed_ergonx_demo"))
 
         if options["validate_only"]:
             self._validate_existing()

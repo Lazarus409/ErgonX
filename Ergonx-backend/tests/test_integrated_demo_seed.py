@@ -72,3 +72,19 @@ def test_people_seed_fills_hr_modules_and_is_idempotent():
     call_command("seed_ergonx_people", stdout=StringIO())
     call_command("seed_ergonx_demo", password="ErgonxDemo!2026", stdout=StringIO())
     assert counts() == first
+
+
+@pytest.mark.django_db
+@override_settings(DEBUG=False)
+@pytest.mark.parametrize("command", ["seed_ergonx_demo", "seed_ergonx_activity", "seed_ergonx_people"])
+def test_demo_seeds_need_an_explicit_opt_in_on_a_server(command, monkeypatch):
+    from django.core.management.base import CommandError
+
+    monkeypatch.delenv("ERGONX_ALLOW_DEMO_SEED", raising=False)
+    with pytest.raises(CommandError, match="development-only"):
+        call_command(command, stdout=StringIO())
+    monkeypatch.setenv("ERGONX_ALLOW_DEMO_SEED", "true")
+    if command != "seed_ergonx_demo":
+        # Past the guard: the follow-up seeds then insist on the foundation.
+        with pytest.raises(CommandError, match="does not exist"):
+            call_command(command, stdout=StringIO())

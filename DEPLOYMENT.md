@@ -41,44 +41,29 @@ docker compose --env-file .env.production -f compose.production.yaml ps
 
 The backend runs migrations and collects static files before Gunicorn starts. Do not run any `seed_*_demo` command in this environment; each one refuses production settings.
 
-## Uploaded files (required on Render)
+## Uploaded files
 
-Documents, expense receipts, complaint files and profile images must live
-outside the container: Render wipes a service's disk on every deploy and
-restart. Downloads always go through the API (which checks access first), so
-the bucket stays private.
+Documents, expense receipts, complaint files and profile images are stored in
+the PostgreSQL database in production (table `filestore_storedfile`), so they
+survive deploys and are part of every database backup. Nothing needs to be
+configured. Files are limited to `DOCUMENT_UPLOAD_MAX_MB` (25 MB) each; keep an
+eye on the database's disk usage as uploads grow.
 
-**Recommended: Cloudflare R2** (10 GB free, no download fees).
+Downloads always go through the API, which checks access first.
 
-1. Cloudflare dashboard → R2 → *Create bucket*, e.g. `ergonx-media`. Leave
-   public access off.
-2. R2 → *Manage API tokens* → *Create API token* with **Object Read & Write**
-   on that bucket. Copy the Access Key ID, Secret Access Key and the S3
-   endpoint (`https://<account-id>.r2.cloudflarestorage.com`).
-3. Render → `ergonx-api` → Environment:
+Other options, if the database ever grows too large:
 
-   | Key | Value |
-   |---|---|
-   | `MEDIA_STORAGE` | `s3` |
-   | `MEDIA_S3_BUCKET` | `ergonx-media` |
-   | `MEDIA_S3_ACCESS_KEY_ID` | the token's access key |
-   | `MEDIA_S3_SECRET_ACCESS_KEY` | the token's secret |
-   | `MEDIA_S3_ENDPOINT_URL` | the R2 S3 endpoint |
-   | `MEDIA_S3_REGION` | `auto` |
+- an S3-compatible bucket: `MEDIA_STORAGE=s3` with `MEDIA_S3_BUCKET`,
+  `MEDIA_S3_ACCESS_KEY_ID`, `MEDIA_S3_SECRET_ACCESS_KEY` and, for Cloudflare
+  R2 or similar, `MEDIA_S3_ENDPOINT_URL` and `MEDIA_S3_REGION=auto`;
+- a persistent disk: `MEDIA_ROOT=/var/data/media` on a mounted disk.
 
-   Save; the API redeploys. AWS S3 works the same way (leave
-   `MEDIA_S3_ENDPOINT_URL` empty, set the bucket's region).
-
-Alternative: a Render persistent disk (paid instance) mounted at, say,
-`/var/data`, with `MEDIA_ROOT=/var/data/media`.
-
-Without either, the API logs a warning at start-up that uploads will be lost.
-
-Files uploaded before storage was configured are gone. List them with
+Files uploaded before database storage was introduced were written to the
+container disk and are gone. List them with
 `python manage.py restore_demo_files` (read-only); with
 `ERGONX_ALLOW_DEMO_SEED=true`, `python manage.py restore_demo_files --restore`
-recreates the Apex Energy demo's placeholder files in the new storage. Real
-organisations' missing files have to be uploaded again.
+recreates the Apex Energy demo's placeholder files. Real organisations' missing
+files have to be uploaded again.
 
 ### Hosted demo only: populating the Apex Energy demo
 

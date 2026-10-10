@@ -30,6 +30,21 @@ services:
       # sign-in limits and audit records. Generated once here, read by the web service.
       - key: BFF_PROXY_SECRET
         generateValue: true
+      # Uploaded files (documents, receipts, complaint files, images). The
+      # container disk is wiped on every deploy, so set MEDIA_STORAGE=s3 and
+      # the bucket values below (Cloudflare R2, AWS S3, ...). See DEPLOYMENT.md.
+      - key: MEDIA_STORAGE
+        sync: false
+      - key: MEDIA_S3_BUCKET
+        sync: false
+      - key: MEDIA_S3_ACCESS_KEY_ID
+        sync: false
+      - key: MEDIA_S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: MEDIA_S3_ENDPOINT_URL
+        sync: false
+      - key: MEDIA_S3_REGION
+        sync: false
 
   - type: web
     runtime: docker

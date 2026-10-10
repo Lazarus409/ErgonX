@@ -41,6 +41,45 @@ docker compose --env-file .env.production -f compose.production.yaml ps
 
 The backend runs migrations and collects static files before Gunicorn starts. Do not run any `seed_*_demo` command in this environment; each one refuses production settings.
 
+## Uploaded files (required on Render)
+
+Documents, expense receipts, complaint files and profile images must live
+outside the container: Render wipes a service's disk on every deploy and
+restart. Downloads always go through the API (which checks access first), so
+the bucket stays private.
+
+**Recommended: Cloudflare R2** (10 GB free, no download fees).
+
+1. Cloudflare dashboard → R2 → *Create bucket*, e.g. `ergonx-media`. Leave
+   public access off.
+2. R2 → *Manage API tokens* → *Create API token* with **Object Read & Write**
+   on that bucket. Copy the Access Key ID, Secret Access Key and the S3
+   endpoint (`https://<account-id>.r2.cloudflarestorage.com`).
+3. Render → `ergonx-api` → Environment:
+
+   | Key | Value |
+   |---|---|
+   | `MEDIA_STORAGE` | `s3` |
+   | `MEDIA_S3_BUCKET` | `ergonx-media` |
+   | `MEDIA_S3_ACCESS_KEY_ID` | the token's access key |
+   | `MEDIA_S3_SECRET_ACCESS_KEY` | the token's secret |
+   | `MEDIA_S3_ENDPOINT_URL` | the R2 S3 endpoint |
+   | `MEDIA_S3_REGION` | `auto` |
+
+   Save; the API redeploys. AWS S3 works the same way (leave
+   `MEDIA_S3_ENDPOINT_URL` empty, set the bucket's region).
+
+Alternative: a Render persistent disk (paid instance) mounted at, say,
+`/var/data`, with `MEDIA_ROOT=/var/data/media`.
+
+Without either, the API logs a warning at start-up that uploads will be lost.
+
+Files uploaded before storage was configured are gone. List them with
+`python manage.py restore_demo_files` (read-only); with
+`ERGONX_ALLOW_DEMO_SEED=true`, `python manage.py restore_demo_files --restore`
+recreates the Apex Energy demo's placeholder files in the new storage. Real
+organisations' missing files have to be uploaded again.
+
 ### Hosted demo only: populating the Apex Energy demo
 
 A server that hosts the sales demo can be filled with the Apex Energy Ghana Ltd

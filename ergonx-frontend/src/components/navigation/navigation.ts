@@ -5,13 +5,16 @@ import {
   Contact,
   FileText,
   GitPullRequest,
+  GraduationCap,
   FileBarChart,
   House,
   LayoutDashboard,
+  MessageSquareWarning,
   Network,
   Receipt,
   Settings,
   ShieldCheck,
+  Target,
   Users,
   Wallet,
 } from "lucide-react";
@@ -90,6 +93,7 @@ export const INSIGHT_PERMISSIONS = ["dashboard.executive.view", "dashboard.hr.vi
 export const APPROVAL_PERMISSIONS = ["approval_request.view", "leave.approve", "attendance.approve", "payroll.approve", "tax_relief.approve", "job_posting.approve", "offer.approve", "journal.approve", "vendor_bill.approve", "expense.approve", "budget.approve"];
 
 export const navigation: NavigationItem[] = [
+  // Ordered by how often people need each area: daily work first, oversight and setup last.
   { label: "Home", href: "/", icon: House, permission: "home.view" },
   { label: "Executive Dashboard", href: "/dashboard", icon: LayoutDashboard, permission: "dashboard.executive.view" },
   {
@@ -108,23 +112,34 @@ export const navigation: NavigationItem[] = [
     label: "Human Resources",
     href: "/hr",
     icon: Users,
-    // HR is the people workspace umbrella. Its own setup pages and each
-    // people-related module remain individually gated below.
+    // Every HR workspace sits in this one menu; each child keeps its own gate.
     anyPermissions: [
       ...moduleWorkspacePermissions.HR,
       ...moduleWorkspacePermissions.RECRUITMENT,
       ...moduleWorkspacePermissions.LEAVE,
       ...moduleWorkspacePermissions.ATTENDANCE,
       ...moduleWorkspacePermissions.PAYROLL,
+      "document_requirement.view",
+      "training.view",
+      "training.manage",
+      "performance.view",
+      "performance.manage",
+      "complaint.view",
+      "complaint.manage",
     ],
     scopes: INSTITUTION_WIDE,
     children: [
       { label: "HR Dashboard", href: "/hr/dashboard", module: "HR", permission: "dashboard.hr.view" },
       { label: "Employees", href: "/hr/employees", module: "HR", permission: "employee.view" },
-      { label: "Recruitment", href: "/recruitment", module: "RECRUITMENT", anyPermissions: moduleWorkspacePermissions.RECRUITMENT },
       { label: "Leave", href: "/leave", module: "LEAVE", anyPermissions: moduleWorkspacePermissions.LEAVE },
       { label: "Attendance", href: "/attendance", module: "ATTENDANCE", anyPermissions: moduleWorkspacePermissions.ATTENDANCE },
       { label: "Payroll", href: "/payroll", module: "PAYROLL", anyPermissions: moduleWorkspacePermissions.PAYROLL },
+      { label: "Recruitment", href: "/recruitment", module: "RECRUITMENT", anyPermissions: moduleWorkspacePermissions.RECRUITMENT },
+      { label: "Organization", href: "/hr/organization", module: "HR", anyPermissions: ["organization.view", "organization.create", "organization.update"] },
+      { label: "Performance", href: "/performance", module: "HR", anyPermissions: ["performance.view", "performance.manage"] },
+      { label: "Training", href: "/training", module: "HR", anyPermissions: ["training.view", "training.manage"] },
+      { label: "Document Checklist", href: "/hr/documents", module: "HR", permission: "document_requirement.view" },
+      { label: "Complaints", href: "/complaints", module: "HR", anyPermissions: ["complaint.view", "complaint.manage"] },
     ],
   },
   {
@@ -205,6 +220,20 @@ export const selfServiceNavigation: NavigationItem[] = [
     selfService: true,
   },
   {
+    label: "My Performance",
+    href: "/me/performance",
+    icon: Target,
+    permission: "home.view",
+    selfService: true,
+  },
+  {
+    label: "My Training",
+    href: "/me/training",
+    icon: GraduationCap,
+    permission: "home.view",
+    selfService: true,
+  },
+  {
     label: "My Payslips",
     href: "/me/payslips",
     icon: CircleDollarSign,
@@ -231,6 +260,13 @@ export const selfServiceNavigation: NavigationItem[] = [
     label: "My Documents",
     href: "/me/documents",
     icon: FileText,
+    permission: "home.view",
+    selfService: true,
+  },
+  {
+    label: "My Complaints",
+    href: "/me/complaints",
+    icon: MessageSquareWarning,
     permission: "home.view",
     selfService: true,
   },

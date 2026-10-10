@@ -24,6 +24,18 @@ export interface Lifecycle {
 }
 
 export const lifecycles: Record<string, Lifecycle> = {
+  complaint: {
+    steps: [
+      { key: "SUBMITTED", label: "Submitted", hint: "Waiting for HR" },
+      { key: "UNDER_REVIEW", label: "Under review", hint: "Assigned to HR" },
+      { key: "INVESTIGATING", label: "Investigating", hint: "HR is looking into it" },
+      { key: "RESOLVED", label: "Resolved", hint: "Outcome recorded" },
+      { key: "CLOSED", label: "Closed", final: true },
+    ],
+    outcomes: {
+      WITHDRAWN: { label: "Withdrawn by the employee", tone: "neutral" },
+    },
+  },
   journal: {
     steps: [
       { key: "DRAFT", label: "Draft", hint: "Being prepared" },

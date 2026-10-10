@@ -29,7 +29,11 @@ Legend: ✅ done · 🔶 partly done · ⬜ not started · ⏸ deferred by decis
 | Permission coverage guard (only service-authorized endpoints skip a permission code); document download mapped | ✅ | backend pending commit |
 | W5 payroll + manual journals: preparer ≠ approver (BQ-04, setting default ON); system journals exempt, record upstream approver | ✅ | backend pending commit; frontend 74669e5 |
 | W6 currency guard (FIN-03), account provenance (BQ-09), Expense 2.0 (BQ-02/03): categories, lines, receipts, manager stage via engine, finance review + recode, accrual posting, settle, reverse, self-service, notifications, audit | ✅ | backend pending commit; frontend 712a4f0, a53f573 |
-| W7/W8 | ⬜ | |
+| HR modules ported from the ErgonX-HR fork (approved 2026-10-09): Performance reviews, Training, Document checklist; HR cannot manage their own review; view-only roles get no review actions | ✅ | backend/frontend branch `phase2/hr-modules`; frontend 1a03928 |
+| W7 bank-statement import: bank CSV exports (title rows, header aliases, debit/credit or DR/CR columns, day-first dates, currency marks, balance rows skipped) | ✅ | backend `phase2/hr-modules` |
+| W7 budget/report screens | ✅ aligned (see Screens) | — |
+| W8 REPORTS gating (BQ-05) and scheduled-report cron | ✅ | 913f6d2; render.yaml `ergonx-scheduled-reports` |
+| W7/W8 deferred by decision: credit notes (BQ-08), candidate retention (BQ-07), careers portal, XLSX/OFX statement files | ⏸ | |
 | Deferred: credit notes, careers portal, candidate retention, reconciliation reopen, PDF/XLSX/XBRL | ⏸ | |
 
 ## Screens
@@ -63,6 +67,6 @@ All 66 screens are accounted for. "Aligned" means the existing page (from the co
 | S055 reports | aligned | — |
 | S030 public careers | deferred (W8+) | — |
 
-Deferred by decision (not built): credit notes, careers portal, candidate retention, reconciliation reopen, payroll "Paid" state, external calendars, identity verification, performance trajectory, healthcare proxy / escalation order, PDF/XLSX/XBRL exports, SMS OTP, procurement/learning/performance/benefits.
+Deferred by decision (not built): credit notes, careers portal, candidate retention, reconciliation reopen, payroll "Paid" state, external calendars, identity verification, performance trajectory, healthcare proxy / escalation order, PDF/XLSX/XBRL exports, SMS OTP, procurement/benefits. (Performance and training were approved on 2026-10-09 and are built.)
 
 Visual checks: no headless browser is installed, so screens are verified by typecheck and lint only. Check each restyled screen in the browser.

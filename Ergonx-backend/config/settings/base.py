@@ -141,7 +141,10 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+# Uploaded files: an S3-compatible bucket (MEDIA_STORAGE=s3) or a folder (config/settings/storage.py).
+from .storage import media_storage_settings  # noqa: E402
+
+STORAGES, MEDIA_ROOT, MEDIA_STORAGE_KIND = media_storage_settings(base_dir=BASE_DIR)
 DOCUMENT_UPLOAD_MAX_BYTES = int(os.environ.get("DOCUMENT_UPLOAD_MAX_MB", "25")) * 1024 * 1024
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "accounts.User"

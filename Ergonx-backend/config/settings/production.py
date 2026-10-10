@@ -19,6 +19,15 @@ if os.environ.get("EMAIL_DELIVERY_ENABLED", "false").lower() == "true":
             f"Email delivery is enabled but missing: {', '.join(missing_email_settings)}"
         )
 
+if MEDIA_STORAGE_KIND == "filesystem" and not os.environ.get("MEDIA_ROOT"):  # noqa: F405
+    # Uploads written to the container's own disk vanish on the next deploy.
+    import logging
+
+    logging.getLogger("ergonx.storage").warning(
+        "Uploaded files are stored on the container disk and will be lost on redeploy. "
+        "Set MEDIA_STORAGE=s3 (with MEDIA_S3_* settings) or MEDIA_ROOT on a persistent disk."
+    )
+
 DEBUG = False
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_SSL_REDIRECT = True

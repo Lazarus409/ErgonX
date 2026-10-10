@@ -340,11 +340,13 @@ class Command(BaseCommand):
             raise CommandError("APEX-DEMO payroll journal is missing or not posted.")
         if journal.lines.aggregate(debits=models.Sum("debit"))["debits"] != journal.lines.aggregate(credits=models.Sum("credit"))["credits"]:
             raise CommandError("APEX-DEMO payroll journal is not balanced.")
-        if institution.vendor_bills.filter(bill_number="BILL-2026-000087", status=VendorBill.Status.PAID).count() != 1:
+        # Like leave, these scenarios may have moved on through real use of the
+        # demo (a receipt voided, a claim approved); they only have to exist.
+        if not institution.vendor_bills.filter(bill_number="BILL-2026-000087", payments__isnull=False).exists():
             raise CommandError("APEX-DEMO vendor-bill payment scenario is incomplete.")
-        if institution.invoices.filter(invoice_number="INV-2026-000184", status=Invoice.Status.PART_PAID).count() != 1:
+        if not institution.invoices.filter(invoice_number="INV-2026-000184", receipts__isnull=False).exists():
             raise CommandError("APEX-DEMO invoice receipt scenario is incomplete.")
-        if institution.expenses.filter(description="EXP-2026-000112 Travel expense", status=Expense.Status.PENDING).count() != 1:
+        if not institution.expenses.filter(description="EXP-2026-000112 Travel expense").exists():
             raise CommandError("APEX-DEMO pending expense scenario is incomplete.")
         self._validate_home_activity(institution)
         self._validate_role_access(institution)

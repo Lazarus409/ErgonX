@@ -1,4 +1,4 @@
-"""Seed rolling, date-relative operational activity for the CSA-DEMO tenant.
+"""Seed rolling, date-relative operational activity for the APEX-DEMO tenant.
 
 ``seed_ergonx_demo`` creates the fixed foundation and a handful of reviewed
 workflow scenarios. Dashboards, however, are about *now*: today's attendance,
@@ -6,7 +6,7 @@ who is on leave this week, interviews coming up, overdue bills. This command
 layers realistic activity around the current date on top of that foundation so
 every dashboard and self-service page has real data.
 
-* Development-only (refuses to run when DEBUG=False) and CSA-DEMO only.
+* Development-only (refuses to run when DEBUG=False) and APEX-DEMO only.
 * Idempotent: every record carries a stable key (number, reference, reason or
   external id) and is skipped when it already exists, so re-running simply
   fills in the days that have passed since the last run.
@@ -71,9 +71,8 @@ from apps.payroll.services import approve_payroll_run, calculate_payroll_run, cr
 from apps.recruitment.models import Application, Candidate, Interview, JobPosting, Offer, RecruitmentStage
 from apps.recruitment.services import decide_offer, extend_offer, move_application_stage, reject_application, submit_application
 from apps.scheduling.services import schedule_assignment_for, schedule_expectation
+from apps.institutions.management.commands.seed_ergonx_demo import DEMO_ADMIN_EMAIL, DEMO_INSTITUTION_CODE
 
-DEMO_INSTITUTION_CODE = "CSA-DEMO"
-DEMO_ADMIN_EMAIL = "kwame.mensah@csa.test"
 SERVICE_ERRORS = (DjangoValidationError, ApiValidationError)
 ATTENDANCE_DAYS = 35
 MINIMAL_PDF = (
@@ -109,7 +108,7 @@ def add_weekdays(day, count):
 
 
 class Command(BaseCommand):
-    help = "Seed rolling, date-relative CSA-DEMO activity so every dashboard shows real data (development only)."
+    help = "Seed rolling, date-relative APEX-DEMO activity so every dashboard shows real data (development only)."
 
     def add_arguments(self, parser):
         parser.add_argument("--days", type=int, default=ATTENDANCE_DAYS, help="Days of attendance history to maintain (default 35).")
@@ -119,7 +118,7 @@ class Command(BaseCommand):
             raise CommandError("seed_ergonx_activity is development-only and refuses to run when DEBUG=False.")
         institution = Institution.objects.filter(code=DEMO_INSTITUTION_CODE).first()
         if institution is None:
-            raise CommandError("CSA-DEMO does not exist. Run `python manage.py seed_ergonx_demo` first.")
+            raise CommandError("APEX-DEMO does not exist. Run `python manage.py seed_ergonx_demo` first.")
         self.institution = institution
         self.admin = User.objects.get(email=DEMO_ADMIN_EMAIL)
         self.zone = ZoneInfo(institution.timezone)
@@ -152,7 +151,7 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.ERROR(f"  FAILED  {label}: {exc}"))
         if failures:
             raise CommandError(f"Activity seeding failed for: {', '.join(failures)}")
-        self.stdout.write(self.style.SUCCESS(f"CSA-DEMO activity is current as of {self.today.isoformat()}."))
+        self.stdout.write(self.style.SUCCESS(f"APEX-DEMO activity is current as of {self.today.isoformat()}."))
 
     # ------------------------------------------------------------------ helpers
 
@@ -411,13 +410,13 @@ class Command(BaseCommand):
         institution, admin = self.institution, self.admin
         stages = {stage.name: stage for stage in RecruitmentStage.objects.filter(institution=institution, is_active=True)}
         rng = random.Random("apex-sources")
-        for candidate in Candidate.objects.filter(institution=institution, source__in=("", "CSA-DEMO")).order_by("email"):
+        for candidate in Candidate.objects.filter(institution=institution, source__in=("", "APEX-DEMO")).order_by("email"):
             candidate.source = rng.choice(self.SOURCES)
             candidate.save(update_fields=("source", "updated_at"))
 
         structure = institution.salary_structures.get(code="APEX-MONTHLY")
         for index, (first, last, job_code, days_ago, stage_name, outcome) in enumerate(self.HISTORY_CANDIDATES):
-            email = f"{first}.{last}.candidate@csa.test".lower()
+            email = f"{first}.{last}@example.com".lower()
             if Candidate.objects.filter(institution=institution, email=email).exists():
                 continue
             candidate = Candidate.objects.create(institution=institution, email=email, first_name=first, last_name=last, source=self.SOURCES[index % len(self.SOURCES)])
@@ -458,16 +457,16 @@ class Command(BaseCommand):
     # ------------------------------------------------ receivables and payables
 
     VENDORS = (
-        ("VND-APEX-002", "Electricity Company of Ghana", "billing@ecg.test"),
-        ("VND-APEX-003", "Vodafone Business Ghana", "business@vodafone.test"),
-        ("VND-APEX-004", "Kotoka Travel & Tours", "accounts@kotokatravel.test"),
-        ("VND-APEX-005", "Deloitte & Associates GH", "fees@deloitte-gh.test"),
-        ("VND-APEX-006", "Accra Facilities Management", "invoices@accrafm.test"),
+        ("VND-APEX-002", "Electricity Company of Ghana", "billing@ecg.example.com"),
+        ("VND-APEX-003", "Vodafone Business Ghana", "business@vodafone.example.com"),
+        ("VND-APEX-004", "Kotoka Travel & Tours", "accounts@kotokatravel.example.com"),
+        ("VND-APEX-005", "Deloitte & Associates GH", "fees@deloitte-gh.example.com"),
+        ("VND-APEX-006", "Accra Facilities Management", "invoices@accrafm.example.com"),
     )
     CUSTOMERS = (
-        ("CUS-APEX-002", "GoldCoast Microfinance", "finance@goldcoastmf.test"),
-        ("CUS-APEX-003", "Tema Port Logistics", "ap@temaport.test"),
-        ("CUS-APEX-004", "Volta Health Services", "accounts@voltahealth.test"),
+        ("CUS-APEX-002", "GoldCoast Microfinance", "finance@goldcoastmf.example.com"),
+        ("CUS-APEX-003", "Tema Port Logistics", "ap@temaport.example.com"),
+        ("CUS-APEX-004", "Volta Health Services", "accounts@voltahealth.example.com"),
     )
 
     def _receivables_and_payables(self):
@@ -487,7 +486,7 @@ class Command(BaseCommand):
             ("BILL-ACT-0102", "VND-APEX-003", "5310", "Fibre internet and mobile data", Decimal("4250"), -40, -12, Decimal("1500")),
             ("BILL-ACT-0103", "VND-APEX-005", "5600", "Statutory audit, interim fieldwork", Decimal("18500"), -70, -40, None),
             ("BILL-ACT-0104", "VND-APEX-006", "5700", "Generator servicing and repairs", Decimal("9300"), -100, -75, Decimal("4000")),
-            ("BILL-ACT-0105", "VND-APEX-004", "5400", "Client site travel, Kumasi", Decimal("3120"), -25, -3, None),
+            ("BILL-ACT-0105", "VND-APEX-004", "5400", "Depot inspection travel, Kumasi", Decimal("3120"), -25, -3, None),
         )
         for number, vendor_code, account_code, description, amount, issued, due, paid in bills:
             bill_date = self.today + timedelta(days=issued)
@@ -513,7 +512,7 @@ class Command(BaseCommand):
                     continue
                 customer = Customer.objects.get(institution=institution, customer_code=code)
                 amount = Decimal(18000 + ((month_index * 7 + customer_index * 5) % 9) * 2750)
-                invoice = create_invoice(institution=institution, actor=admin, customer=customer, invoice_number=number, invoice_date=invoice_date, due_date=invoice_date + timedelta(days=30), currency="GHS", accounting_period=self._period_for(invoice_date), lines=[{"description": "Managed IT and implementation services", "income_account": revenue, "quantity": Decimal("1"), "unit_price": amount}])
+                invoice = create_invoice(institution=institution, actor=admin, customer=customer, invoice_number=number, invoice_date=invoice_date, due_date=invoice_date + timedelta(days=30), currency="GHS", accounting_period=self._period_for(invoice_date), lines=[{"description": "Bulk fuel supply (diesel and premium petrol)", "income_account": revenue, "quantity": Decimal("1"), "unit_price": amount}])
                 invoice = issue_invoice(invoice=invoice, actor=admin)
                 age = (self.today - invoice_date).days
                 paid = amount if age > 50 else (amount / 2).quantize(Decimal("0.01")) if age > 30 and customer_index == 0 else None

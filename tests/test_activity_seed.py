@@ -15,8 +15,8 @@ def seeded(api_client, db):
         call_command("seed_ergonx_demo", password="ErgonxDemo!2026", stdout=StringIO())
         output = StringIO()
         call_command("seed_ergonx_activity", stdout=output)
-    institution = Institution.objects.get(code="CSA-DEMO")
-    api_client.force_authenticate(User.objects.get(email="kwame.mensah@csa.test"))
+    institution = Institution.objects.get(code="APEX-DEMO")
+    api_client.force_authenticate(User.objects.get(email="kwame.mensah@apexenergy.com"))
     api_client.credentials(HTTP_X_INSTITUTION_ID=str(institution.id))
     return institution, output.getvalue()
 
@@ -65,7 +65,7 @@ def test_activity_seed_populates_every_dashboard(api_client, seeded):
 def test_activity_seed_gives_employees_a_personal_snapshot(api_client, seeded):
     institution, _ = seeded
     # The self-service persona used for demos and visual checks.
-    persona = User.objects.get(email="nana.nyarko@csa.test")
+    persona = User.objects.get(email="nana.nyarko@apexenergy.com")
     assert InstitutionMembership.objects.get(institution=institution, user=persona).role.code == "EMPLOYEE"
     api_client.force_authenticate(persona)
     snapshot = api_client.get("/api/v1/home/").data["optional_personal_snapshot"]

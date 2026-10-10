@@ -49,7 +49,7 @@ from apps.compensation.services import change_current_compensation
 from apps.documents.models import EMPLOYEE_ENTITY_TYPE, Document, DocumentRequirement, DocumentRequirementWaiver
 from apps.employees.models import EmergencyContact, Employee, EmployeeOffboarding, EmployeeOnboarding, Employment
 from apps.employees.services import complete_employee_onboarding, create_employment, initiate_employee_offboarding, save_emergency_contact, start_employee_onboarding
-from apps.institutions.management.commands.seed_ergonx_demo import DEFAULT_DEMO_PASSWORD, DEMO_ADMIN_EMAIL, DEMO_EMAIL_DOMAIN, DEMO_INSTITUTION_CODE, EMPLOYEES
+from apps.institutions.management.commands.seed_ergonx_demo import DEFAULT_DEMO_PASSWORD, DEMO_ADMIN_EMAIL, DEMO_EMAIL_DOMAIN, DEMO_INSTITUTION_CODE, DEMO_SEED_REFUSAL, EMPLOYEES, demo_seed_allowed
 from apps.institutions.models import Institution, InstitutionMembership
 from apps.institutions.services import create_membership
 from apps.organization.models import Department, Location, Position
@@ -161,8 +161,8 @@ class Command(BaseCommand):
     help = "Seed energy-company structure, October hires and HR module data for APEX-DEMO (development only)."
 
     def handle(self, *args, **options):
-        if not settings.DEBUG:
-            raise CommandError("seed_ergonx_people is development-only and refuses to run when DEBUG=False.")
+        if not demo_seed_allowed():
+            raise CommandError(DEMO_SEED_REFUSAL.format("seed_ergonx_people"))
         institution = Institution.objects.filter(code=DEMO_INSTITUTION_CODE).first()
         if institution is None:
             raise CommandError("APEX-DEMO does not exist. Run `python manage.py seed_ergonx_demo` first.")

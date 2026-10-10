@@ -61,6 +61,7 @@ LOCAL_APPS = [
     "apps.training.apps.TrainingConfig",
     "apps.performance.apps.PerformanceConfig",
     "apps.complaints.apps.ComplaintsConfig",
+    "apps.filestore.apps.FilestoreConfig",
 ]
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 

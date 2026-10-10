@@ -97,3 +97,64 @@ def test_uploads_round_trip_through_an_s3_bucket(api_client, institution_factory
         attachment = uploaded.data["attachments"][0]
         download = api_client.get(f"/api/v1/complaints/{complaint['id']}/attachments/{attachment['id']}/download/")
         assert download.status_code == 200 and b"".join(download.streaming_content) == b"PNG-bytes"
+
+
+DATABASE_STORAGES = media_storage_settings({"MEDIA_STORAGE": "database"}, Path("/app"))[0]
+
+
+def test_database_storage_is_selectable():
+    storages, _, kind = media_storage_settings({"MEDIA_STORAGE": "database"}, Path("/app"))
+    assert kind == "database" and storages["default"]["BACKEND"] == "apps.filestore.storage.DatabaseStorage"
+
+
+@pytest.mark.django_db
+def test_database_storage_saves_reads_and_never_overwrites():
+    from apps.filestore.models import StoredFile
+    from apps.filestore.storage import DatabaseStorage
+
+    storage = DatabaseStorage()
+    name = storage.save("documents/2026/10/contract.pdf", ContentFile(b"%PDF one"))
+    assert name == "documents/2026/10/contract.pdf" and storage.exists(name) and storage.size(name) == 8
+    assert storage.open(name).read() == b"%PDF one"
+    second = storage.save("documents/2026/10/contract.pdf", ContentFile(b"%PDF two"))
+    assert second != name and storage.open(second).read() == b"%PDF two"
+    assert storage.listdir("documents/2026/10") == ([], sorted([name.rsplit("/", 1)[1], second.rsplit("/", 1)[1]]))
+    storage.delete(name)
+    assert not storage.exists(name) and StoredFile.objects.count() == 1
+    with pytest.raises(FileNotFoundError):
+        storage.open(name)
+
+
+@pytest.mark.django_db
+def test_uploads_round_trip_through_the_database(api_client, institution_factory, user_factory, membership_factory, employee_factory):
+    """A complaint file is stored as a database row and downloads through the API."""
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    from apps.filestore.models import StoredFile
+
+    with override_settings(STORAGES=DATABASE_STORAGES):
+        institution = institution_factory()
+        user = user_factory(email="db.staff@example.com")
+        membership_factory(user=user, institution=institution, role_code="EMPLOYEE")
+        employee_factory(institution, user=user)
+        api_client.force_authenticate(user)
+        complaint = api_client.post("/api/v1/complaints/", {"category": "OTHER", "subject": "Database test", "description": "Checking storage."}, format="json").data
+        uploaded = api_client.post(f"/api/v1/complaints/{complaint['id']}/attachments/", {"file": SimpleUploadedFile("photo.png", b"PNG-bytes", content_type="image/png")}, format="multipart")
+        assert uploaded.status_code == 200, uploaded.data
+        row = StoredFile.objects.get()
+        assert row.name.startswith("complaints/") and bytes(row.content) == b"PNG-bytes"
+        attachment = uploaded.data["attachments"][0]
+        download = api_client.get(f"/api/v1/complaints/{complaint['id']}/attachments/{attachment['id']}/download/")
+        assert download.status_code == 200 and b"".join(download.streaming_content) == b"PNG-bytes"
+
+
+@pytest.mark.django_db
+def test_restore_demo_files_writes_into_the_database(institution_factory):
+    from apps.filestore.models import StoredFile
+
+    demo = institution_factory(code="APEX-DEMO")
+    # A row whose file was lost with the old container disk.
+    Document.objects.create(institution=demo, original_filename="ssnit.pdf", content_type="application/pdf", size_bytes=10, category="SSNIT", stored_file="apex-demo/EMP-000101-ssnit.pdf", is_active=True)
+    with override_settings(STORAGES=DATABASE_STORAGES, DEBUG=True):
+        call_command("restore_demo_files", restore=True, stdout=StringIO())
+    assert bytes(StoredFile.objects.get(name="apex-demo/EMP-000101-ssnit.pdf").content).startswith(b"%PDF")

@@ -3,6 +3,7 @@ import os
 from django.core.exceptions import ImproperlyConfigured
 
 from .base import *  # noqa: F403
+from .storage import media_storage_settings
 
 
 if SECRET_KEY == "unsafe-development-only-key-change-before-production":  # noqa: F405
@@ -19,14 +20,11 @@ if os.environ.get("EMAIL_DELIVERY_ENABLED", "false").lower() == "true":
             f"Email delivery is enabled but missing: {', '.join(missing_email_settings)}"
         )
 
-if MEDIA_STORAGE_KIND == "filesystem" and not os.environ.get("MEDIA_ROOT"):  # noqa: F405
-    # Uploads written to the container's own disk vanish on the next deploy.
-    import logging
-
-    logging.getLogger("ergonx.storage").warning(
-        "Uploaded files are stored on the container disk and will be lost on redeploy. "
-        "Set MEDIA_STORAGE=s3 (with MEDIA_S3_* settings) or MEDIA_ROOT on a persistent disk."
-    )
+if MEDIA_STORAGE_KIND == "filesystem" and not os.environ.get("MEDIA_STORAGE") and not os.environ.get("MEDIA_ROOT"):  # noqa: F405
+    # A hosted container's own disk is wiped on every deploy, so uploads go to
+    # the database unless a bucket (MEDIA_STORAGE=s3) or a persistent-disk folder
+    # (MEDIA_ROOT) is configured.
+    STORAGES, MEDIA_ROOT, MEDIA_STORAGE_KIND = media_storage_settings({"MEDIA_STORAGE": "database"}, BASE_DIR)  # noqa: F405
 
 DEBUG = False
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

@@ -1,9 +1,12 @@
 """Where uploaded files (documents, receipts, complaint files, images) live.
 
-Set ``MEDIA_STORAGE=s3`` to keep them in an S3-compatible bucket (Cloudflare
-R2, AWS S3, Backblaze B2, ...). Otherwise they are written to ``MEDIA_ROOT``
-(default ``<backend>/media``); on a hosted server that folder must be a
-persistent disk, because a container's own disk is wiped on every deploy.
+* ``MEDIA_STORAGE=database``: in the application database (apps.filestore).
+  Production uses this unless told otherwise: nothing to set up, and the
+  files survive deploys and are part of every database backup.
+* ``MEDIA_STORAGE=s3``: an S3-compatible bucket (Cloudflare R2, AWS S3, ...).
+* Otherwise: the ``MEDIA_ROOT`` folder (default ``<backend>/media``), as in
+  development. On a hosted server that folder must be a persistent disk,
+  because a container's own disk is wiped on every deploy.
 
 Files are never served from the bucket directly: every download goes through
 the API, which checks the caller's access first. The bucket stays private.
@@ -15,11 +18,14 @@ S3_REQUIRED = ("MEDIA_S3_BUCKET", "MEDIA_S3_ACCESS_KEY_ID", "MEDIA_S3_SECRET_ACC
 
 
 def media_storage_settings(environ=None, base_dir=None):
-    """Returns ``(STORAGES, MEDIA_ROOT, kind)`` where kind is "s3" or "filesystem"."""
+    """Returns ``(STORAGES, MEDIA_ROOT, kind)`` where kind is "database", "s3" or "filesystem"."""
     environ = os.environ if environ is None else environ
     media_root = environ.get("MEDIA_ROOT") or (str(base_dir / "media") if base_dir is not None else "media")
     staticfiles = {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"}
-    if environ.get("MEDIA_STORAGE", "").strip().lower() != "s3":
+    choice = environ.get("MEDIA_STORAGE", "").strip().lower()
+    if choice == "database":
+        return {"default": {"BACKEND": "apps.filestore.storage.DatabaseStorage"}, "staticfiles": staticfiles}, media_root, "database"
+    if choice != "s3":
         # No fixed location: the storage follows settings.MEDIA_ROOT (and overrides of it).
         default = {"BACKEND": "django.core.files.storage.FileSystemStorage"}
         return {"default": default, "staticfiles": staticfiles}, media_root, "filesystem"

@@ -181,6 +181,14 @@ PERMISSIONS = {
     "document.create": "Create shared document references",
     "document.update": "Update shared document metadata",
     "document.delete": "Deactivate shared documents",
+    "document_requirement.view": "View document requirements and employee document checklists",
+    "document_requirement.manage": "Manage document requirements and waivers",
+    "training.view": "View training courses, enrolments and certificates",
+    "training.manage": "Manage training courses and enrol employees",
+    "performance.view": "View performance review cycles and results",
+    "performance.manage": "Run review cycles and sign off performance reviews",
+    "complaint.view": "View employee complaints, except any that name you",
+    "complaint.manage": "Handle employee complaints: assign, investigate, resolve and close",
     "report.view": "View and export institution reports",
     "report.all": "View every report institution-wide, read-only, without the underlying module permissions",
     "report.publish": "Publish saved dashboards and reports to everyone with access",
@@ -321,6 +329,10 @@ ROLE_PERMISSION_CODES = {
         "report.view",
         "report.publish",
         "report.all",
+        "document_requirement.view",
+        "training.view",
+        "performance.view",
+        "complaint.view",
     ),
     "EMPLOYEE": (
         "home.view",
@@ -363,6 +375,8 @@ ROLE_PERMISSION_CODES = {
         "tax_relief.view",
         "tax_relief.claim",
         "dashboard.department.view",
+        "document_requirement.view",
+        "training.view",
     ),
     "ACCOUNTANT": (
         *SELF_SERVICE_PERMISSIONS,
@@ -440,6 +454,10 @@ ROLE_PERMISSION_CODES = {
         # Oversight is read-only: every report, but no approval queue.
         "report.all",
         "audit.view",
+        "document_requirement.view",
+        "training.view",
+        "performance.view",
+        "complaint.view",
     ),
 }
 

@@ -41,6 +41,27 @@ docker compose --env-file .env.production -f compose.production.yaml ps
 
 The backend runs migrations and collects static files before Gunicorn starts. Do not run any `seed_*_demo` command in this environment; each one refuses production settings.
 
+### Hosted demo only: populating the Apex Energy demo
+
+A server that hosts the sales demo can be filled with the Apex Energy Ghana Ltd
+data (`APEX-DEMO`). The three seeds below write only to that institution, but
+they create accounts with the published demo password, so never do this on a
+server that holds real customers' data unless you accept that.
+
+1. Back up the database.
+2. Keep `EMAIL_DELIVERY_ENABLED=false` (demo staff addresses use `@apexenergy.com`).
+3. Add `ERGONX_ALLOW_DEMO_SEED=true` to the API service and open its shell.
+4. Run, in order:
+
+   ```
+   python manage.py seed_ergonx_demo
+   python manage.py seed_ergonx_activity
+   python manage.py seed_ergonx_people
+   ```
+
+5. Remove `ERGONX_ALLOW_DEMO_SEED` again. Re-run `seed_ergonx_activity` (with the
+   variable set) whenever the demo's dashboards should catch up to today.
+
 ## First institution and real users
 
 1. Create the first Django superuser from the backend container:
@@ -58,7 +79,7 @@ docker compose --env-file .env.production -f compose.production.yaml exec backen
 
 - Verify `/api/v1/schema/` through the public API origin and the application login through the public application origin.
 - Confirm `NEXT_PUBLIC_ENABLE_DEV_AUTH_BYPASS=false` in the built frontend environment.
-- Confirm production logs contain no development seed execution and that no PostgreSQL or pgAdmin port is publicly exposed.
+- Confirm production logs contain no development seed execution (except a deliberate hosted-demo run) and that no PostgreSQL or pgAdmin port is publicly exposed.
 - Rotate application/database credentials on the organization’s security schedule.
 ## Email delivery
 

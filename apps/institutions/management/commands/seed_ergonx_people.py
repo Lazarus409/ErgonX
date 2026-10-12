@@ -382,7 +382,10 @@ class Command(BaseCommand):
         employee = review.employee
         hr = self._hr_for(employee)
         if review.reviewer_id is None:
-            reassign_reviewer(review=review, actor=hr, reviewer=User.objects.get(email=f"evelyn.darko@{DEMO_EMAIL_DOMAIN}"))
+            reviewer = User.objects.get(email=f"evelyn.darko@{DEMO_EMAIL_DOMAIN}")
+            if reviewer.id == employee.user_id:  # Nobody reviews themselves.
+                reviewer = self.admin
+            reassign_reviewer(review=review, actor=hr, reviewer=reviewer)
             review.refresh_from_db()
         if target == "SELF_ASSESSMENT":
             if rng.random() < 0.5:  # A draft in progress.
@@ -452,7 +455,7 @@ class Command(BaseCommand):
         if outcome == "IN_PROGRESS":
             start_enrollment(enrollment=enrollment, actor=self.hr)
         elif outcome in ("COMPLETED", "NOT_PASSED"):
-            complete_enrollment(enrollment=enrollment, actor=self.hr, completed_on=on, passed=outcome == "COMPLETED", score=score, certificate_number=f"APX-{course.code}-{employee.employee_number[-3:]}" if outcome == "COMPLETED" else "")
+            complete_enrollment(enrollment=enrollment, actor=self._hr_for(employee), completed_on=on, passed=outcome == "COMPLETED", score=score, certificate_number=f"APX-{course.code}-{employee.employee_number[-3:]}" if outcome == "COMPLETED" else "")
         self._count("training")
 
     def _training(self):

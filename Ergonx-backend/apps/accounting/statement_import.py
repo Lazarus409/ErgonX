@@ -92,6 +92,8 @@ def parse_amount(value):
         amount = Decimal(text)
     except InvalidOperation:
         raise ValueError(value)
+    if not amount.is_finite():  # "NaN" and "Infinity" parse as Decimals but are not amounts.
+        raise ValueError(value)
     return -amount if negative else amount
 
 

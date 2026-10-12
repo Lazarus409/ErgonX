@@ -234,6 +234,8 @@ def reassign_reviewer(*, review, actor, reviewer):
         raise ValidationError({"status": "Only open reviews can be reassigned."})
     if not _active_member(reviewer, review.institution):
         raise ValidationError({"reviewer": "The reviewer must be an active member."})
+    if reviewer.id == review.employee.user_id:
+        raise ValidationError({"reviewer": "An employee cannot review themselves."})
     previous = review.reviewer
     review.reviewer = reviewer
     review.save()

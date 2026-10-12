@@ -133,6 +133,16 @@ def test_release_reassign_and_summary(team):
     assert client.post(f"{REVIEWS}{review.id}/manager-review/", {"overall_rating": 3}, format="json").status_code == 400
 
 
+def test_employee_cannot_be_made_their_own_reviewer(team):
+    client = team["client"]
+    review = launch(team)
+    client.force_authenticate(team["hr"])
+    response = client.post(f"{REVIEWS}{review.id}/reassign/", {"reviewer": str(team["staff"].id)}, format="json")
+    assert response.status_code == 400
+    review.refresh_from_db()
+    assert review.reviewer_id == team["manager"].id
+
+
 def test_hr_cannot_steer_their_own_review(team, user_factory, membership_factory):
     """HR staff are the employee on their own review: no management actions and no early look at the manager's half."""
     from apps.employees.models import Employee

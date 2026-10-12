@@ -61,6 +61,14 @@ def test_enrol_complete_and_certificate_expiry(setup, user_factory, membership_f
     assert AuditLog.objects.filter(action="training.enrollment.completed").exists()
 
 
+def test_hr_cannot_certify_their_own_training(setup):
+    client, institution, hr, employee_factory = setup
+    own = TrainingEnrollment.objects.create(institution=institution, course=course(institution), employee=employee_factory(institution, user=hr))
+    assert client.post(f"{ENROLLMENTS}{own.id}/complete/", {"certificate_number": "SELF-1"}, format="json").status_code == 400
+    own.refresh_from_db()
+    assert own.status == TrainingEnrollment.Status.PLANNED
+
+
 def test_future_completion_and_failed_course(setup):
     client, institution, _, employee_factory = setup
     person = employee_factory(institution)

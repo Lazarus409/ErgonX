@@ -6,6 +6,7 @@ from django.utils import timezone
 
 from apps.audit.services import record_audit_event
 from apps.documents.checklist import add_months
+from apps.employees.services import ensure_not_self_hr_mutation
 from apps.notifications.models import Notification
 from apps.training.models import TrainingCourse, TrainingEnrollment
 
@@ -81,6 +82,8 @@ def start_enrollment(*, enrollment, actor):
 @transaction.atomic
 def complete_enrollment(*, enrollment, actor, completed_on=None, passed=True, score=None, certificate_number="", certificate_expires_on=None, certificate_document=None, notes=None):
     instance = _locked(enrollment)
+    # HR cannot certify their own training (a lapsed safety certificate, say).
+    ensure_not_self_hr_mutation(actor=actor, employee=instance.employee)
     if instance.status not in TrainingEnrollment.OPEN_STATUSES:
         raise ValidationError({"status": "Only planned or in-progress training can be completed."})
     completed_on = completed_on or timezone.localdate()

@@ -63,6 +63,14 @@ def test_amounts(value, expected):
     assert parse_amount(value) == expected
 
 
+@pytest.mark.parametrize("value", ["NaN", "Infinity", "-inf", "sNaN"])
+def test_non_finite_amounts_are_rejected(value):
+    with pytest.raises(ValueError):
+        parse_amount(value)
+    rows, errors, _ = parse_statement(f"date,amount\n2026-01-05,{value}\n")
+    assert rows == [] and len(errors) == 1
+
+
 def test_file_without_a_header_is_rejected():
     with pytest.raises(ValueError):
         parse_statement("hello,world\n1,2\n")

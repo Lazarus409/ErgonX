@@ -12,6 +12,22 @@ class BaseModel(models.Model):
         abstract = True
 
 
+def changed_actor_fields(instance, fields):
+    """The actor stamps (``created_by``, ``approved_by``, ...) being set by this save.
+
+    A stamp is checked against active membership when it is recorded. Once
+    recorded it stays valid after that member leaves, so their records can
+    still be approved, voided or settled by others.
+    """
+    fields = tuple(fields)
+    if instance._state.adding:
+        return fields
+    stored = type(instance)._base_manager.filter(pk=instance.pk).values(*(f"{field}_id" for field in fields)).first()
+    if stored is None:
+        return fields
+    return tuple(field for field in fields if getattr(instance, f"{field}_id") != stored[f"{field}_id"])
+
+
 class TenantQuerySet(models.QuerySet):
     def for_institution(self, institution):
         if institution is None:

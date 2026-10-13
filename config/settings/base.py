@@ -226,3 +226,5 @@ SERVER_EMAIL = DEFAULT_FROM_EMAIL
 FRONTEND_PUBLIC_URL = os.environ.get("FRONTEND_PUBLIC_URL", "http://localhost:3000").rstrip("/")
 # Anonymous Get Started access requests allowed per client address.
 INSTITUTION_ACCESS_REQUEST_RATE = os.environ.get("INSTITUTION_ACCESS_REQUEST_RATE", "5/hour")
+# Reset emails per address; keyed by email, so a mailbox cannot be flooded.
+PASSWORD_RESET_EMAIL_RATE = os.environ.get("PASSWORD_RESET_EMAIL_RATE", "3/hour")

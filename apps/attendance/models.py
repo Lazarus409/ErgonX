@@ -7,7 +7,7 @@ from django.db import models
 from apps.employees.models import Employee
 from apps.institutions.models import Institution
 from apps.scheduling.models import ScheduleAssignment
-from common.models import TenantOwnedModel
+from common.models import TenantOwnedModel, changed_actor_fields
 
 
 class AttendanceRecord(TenantOwnedModel):
@@ -177,7 +177,8 @@ class AttendanceAdjustment(TenantOwnedModel):
             errors["attendance_record"] = "Attendance record belongs to another institution."
         if self.evidence_id and self.evidence.institution_id != self.institution_id:
             errors["evidence"] = "Evidence must belong to the same institution."
-        for field_name in ("requested_by", "approved_by", "assigned_to"):
+        # assigned_to is a live assignment, so it must stay an active member.
+        for field_name in (*changed_actor_fields(self, ("requested_by", "approved_by")), "assigned_to"):
             user = getattr(self, field_name, None)
             if user and self.institution_id and not user.memberships.filter(
                 institution_id=self.institution_id, status="ACTIVE"
@@ -245,7 +246,7 @@ class OvertimeRecord(TenantOwnedModel):
                 errors["attendance_record"] = "Attendance record belongs to another institution."
             elif self.employee_id and self.attendance_record.employee_id != self.employee_id:
                 errors["attendance_record"] = "Attendance record belongs to another employee."
-        if self.approved_by_id and not self.approved_by.memberships.filter(
+        if self.approved_by_id and changed_actor_fields(self, ("approved_by",)) and not self.approved_by.memberships.filter(
             institution_id=self.institution_id, status="ACTIVE"
         ).exists():
             errors["approved_by"] = "Approver must be an active institution member."

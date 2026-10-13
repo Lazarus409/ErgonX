@@ -112,7 +112,7 @@ def _relief_items(payroll_run, record, chargeable_income):
     return _money(remaining_basis), items
 
 
-def _pension(payroll_run, compensation):
+def _pension(payroll_run, basic_pay):
     rule = effective_contribution_rule(
         institution=payroll_run.institution,
         payroll_run=payroll_run,
@@ -122,7 +122,7 @@ def _pension(payroll_run, compensation):
         raise ValidationError(
             {"preset_version": "Ghana preset has no effective pension rule."}
         )
-    basis = Decimal(compensation.base_salary)
+    basis = Decimal(basic_pay)
     if rule.minimum_basis is not None:
         basis = max(basis, rule.minimum_basis)
     if rule.maximum_basis is not None:
@@ -169,7 +169,7 @@ def _pension(payroll_run, compensation):
 
 
 def calculate_statutory(
-    *, payroll_run, record, compensation, gross_pay, taxable_income, configuration
+    *, payroll_run, record, compensation, basic_pay, gross_pay, taxable_income, configuration
 ):
     if configuration.country_code != "GH" or configuration.currency != "GHS":
         raise ValidationError(
@@ -203,7 +203,7 @@ def calculate_statutory(
     if employment is None:
         raise ValidationError({"employee": "An effective employment record is required."})
 
-    employee_pension, employer_pension, items = _pension(payroll_run, compensation)
+    employee_pension, employer_pension, items = _pension(payroll_run, basic_pay)
     statutory_tax = Decimal("0")
     regular_basis = max(Decimal("0"), Decimal(taxable_income) - employee_pension)
 

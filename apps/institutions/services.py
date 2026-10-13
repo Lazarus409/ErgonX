@@ -834,6 +834,10 @@ def update_membership(*, membership, institution, actor, role=None, status=None,
             locked.joined_at = timezone.now()
         if status in (InstitutionMembership.Status.SUSPENDED, InstitutionMembership.Status.INACTIVE):
             locked.ended_at = timezone.now()
+            # A pending invitation would otherwise let them back in.
+            InstitutionInvitation.objects.filter(
+                institution=institution, email__iexact=locked.user.email, status=InstitutionInvitation.Status.PENDING
+            ).update(status=InstitutionInvitation.Status.REVOKED, updated_at=timezone.now())
     if is_primary is not None:
         locked.is_primary = is_primary
     locked.full_clean()

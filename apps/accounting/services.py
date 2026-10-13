@@ -1792,6 +1792,8 @@ def generate_payroll_journal(*, payroll_run, actor):
     items = run.records.prefetch_related("items__pay_component").all()
     for record in items:
         for item in record.items.all():
+            if item.metadata.get("effect") == "TAX_RELIEF":
+                continue  # A relief only lowers the PAYE basis; no money moves.
             mapping = None
             if item.pay_component_id:
                 mapping = PayComponentAccountMapping.objects.filter(institution=run.institution, pay_component=item.pay_component, is_active=True, effective_from__lte=run.payroll_period.pay_date).filter(models.Q(effective_to__isnull=True) | models.Q(effective_to__gte=run.payroll_period.pay_date)).order_by("-effective_from").first()

@@ -38,6 +38,20 @@ def _can_manage(actor, employee):
     raise ValidationError({"actor": "Actor cannot manage this employee's attendance."})
 
 
+def _clock_time(actor, employee, at):
+    """Self-service clocks at server time; only an attendance manager records another time.
+
+    A manager may enter a missed punch for someone else, never for themselves:
+    corrections to one's own record go through an adjustment request.
+    """
+    if at is None:
+        return timezone.now()
+    membership = _membership(actor, employee.institution)
+    if employee.user_id == actor.id or not membership.role.permissions.filter(code="attendance.manage").exists():
+        raise ValidationError({"at": "Clock times are recorded as now. Request an adjustment to correct a past time."})
+    return at
+
+
 def _local_date(employee, at):
     try:
         zone = ZoneInfo(employee.institution.timezone)
@@ -163,7 +177,7 @@ def _sync_overtime(record):
 @transaction.atomic
 def clock_in(*, employee, actor, at=None, source=AttendanceRecord.Source.WEB):
     _can_manage(actor, employee)
-    at = at or timezone.now()
+    at = _clock_time(actor, employee, at)
     attendance_date = _local_date(employee, at)
     if _approved_leave_exists(employee, attendance_date):
         raise ValidationError({"attendance_date": "Employee is on approved leave."})
@@ -209,7 +223,7 @@ def clock_out(*, attendance_record, actor, at=None):
         raise ValidationError({"check_out": "Cannot check out before checking in."})
     if attendance_record.check_out is not None:
         raise ValidationError({"check_out": "Employee is already checked out."})
-    attendance_record.check_out = at or timezone.now()
+    attendance_record.check_out = _clock_time(actor, attendance_record.employee, at)
     _recalculate(attendance_record)
     attendance_record.save()
     _sync_overtime(attendance_record)

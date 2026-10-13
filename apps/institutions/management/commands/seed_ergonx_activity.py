@@ -365,13 +365,31 @@ class Command(BaseCommand):
             arrival = shift_start + timedelta(minutes=expectation["grace_minutes"] + rng.randint(4, 38))
         else:
             arrival = shift_start + timedelta(minutes=rng.randint(-18, 3))
-        record = clock_in(employee=employee, actor=self.admin, at=arrival)
+        recorder = self._punch_recorder(employee)
+        record = clock_in(employee=employee, actor=recorder, at=arrival)
         if shift_end and shift_end <= self.now:
             overtime = rng.random() < 0.12
             departure = shift_end + timedelta(minutes=rng.randint(60, 150) if overtime else rng.randint(-4, 22))
             if departure <= self.now:
-                clock_out(attendance_record=record, actor=self.admin, at=departure)
+                clock_out(attendance_record=record, actor=recorder, at=departure)
         return 1
+
+    def _punch_recorder(self, employee):
+        """Past punches are entered by an attendance manager, never for their own record."""
+        if employee.user_id != self.admin.id:
+            return self.admin
+        if not hasattr(self, "_second_attendance_manager"):
+            from apps.institutions.models import InstitutionMembership
+
+            membership = (
+                InstitutionMembership.objects.filter(
+                    institution=self.institution, status=InstitutionMembership.Status.ACTIVE, role__permissions__code="attendance.manage",
+                ).exclude(user=self.admin).select_related("user").order_by("created_at").first()
+            )
+            if membership is None:
+                raise CommandError("A second attendance manager is needed to record the demo admin's attendance.")
+            self._second_attendance_manager = membership.user
+        return self._second_attendance_manager
 
     def _decide_overtime(self):
         """Older overtime is decided; the last week stays pending for review."""

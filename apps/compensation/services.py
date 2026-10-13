@@ -2,6 +2,8 @@ from datetime import date, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.core.exceptions import ValidationError
+
+from common.exceptions import CodedValidationError
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -26,6 +28,15 @@ def _assert_active_member(actor, institution):
 
 
 @transaction.atomic
+def assert_not_own_pay(actor, employee):
+    """Nobody sets or approves their own pay: salary, overrides, adjustments, reliefs."""
+    if actor is not None and employee is not None and employee.user_id == actor.id:
+        raise CodedValidationError(
+            {"employee": "Your own pay must be set or approved by someone else."},
+            api_code="own_pay_not_allowed",
+        )
+
+
 def change_current_compensation(
     *,
     institution,
@@ -38,6 +49,7 @@ def change_current_compensation(
     pay_basis=EmployeeCompensation.PayBasis.PAYROLL_PERIOD,
 ):
     _assert_active_member(actor, institution)
+    assert_not_own_pay(actor, employee)
     if employee.institution_id != institution.id:
         raise ValidationError({"employee": "Employee must belong to the selected institution."})
     if salary_structure.institution_id != institution.id:
@@ -114,6 +126,7 @@ def set_employee_pay_component(
     compensation = EmployeeCompensation.objects.select_for_update().get(
         pk=employee_compensation.pk
     )
+    assert_not_own_pay(actor, compensation.employee)
     if compensation.institution_id != institution.id:
         raise ValidationError(
             {"employee_compensation": "Compensation belongs to another institution."}
@@ -169,6 +182,7 @@ def set_employee_pay_component(
 def deactivate_employee_pay_component(*, override, actor, effective_to):
     override = EmployeePayComponent.objects.select_for_update().get(pk=override.pk)
     _assert_active_member(actor, override.institution)
+    assert_not_own_pay(actor, override.employee_compensation.employee)
     if not override.employee_compensation.is_current:
         raise ValidationError({"employee_compensation": "Historical compensation cannot be modified."})
     if not override.is_active:

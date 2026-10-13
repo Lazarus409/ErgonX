@@ -116,7 +116,7 @@ def attendance(institution_factory, user_factory, membership_factory, employee_f
     employee = _employee_with_employment(institution, user=staff, employee_factory=employee_factory, organization_factory=organization_factory, assignment_dimensions_factory=assignment_dimensions_factory)
     _, schedule = _fixed_schedule(institution)
     change_current_schedule_assignment(institution=institution, employee=employee, work_schedule=schedule, effective_from=date(2026, 1, 1), is_current=True, assigned_by=hr)
-    record = clock_in(employee=employee, actor=staff, at=datetime(2026, 9, 14, 9, 0, tzinfo=ZONE))
+    record = clock_in(employee=employee, actor=hr, at=datetime(2026, 9, 14, 9, 0, tzinfo=ZONE))
     adjustment = request_adjustment(institution=institution, attendance_record=record, actor=staff, reason="Missed clock-out", proposed_values={"check_out": "2026-09-14T17:00:00+00:00"})
     return {"institution": institution, "hr": hr, "adjustment": adjustment}
 

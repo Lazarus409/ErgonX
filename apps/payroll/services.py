@@ -33,6 +33,7 @@ from apps.payroll.selectors import (
     eligible_employees_for_payroll_run,
     payroll_records_with_items,
 )
+from apps.compensation.services import assert_not_own_pay
 from common.exceptions import CodedValidationError
 
 
@@ -965,6 +966,7 @@ def reconcile_payroll_run(payroll_run):
 @transaction.atomic
 def create_payroll_adjustment(*, institution, actor, **values):
     _membership_with_permission(actor, institution, "payroll.prepare")
+    assert_not_own_pay(actor, values.get("employee"))
     adjustment = PayrollAdjustment(
         institution=institution,
         created_by=actor,
@@ -1034,6 +1036,7 @@ def submit_payroll_adjustment(*, adjustment, actor):
 def decide_payroll_adjustment(*, adjustment, actor, approve):
     adjustment = PayrollAdjustment.objects.select_for_update().get(pk=adjustment.pk)
     _membership_with_permission(actor, adjustment.institution, "payroll.approve")
+    assert_not_own_pay(actor, adjustment.employee)
     decided_status = (
         PayrollAdjustment.Status.APPROVED if approve else PayrollAdjustment.Status.REJECTED
     )
@@ -1195,6 +1198,7 @@ def submit_tax_relief_claim(*, claim, actor):
 def decide_tax_relief_claim(*, claim, actor, approve, approved_amount=None):
     claim = EmployeeTaxReliefClaim.objects.select_for_update().get(pk=claim.pk)
     _membership_with_permission(actor, claim.institution, "tax_relief.approve")
+    assert_not_own_pay(actor, claim.employee)
     decided_status = (
         EmployeeTaxReliefClaim.Status.APPROVED
         if approve

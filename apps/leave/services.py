@@ -91,6 +91,45 @@ def applicable_policy(*, employee, leave_type, effective_from, effective_to=None
     )
 
 
+HALF_DAY = Decimal("0.5")
+
+
+def working_days(employee, start_date, end_date):
+    """Working days in a date range: the employee's schedule, or Monday-Friday without one."""
+    from apps.scheduling.services import schedule_assignment_for, schedule_expectation
+
+    count = 0
+    day = start_date
+    while day <= end_date:
+        assignment = schedule_assignment_for(employee, day)
+        if assignment is not None:
+            if not schedule_expectation(assignment, day)["off_day"]:
+                count += 1
+        elif day.weekday() < 5:
+            count += 1
+        day += timedelta(days=1)
+    return Decimal(count)
+
+
+def _normalize_requested_days(leave_request):
+    """The balance is charged working days, decided here rather than by the browser.
+
+    A request may take half a day off the range's working days (e.g. a half-day
+    on the last day); more than the working days is reduced to them, and fewer
+    than that is refused because the dates would not be covered.
+    """
+    if not (leave_request.employee_id and leave_request.start_date and leave_request.end_date) or leave_request.end_date < leave_request.start_date:
+        return
+    available = working_days(leave_request.employee, leave_request.start_date, leave_request.end_date)
+    if available <= 0:
+        raise ValidationError({"start_date": "There are no working days between these dates."})
+    requested = leave_request.requested_days
+    if requested is None or requested > available:
+        leave_request.requested_days = available
+    elif requested < available - HALF_DAY:
+        raise ValidationError({"requested_days": f"These dates cover {available} working day(s); request {available} or {available - HALF_DAY}."})
+
+
 def validate_request_against_policy(leave_request):
     leave_request.full_clean()
     policy = matching_policy(leave_request)
@@ -292,6 +331,7 @@ def create_leave_request(*, institution, actor, **values):
     ).exists():
         raise ValidationError({"employee": "Requester may only create their own leave request."})
     leave_request = LeaveRequest(institution=institution, status=LeaveRequest.Status.DRAFT, **values)
+    _normalize_requested_days(leave_request)
     validate_request_against_policy(leave_request)
     leave_request.save()
     record_audit_event(
@@ -470,10 +510,17 @@ def cancel_leave_request(*, leave_request, actor):
     membership = _active_membership(actor, leave_request.institution)
     if membership is None:
         raise ValidationError({"actor": "Actor must be an active institution member."})
-    if leave_request.employee.user_id != actor.id and not membership.role.permissions.filter(
-        code="leave.approve"
-    ).exists():
+    is_own = leave_request.employee.user_id == actor.id
+    is_approver = membership.role.permissions.filter(code="leave.approve").exists()
+    if not is_own and not is_approver:
         raise ValidationError({"actor": "Only the employee or a leave approver may cancel."})
+    if (
+        leave_request.status == LeaveRequest.Status.APPROVED
+        and leave_request.start_date <= timezone.localdate()
+        and (is_own or not is_approver)
+    ):
+        # Days already taken would otherwise return to the balance unreviewed.
+        raise ValidationError({"status": "This leave has started; ask a leave approver to cancel it."})
     if leave_request.status == LeaveRequest.Status.APPROVED:
         _restore_balance(leave_request)
     leave_request.status = LeaveRequest.Status.CANCELLED
@@ -601,6 +648,8 @@ def update_leave_request(*, leave_request, actor, **values):
         raise ValidationError({field: "This field cannot be changed on a draft." for field in unknown})
     for field, value in values.items():
         setattr(leave_request, field, value)
+    if {"start_date", "end_date", "requested_days"} & set(values):
+        _normalize_requested_days(leave_request)
     validate_request_against_policy(leave_request)
     leave_request.save()
     record_audit_event(

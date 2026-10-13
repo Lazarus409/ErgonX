@@ -30,6 +30,40 @@ REPORT_PERMISSIONS = {
 }
 
 
+# The module whose records a report reads, beyond the REPORTS module itself.
+REPORT_MODULES = {
+    "leave": "LEAVE",
+    "attendance": "ATTENDANCE",
+    "payroll": "PAYROLL",
+    "accounting": "ACCOUNTING",
+    "ap-ar": "ACCOUNTING",
+    "expenses": "ACCOUNTING",
+    "recruitment": "RECRUITMENT",
+}
+
+
+def report_scope(request, name):
+    """Authorize report ``name`` for the requester and return the data-scope function.
+
+    Shared by the report endpoints and queued exports, so an export never
+    reads a report its requester could not open.
+    """
+    enabled = set(request.institution.modules.filter(is_enabled=True).values_list("module_code", flat=True))
+    # REPORTS gates every reports surface, as well as the source module (Wave 0 BQ-05).
+    if "REPORTS" not in enabled:
+        raise PermissionDenied("The REPORTS module is disabled.", code="module_disabled")
+    source_module = REPORT_MODULES.get(name)
+    if source_module and source_module not in enabled:
+        raise PermissionDenied(f"The {source_module} module is disabled.", code="module_disabled")
+    granted = set(effective_permission_codes(request.membership))
+    # report.all (directors, auditors) opens every report read-only and institution-wide.
+    if "report.all" in granted:
+        return lambda queryset, field, **options: queryset
+    if "report.view" not in granted or not all(granted & set(requirement) for requirement in REPORT_PERMISSIONS[name]):
+        raise PermissionDenied("Your role does not include access to this report.")
+    return lambda queryset, field, **options: scope_to_employees(queryset, request, field, **options)
+
+
 @extend_schema(responses={200: OpenApiTypes.OBJECT})
 class ReportsViewSet(ViewSet):
     permission_classes = (TenantContextPermission, TenantRBACPermission)
@@ -50,14 +84,7 @@ class ReportsViewSet(ViewSet):
         return "report.view"
 
     def _respond(self, request, name):
-        granted = set(effective_permission_codes(request.membership))
-        # report.all (directors, auditors) opens every report read-only and institution-wide.
-        # REPORTS gates every reports surface, as well as the source module (Wave 0 BQ-05).
-        if not request.institution.modules.filter(module_code="REPORTS", is_enabled=True).exists():
-            raise PermissionDenied("The REPORTS module is disabled.", code="module_disabled")
-        sees_all = "report.all" in granted
-        if not sees_all and not all(granted & set(requirement) for requirement in REPORT_PERMISSIONS[name]):
-            raise PermissionDenied("Your role does not include access to this report.")
+        scope = report_scope(request, name)
         filters = {
             "status": request.query_params.get("status"),
             "date_from": request.query_params.get("date_from"),
@@ -71,11 +98,11 @@ class ReportsViewSet(ViewSet):
                     request.institution,
                     name,
                     group,
-                    scope=(lambda queryset, field, **options: queryset) if sees_all else (lambda queryset, field, **options: scope_to_employees(queryset, request, field, **options)),
+                    scope=scope,
                     **filters,
                 )
             else:
-                rows = build_report_rows(request.institution, name, **filters)
+                rows = build_report_rows(request.institution, name, scope=scope, **filters)
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
         if request.query_params.get("export") != "csv":

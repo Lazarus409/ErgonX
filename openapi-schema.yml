@@ -61533,6 +61533,7 @@ components:
         user:
           type: string
           format: uuid
+          readOnly: true
           nullable: true
         employee_number:
           type: string
@@ -61634,6 +61635,7 @@ components:
       - id
       - last_name
       - updated_at
+      - user
     EmployeeCompensation:
       type: object
       description: Runs model validation so domain invariants also protect non-form
@@ -65150,7 +65152,6 @@ components:
       - id
       - leave_type
       - reference
-      - requested_days
       - start_date
       - status
       - submitted_at
@@ -69433,6 +69434,7 @@ components:
         user:
           type: string
           format: uuid
+          readOnly: true
           nullable: true
         employee_number:
           type: string

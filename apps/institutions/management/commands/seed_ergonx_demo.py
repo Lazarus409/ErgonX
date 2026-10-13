@@ -584,12 +584,23 @@ class Command(BaseCommand):
         if not structure.is_active:
             raise CommandError("APEX-MONTHLY salary structure is inactive; refusing to seed compensation.")
         effective_from = date(2026, 1, 1)
+        # Nobody sets their own pay, so another compensation manager sets the admin's.
+        second_payroll_manager = (
+            InstitutionMembership.objects.filter(
+                institution=institution, status=InstitutionMembership.Status.ACTIVE, role__permissions__code="compensation.manage",
+            ).exclude(user=admin).select_related("user").order_by("created_at").first()
+        )
         for person, amount in zip(EMPLOYEES, COMPENSATION_AMOUNTS, strict=True):
             number = person[0]
             employee = institution.employees.get(employee_number=number)
             compensation = EmployeeCompensation.objects.filter(employee=employee, is_current=True).first()
             salary = Decimal(amount)
             if compensation is None:
+                actor = admin
+                if employee.user_id == admin.id:
+                    if second_payroll_manager is None:
+                        raise CommandError("A second compensation manager is needed to set the demo admin's pay.")
+                    actor = second_payroll_manager.user
                 change_current_compensation(
                     institution=institution,
                     employee=employee,
@@ -597,7 +608,7 @@ class Command(BaseCommand):
                     base_salary=salary,
                     currency="GHS",
                     effective_from=effective_from,
-                    actor=admin,
+                    actor=actor,
                 )
             elif (
                 compensation.salary_structure_id != structure.id

@@ -434,3 +434,213 @@ def test_get_started_limit_is_per_visitor_not_per_proxy(api_client, settings):
     assert [submit("203.0.113.1", 1), submit("203.0.113.1", 2)] == [202, 429]
     assert submit("203.0.113.2", 3) == 202
     cache.clear()
+
+
+# --- Third round: module review (leave, attendance, pay, roles, exports) -------
+
+def _leave_setup(institution_factory, user_factory, membership_factory, employee_factory, organization_factory, assignment_dimensions_factory, code):
+    from apps.employees.models import Employment
+    from apps.leave.models import LeavePolicy
+
+    institution = institution_factory(code=code)
+    InstitutionModule.objects.filter(institution=institution, module_code="LEAVE").update(is_enabled=True)
+    hr = user_factory()
+    membership_factory(user=hr, institution=institution, role_code="HR_ADMIN")
+    staff = user_factory()
+    membership_factory(user=staff, institution=institution, role_code="EMPLOYEE")
+    employee = employee_factory(institution, user=staff)
+    department, position = organization_factory(institution)
+    grade, location = assignment_dimensions_factory(institution)
+    Employment.objects.create(
+        institution=institution, employee=employee, department=department, position=position, grade=grade, location=location,
+        employment_type=Employment.EmploymentType.PERMANENT, start_date=date(2026, 1, 1),
+    )
+    leave_type = LeaveType.objects.create(institution=institution, name="Annual (review)", code="ANNUAL-REVIEW", requires_approval=False)
+    LeavePolicy.objects.create(institution=institution, leave_type=leave_type, name="Annual", annual_entitlement=Decimal("20"), effective_from=date(2026, 1, 1))
+    return institution, hr, staff, employee, leave_type
+
+
+def test_leave_is_charged_working_days_counted_by_the_server(
+    institution_factory, user_factory, membership_factory, employee_factory, organization_factory, assignment_dimensions_factory,
+):
+    from django.core.exceptions import ValidationError
+
+    from apps.leave.services import create_leave_request
+
+    institution, _hr, staff, employee, leave_type = _leave_setup(
+        institution_factory, user_factory, membership_factory, employee_factory, organization_factory, assignment_dimensions_factory, "LEAVE-DAYS",
+    )
+    # Monday 2026-11-02 to Sunday 2026-11-08: five weekdays (no schedule assigned).
+    week = {"institution": institution, "actor": staff, "employee": employee, "leave_type": leave_type, "start_date": date(2026, 11, 2), "end_date": date(2026, 11, 8)}
+
+    assert create_leave_request(**week, requested_days=Decimal("7")).requested_days == Decimal("5")  # calendar days from the form
+    LeaveRequest.objects.all().delete()
+    assert create_leave_request(**week).requested_days == Decimal("5")
+    LeaveRequest.objects.all().delete()
+    assert create_leave_request(**week, requested_days=Decimal("4.5")).requested_days == Decimal("4.5")  # a half-day
+    LeaveRequest.objects.all().delete()
+    with pytest.raises(ValidationError, match="working day"):
+        create_leave_request(**week, requested_days=Decimal("1"))
+
+
+def test_an_employee_cannot_cancel_leave_that_has_started(
+    institution_factory, user_factory, membership_factory, employee_factory, organization_factory, assignment_dimensions_factory,
+):
+    from django.core.exceptions import ValidationError
+
+    from apps.leave.services import cancel_leave_request, create_leave_request, submit_leave_request
+
+    institution, hr, staff, employee, leave_type = _leave_setup(
+        institution_factory, user_factory, membership_factory, employee_factory, organization_factory, assignment_dimensions_factory, "LEAVE-CANCEL",
+    )
+    today = timezone.localdate()
+    start = today - timedelta(days=today.weekday())  # this week's Monday, already started (or today)
+    taken = submit_leave_request(
+        leave_request=create_leave_request(institution=institution, actor=staff, employee=employee, leave_type=leave_type, start_date=start, end_date=start),
+        actor=staff,
+    )
+    assert taken.status == LeaveRequest.Status.APPROVED
+
+    with pytest.raises(ValidationError, match="has started"):
+        cancel_leave_request(leave_request=taken, actor=staff)
+    # A leave approver (not the employee) may still cancel it.
+    assert cancel_leave_request(leave_request=taken, actor=hr).status == LeaveRequest.Status.CANCELLED
+
+    future = start + timedelta(days=14)
+    upcoming = submit_leave_request(
+        leave_request=create_leave_request(institution=institution, actor=staff, employee=employee, leave_type=leave_type, start_date=future, end_date=future),
+        actor=staff,
+    )
+    assert cancel_leave_request(leave_request=upcoming, actor=staff).status == LeaveRequest.Status.CANCELLED
+
+
+def test_clock_times_are_server_time_for_self_service(
+    institution_factory, user_factory, membership_factory, employee_factory, organization_factory, assignment_dimensions_factory,
+):
+    from datetime import datetime
+
+    from django.core.exceptions import ValidationError
+
+    from apps.attendance.services import clock_in
+
+    institution, hr, staff, employee, _leave_type = _leave_setup(
+        institution_factory, user_factory, membership_factory, employee_factory, organization_factory, assignment_dimensions_factory, "CLOCK-TIME",
+    )
+    InstitutionModule.objects.filter(institution=institution, module_code="ATTENDANCE").update(is_enabled=True)
+    shift = Shift.objects.create(institution=institution, name="Day", code="DAY", start_time=time(8), end_time=time(16))
+    schedule = WorkSchedule.objects.create(institution=institution, name="Daily", code="DAILY", schedule_type=WorkSchedule.ScheduleType.FIXED, effective_from=date(2026, 1, 1), fixed_shift=shift)
+    ScheduleAssignment.objects.create(institution=institution, employee=employee, work_schedule=schedule, effective_from=date(2026, 1, 1), assigned_by=hr)
+    backdated = timezone.make_aware(datetime(2026, 9, 14, 7, 0))
+
+    with pytest.raises(ValidationError, match="recorded as now"):
+        clock_in(employee=employee, actor=staff, at=backdated)
+    # An attendance manager may enter someone else's missed punch.
+    assert clock_in(employee=employee, actor=hr, at=backdated).check_in == backdated
+
+
+def test_hr_cannot_link_their_account_to_another_employee(api_client, institution_factory, user_factory, membership_factory, employee_factory):
+    institution = institution_factory(code="EMP-LINK")
+    hr = user_factory()
+    membership_factory(user=hr, institution=institution, role_code="HR_ADMIN", is_primary=True)
+    director = employee_factory(institution, employee_number="DIR-1")
+    api_client.force_authenticate(hr)
+    api_client.credentials(HTTP_X_INSTITUTION_ID=str(institution.id))
+
+    response = api_client.patch(f"/api/v1/employees/{director.id}/", {"user": str(hr.id)}, format="json")
+
+    assert response.status_code in (200, 400)
+    director.refresh_from_db()
+    assert director.user_id is None
+
+
+def test_nobody_sets_or_approves_their_own_pay(
+    institution_factory, user_factory, membership_factory, employee_factory, organization_factory, assignment_dimensions_factory,
+):
+    from apps.compensation.models import PayComponent
+    from apps.compensation.services import change_current_compensation
+    from apps.payroll.models import PayrollPeriod
+    from apps.payroll.services import create_payroll_adjustment, decide_payroll_adjustment, submit_payroll_adjustment
+    from common.exceptions import CodedValidationError
+
+    institution = institution_factory(code="OWN-PAY")
+    hr, employee, compensation = _ghana_employee(
+        institution, user_factory, membership_factory, employee_factory, organization_factory, assignment_dimensions_factory,
+    )
+    payroll_officer = user_factory()
+    membership_factory(user=payroll_officer, institution=institution, role_code="HR_ADMIN")
+    from apps.employees.models import Employee
+
+    Employee.objects.filter(pk=employee.pk).update(user=payroll_officer)
+    employee.refresh_from_db()
+
+    with pytest.raises(CodedValidationError):
+        change_current_compensation(
+            institution=institution, employee=employee, salary_structure=compensation.salary_structure, base_salary=Decimal("9000.00"),
+            currency="GHS", effective_from=date(2026, 10, 1), actor=payroll_officer,
+        )
+    period = PayrollPeriod.objects.create(institution=institution, name="Oct 2026", start_date=date(2026, 10, 1), end_date=date(2026, 10, 31), pay_date=date(2026, 10, 31))
+    bonus = PayComponent.objects.create(institution=institution, name="One-off", code="ONEOFF", component_type=PayComponent.ComponentType.EARNING, calculation_type=PayComponent.CalculationType.FIXED)
+    with pytest.raises(CodedValidationError):
+        create_payroll_adjustment(institution=institution, actor=payroll_officer, employee=employee, payroll_period=period, pay_component=bonus, amount=Decimal("500.00"), reason="Self")
+    adjustment = submit_payroll_adjustment(
+        adjustment=create_payroll_adjustment(institution=institution, actor=hr, employee=employee, payroll_period=period, pay_component=bonus, amount=Decimal("500.00"), reason="Award"),
+        actor=hr,
+    )
+    with pytest.raises(CodedValidationError):
+        decide_payroll_adjustment(adjustment=adjustment, actor=payroll_officer, approve=True)
+
+
+def test_widening_a_custom_role_regrants_its_permissions(institution_factory, user_factory, membership_factory):
+    from apps.institutions.services import create_custom_role, update_custom_role
+    from common.exceptions import CodedValidationError
+
+    institution = institution_factory(code="ROLE-WIDEN")
+    admin = user_factory()
+    membership_factory(user=admin, institution=institution, role_code="INSTITUTION_ADMIN", is_primary=True)
+    hr = user_factory()
+    membership_factory(user=hr, institution=institution, role_code="HR_ADMIN")
+    # The admin creates a self-only role holding a permission HR does not have.
+    role = create_custom_role(institution=institution, actor=admin, code="SELF_LEDGER", name="Own ledger", permission_codes=("journal.view",), data_scope=Role.DataScope.SELF)
+
+    with pytest.raises(CodedValidationError, match="Not held: journal.view"):
+        update_custom_role(role=role, institution=institution, actor=hr, data_scope=Role.DataScope.INSTITUTION)
+
+
+def test_reactivating_a_member_needs_the_right_to_assign_their_role(institution_factory, user_factory, membership_factory):
+    from apps.institutions.services import update_membership
+    from common.exceptions import CodedValidationError
+
+    institution = institution_factory(code="REACTIVATE")
+    admin = user_factory()
+    membership_factory(user=admin, institution=institution, role_code="INSTITUTION_ADMIN", is_primary=True)
+    hr = user_factory()
+    membership_factory(user=hr, institution=institution, role_code="HR_ADMIN")
+    finance = user_factory()
+    finance_membership = membership_factory(user=finance, institution=institution, role_code="FINANCE_MANAGER", status=InstitutionMembership.Status.SUSPENDED)
+
+    with pytest.raises(CodedValidationError):
+        update_membership(membership=finance_membership, institution=institution, actor=hr, status=InstitutionMembership.Status.ACTIVE)
+    assert update_membership(membership=finance_membership, institution=institution, actor=admin, status=InstitutionMembership.Status.ACTIVE).status == InstitutionMembership.Status.ACTIVE
+
+
+def test_exports_need_the_same_access_as_the_report(api_client, institution_factory, user_factory, membership_factory):
+    institution = institution_factory(code="EXPORT-ACCESS")
+    InstitutionModule.objects.filter(institution=institution, module_code__in=("REPORTS", "ACCOUNTING")).update(is_enabled=True)
+    hr = user_factory()
+    membership_factory(user=hr, institution=institution, role_code="HR_ADMIN", is_primary=True)
+    admin = user_factory()
+    membership_factory(user=admin, institution=institution, role_code="INSTITUTION_ADMIN", is_primary=True)
+    api_client.credentials(HTTP_X_INSTITUTION_ID=str(institution.id))
+
+    api_client.force_authenticate(hr)
+    # HR holds export_job.create but no accounting access.
+    assert api_client.post("/api/v1/export-jobs/", {"export_type": "accounting"}, format="json").status_code == 403
+    assert api_client.post("/api/v1/export-jobs/", {"export_type": "workforce-cost"}, format="json").status_code == 201
+
+    api_client.force_authenticate(admin)
+    created = api_client.post("/api/v1/export-jobs/", {"export_type": "accounting"}, format="json")
+    assert created.status_code == 201, created.content
+    # HR cannot see or download the admin's accounting export.
+    api_client.force_authenticate(hr)
+    export_id = created.json()["data"]["id"]
+    assert api_client.get(f"/api/v1/export-jobs/{export_id}/download/").status_code == 404

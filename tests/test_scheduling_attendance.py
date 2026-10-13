@@ -352,13 +352,13 @@ def test_schedule_aware_attendance_and_approval_flow(
 
     record = clock_in(
         employee=employee,
-        actor=employee_user,
+        actor=hr,  # a manager enters past punches
         at=datetime(2026, 9, 14, 9, 15, tzinfo=zone),
         source=AttendanceRecord.Source.PWA,
     )
     record = clock_out(
         attendance_record=record,
-        actor=employee_user,
+        actor=hr,
         at=datetime(2026, 9, 14, 18, 0, tzinfo=zone),
     )
 
@@ -457,7 +457,7 @@ def test_approved_leave_blocks_clock_in(
     with pytest.raises(ValidationError, match="approved leave"):
         clock_in(
             employee=employee,
-            actor=employee_user,
+            actor=hr,
             at=datetime(2026, 9, 14, 9, 0, tzinfo=ZoneInfo("Africa/Accra")),
         )
 

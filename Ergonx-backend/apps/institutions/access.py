@@ -25,6 +25,8 @@ REPEAT_WINDOW = timedelta(hours=24)
 @extend_schema(request=OpenApiTypes.OBJECT, responses={200: OpenApiTypes.OBJECT})
 class AccessRequestView(APIView):
     permission_classes = [TenantContextPermission, TenantRBACPermission]
+    # Read-only roles (Director, Auditor) are the members most likely to ask.
+    read_only_roles_may_write = True
 
     def get_required_permission(self):
         return None  # Any active member may ask; the request itself grants nothing.

@@ -9,7 +9,7 @@ from apps.compensation.models import PayComponent
 from apps.documents.models import Document
 from apps.employees.models import Employee
 from apps.institutions.models import Institution
-from common.models import BaseModel, TenantOwnedModel
+from common.models import BaseModel, TenantOwnedModel, changed_actor_fields
 
 
 class ValidatedBaseModel(BaseModel):
@@ -542,7 +542,7 @@ class InstitutionPayrollConfiguration(TenantOwnedModel):
             errors["selected_payroll_preset_version"] = (
                 "Custom mode cannot select a payroll preset version."
             )
-        if self.configured_by_id and not self.configured_by.memberships.filter(
+        if self.configured_by_id and changed_actor_fields(self, ("configured_by",)) and not self.configured_by.memberships.filter(
             institution_id=self.institution_id, status="ACTIVE"
         ).exists():
             errors["configured_by"] = "Configurer must be an active institution member."
@@ -655,7 +655,7 @@ class EmployeeTaxReliefClaim(TenantOwnedModel):
                 )
         if self.evidence_id and self.evidence.institution_id != self.institution_id:
             errors["evidence"] = "Evidence must belong to the same institution."
-        if self.approved_by_id and not self.approved_by.memberships.filter(
+        if self.approved_by_id and changed_actor_fields(self, ("approved_by",)) and not self.approved_by.memberships.filter(
             institution_id=self.institution_id, status="ACTIVE"
         ).exists():
             errors["approved_by"] = "Approver must be an active institution member."
@@ -800,7 +800,7 @@ class PayrollRun(TenantOwnedModel):
         errors = {}
         if self.payroll_period_id and self.payroll_period.institution_id != self.institution_id:
             errors["payroll_period"] = "Payroll period belongs to another institution."
-        for field in ("started_by", "approved_by", "finalized_by"):
+        for field in changed_actor_fields(self, ("started_by", "approved_by", "finalized_by")):
             user = getattr(self, field, None)
             if user and not user.memberships.filter(
                 institution_id=self.institution_id, status="ACTIVE"
@@ -1010,7 +1010,7 @@ class PayrollAdjustment(TenantOwnedModel):
         for field, relation in relations.items():
             if relation and relation.institution_id != self.institution_id:
                 errors[field] = "Referenced record belongs to another institution."
-        for field in ("created_by", "approved_by"):
+        for field in changed_actor_fields(self, ("created_by", "approved_by")):
             user = getattr(self, field, None)
             if user and not user.memberships.filter(
                 institution_id=self.institution_id, status="ACTIVE"

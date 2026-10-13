@@ -365,13 +365,31 @@ class Command(BaseCommand):
             arrival = shift_start + timedelta(minutes=expectation["grace_minutes"] + rng.randint(4, 38))
         else:
             arrival = shift_start + timedelta(minutes=rng.randint(-18, 3))
-        record = clock_in(employee=employee, actor=self.admin, at=arrival)
+        recorder = self._punch_recorder(employee)
+        record = clock_in(employee=employee, actor=recorder, at=arrival)
         if shift_end and shift_end <= self.now:
             overtime = rng.random() < 0.12
             departure = shift_end + timedelta(minutes=rng.randint(60, 150) if overtime else rng.randint(-4, 22))
             if departure <= self.now:
-                clock_out(attendance_record=record, actor=self.admin, at=departure)
+                clock_out(attendance_record=record, actor=recorder, at=departure)
         return 1
+
+    def _punch_recorder(self, employee):
+        """Past punches are entered by an attendance manager, never for their own record."""
+        if employee.user_id != self.admin.id:
+            return self.admin
+        if not hasattr(self, "_second_attendance_manager"):
+            from apps.institutions.models import InstitutionMembership
+
+            membership = (
+                InstitutionMembership.objects.filter(
+                    institution=self.institution, status=InstitutionMembership.Status.ACTIVE, role__permissions__code="attendance.manage",
+                ).exclude(user=self.admin).select_related("user").order_by("created_at").first()
+            )
+            if membership is None:
+                raise CommandError("A second attendance manager is needed to record the demo admin's attendance.")
+            self._second_attendance_manager = membership.user
+        return self._second_attendance_manager
 
     def _decide_overtime(self):
         """Older overtime is decided; the last week stays pending for review."""
@@ -495,7 +513,7 @@ class Command(BaseCommand):
             vendor = Vendor.objects.get(institution=institution, vendor_code=vendor_code)
             bill = create_vendor_bill(institution=institution, actor=admin, vendor=vendor, bill_number=number, bill_date=bill_date, due_date=self.today + timedelta(days=due), currency="GHS", accounting_period=self._period_for(bill_date), lines=[{"description": description, "expense_account": self._account(account_code), "quantity": Decimal("1"), "unit_price": amount}])
             bill = submit_vendor_bill(bill=bill, actor=admin)
-            bill = approve_vendor_bill(bill=bill, actor=admin)
+            bill = approve_vendor_bill(bill=bill, actor=institution.memberships.select_related("user").get(role__code="FINANCE_MANAGER", status="ACTIVE").user)  # preparer != approver
             bill = post_vendor_bill(bill=bill, actor=admin)
             if paid:
                 pay_date = min(bill_date + timedelta(days=14), self.today)

@@ -81,6 +81,7 @@ class TenantRBACPermission(BasePermission):
             # Read-only roles (Role.is_read_only) may only use self-service writes.
             and membership.role.is_read_only
             and permission_code not in SELF_SERVICE_ACTIONS
+            and not getattr(view, "read_only_roles_may_write", False)
         ):
             raise PermissionDenied("Your role has read-only access.", code="read_only_role")
         if permission_code is None:

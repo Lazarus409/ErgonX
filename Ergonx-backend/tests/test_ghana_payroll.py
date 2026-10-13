@@ -399,9 +399,11 @@ def test_ghana_approved_relief_and_bonus_are_applied_with_ytd_metadata(
     assert record.gross_pay == Decimal("4000.00")
     assert bonus_tax.amount == Decimal("50.00")
     assert bonus_tax.metadata["annual_threshold"] == "5400.00"
-    assert relief_item.amount == Decimal("1200.00")
-    assert record.total_deductions == Decimal("226.88")
-    assert record.net_pay == Decimal("3608.12")
+    # The GHS 1,200 annual relief is granted a twelfth a month: 9/12 by September.
+    assert relief_item.amount == Decimal("900.00")
+    assert relief_item.metadata["allowance_to_date"] == "900.00"
+    assert record.total_deductions == Decimal("279.38")
+    assert record.net_pay == Decimal("3555.62")
 
 
 def test_ghana_non_resident_bonus_rate_is_loaded_from_versioned_rule_data(

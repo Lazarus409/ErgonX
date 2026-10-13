@@ -184,6 +184,8 @@ class LeaveRequestSerializer(ValidatedModelSerializer):
             "created_at",
             "updated_at",
         )
+        # The server counts the working days in the range (see leave.services).
+        extra_kwargs = {"requested_days": {"required": False}}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

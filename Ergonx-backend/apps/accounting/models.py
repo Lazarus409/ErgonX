@@ -11,7 +11,7 @@ from apps.documents.models import Document
 from apps.institutions.models import Institution
 from apps.organization.models import Department, Location
 from common.codes import AutoCodeMixin
-from common.models import BaseModel, TenantOwnedModel
+from common.models import BaseModel, TenantOwnedModel, changed_actor_fields
 
 
 class AccountingPreset(BaseModel):
@@ -315,7 +315,7 @@ class InstitutionAccountingConfiguration(TenantOwnedModel):
             errors["selected_accounting_preset_version"] = (
                 "Custom mode cannot select an accounting preset version."
             )
-        if self.configured_by_id and not self.configured_by.memberships.filter(
+        if self.configured_by_id and changed_actor_fields(self, ("configured_by",)) and not self.configured_by.memberships.filter(
             institution_id=self.institution_id, status="ACTIVE"
         ).exists():
             errors["configured_by"] = "Configurer must be an active institution member."
@@ -608,7 +608,7 @@ class AccountingPeriod(TenantOwnedModel):
             overlap = overlap.exclude(pk=self.pk)
         if overlap.exists():
             errors["start_date"] = "Accounting periods cannot overlap."
-        if self.closed_by_id and not self.closed_by.memberships.filter(
+        if self.closed_by_id and changed_actor_fields(self, ("closed_by",)) and not self.closed_by.memberships.filter(
             institution_id=self.institution_id, status="ACTIVE"
         ).exists():
             errors["closed_by"] = "Closer must be an active institution member."
@@ -677,8 +677,9 @@ class JournalEntry(TenantOwnedModel):
             ),
             models.UniqueConstraint(
                 fields=("reversal_of",),
-                condition=models.Q(reversal_of__isnull=False),
-                name="uniq_reversal_per_journal",
+                # A voided reversal does not count: the journal can be reversed again.
+                condition=models.Q(reversal_of__isnull=False) & ~models.Q(status="VOID"),
+                name="uniq_live_reversal_per_journal",
             ),
         ]
         indexes = [models.Index(fields=("institution", "status", "entry_date"))]
@@ -696,7 +697,7 @@ class JournalEntry(TenantOwnedModel):
                 errors["entry_date"] = "Entry date must fall within the accounting period."
         if self.reversal_of_id and self.reversal_of.institution_id != self.institution_id:
             errors["reversal_of"] = "Reversed journal belongs to another institution."
-        for field in ("created_by", "approved_by", "posted_by"):
+        for field in changed_actor_fields(self, ("created_by", "approved_by", "posted_by")):
             user = getattr(self, field, None)
             if user and not user.memberships.filter(
                 institution_id=self.institution_id, status="ACTIVE"
@@ -1539,7 +1540,7 @@ class BankStatementLine(TenantOwnedModel):
             errors["journal_entry"] = "A matched statement line requires a journal."
         if self.status != self.Status.MATCHED and self.journal_entry_id:
             errors["status"] = "Only matched statement lines can carry a journal."
-        if self.reconciled_by_id and not self.reconciled_by.memberships.filter(
+        if self.reconciled_by_id and changed_actor_fields(self, ("reconciled_by",)) and not self.reconciled_by.memberships.filter(
             institution_id=self.institution_id, status="ACTIVE"
         ).exists():
             errors["reconciled_by"] = "Reconciler must be an active institution member."
@@ -1718,7 +1719,7 @@ class Expense(TenantOwnedModel):
             errors["claimant"] = "Claimant belongs to another institution."
         if self.attachment_id and self.attachment.institution_id != self.institution_id:
             errors["attachment"] = "Attachment belongs to another institution."
-        for field in ("created_by", "approved_by", "finance_reviewed_by", "settled_by", "reversed_by"):
+        for field in changed_actor_fields(self, ("created_by", "approved_by", "finance_reviewed_by", "settled_by", "reversed_by")):
             user = getattr(self, field, None)
             if user and not user.memberships.filter(institution_id=self.institution_id, status="ACTIVE").exists():
                 errors[field] = "User must be an active institution member."

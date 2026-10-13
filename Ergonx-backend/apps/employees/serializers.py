@@ -1,6 +1,5 @@
 from rest_framework import serializers
 
-from apps.accounts.models import User
 from apps.employees.models import EmergencyContact, Employee, EmployeeOffboarding, EmployeeOnboarding, Employment
 from apps.employees.services import change_current_employment, create_employment, save_emergency_contact
 from apps.organization.models import Department, Grade, Location, Position
@@ -36,16 +35,10 @@ class EmployeeSerializer(ValidatedModelSerializer):
             "created_at",
             "updated_at",
         )
-        read_only_fields = ("id", "full_name", "created_at", "updated_at")
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        request = self.context.get("request")
-        institution = getattr(request, "institution", None)
-        if institution:
-            self.fields["user"].queryset = User.objects.filter(
-                memberships__institution=institution
-            ).distinct()
+        # The sign-in account is linked only by accepting a self-service
+        # invitation: letting HR set it would let them take over another
+        # employee's payslips and personal data.
+        read_only_fields = ("id", "user", "full_name", "created_at", "updated_at")
 
     PERSONAL_FIELDS = ("personal_email", "date_of_birth", "mobile_phone")
 
@@ -57,14 +50,6 @@ class EmployeeSerializer(ValidatedModelSerializer):
             for field in self.PERSONAL_FIELDS:
                 data.pop(field, None)
         return data
-
-    def validate_user(self, user):
-        institution = self.context["request"].institution
-        if user and not user.memberships.filter(institution=institution).exists():
-            raise serializers.ValidationError(
-                "Linked user must have a membership in the current institution."
-            )
-        return user
 
 
 class EmploymentSerializer(ValidatedModelSerializer):

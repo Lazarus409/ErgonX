@@ -7,6 +7,7 @@ import pytest
 from apps.accounting.models import Account, FinancialReport
 from apps.accounting.reporting import run_due_reports
 from apps.accounting.services import approve_vendor_bill, create_vendor, create_vendor_bill, post_vendor_bill, submit_vendor_bill
+from tests.approvals import second_approver
 from tests.test_accounts_payable import _accounting_foundation, _enable_accounting, _finance
 
 pytestmark = pytest.mark.django_db
@@ -22,7 +23,7 @@ def reporting(institution_factory, user_factory, membership_factory):
     bill = create_vendor_bill(institution=institution, actor=finance, vendor=vendor, bill_number="RPT-1", bill_date=date(2026, 1, 15), due_date=date(2026, 1, 30),
                               currency="GHS", accounting_period=period,
                               lines=[{"description": "Consulting", "expense_account": Account.objects.get(institution=institution, code="5000"), "quantity": Decimal("1"), "unit_price": Decimal("200")}])
-    post_vendor_bill(bill=approve_vendor_bill(bill=submit_vendor_bill(bill=bill, actor=finance), actor=finance), actor=finance)
+    post_vendor_bill(bill=approve_vendor_bill(bill=submit_vendor_bill(bill=bill, actor=finance), actor=second_approver(finance)), actor=finance)
     return {"institution": institution, "finance": finance}
 
 

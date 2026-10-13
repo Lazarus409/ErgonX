@@ -15,6 +15,7 @@ from apps.accounting.services import (
     post_vendor_bill,
     submit_vendor_bill,
 )
+from tests.approvals import second_approver
 from tests.test_accounts_payable import _accounting_foundation, _enable_accounting, _finance
 
 pytestmark = pytest.mark.django_db
@@ -34,7 +35,7 @@ def banking(institution_factory, user_factory, membership_factory):
         currency="GHS", accounting_period=period,
         lines=[{"description": "Service", "expense_account": Account.objects.get(institution=institution, code="5000"), "quantity": Decimal("1"), "unit_price": Decimal("100"), "tax_code": tax_code}],
     )
-    bill = post_vendor_bill(bill=approve_vendor_bill(bill=submit_vendor_bill(bill=bill, actor=actor), actor=actor), actor=actor)
+    bill = post_vendor_bill(bill=approve_vendor_bill(bill=submit_vendor_bill(bill=bill, actor=actor), actor=second_approver(actor)), actor=actor)
     payment = create_payment(institution=institution, actor=actor, payment_number="PAY-WS", payment_date=date(2026, 1, 20), amount=Decimal("40"),
                              currency="GHS", payment_method=Payment.Method.BANK_TRANSFER, bank_account=bank, vendor_bill=bill)
     return {"institution": institution, "actor": actor, "bank": bank, "payment": payment}

@@ -62,9 +62,9 @@ def _schedule_totals(employee, period):
     return working_dates, required_minutes
 
 
-def _basis_value(basis, *, compensation, gross_pay, taxable_income):
+def _basis_value(basis, *, basic_pay, gross_pay, taxable_income):
     values = {
-        TaxRule.Basis.BASE_SALARY: compensation.base_salary,
+        TaxRule.Basis.BASE_SALARY: basic_pay,
         TaxRule.Basis.GROSS_PAY: gross_pay,
         TaxRule.Basis.TAXABLE_INCOME: taxable_income,
     }
@@ -127,7 +127,7 @@ def _create_item(
     )
 
 
-def _apply_custom_rules(record, *, payroll_run, compensation, gross_pay, taxable_income):
+def _apply_custom_rules(record, *, payroll_run, compensation, basic_pay, gross_pay, taxable_income):
     """Evaluate a CUSTOM configuration's own rules, as frozen on the run's snapshot."""
     rules = (payroll_run.statutory_snapshot or {}).get("configuration", {}).get("custom_rules") or {}
     statutory_deductions = Decimal("0")
@@ -135,7 +135,7 @@ def _apply_custom_rules(record, *, payroll_run, compensation, gross_pay, taxable
     employer_contributions = Decimal("0")
 
     def basis_of(basis):
-        return _basis_value(basis, compensation=compensation, gross_pay=gross_pay, taxable_income=taxable_income)
+        return _basis_value(basis, basic_pay=basic_pay, gross_pay=gross_pay, taxable_income=taxable_income)
 
     tax = rules.get("income_tax") or {}
     if tax.get("method") in ("FLAT", "PROGRESSIVE"):
@@ -191,9 +191,11 @@ def _apply_statutory_rules(
     *,
     payroll_run,
     compensation,
+    basic_pay,
     gross_pay,
     taxable_income,
 ):
+    """``basic_pay``, ``gross_pay`` and ``taxable_income`` are what was earned: unpaid leave is already out."""
     employee_contributions = Decimal("0")
     employer_contributions = Decimal("0")
     statutory_deductions = Decimal("0")
@@ -203,6 +205,7 @@ def _apply_statutory_rules(
             record,
             payroll_run=payroll_run,
             compensation=compensation,
+            basic_pay=basic_pay,
             gross_pay=gross_pay,
             taxable_income=taxable_income,
         )
@@ -214,6 +217,7 @@ def _apply_statutory_rules(
             payroll_run=payroll_run,
             record=record,
             compensation=compensation,
+            basic_pay=basic_pay,
             gross_pay=gross_pay,
             taxable_income=taxable_income,
             configuration=payroll_run.institution.payroll_configuration,
@@ -252,7 +256,7 @@ def _apply_statutory_rules(
             )
         basis = _basis_value(
             rule.basis,
-            compensation=compensation,
+            basic_pay=basic_pay,
             gross_pay=gross_pay,
             taxable_income=taxable_income,
         )
@@ -290,7 +294,7 @@ def _apply_statutory_rules(
     for rule in contribution_rules.order_by("code", "effective_from"):
         basis = _basis_value(
             rule.basis,
-            compensation=compensation,
+            basic_pay=basic_pay,
             gross_pay=gross_pay,
             taxable_income=taxable_income,
         )
@@ -443,6 +447,7 @@ def calculate_employee_record(payroll_run, employee, configuration):
     working_dates, scheduled_minutes = _schedule_totals(employee, period)
     working_date_set = set(working_dates)
     unpaid_dates = set()
+    unpaid_amount = Decimal("0")
     unpaid_requests = LeaveRequest.objects.filter(
         institution=payroll_run.institution,
         employee=employee,
@@ -476,7 +481,8 @@ def calculate_employee_record(payroll_run, employee, configuration):
             effect="DEDUCTION",
             quantity=Decimal(len(unpaid_dates)),
             rate=money(compensation.base_salary / len(working_dates)),
-            metadata={"leave_dates": [value.isoformat() for value in sorted(unpaid_dates)]},
+            # Unearned pay: it also comes off taxable income (see reconcile_payroll_run).
+            metadata={"leave_dates": [value.isoformat() for value in sorted(unpaid_dates)], "reduces_taxable": True},
         )
 
     overtime_rows = OvertimeRecord.objects.filter(
@@ -561,12 +567,16 @@ def calculate_employee_record(payroll_run, employee, configuration):
             adjustment.applied_run = payroll_run
             adjustment.save(update_fields=("status", "applied_run", "updated_at"))
 
+    # Unpaid leave stays a payslip deduction, but pay that was never earned is
+    # neither taxed nor pensionable.
+    taxable_income -= unpaid_amount
     statutory, employee_contributions, statutory_employer = _apply_statutory_rules(
         record,
         payroll_run=payroll_run,
         compensation=compensation,
-        gross_pay=gross_pay,
-        taxable_income=taxable_income,
+        basic_pay=money(max(Decimal("0"), compensation.base_salary - unpaid_amount)),
+        gross_pay=max(Decimal("0"), gross_pay - unpaid_amount),
+        taxable_income=max(Decimal("0"), taxable_income),
     )
     total_deductions += statutory
     employer_contributions += statutory_employer

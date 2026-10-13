@@ -83,6 +83,9 @@ def decide_approval_request(*, request, actor, action, comments=""):
         is_assigned_role = step.approver_role_id and actor.memberships.filter(institution=request.institution, role_id=step.approver_role_id, status="ACTIVE").exists()
         if not (is_assigned_user or is_assigned_role):
             raise PermissionDenied("You are not assigned to the current approval step.")
+        if action == ApprovalAction.Action.APPROVE and request.actions.filter(actor=actor, action=ApprovalAction.Action.APPROVE).exists():
+            # Each step is a separate check: someone else must approve this one.
+            raise PermissionDenied("You approved an earlier step of this request, so someone else must approve this one.")
         if action == ApprovalAction.Action.RETURN and not comments.strip():
             raise ValidationError("Explain what needs to change.")
     ApprovalAction.objects.create(institution=request.institution, request=request, step=step, actor=actor, action=action, comments=comments)

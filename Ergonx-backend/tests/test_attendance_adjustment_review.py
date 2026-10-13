@@ -43,7 +43,7 @@ def flow(institution_factory, user_factory, membership_factory, employee_factory
         institution=institution, employee=employee, work_schedule=schedule,
         effective_from=date(2026, 1, 1), is_current=True, assigned_by=hr,
     )
-    record = clock_in(employee=employee, actor=staff, at=datetime(2026, 9, 14, 9, 0, tzinfo=ZONE))
+    record = clock_in(employee=employee, actor=hr, at=datetime(2026, 9, 14, 9, 0, tzinfo=ZONE))
     adjustment = request_adjustment(
         institution=institution, attendance_record=record, actor=staff,
         reason="Network outage prevented clock-out",

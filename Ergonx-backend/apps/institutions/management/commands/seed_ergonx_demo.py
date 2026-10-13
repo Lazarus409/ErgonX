@@ -584,12 +584,23 @@ class Command(BaseCommand):
         if not structure.is_active:
             raise CommandError("APEX-MONTHLY salary structure is inactive; refusing to seed compensation.")
         effective_from = date(2026, 1, 1)
+        # Nobody sets their own pay, so another compensation manager sets the admin's.
+        second_payroll_manager = (
+            InstitutionMembership.objects.filter(
+                institution=institution, status=InstitutionMembership.Status.ACTIVE, role__permissions__code="compensation.manage",
+            ).exclude(user=admin).select_related("user").order_by("created_at").first()
+        )
         for person, amount in zip(EMPLOYEES, COMPENSATION_AMOUNTS, strict=True):
             number = person[0]
             employee = institution.employees.get(employee_number=number)
             compensation = EmployeeCompensation.objects.filter(employee=employee, is_current=True).first()
             salary = Decimal(amount)
             if compensation is None:
+                actor = admin
+                if employee.user_id == admin.id:
+                    if second_payroll_manager is None:
+                        raise CommandError("A second compensation manager is needed to set the demo admin's pay.")
+                    actor = second_payroll_manager.user
                 change_current_compensation(
                     institution=institution,
                     employee=employee,
@@ -597,7 +608,7 @@ class Command(BaseCommand):
                     base_salary=salary,
                     currency="GHS",
                     effective_from=effective_from,
-                    actor=admin,
+                    actor=actor,
                 )
             elif (
                 compensation.salary_structure_id != structure.id
@@ -860,7 +871,9 @@ class Command(BaseCommand):
             if adjustment.status == PayrollAdjustment.Status.DRAFT:
                 adjustment = submit_payroll_adjustment(adjustment=adjustment, actor=admin)
             if approve and adjustment.status == PayrollAdjustment.Status.PENDING:
-                decide_payroll_adjustment(adjustment=adjustment, actor=admin, approve=True)
+                # Preparer != approver (BQ-04): the Finance Manager approves.
+                finance_manager = institution.memberships.select_related("user").get(role__code="FINANCE_MANAGER", status="ACTIVE").user
+                decide_payroll_adjustment(adjustment=adjustment, actor=finance_manager, approve=True)
         run = create_payroll_run(institution=institution, payroll_period=period, actor=admin, idempotency_key="apex-demo-2026-09-v1")
         if run.status == PayrollRun.Status.DRAFT:
             run = calculate_payroll_run(payroll_run=run, actor=admin)
@@ -941,7 +954,7 @@ class Command(BaseCommand):
         if bill.status == VendorBill.Status.DRAFT:
             bill = submit_vendor_bill(bill=bill, actor=admin)
         if bill.status == VendorBill.Status.PENDING:
-            bill = approve_vendor_bill(bill=bill, actor=admin)
+            bill = approve_vendor_bill(bill=bill, actor=institution.memberships.select_related("user").get(role__code="FINANCE_MANAGER", status="ACTIVE").user)  # preparer != approver
         if bill.status == VendorBill.Status.APPROVED:
             bill = post_vendor_bill(bill=bill, actor=admin)
         if not bill.payments.exists():

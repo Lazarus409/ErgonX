@@ -18,6 +18,7 @@ from apps.accounting.services import (
     set_vendor_bill_hold,
     submit_vendor_bill,
 )
+from tests.approvals import second_approver
 from tests.test_accounts_payable import _accounting_foundation, _enable_accounting, _finance
 
 pytestmark = pytest.mark.django_db
@@ -56,10 +57,10 @@ def test_reject_revise_hold_and_schedule(payables):
 
     bill = set_vendor_bill_hold(bill=bill, actor=actor, on_hold=True, reason="Awaiting delivery note")
     with pytest.raises(ValidationError):
-        approve_vendor_bill(bill=bill, actor=actor)
+        approve_vendor_bill(bill=bill, actor=second_approver(actor))
     bill = set_vendor_bill_hold(bill=bill, actor=actor, on_hold=False)
-    bill = approve_vendor_bill(bill=bill, actor=actor)
-    assert bill.approved_by == actor
+    bill = approve_vendor_bill(bill=bill, actor=second_approver(actor))
+    assert bill.approved_by == second_approver(actor)
     with pytest.raises(ValidationError):
         schedule_vendor_bill_payment(bill=bill, actor=actor, payment_date=date(2026, 2, 5), payment_method="BANK_TRANSFER")
     bill = post_vendor_bill(bill=bill, actor=actor)

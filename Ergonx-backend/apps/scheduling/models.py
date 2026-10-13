@@ -9,7 +9,7 @@ from django.utils import timezone
 from apps.employees.models import Employee
 from apps.institutions.models import Institution
 from common.codes import AutoCodeMixin
-from common.models import TenantOwnedModel
+from common.models import TenantOwnedModel, changed_actor_fields
 
 
 class Shift(AutoCodeMixin, TenantOwnedModel):
@@ -446,7 +446,7 @@ class ScheduleAssignment(TenantOwnedModel):
             errors["employee"] = "Employee must belong to the same institution."
         if self.work_schedule_id and self.work_schedule.institution_id != self.institution_id:
             errors["work_schedule"] = "Schedule must belong to the same institution."
-        if self.assigned_by_id and self.institution_id:
+        if self.assigned_by_id and self.institution_id and changed_actor_fields(self, ("assigned_by",)):
             if not self.assigned_by.memberships.filter(
                 institution_id=self.institution_id, status="ACTIVE"
             ).exists():

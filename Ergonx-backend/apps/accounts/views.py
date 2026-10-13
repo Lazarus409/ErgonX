@@ -3,7 +3,7 @@ from rest_framework.exceptions import APIException, PermissionDenied, Validation
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
-from rest_framework.throttling import AnonRateThrottle
+from rest_framework.throttling import AnonRateThrottle, SimpleRateThrottle
 from django.conf import settings
 from django.core.mail import BadHeaderError
 from smtplib import SMTPException
@@ -14,7 +14,9 @@ import secrets
 from django.utils.crypto import salted_hmac
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import models, transaction
 from django.utils.text import slugify
 from urllib.parse import quote
@@ -462,6 +464,12 @@ class InstitutionAccessRequestThrottle(AnonRateThrottle):
     def get_rate(self):
         return settings.INSTITUTION_ACCESS_REQUEST_RATE
 
+    def get_ident(self, request):
+        # Browsers arrive through the BFF, so REMOTE_ADDR is the BFF for every
+        # visitor; use the client address it forwards with the shared secret.
+        ip, _trusted = client_ip(request)
+        return ip or super().get_ident(request)
+
 
 class InstitutionAccessRequestView(APIView):
     """Public submission of an access request; platform admins list them."""
@@ -665,10 +673,24 @@ class PasswordChangeView(APIView):
         return Response({"changed": True})
 
 
+class PasswordResetEmailThrottle(SimpleRateThrottle):
+    """Caps reset emails per address. Requests arrive through the BFF, so an IP key would be shared."""
+
+    scope = "password_reset_email"
+
+    def get_rate(self):
+        return settings.PASSWORD_RESET_EMAIL_RATE
+
+    def get_cache_key(self, request, view):
+        email = str(request.data.get("email") or "").strip().lower()
+        return self.cache_format % {"scope": self.scope, "ident": salted_hmac("password-reset-throttle", email).hexdigest()} if email else None
+
+
 class PasswordResetRequestView(APIView):
     """Always returns the same response to avoid account-enumeration leaks."""
 
     permission_classes = [AllowAny]
+    throttle_classes = [PasswordResetEmailThrottle]
 
     @extend_schema(request=PasswordResetRequestSerializer, responses={202: OpenApiTypes.OBJECT})
     def post(self, request):
@@ -779,14 +801,15 @@ class InvitationAcceptanceView(APIView):
     serializer_class = InstitutionAdminInvitationAcceptanceSerializer
 
     @staticmethod
-    def _access_preview(invitation):
+    def _access_preview(invitation, role=None):
+        role = role or invitation.role
         enabled_modules = set(
             invitation.institution.modules.filter(is_enabled=True).values_list(
                 "module_code", flat=True
             )
         )
         permitted_modules = set(
-            invitation.role.permissions.values_list("module_code", flat=True)
+            role.permissions.values_list("module_code", flat=True)
         )
         modules = [
             {"code": code, "name": label}
@@ -794,8 +817,8 @@ class InvitationAcceptanceView(APIView):
             if code in enabled_modules and code in permitted_modules
         ]
         return {
-            "role_code": invitation.role.code,
-            "role_name": invitation.role.name,
+            "role_code": role.code,
+            "role_name": role.name,
             "modules": modules,
         }
 
@@ -832,18 +855,34 @@ class InvitationAcceptanceView(APIView):
         last_name = request.data.get("last_name", "")
         user = User.objects.filter(email=invitation.email).first()
         created = user is None
+        # Every refusal happens before anything is written: returning a response
+        # does not roll back this transaction.
+        membership = InstitutionMembership.objects.select_for_update().filter(institution=invitation.institution, user=user).first() if user else None
+        if membership is not None and membership.status in (InstitutionMembership.Status.SUSPENDED, InstitutionMembership.Status.INACTIVE):
+            # An old invitation must not undo a suspension or an offboarding.
+            return Response({"detail": "Your access to this organization has been suspended. Ask an administrator to restore it."}, status=403)
+        if invitation.employee_id and invitation.employee.user_id and invitation.employee.user_id != getattr(user, "id", None):
+            return Response({"detail": "This employee record is already linked to another account."}, status=409)
         if user and user.has_usable_password():
             # A recipient can be invited into another institution or role. The
             # invitation token plus their current password proves ownership of
-            # the existing account without creating a duplicate identity.
+            # the existing account without creating a duplicate identity. The
+            # check shares the sign-in lockout, so it cannot be used to guess.
+            key = email_key(user.email)
+            ip, ip_trusted = client_ip(request)
+            ensure_login_allowed(key=key, ip=ip, ip_trusted=ip_trusted)
             if not user.check_password(password):
+                record_login_attempt(key=key, ip=ip, outcome=AuthAttempt.Outcome.FAILED, reason="invitation_password_invalid")
                 return Response(
                     {"detail": "Enter your current ErgonX password to accept this invitation."},
                     status=400,
                 )
+            record_login_attempt(key=key, ip=ip, outcome=AuthAttempt.Outcome.SUCCEEDED)
         else:
-            if len(password) < 8:
-                return Response({"detail": "Password must contain at least 8 characters."}, status=400)
+            try:
+                validate_password(password, user)
+            except DjangoValidationError as exc:
+                return Response({"detail": " ".join(exc.messages), "password": exc.messages}, status=400)
             if user is None:
                 user = User.objects.create_user(
                     email=invitation.email,
@@ -854,14 +893,17 @@ class InvitationAcceptanceView(APIView):
             else:
                 user.set_password(password)
                 user.save(update_fields=("password", "updated_at"))
-        membership, _ = InstitutionMembership.objects.get_or_create(institution=invitation.institution, user=user, defaults={"role": invitation.role, "status": "ACTIVE"})
-        membership.role = invitation.role; membership.status = "ACTIVE"; membership.save()
+        if membership is None:
+            membership = InstitutionMembership.objects.create(institution=invitation.institution, user=user, role=invitation.role, status=InstitutionMembership.Status.ACTIVE)
+        elif membership.status == InstitutionMembership.Status.INVITED:
+            membership.role = invitation.role; membership.status = InstitutionMembership.Status.ACTIVE; membership.save()
+        # An already active member keeps their role: an Employee self-service
+        # invitation must not demote an administrator.
         if invitation.employee_id:
             employee = invitation.employee
-            if employee.user_id and employee.user_id != user.id:
-                return Response({"detail": "This employee record is already linked to another account."}, status=409)
-            employee.user = user
-            employee.save(update_fields=("user", "updated_at"))
+            if employee.user_id != user.id:
+                employee.user = user
+                employee.save(update_fields=("user", "updated_at"))
         elif invitation.role.code == "EMPLOYEE":
             # New employee invitations deliberately start without an HR record.
             # Acceptance creates the minimum linked profile; the employee can
@@ -883,7 +925,7 @@ class InvitationAcceptanceView(APIView):
             {
                 "accepted": True,
                 "existing_account": not created,
-                "access_preview": self._access_preview(invitation),
+                "access_preview": self._access_preview(invitation, membership.role),
             },
             status=200 if not created else 201,
         )

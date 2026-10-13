@@ -599,12 +599,12 @@ SETTING_NAMESPACE_PERMISSIONS = {
 }
 GOVERNED_SETTINGS = {
     # Separation of duties (BQ-04): preparer != approver, default ON.
-    "security.separation_of_duties": {"payroll": bool, "journals": bool},
+    "security.separation_of_duties": {"payroll": bool, "journals": bool, "payables": bool},
     # Whether members may receive notification copies by email.
     "notifications.email_enabled": bool,
 }
 SETTING_DEFAULTS = {
-    "security.separation_of_duties": {"payroll": True, "journals": True},
+    "security.separation_of_duties": {"payroll": True, "journals": True, "payables": True},
     "notifications.email_enabled": True,
 }
 
@@ -786,6 +786,13 @@ def update_custom_role(*, role, institution, actor, name=None, description=None,
         raise CodedValidationError("Reserved system roles cannot be changed.", api_code="role_protected")
     old_permissions = sorted(locked.permissions.values_list("code", flat=True))
     old_access = {"data_scope": locked.data_scope, "is_read_only": locked.is_read_only}
+    breadth = {Role.DataScope.SELF: 0, Role.DataScope.DEPARTMENT: 1, Role.DataScope.INSTITUTION: 2}
+    widens = (data_scope is not None and breadth.get(data_scope, 2) > breadth.get(locked.data_scope, 2)) or (
+        is_read_only is False and locked.is_read_only
+    )
+    if widens:
+        # Wider reach (or write access) re-grants every permission the role holds.
+        _assert_can_grant(actor, institution, set(permission_codes if permission_codes is not None else old_permissions))
     if data_scope is not None:
         locked.data_scope = data_scope
     if is_read_only is not None:
@@ -828,12 +835,23 @@ def update_membership(*, membership, institution, actor, role=None, status=None,
         if role.pk != locked.role_id:
             _assert_can_assign_role(actor, institution, role)
         locked.role = role
+    if (
+        status == InstitutionMembership.Status.ACTIVE
+        and locked.status != InstitutionMembership.Status.ACTIVE
+        and (role is None or role.pk == locked.role_id)
+    ):
+        # Reactivating restores the role's access, so the actor must be able to grant it.
+        _assert_can_assign_role(actor, institution, locked.role)
     if status is not None:
         locked.status = status
         if status == InstitutionMembership.Status.ACTIVE and locked.joined_at is None:
             locked.joined_at = timezone.now()
         if status in (InstitutionMembership.Status.SUSPENDED, InstitutionMembership.Status.INACTIVE):
             locked.ended_at = timezone.now()
+            # A pending invitation would otherwise let them back in.
+            InstitutionInvitation.objects.filter(
+                institution=institution, email__iexact=locked.user.email, status=InstitutionInvitation.Status.PENDING
+            ).update(status=InstitutionInvitation.Status.REVOKED, updated_at=timezone.now())
     if is_primary is not None:
         locked.is_primary = is_primary
     locked.full_clean()

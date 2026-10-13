@@ -423,7 +423,7 @@ def journal_totals(journal):
 
 def _validate_balanced(journal):
     totals = journal_totals(journal)
-    if not journal.lines.exists() or totals["debit"] != totals["credit"]:
+    if totals["debit"] <= 0 or totals["debit"] != totals["credit"]:
         raise CodedValidationError(
             {"lines": "Journal debits and credits must be non-zero and equal."},
             api_code="unbalanced_journal",
@@ -525,8 +525,12 @@ def update_draft_journal(*, journal, actor, lines=None, **values):
             {"accounting_period": "Closed or locked periods cannot accept journals."},
             api_code="period_closed",
         )
+    previous_year = journal.entry_date.year
     for field, value in values.items():
         setattr(journal, field, value)
+    if journal.entry_date.year != previous_year:
+        # The number carries the entry year (JE-YYYY-nnnnnn); drafts are renumbered.
+        journal.journal_number = _next_journal_number(journal.institution, journal.entry_date)
     journal.save()
     if lines is not None:
         _replace_lines(journal, lines)
@@ -688,7 +692,8 @@ def create_reversal(*, journal, actor, entry_date, accounting_period, descriptio
             {"status": "Only posted journals can be reversed."},
             api_code="invalid_state_transition",
         )
-    existing = original.reversals.first()
+    # A voided reversal never took effect, so the journal can be reversed again.
+    existing = original.reversals.exclude(status=JournalEntry.Status.VOID).first()
     if existing:
         return existing
     lines = [
@@ -1014,6 +1019,27 @@ def submit_vendor_bill(*, bill, actor):
     return bill
 
 
+def prepared_vendor_bill(bill, user):
+    """Whether separation of duties keeps ``user`` from approving ``bill`` (they entered or submitted it)."""
+    from apps.audit.models import AuditLog
+    from apps.institutions.services import institution_setting
+
+    if not (institution_setting(bill.institution, "security.separation_of_duties") or {}).get("payables", True):
+        return False
+    return bill.submitted_by_id == user.id or AuditLog.objects.filter(
+        institution=bill.institution, entity_id=bill.id, actor=user, action="accounting.vendor_bill.created",
+    ).exists()
+
+
+def _ensure_payables_separation(bill, actor):
+    """Whoever entered or submitted a bill does not approve it (BQ-04, setting ``payables``)."""
+    if prepared_vendor_bill(bill, actor):
+        raise CodedValidationError(
+            {"actor": "You prepared this bill, so someone else must approve it (separation of duties)."},
+            api_code="separation_of_duties",
+        )
+
+
 @transaction.atomic
 def approve_vendor_bill(*, bill, actor):
     bill = VendorBill.objects.select_for_update().get(pk=bill.pk)
@@ -1027,6 +1053,7 @@ def approve_vendor_bill(*, bill, actor):
         )
     if bill.on_hold:
         raise CodedValidationError({"on_hold": "Release the hold before approving this bill."}, api_code="invalid_state_transition")
+    _ensure_payables_separation(bill, actor)
     bill.status = VendorBill.Status.APPROVED
     bill.approved_by = actor
     bill.approved_at = timezone.now()
@@ -1792,6 +1819,8 @@ def generate_payroll_journal(*, payroll_run, actor):
     items = run.records.prefetch_related("items__pay_component").all()
     for record in items:
         for item in record.items.all():
+            if item.metadata.get("effect") == "TAX_RELIEF":
+                continue  # A relief only lowers the PAYE basis; no money moves.
             mapping = None
             if item.pay_component_id:
                 mapping = PayComponentAccountMapping.objects.filter(institution=run.institution, pay_component=item.pay_component, is_active=True, effective_from__lte=run.payroll_period.pay_date).filter(models.Q(effective_to__isnull=True) | models.Q(effective_to__gte=run.payroll_period.pay_date)).order_by("-effective_from").first()

@@ -81,25 +81,29 @@ def _open_ap_ar(institution, start, end):
     return bills, invoices
 
 
-def _filtered(institution, report_type, *, status, start, end):
-    """The records a report counts, with the report's filters applied."""
+def _unscoped(queryset, employee_field, **options):
+    return queryset
+
+
+def _filtered(institution, report_type, *, status, start, end, scope=_unscoped):
+    """The records a report counts, with the report's filters and the requester's data scope applied."""
     if report_type == "workforce-cost":
-        employees = Employee.objects.for_institution(institution)
+        employees = scope(Employee.objects.for_institution(institution), "")
         return employees.filter(status=status) if status else employees
     if report_type == "leave":
-        records = LeaveRequest.objects.filter(institution=institution)
+        records = scope(LeaveRequest.objects.filter(institution=institution), "employee", broad=LEAVE_BROAD)
         if start:
             records = records.filter(end_date__gte=start)
         if end:
             records = records.filter(start_date__lte=end)
     elif report_type == "attendance":
-        records = AttendanceRecord.objects.filter(institution=institution)
+        records = scope(AttendanceRecord.objects.filter(institution=institution), "employee", broad=ATTENDANCE_BROAD)
         if start:
             records = records.filter(attendance_date__gte=start)
         if end:
             records = records.filter(attendance_date__lte=end)
     elif report_type == "payroll":
-        records = _payroll_records(institution, start, end)
+        records = scope(_payroll_records(institution, start, end), "employee", allow_team=False)
         return records.filter(payroll_run__status=status) if status else records
     elif report_type == "accounting":
         records = JournalEntry.objects.filter(institution=institution)
@@ -122,17 +126,20 @@ def _filtered(institution, report_type, *, status, start, end):
     return records.filter(status=status) if status else records
 
 
-def build_report_rows(institution, report_type, *, status=None, date_from=None, date_to=None):
-    """Build tenant-scoped report rows for both API and queued exports."""
+def build_report_rows(institution, report_type, *, status=None, date_from=None, date_to=None, scope=_unscoped):
+    """Build tenant-scoped report rows for both API and queued exports.
+
+    ``scope`` narrows people-linked records as in :func:`build_report_details`.
+    """
     report_type = normalize_report_type(report_type)
     start, end = _date_range(date_from, date_to)
     if report_type == "ap-ar":
         bills, invoices = _open_ap_ar(institution, start, end)
         return [{"area": "AP", "open_amount": bills.aggregate(total=Sum("amount_payable"))["total"] or Decimal("0")}, {"area": "AR", "open_amount": invoices.aggregate(total=Sum("total_amount"))["total"] or Decimal("0")}]
-    records = _filtered(institution, report_type, status=status, start=start, end=end)
+    records = _filtered(institution, report_type, status=status, start=start, end=end, scope=scope)
     if report_type == "workforce-cost":
         rows = list(records.values("status").annotate(employee_count=Count("id")).order_by("status"))
-        payroll = _payroll_records(institution, start, end).aggregate(gross=Sum("gross_pay"), net=Sum("net_pay"))
+        payroll = scope(_payroll_records(institution, start, end), "employee", allow_team=False).aggregate(gross=Sum("gross_pay"), net=Sum("net_pay"))
         rows.append({"status": "PAYROLL_TOTAL", "employee_count": "", "gross_pay": payroll["gross"] or Decimal("0"), "net_pay": payroll["net"] or Decimal("0")})
         return rows
     if report_type == "leave":
@@ -170,10 +177,6 @@ def _zone(institution):
         return ZoneInfo(institution.timezone or "UTC")
     except (ZoneInfoNotFoundError, ValueError):
         return ZoneInfo("UTC")
-
-
-def _unscoped(queryset, employee_field, **options):
-    return queryset
 
 
 def _employee_rows(institution, items, build):

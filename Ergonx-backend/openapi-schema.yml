@@ -61533,6 +61533,7 @@ components:
         user:
           type: string
           format: uuid
+          readOnly: true
           nullable: true
         employee_number:
           type: string
@@ -61634,6 +61635,7 @@ components:
       - id
       - last_name
       - updated_at
+      - user
     EmployeeCompensation:
       type: object
       description: Runs model validation so domain invariants also protect non-form
@@ -65150,7 +65152,6 @@ components:
       - id
       - leave_type
       - reference
-      - requested_days
       - start_date
       - status
       - submitted_at
@@ -69433,6 +69434,7 @@ components:
         user:
           type: string
           format: uuid
+          readOnly: true
           nullable: true
         employee_number:
           type: string
@@ -72368,6 +72370,11 @@ components:
           nullable: true
         scheduled_payment_method:
           type: string
+          readOnly: true
+        prepared_by_viewer:
+          type: boolean
+          description: True when the viewer entered or submitted this pending bill,
+            so someone else approves it.
           readOnly: true
         created_at:
           type: string
@@ -75792,6 +75799,11 @@ components:
         scheduled_payment_method:
           type: string
           readOnly: true
+        prepared_by_viewer:
+          type: boolean
+          description: True when the viewer entered or submitted this pending bill,
+            so someone else approves it.
+          readOnly: true
         created_at:
           type: string
           format: date-time
@@ -75816,6 +75828,7 @@ components:
       - journal_entry
       - lines
       - on_hold
+      - prepared_by_viewer
       - rejected_at
       - rejected_by_name
       - rejection_reason

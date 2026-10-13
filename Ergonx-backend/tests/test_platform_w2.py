@@ -66,7 +66,7 @@ def test_search_is_mounted_once(org):
 
 
 def test_security_settings_need_the_security_permission_and_a_valid_shape(org):
-    body = {"key": "security.separation_of_duties", "value": {"payroll": True, "journals": False}}
+    body = {"key": "security.separation_of_duties", "value": {"payroll": True, "journals": False, "payables": True}}
     assert org["as"](org["hr"]).put(SETTINGS, body, format="json").status_code == 403
 
     client = org["as"](org["admin"])
@@ -74,13 +74,13 @@ def test_security_settings_need_the_security_permission_and_a_valid_shape(org):
     assert client.put(SETTINGS, {"key": "security.unknown", "value": True}, format="json").status_code == 400
     assert client.put(SETTINGS, body, format="json").status_code == 200
 
-    assert institution_setting(org["institution"], "security.separation_of_duties") == {"payroll": True, "journals": False}
+    assert institution_setting(org["institution"], "security.separation_of_duties") == {"payroll": True, "journals": False, "payables": True}
     event = AuditLog.objects.get(action="institution.setting.updated")
-    assert event.metadata["changes"]["value"] == [None, {"payroll": True, "journals": False}]
+    assert event.metadata["changes"]["value"] == [None, {"payroll": True, "journals": False, "payables": True}]
 
 
 def test_separation_of_duties_defaults_on(org):
-    assert institution_setting(org["institution"], "security.separation_of_duties") == {"payroll": True, "journals": True}
+    assert institution_setting(org["institution"], "security.separation_of_duties") == {"payroll": True, "journals": True, "payables": True}
 
 
 def test_notification_settings_need_the_notifications_permission(org):

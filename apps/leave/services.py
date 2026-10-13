@@ -418,6 +418,12 @@ def approve_leave_request(*, leave_request, actor, comment=""):
     )
     if approval is None or approval.approver_id != actor.id:
         raise ValidationError({"approver": "This is not the actor's active approval step."})
+    if LeaveApproval.objects.filter(
+        leave_request=leave_request, approver=actor, status=LeaveApproval.Status.APPROVED,
+        created_at__gte=leave_request.submitted_at, sequence__lt=approval.sequence,
+    ).exists():
+        # e.g. a later step delegated back to an earlier approver.
+        raise ValidationError({"approver": "You approved an earlier step of this request, so someone else must approve this one."})
     approval.status = LeaveApproval.Status.APPROVED
     approval.comment = comment
     approval.acted_at = timezone.now()

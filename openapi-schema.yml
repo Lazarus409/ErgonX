@@ -72371,6 +72371,11 @@ components:
         scheduled_payment_method:
           type: string
           readOnly: true
+        prepared_by_viewer:
+          type: boolean
+          description: True when the viewer entered or submitted this pending bill,
+            so someone else approves it.
+          readOnly: true
         created_at:
           type: string
           format: date-time
@@ -75794,6 +75799,11 @@ components:
         scheduled_payment_method:
           type: string
           readOnly: true
+        prepared_by_viewer:
+          type: boolean
+          description: True when the viewer entered or submitted this pending bill,
+            so someone else approves it.
+          readOnly: true
         created_at:
           type: string
           format: date-time
@@ -75818,6 +75828,7 @@ components:
       - journal_entry
       - lines
       - on_hold
+      - prepared_by_viewer
       - rejected_at
       - rejected_by_name
       - rejection_reason

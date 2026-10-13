@@ -7,6 +7,7 @@ import pytest
 from apps.accounting.models import Account, Budget, FiscalYear
 from apps.accounting.services import approve_vendor_bill, create_vendor, create_vendor_bill, post_vendor_bill, submit_vendor_bill
 from apps.institutions.models import Role
+from tests.approvals import second_approver
 from tests.test_accounts_payable import _accounting_foundation, _enable_accounting, _finance
 
 pytestmark = pytest.mark.django_db
@@ -26,7 +27,7 @@ def budgeting(institution_factory, user_factory, membership_factory):
         created = create_vendor_bill(institution=institution, actor=finance, vendor=vendor, bill_number=number, bill_date=date(2026, 1, 15),
                                      due_date=date(2026, 1, 30), currency="GHS", accounting_period=period,
                                      lines=[{"description": "Consulting", "expense_account": expense, "quantity": Decimal("1"), "unit_price": Decimal(amount)}])
-        created = approve_vendor_bill(bill=submit_vendor_bill(bill=created, actor=finance), actor=finance)
+        created = approve_vendor_bill(bill=submit_vendor_bill(bill=created, actor=finance), actor=second_approver(finance))
         return post_vendor_bill(bill=created, actor=finance) if post else created
 
     bill("BUD-1", "300", post=True)

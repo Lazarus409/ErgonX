@@ -871,7 +871,9 @@ class Command(BaseCommand):
             if adjustment.status == PayrollAdjustment.Status.DRAFT:
                 adjustment = submit_payroll_adjustment(adjustment=adjustment, actor=admin)
             if approve and adjustment.status == PayrollAdjustment.Status.PENDING:
-                decide_payroll_adjustment(adjustment=adjustment, actor=admin, approve=True)
+                # Preparer != approver (BQ-04): the Finance Manager approves.
+                finance_manager = institution.memberships.select_related("user").get(role__code="FINANCE_MANAGER", status="ACTIVE").user
+                decide_payroll_adjustment(adjustment=adjustment, actor=finance_manager, approve=True)
         run = create_payroll_run(institution=institution, payroll_period=period, actor=admin, idempotency_key="apex-demo-2026-09-v1")
         if run.status == PayrollRun.Status.DRAFT:
             run = calculate_payroll_run(payroll_run=run, actor=admin)
@@ -952,7 +954,7 @@ class Command(BaseCommand):
         if bill.status == VendorBill.Status.DRAFT:
             bill = submit_vendor_bill(bill=bill, actor=admin)
         if bill.status == VendorBill.Status.PENDING:
-            bill = approve_vendor_bill(bill=bill, actor=admin)
+            bill = approve_vendor_bill(bill=bill, actor=institution.memberships.select_related("user").get(role__code="FINANCE_MANAGER", status="ACTIVE").user)  # preparer != approver
         if bill.status == VendorBill.Status.APPROVED:
             bill = post_vendor_bill(bill=bill, actor=admin)
         if not bill.payments.exists():

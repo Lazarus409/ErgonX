@@ -139,6 +139,10 @@ class ApprovalWorkflowStep(TenantOwnedModel):
             institution_id=self.institution_id, role__is_read_only=True
         ).exists():
             errors["approver_user"] = "This user has a read-only role and cannot approve requests."
+        if self.approver_user_id and self.workflow_id and type(self).objects.filter(
+            workflow_id=self.workflow_id, approver_user_id=self.approver_user_id
+        ).exclude(pk=self.pk).exists():
+            errors["approver_user"] = "This person already approves another step of this workflow; each step needs a different approver."
         if errors:
             raise ValidationError(errors)
 

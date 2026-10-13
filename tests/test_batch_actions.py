@@ -4,6 +4,7 @@ import pytest
 from apps.accounting.models import BatchJob, VendorBill
 from apps.accounting.services import approve_vendor_bill, post_vendor_bill, submit_vendor_bill
 from apps.audit.models import AuditLog
+from tests.approvals import second_approver
 from tests.test_accounts_payable_workspace import payables  # noqa: F401  (fixture)
 
 pytestmark = pytest.mark.django_db
@@ -23,7 +24,7 @@ def test_preview_uses_real_rules_and_changes_nothing(api_client, payables):
     actor = payables["actor"]
     draft = payables["bill"]("BA-001")
     pending = submit_vendor_bill(bill=payables["bill"]("BA-002"), actor=actor)
-    posted = post_vendor_bill(bill=approve_vendor_bill(bill=submit_vendor_bill(bill=payables["bill"]("BA-003"), actor=actor), actor=actor), actor=actor)
+    posted = post_vendor_bill(bill=approve_vendor_bill(bill=submit_vendor_bill(bill=payables["bill"]("BA-003"), actor=actor), actor=second_approver(actor)), actor=actor)
     client = _client(api_client, payables)
     audit_before = AuditLog.objects.count()
 

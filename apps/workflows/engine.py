@@ -83,8 +83,14 @@ def step_candidates(step, *, institution, requester, employment=None, employee_i
 
 
 def resolve_chain(definition, *, institution, requester, employment=None, employee_id=None):
-    """One approver per step, in order. Fails closed when a step has nobody eligible."""
+    """One approver per step, in order, each a different person.
+
+    A multi-step chain exists so that several people check the request, so a
+    person who approves one step is not chosen for another. Fails closed when a
+    step has nobody eligible, or nobody who has not already been chosen.
+    """
     chain = []
+    chosen = set()
     for step in definition.steps.order_by("order"):
         candidates = step_candidates(step, institution=institution, requester=requester, employment=employment, employee_id=employee_id)
         if not candidates:
@@ -92,7 +98,14 @@ def resolve_chain(definition, *, institution, requester, employment=None, employ
                 {"approval": f"No eligible approver is available for step {step.order} ({step.name}). The requester cannot approve their own request."},
                 api_code="policy_not_applicable",
             )
-        chain.append((step, candidates[0]))
+        fresh = [candidate for candidate in candidates if candidate.pk not in chosen]
+        if not fresh:
+            raise CodedValidationError(
+                {"approval": f"Step {step.order} ({step.name}) needs a different approver from the earlier steps, and nobody else is eligible. Add an approver or change the workflow."},
+                api_code="policy_not_applicable",
+            )
+        chosen.add(fresh[0].pk)
+        chain.append((step, fresh[0]))
     return chain
 
 

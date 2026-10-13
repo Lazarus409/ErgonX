@@ -1019,6 +1019,27 @@ def submit_vendor_bill(*, bill, actor):
     return bill
 
 
+def prepared_vendor_bill(bill, user):
+    """Whether separation of duties keeps ``user`` from approving ``bill`` (they entered or submitted it)."""
+    from apps.audit.models import AuditLog
+    from apps.institutions.services import institution_setting
+
+    if not (institution_setting(bill.institution, "security.separation_of_duties") or {}).get("payables", True):
+        return False
+    return bill.submitted_by_id == user.id or AuditLog.objects.filter(
+        institution=bill.institution, entity_id=bill.id, actor=user, action="accounting.vendor_bill.created",
+    ).exists()
+
+
+def _ensure_payables_separation(bill, actor):
+    """Whoever entered or submitted a bill does not approve it (BQ-04, setting ``payables``)."""
+    if prepared_vendor_bill(bill, actor):
+        raise CodedValidationError(
+            {"actor": "You prepared this bill, so someone else must approve it (separation of duties)."},
+            api_code="separation_of_duties",
+        )
+
+
 @transaction.atomic
 def approve_vendor_bill(*, bill, actor):
     bill = VendorBill.objects.select_for_update().get(pk=bill.pk)
@@ -1032,6 +1053,7 @@ def approve_vendor_bill(*, bill, actor):
         )
     if bill.on_hold:
         raise CodedValidationError({"on_hold": "Release the hold before approving this bill."}, api_code="invalid_state_transition")
+    _ensure_payables_separation(bill, actor)
     bill.status = VendorBill.Status.APPROVED
     bill.approved_by = actor
     bill.approved_at = timezone.now()

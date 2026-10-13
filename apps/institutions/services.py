@@ -599,12 +599,12 @@ SETTING_NAMESPACE_PERMISSIONS = {
 }
 GOVERNED_SETTINGS = {
     # Separation of duties (BQ-04): preparer != approver, default ON.
-    "security.separation_of_duties": {"payroll": bool, "journals": bool},
+    "security.separation_of_duties": {"payroll": bool, "journals": bool, "payables": bool},
     # Whether members may receive notification copies by email.
     "notifications.email_enabled": bool,
 }
 SETTING_DEFAULTS = {
-    "security.separation_of_duties": {"payroll": True, "journals": True},
+    "security.separation_of_duties": {"payroll": True, "journals": True, "payables": True},
     "notifications.email_enabled": True,
 }
 

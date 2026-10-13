@@ -295,6 +295,13 @@ def _current_step(expense):
     return expense.approvals.select_for_update().filter(status=ExpenseApproval.Status.PENDING).order_by("sequence").first()
 
 
+def _approved_this_round(expense, actor):
+    """Whether ``actor`` already approved a step since the claim was last submitted."""
+    return expense.approvals.filter(
+        approver=actor, status=ExpenseApproval.Status.APPROVED, created_at__gte=expense.submitted_at,
+    ).exists()
+
+
 @transaction.atomic
 def decide_expense_step(*, expense, actor, decision, comment=""):
     """Manager-stage decision on a claim: approve, return or reject."""
@@ -306,6 +313,8 @@ def decide_expense_step(*, expense, actor, decision, comment=""):
     step = _current_step(expense)
     if step is None or step.approver_id != actor.id:
         raise CodedValidationError({"actor": "This is not your approval step."}, api_code="permission_denied")
+    if decision == "approve" and _approved_this_round(expense, actor):
+        raise CodedValidationError({"actor": "You approved an earlier step of this claim, so someone else must approve this one."}, api_code="separation_of_duties")
     if decision in ("return", "reject") and not comment.strip():
         raise CodedValidationError({"comment": "Explain the decision to the claimant."}, api_code="validation_error")
     step.status = {"approve": ExpenseApproval.Status.APPROVED, "return": ExpenseApproval.Status.RETURNED, "reject": ExpenseApproval.Status.REJECTED}[decision]
@@ -344,6 +353,9 @@ def finance_review_expense(*, expense, actor, decision, comment="", recodes=None
         raise CodedValidationError({"status": "Only claims in finance review can be reviewed."}, api_code="invalid_state_transition")
     if _is_claimant(actor, expense) or expense.created_by_id == actor.id:
         raise CodedValidationError({"actor": "You cannot review an expense you claimed or created."}, api_code="permission_denied")
+    if decision == "approve" and _approved_this_round(expense, actor):
+        # The finance check is separate from the manager's approval.
+        raise CodedValidationError({"actor": "You approved this claim as a manager, so another finance reviewer must approve it."}, api_code="separation_of_duties")
     if decision in ("return", "reject") and not comment.strip():
         raise CodedValidationError({"comment": "Explain the decision to the claimant."}, api_code="validation_error")
     for line_id, account in (recodes or {}).items():

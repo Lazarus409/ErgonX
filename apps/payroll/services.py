@@ -1037,6 +1037,14 @@ def decide_payroll_adjustment(*, adjustment, actor, approve):
     adjustment = PayrollAdjustment.objects.select_for_update().get(pk=adjustment.pk)
     _membership_with_permission(actor, adjustment.institution, "payroll.approve")
     assert_not_own_pay(actor, adjustment.employee)
+    if approve:
+        from apps.institutions.services import institution_setting
+
+        if (institution_setting(adjustment.institution, "security.separation_of_duties") or {}).get("payroll", True) and adjustment.created_by_id == actor.id:
+            raise CodedValidationError(
+                {"actor": "You prepared this adjustment, so someone else must approve it (separation of duties)."},
+                api_code="separation_of_duties",
+            )
     decided_status = (
         PayrollAdjustment.Status.APPROVED if approve else PayrollAdjustment.Status.REJECTED
     )

@@ -543,9 +543,10 @@ class Command(BaseCommand):
         if adjustment.status == PayrollAdjustment.Status.DRAFT:
             adjustment = submit_payroll_adjustment(adjustment=adjustment, actor=admin)
         if adjustment.status == PayrollAdjustment.Status.PENDING:
+            # Preparer != approver (BQ-04): the Finance Manager approves.
             adjustment = decide_payroll_adjustment(
                 adjustment=adjustment,
-                actor=admin,
+                actor=institution.memberships.select_related("user").get(role__code="FINANCE_MANAGER", status="ACTIVE").user,
                 approve=True,
             )
         if adjustment.status not in {

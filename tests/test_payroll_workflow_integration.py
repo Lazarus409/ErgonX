@@ -144,6 +144,7 @@ def test_adjustment_submission_and_decision_are_audited_and_retry_safe(
     }
 
     approve_url = reverse("v1:payroll-adjustment-approve", args=(adjustment.id,))
+    api_client.force_authenticate(approver)  # preparer != approver
     assert _post(api_client, approve_url).status_code == 200
     assert _post(api_client, approve_url).status_code == 200
     _assert_transition_audit(

@@ -152,6 +152,16 @@ class VendorBillSerializer(ValidatedModelSerializer):
     approved_by_name = serializers.SerializerMethodField()
     rejected_by_name = serializers.SerializerMethodField()
     amount_paid = serializers.SerializerMethodField()
+    prepared_by_viewer = serializers.SerializerMethodField()
+
+    def get_prepared_by_viewer(self, obj) -> bool:
+        """True when the viewer entered or submitted this pending bill, so someone else approves it."""
+        from apps.accounting.services import prepared_vendor_bill
+
+        request = self.context.get("request")
+        if request is None or obj.status != VendorBill.Status.PENDING:
+            return False
+        return prepared_vendor_bill(obj, request.user)
 
     def get_submitted_by_name(self, obj):
         return _person_name(obj.submitted_by)
@@ -175,7 +185,7 @@ class VendorBillSerializer(ValidatedModelSerializer):
             "tax_total", "withholding_total", "total_amount", "amount_payable", "amount_paid", "status",
             "accounting_period", "journal_entry", "lines", "submitted_by_name", "submitted_at", "approved_by_name",
             "approved_at", "rejected_by_name", "rejected_at", "rejection_reason", "on_hold", "hold_reason",
-            "scheduled_payment_date", "scheduled_payment_method", "created_at", "updated_at",
+            "scheduled_payment_date", "scheduled_payment_method", "prepared_by_viewer", "created_at", "updated_at",
         )
         read_only_fields = (
             "id", "subtotal", "tax_total", "withholding_total", "total_amount",

@@ -272,3 +272,46 @@ def test_reminder_command_reports_counts():
     out = StringIO()
     call_command("send_approval_reminders", stdout=out)
     assert "Escalated 0 approval request step(s) and 0 leave approval step(s)." in out.getvalue()
+
+
+def test_one_person_approves_only_one_step_of_a_request(org):
+    institution = org["institution"]
+    requester, _, _ = org["person"]("sod-requester@example.com", "EMPLOYEE")
+    first, _, _ = org["person"]("sod-first@example.com", "HR_ADMIN")
+    second, _, _ = org["person"]("sod-second@example.com", "HR_ADMIN")
+    hr_role = institution.roles.get(code="HR_ADMIN")
+    definition = _definition(institution, trigger=Trigger.BUDGET, name="Two HR checks")
+    _step(definition, 1, approver_role=hr_role)
+    _step(definition, 2, approver_role=hr_role)
+    request = submit_approval_request(institution=institution, workflow=definition, entity_type="finance.Budget", entity_id=uuid4(), requested_by=requester)
+
+    request = decide_approval_request(request=request, actor=first, action="APPROVE")
+    with pytest.raises(PermissionDenied, match="earlier step"):
+        decide_approval_request(request=request, actor=first, action="APPROVE")
+    assert decide_approval_request(request=request, actor=second, action="APPROVE").status == ApprovalRequest.Status.APPROVED
+
+
+def test_a_workflow_cannot_name_the_same_person_on_two_steps(org):
+    institution = org["institution"]
+    reviewer, _, _ = org["person"]("twice@example.com", "DIRECTOR")
+    definition = _definition(institution, trigger=Trigger.BUDGET)
+    _step(definition, 1, approver_user=reviewer)
+    with pytest.raises(ValidationError, match="different approver"):
+        _step(definition, 2, approver_user=reviewer)
+
+
+def test_chain_picks_a_different_person_per_step_and_fails_closed_without_one(org):
+    institution = org["institution"]
+    requester, _, employment = org["person"]("chain-requester@example.com", "EMPLOYEE")
+    only_hr, _, _ = org["person"]("only-hr@example.com", "HR_ADMIN")
+    hr_role = institution.roles.get(code="HR_ADMIN")
+    definition = _definition(institution, trigger=Trigger.BUDGET)
+    _step(definition, 1, approver_role=hr_role)
+    _step(definition, 2, approver_role=hr_role)
+
+    with pytest.raises(CodedValidationError, match="different approver"):
+        resolve_chain(definition, institution=institution, requester=requester, employment=employment)
+
+    other_hr, _, _ = org["person"]("other-chain-hr@example.com", "HR_ADMIN")
+    chain = resolve_chain(definition, institution=institution, requester=requester, employment=employment)
+    assert {approver for _, approver in chain} == {only_hr, other_hr}

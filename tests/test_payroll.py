@@ -51,6 +51,7 @@ from apps.payroll.services import (
     submit_payroll_run_for_review,
 )
 from apps.scheduling.models import ScheduleAssignment, Shift, WorkSchedule
+from tests.approvals import second_approver
 
 
 pytestmark = pytest.mark.django_db
@@ -778,7 +779,7 @@ def test_only_approved_overtime_and_adjustments_feed_calculation(
         reason="Approved loan deduction",
     )
     adjustment = submit_payroll_adjustment(adjustment=adjustment, actor=hr)
-    decide_payroll_adjustment(adjustment=adjustment, actor=hr, approve=True)
+    decide_payroll_adjustment(adjustment=adjustment, actor=second_approver(hr), approve=True)
 
     run = create_payroll_run(
         institution=institution,

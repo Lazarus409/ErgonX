@@ -513,7 +513,7 @@ class Command(BaseCommand):
             vendor = Vendor.objects.get(institution=institution, vendor_code=vendor_code)
             bill = create_vendor_bill(institution=institution, actor=admin, vendor=vendor, bill_number=number, bill_date=bill_date, due_date=self.today + timedelta(days=due), currency="GHS", accounting_period=self._period_for(bill_date), lines=[{"description": description, "expense_account": self._account(account_code), "quantity": Decimal("1"), "unit_price": amount}])
             bill = submit_vendor_bill(bill=bill, actor=admin)
-            bill = approve_vendor_bill(bill=bill, actor=admin)
+            bill = approve_vendor_bill(bill=bill, actor=institution.memberships.select_related("user").get(role__code="FINANCE_MANAGER", status="ACTIVE").user)  # preparer != approver
             bill = post_vendor_bill(bill=bill, actor=admin)
             if paid:
                 pay_date = min(bill_date + timedelta(days=14), self.today)

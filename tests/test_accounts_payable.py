@@ -57,6 +57,7 @@ from apps.accounting.services import (
     void_vat_withholding_certificate,
 )
 from apps.institutions.models import InstitutionModule
+from tests.approvals import second_approver
 
 
 pytestmark = pytest.mark.django_db
@@ -225,7 +226,7 @@ def test_vendor_bill_derives_tax_and_withholding_then_posts_balanced_ap_journal(
     )
 
     bill = submit_vendor_bill(bill=bill, actor=actor)
-    bill = approve_vendor_bill(bill=bill, actor=actor)
+    bill = approve_vendor_bill(bill=bill, actor=second_approver(actor))
     bill = post_vendor_bill(bill=bill, actor=actor)
     assert bill.status == VendorBill.Status.POSTED
     assert bill.journal_entry.source == "AP"
@@ -412,7 +413,7 @@ def test_cash_bank_settles_and_voids_single_bill_and_invoice_with_balanced_journ
             "quantity": Decimal("1"), "unit_price": Decimal("100"), "tax_code": tax_code,
         }],
     )
-    bill = post_vendor_bill(bill=approve_vendor_bill(bill=submit_vendor_bill(bill=bill, actor=actor), actor=actor), actor=actor)
+    bill = post_vendor_bill(bill=approve_vendor_bill(bill=submit_vendor_bill(bill=bill, actor=actor), actor=second_approver(actor)), actor=actor)
     payment = create_payment(
         institution=institution, actor=actor, payment_number="PAY-001", payment_date=date(2026, 1, 20),
         amount=Decimal("40"), currency="GHS", payment_method=Payment.Method.BANK_TRANSFER,
@@ -477,7 +478,7 @@ def test_bank_statement_reconciliation_matches_only_equal_posted_bank_journals(
         accounting_period=period,
         lines=[{"description": "Service", "expense_account": Account.objects.get(institution=institution, code="5000"), "quantity": Decimal("1"), "unit_price": Decimal("100"), "tax_code": tax_code}],
     )
-    bill = post_vendor_bill(bill=approve_vendor_bill(bill=submit_vendor_bill(bill=bill, actor=actor), actor=actor), actor=actor)
+    bill = post_vendor_bill(bill=approve_vendor_bill(bill=submit_vendor_bill(bill=bill, actor=actor), actor=second_approver(actor)), actor=actor)
     payment = create_payment(
         institution=institution, actor=actor, payment_number="PAY-REC", payment_date=date(2026, 1, 20),
         amount=Decimal("40"), currency="GHS", payment_method=Payment.Method.BANK_TRANSFER,
@@ -528,7 +529,7 @@ def test_cash_settlement_rejects_overpayment_and_cross_tenant_bank_account(
         due_date=date(2026, 1, 30), currency="GHS", accounting_period=period,
         lines=[{"description": "Service", "expense_account": Account.objects.get(institution=home, code="5000"), "quantity": Decimal("1"), "unit_price": Decimal("100"), "tax_code": tax_code}],
     )
-    bill = post_vendor_bill(bill=approve_vendor_bill(bill=submit_vendor_bill(bill=bill, actor=actor), actor=actor), actor=actor)
+    bill = post_vendor_bill(bill=approve_vendor_bill(bill=submit_vendor_bill(bill=bill, actor=actor), actor=second_approver(actor)), actor=actor)
     with pytest.raises(ValidationError, match="Bank account belongs to another institution"):
         create_payment(
             institution=home, actor=actor, payment_number="PAY-FOREIGN", payment_date=date(2026, 1, 20),
@@ -559,7 +560,7 @@ def test_vat_withholding_certificate_requires_agent_and_keeps_void_audit_history
         bill_date=date(2026, 1, 15), due_date=date(2026, 1, 30), currency="GHS", accounting_period=period,
         lines=[{"description": "Service", "expense_account": Account.objects.get(institution=institution, code="5000"), "quantity": Decimal("1"), "unit_price": Decimal("100"), "tax_code": tax_code, "withholding_rule": rule}],
     )
-    bill = post_vendor_bill(bill=approve_vendor_bill(bill=submit_vendor_bill(bill=bill, actor=actor), actor=actor), actor=actor)
+    bill = post_vendor_bill(bill=approve_vendor_bill(bill=submit_vendor_bill(bill=bill, actor=actor), actor=second_approver(actor)), actor=actor)
     with pytest.raises(ValidationError, match="not configured"):
         issue_vat_withholding_certificate(institution=institution, actor=actor, vendor_bill=bill, withholding_rule=rule, certificate_number="VAT-001", certificate_date=date(2026, 1, 20), amount=Decimal("7"))
     configuration = institution.accounting_configuration

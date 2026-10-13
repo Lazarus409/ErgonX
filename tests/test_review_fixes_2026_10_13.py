@@ -644,3 +644,66 @@ def test_exports_need_the_same_access_as_the_report(api_client, institution_fact
     api_client.force_authenticate(hr)
     export_id = created.json()["data"]["id"]
     assert api_client.get(f"/api/v1/export-jobs/{export_id}/download/").status_code == 404
+
+
+# --- Fourth round: separation of duties -----------------------------------------
+
+def test_whoever_prepares_a_vendor_bill_cannot_approve_it(institution_factory, user_factory, membership_factory):
+    from apps.accounting.services import approve_vendor_bill, create_vendor, create_vendor_bill, submit_vendor_bill
+    from apps.accounting.models import Account
+    from apps.institutions.models import InstitutionSetting
+    from common.exceptions import CodedValidationError
+    from tests.approvals import second_approver
+    from tests.test_accounts_payable import _accounting_foundation, _enable_accounting, _finance
+
+    institution = institution_factory(code="AP-SOD", country_code="GH")
+    _enable_accounting(institution)
+    clerk = _finance(institution, user_factory, membership_factory, "ap.clerk@example.com")
+    period, _tax_code, _ = _accounting_foundation(institution, clerk, "AP-SOD")
+    vendor = create_vendor(institution=institution, actor=clerk, name="Supplier", vendor_code="SUP-SOD")
+    expense = Account.objects.get(institution=institution, code="5000")
+
+    def bill(number):
+        return submit_vendor_bill(
+            bill=create_vendor_bill(
+                institution=institution, actor=clerk, vendor=vendor, bill_number=number, bill_date=date(2026, 1, 15), due_date=date(2026, 1, 30),
+                currency="GHS", accounting_period=period, lines=[{"description": "Work", "expense_account": expense, "quantity": Decimal("1"), "unit_price": Decimal("100")}],
+            ),
+            actor=clerk,
+        )
+
+    first = bill("SOD-1")
+    with pytest.raises(CodedValidationError, match="separation of duties"):
+        approve_vendor_bill(bill=first, actor=clerk)
+    assert approve_vendor_bill(bill=first, actor=second_approver(clerk)).approved_by != clerk
+
+    # The institution may switch the payables check off.
+    InstitutionSetting.objects.update_or_create(
+        institution=institution, key="security.separation_of_duties",
+        defaults={"value": {"payroll": True, "journals": True, "payables": False}},
+    )
+    assert approve_vendor_bill(bill=bill("SOD-2"), actor=clerk).approved_by == clerk
+
+
+def test_whoever_creates_a_payroll_adjustment_cannot_approve_it(
+    institution_factory, user_factory, membership_factory, employee_factory, organization_factory, assignment_dimensions_factory,
+):
+    from apps.compensation.models import PayComponent
+    from apps.payroll.models import PayrollPeriod
+    from apps.payroll.services import create_payroll_adjustment, decide_payroll_adjustment, submit_payroll_adjustment
+    from common.exceptions import CodedValidationError
+    from tests.approvals import second_approver
+
+    institution = institution_factory(code="ADJ-SOD")
+    hr, employee, _ = _ghana_employee(institution, user_factory, membership_factory, employee_factory, organization_factory, assignment_dimensions_factory)
+    period = PayrollPeriod.objects.create(institution=institution, name="Oct 2026", start_date=date(2026, 10, 1), end_date=date(2026, 10, 31), pay_date=date(2026, 10, 31))
+    award = PayComponent.objects.create(institution=institution, name="Award", code="AWARD", component_type=PayComponent.ComponentType.EARNING, calculation_type=PayComponent.CalculationType.FIXED)
+    adjustment = submit_payroll_adjustment(
+        adjustment=create_payroll_adjustment(institution=institution, actor=hr, employee=employee, payroll_period=period, pay_component=award, amount=Decimal("200.00"), reason="Award"),
+        actor=hr,
+    )
+
+    with pytest.raises(CodedValidationError, match="separation of duties"):
+        decide_payroll_adjustment(adjustment=adjustment, actor=hr, approve=True)
+    approved = decide_payroll_adjustment(adjustment=adjustment, actor=second_approver(hr), approve=True)
+    assert approved.approved_by != hr

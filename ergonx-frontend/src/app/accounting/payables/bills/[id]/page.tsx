@@ -81,10 +81,10 @@ export default function VendorBillDetailPage() {
     const calls = { submit: accountingApi.submitVendorBill, approve: accountingApi.approveVendorBill, post: accountingApi.postVendorBill, void: accountingApi.voidVendorBill, revise: accountingApi.reviseVendorBill, release: accountingApi.releaseVendorBill };
     void run(() => calls[pending](bill.id));
   };
-  const primary: Pending = bill.status === "DRAFT" && can("vendor_bill.create") ? "submit" : bill.status === "PENDING" && !bill.on_hold && can("vendor_bill.approve") ? "approve" : bill.status === "APPROVED" && !bill.on_hold && can("vendor_bill.post") ? "post" : bill.status === "REJECTED" && can("vendor_bill.create") ? "revise" : null;
+  const primary: Pending = bill.status === "DRAFT" && can("vendor_bill.create") ? "submit" : bill.status === "PENDING" && !bill.on_hold && can("vendor_bill.approve") && !bill.prepared_by_viewer ? "approve" : bill.status === "APPROVED" && !bill.on_hold && can("vendor_bill.post") ? "post" : bill.status === "REJECTED" && can("vendor_bill.create") ? "revise" : null;
   const accountName = (accountId: string) => { const row = accounts.find((item) => item.id === accountId); return row ? `${row.code} ${row.name}` : EM_DASH; };
   const unpaid = ["POSTED", "PART_PAID"].includes(bill.status);
-  const statusNote = bill.on_hold ? `On hold: ${bill.hold_reason}` : bill.status === "DRAFT" ? "Ready for submission" : bill.status === "PENDING" ? "Awaiting approval" : bill.status === "REJECTED" ? `Rejected: ${bill.rejection_reason}` : bill.status === "APPROVED" ? "Ready to post" : unpaid ? "Posted, awaiting payment" : bill.status === "PAID" ? "Fully paid" : "";
+  const statusNote = bill.on_hold ? `On hold: ${bill.hold_reason}` : bill.status === "DRAFT" ? "Ready for submission" : bill.status === "PENDING" ? (bill.prepared_by_viewer ? "Awaiting approval by someone other than you" : "Awaiting approval") : bill.status === "REJECTED" ? `Rejected: ${bill.rejection_reason}` : bill.status === "APPROVED" ? "Ready to post" : unpaid ? "Posted, awaiting payment" : bill.status === "PAID" ? "Fully paid" : "";
   const printDocument = () => window.print();
   const downloadCsv = () => {
     const rows = [["#", "Description", "Qty", "Unit price", "Amount"], ...bill.lines.map((line, index) => [String(index + 1), line.description, line.quantity, line.unit_price, line.line_total]), ["", "Subtotal", "", "", bill.subtotal], ["", "Tax", "", "", bill.tax_total], ["", "Total", "", "", bill.total_amount]];

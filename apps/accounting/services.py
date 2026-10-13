@@ -423,7 +423,7 @@ def journal_totals(journal):
 
 def _validate_balanced(journal):
     totals = journal_totals(journal)
-    if not journal.lines.exists() or totals["debit"] != totals["credit"]:
+    if totals["debit"] <= 0 or totals["debit"] != totals["credit"]:
         raise CodedValidationError(
             {"lines": "Journal debits and credits must be non-zero and equal."},
             api_code="unbalanced_journal",
@@ -525,8 +525,12 @@ def update_draft_journal(*, journal, actor, lines=None, **values):
             {"accounting_period": "Closed or locked periods cannot accept journals."},
             api_code="period_closed",
         )
+    previous_year = journal.entry_date.year
     for field, value in values.items():
         setattr(journal, field, value)
+    if journal.entry_date.year != previous_year:
+        # The number carries the entry year (JE-YYYY-nnnnnn); drafts are renumbered.
+        journal.journal_number = _next_journal_number(journal.institution, journal.entry_date)
     journal.save()
     if lines is not None:
         _replace_lines(journal, lines)
@@ -688,7 +692,8 @@ def create_reversal(*, journal, actor, entry_date, accounting_period, descriptio
             {"status": "Only posted journals can be reversed."},
             api_code="invalid_state_transition",
         )
-    existing = original.reversals.first()
+    # A voided reversal never took effect, so the journal can be reversed again.
+    existing = original.reversals.exclude(status=JournalEntry.Status.VOID).first()
     if existing:
         return existing
     lines = [

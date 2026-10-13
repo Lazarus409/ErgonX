@@ -464,6 +464,12 @@ class InstitutionAccessRequestThrottle(AnonRateThrottle):
     def get_rate(self):
         return settings.INSTITUTION_ACCESS_REQUEST_RATE
 
+    def get_ident(self, request):
+        # Browsers arrive through the BFF, so REMOTE_ADDR is the BFF for every
+        # visitor; use the client address it forwards with the shared secret.
+        ip, _trusted = client_ip(request)
+        return ip or super().get_ident(request)
+
 
 class InstitutionAccessRequestView(APIView):
     """Public submission of an access request; platform admins list them."""
@@ -860,12 +866,18 @@ class InvitationAcceptanceView(APIView):
         if user and user.has_usable_password():
             # A recipient can be invited into another institution or role. The
             # invitation token plus their current password proves ownership of
-            # the existing account without creating a duplicate identity.
+            # the existing account without creating a duplicate identity. The
+            # check shares the sign-in lockout, so it cannot be used to guess.
+            key = email_key(user.email)
+            ip, ip_trusted = client_ip(request)
+            ensure_login_allowed(key=key, ip=ip, ip_trusted=ip_trusted)
             if not user.check_password(password):
+                record_login_attempt(key=key, ip=ip, outcome=AuthAttempt.Outcome.FAILED, reason="invitation_password_invalid")
                 return Response(
                     {"detail": "Enter your current ErgonX password to accept this invitation."},
                     status=400,
                 )
+            record_login_attempt(key=key, ip=ip, outcome=AuthAttempt.Outcome.SUCCEEDED)
         else:
             try:
                 validate_password(password, user)

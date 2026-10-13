@@ -35,3 +35,14 @@ SECURE_HSTS_SECONDS = int(os.environ.get("DJANGO_SECURE_HSTS_SECONDS", "31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
+
+# Rate limits (password-reset emails, Get Started submissions) live in the
+# cache. Gunicorn runs several workers, so the cache must be shared between
+# them; the database is the one store every worker already has. The table is
+# created at container start (manage.py createcachetable, idempotent).
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": "ergonx_cache",
+    }
+}

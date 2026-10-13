@@ -677,8 +677,9 @@ class JournalEntry(TenantOwnedModel):
             ),
             models.UniqueConstraint(
                 fields=("reversal_of",),
-                condition=models.Q(reversal_of__isnull=False),
-                name="uniq_reversal_per_journal",
+                # A voided reversal does not count: the journal can be reversed again.
+                condition=models.Q(reversal_of__isnull=False) & ~models.Q(status="VOID"),
+                name="uniq_live_reversal_per_journal",
             ),
         ]
         indexes = [models.Index(fields=("institution", "status", "entry_date"))]

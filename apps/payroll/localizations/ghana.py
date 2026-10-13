@@ -88,9 +88,14 @@ def _relief_items(payroll_run, record, chargeable_income):
             applied_by_claim[claim_id] = applied_by_claim.get(
                 claim_id, Decimal("0")
             ) + prior_item.amount
+    # Reliefs are annual. PAYE grants them a twelfth per month; the allowance is
+    # cumulative, so a claim approved mid-year (or a month too small to use it)
+    # catches up, and the year never exceeds the approved amount.
+    months_elapsed = Decimal(payroll_run.payroll_period.end_date.month)
     for claim in claims.order_by("relief_definition__code"):
         previously_applied = applied_by_claim.get(str(claim.id), Decimal("0"))
-        available = max(Decimal("0"), claim.approved_amount - previously_applied)
+        allowance_to_date = _money(claim.approved_amount * months_elapsed / Decimal("12"))
+        available = max(Decimal("0"), min(claim.approved_amount, allowance_to_date) - previously_applied)
         applied = _money(min(available, remaining_basis))
         if not applied:
             continue
@@ -105,6 +110,7 @@ def _relief_items(payroll_run, record, chargeable_income):
                     "relief_claim_id": str(claim.id),
                     "relief_definition_id": str(claim.relief_definition_id),
                     "approved_amount": str(claim.approved_amount),
+                    "allowance_to_date": str(allowance_to_date),
                     "previously_applied": str(_money(previously_applied)),
                 },
             )
@@ -365,7 +371,9 @@ def calculate_statutory(
             bonus_amount, max(Decimal("0"), annual_threshold - prior_bonus)
         )
         concession_tax = _money(concession_basis * concession_rate / Decimal("100"))
-        regular_basis -= min(concession_basis, bonus_in_regular_basis)
+        # A bonus is employment income whatever the component's taxable flag:
+        # the concessionary part is taxed above, the excess at graduated rates.
+        regular_basis += (bonus_amount - concession_basis) - bonus_in_regular_basis
         statutory_tax += concession_tax
         items.append(
             _item(
@@ -376,6 +384,7 @@ def calculate_statutory(
                 rate=concession_rate,
                 metadata={
                     "basis": str(_money(concession_basis)),
+                    "excess_in_paye": str(_money(bonus_amount - concession_basis)),
                     "annual_threshold": str(_money(annual_threshold)),
                     "prior_bonus": str(_money(prior_bonus)),
                 },
@@ -390,30 +399,34 @@ def calculate_statutory(
         )
         if overtime_rule is None:
             raise ValidationError({"preset_version": "Ghana overtime rule is missing."})
-        if overtime_rule.requires_validation:
-            raise ValidationError(
-                {
-                    "ghana_overtime_rule": (
-                        "The GHS 18,000 eligibility threshold requires legal validation."
-                    )
-                }
-            )
-        annual_income_limit = Decimal(overtime_rule.eligibility_json["annual_income_limit"])
-        ytd_income = (
-            finalized_employee_payroll_records_ytd(
-                institution=payroll_run.institution,
-                payroll_run=payroll_run,
-                employee=record.employee,
-            ).aggregate(
-                total=Sum("taxable_income")
-            )["total"]
-            or Decimal("0")
-        ) + Decimal(taxable_income)
-        qualifies = (
-            employment.staff_category == Employment.StaffCategory.JUNIOR
-            and ytd_income <= annual_income_limit
-        )
+        # Only junior staff can qualify for the concessionary overtime rates; for
+        # everyone else overtime is ordinary income and no unvalidated value is used.
+        qualifies = employment.staff_category == Employment.StaffCategory.JUNIOR
         if qualifies:
+            if overtime_rule.requires_validation:
+                raise ValidationError(
+                    {
+                        "ghana_overtime_rule": (
+                            "The GHS 18,000 eligibility threshold requires legal validation."
+                        )
+                    }
+                )
+            annual_income_limit = Decimal(overtime_rule.eligibility_json["annual_income_limit"])
+            ytd_income = (
+                finalized_employee_payroll_records_ytd(
+                    institution=payroll_run.institution,
+                    payroll_run=payroll_run,
+                    employee=record.employee,
+                ).aggregate(
+                    total=Sum("taxable_income")
+                )["total"]
+                or Decimal("0")
+            ) + Decimal(taxable_income)
+            qualifies = ytd_income <= annual_income_limit
+        if not qualifies:
+            # Overtime is employment income whatever the component's taxable flag.
+            regular_basis += overtime_amount - overtime_in_regular_basis
+        else:
             lower_rate = Decimal(overtime_rule.calculation_json["lower_rate"])
             upper_rate = Decimal(overtime_rule.calculation_json["upper_rate"])
             threshold = compensation.base_salary * Decimal(

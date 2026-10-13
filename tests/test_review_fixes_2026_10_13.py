@@ -69,6 +69,9 @@ def test_unpaid_leave_is_neither_taxed_nor_pensionable(
     paye = record.items.get(component_code_snapshot="GH_PAYE_RESIDENT")
     assert Decimal(paye.metadata["basis"]) == earned - pension.amount
     assert record.net_pay == record.gross_pay - record.total_deductions - record.employee_contributions
+    from apps.payroll.services import reconcile_payroll_run
+
+    assert reconcile_payroll_run(record.payroll_run)["discrepancy_count"] == 0
 
 
 def test_ghana_payroll_journal_maps_unpaid_leave_and_special_taxes():
@@ -264,3 +267,170 @@ def test_tax_relief_lines_do_not_block_the_payroll_journal(institution_factory, 
     journal = generate_payroll_journal(payroll_run=run, actor=actor)
 
     assert sorted(journal.lines.values_list("debit", "credit")) == [(Decimal("0.00"), Decimal("1200.00")), (Decimal("1200.00"), Decimal("0.00"))]
+
+
+# --- Second round: tax treatment, journals, lockout and throttles -------------
+
+def _ghana_employee(institution, user_factory, membership_factory, employee_factory, organization_factory, assignment_dimensions_factory, **kwargs):
+    _enable_payroll(institution)
+    hr = user_factory()
+    membership_factory(user=hr, institution=institution, role_code="HR_ADMIN")
+    employee, compensation = _employee_with_compensation(institution, employee_factory, organization_factory, assignment_dimensions_factory, **kwargs)
+    _configure_ghana(institution, hr, _ghana_version())
+    configure_employee_payroll_profile(institution=institution, employee=employee, actor=hr, tax_residency="RESIDENT")
+    return hr, employee, compensation
+
+
+def test_a_bonus_above_the_concession_is_taxed_even_if_flagged_non_taxable(
+    institution_factory, user_factory, membership_factory, employee_factory, organization_factory, assignment_dimensions_factory,
+):
+    from apps.compensation.models import PayComponent, SalaryStructureComponent
+
+    institution = institution_factory(code="BONUS-EXCESS")
+    hr, employee, compensation = _ghana_employee(institution, user_factory, membership_factory, employee_factory, organization_factory, assignment_dimensions_factory)
+    bonus = PayComponent.objects.create(
+        institution=institution, name="Bonus", code="BONUS", component_type=PayComponent.ComponentType.EARNING,
+        calculation_type=PayComponent.CalculationType.FIXED, taxable=False,
+    )
+    SalaryStructureComponent.objects.create(institution=institution, salary_structure=compensation.salary_structure, pay_component=bonus, default_amount=Decimal("6000.00"))
+    _period, run = _period_and_run(institution, hr, key="bonus-excess")
+
+    record = calculate_payroll_run(payroll_run=run, actor=hr).records.get(employee=employee)
+
+    # Threshold: 15% of 12 x 3,000 = 5,400 taxed at 5%; the other 600 joins PAYE.
+    bonus_tax = record.items.get(component_code_snapshot="GH_BONUS_TAX")
+    assert bonus_tax.amount == Decimal("270.00")
+    assert bonus_tax.metadata["excess_in_paye"] == "600.00"
+    paye = record.items.get(component_code_snapshot="GH_PAYE_RESIDENT")
+    assert Decimal(paye.metadata["basis"]) == Decimal("3000.00") - Decimal("165.00") + Decimal("600.00")
+
+
+def _approved_overtime(institution, hr, employee, taxable):
+    from apps.attendance.models import AttendanceRecord, OvertimeRecord
+    from apps.compensation.models import PayComponent
+
+    PayComponent.objects.create(
+        institution=institution, name="Overtime", code="OVERTIME", component_type=PayComponent.ComponentType.EARNING,
+        calculation_type=PayComponent.CalculationType.FIXED, taxable=taxable,
+    )
+    shift = Shift.objects.create(institution=institution, name="Day", code="DAY", start_time=time(8), end_time=time(16))
+    schedule = WorkSchedule.objects.create(
+        institution=institution, name="Daily", code="DAILY", schedule_type=WorkSchedule.ScheduleType.FIXED, effective_from=date(2026, 1, 1), fixed_shift=shift,
+    )
+    assignment = ScheduleAssignment.objects.create(institution=institution, employee=employee, work_schedule=schedule, effective_from=date(2026, 1, 1), assigned_by=hr)
+    attendance = AttendanceRecord.objects.create(
+        institution=institution, employee=employee, schedule_assignment=assignment, attendance_date=date(2026, 9, 10), overtime_minutes=120,
+        status=AttendanceRecord.Status.PRESENT, source=AttendanceRecord.Source.MANUAL,
+    )
+    OvertimeRecord.objects.create(
+        institution=institution, employee=employee, attendance_record=attendance, calculated_minutes=120, approved_minutes=120,
+        rate_multiplier=Decimal("1.50"), status=OvertimeRecord.Status.APPROVED, approved_by=hr, approved_at=timezone.now(),
+    )
+
+
+def test_overtime_of_non_junior_staff_is_ordinary_income_whatever_the_flag(
+    institution_factory, user_factory, membership_factory, employee_factory, organization_factory, assignment_dimensions_factory,
+):
+    from apps.payroll.models import PayrollItem
+
+    institution = institution_factory(code="OVERTIME-SENIOR")
+    hr, employee, _ = _ghana_employee(institution, user_factory, membership_factory, employee_factory, organization_factory, assignment_dimensions_factory)
+    _approved_overtime(institution, hr, employee, taxable=False)
+    _period, run = _period_and_run(institution, hr, key="overtime-senior")
+
+    # The rule awaiting legal review only concerns junior staff, so this run is not blocked.
+    record = calculate_payroll_run(payroll_run=run, actor=hr).records.get(employee=employee)
+
+    overtime = record.items.get(source=PayrollItem.Source.ATTENDANCE).amount
+    assert overtime > 0
+    assert not record.items.filter(component_code_snapshot="GH_OVERTIME_TAX").exists()
+    paye = record.items.get(component_code_snapshot="GH_PAYE_RESIDENT")
+    assert Decimal(paye.metadata["basis"]) == Decimal("3000.00") - Decimal("165.00") + overtime
+
+
+def test_junior_staff_overtime_still_fails_closed_until_the_threshold_is_validated(
+    institution_factory, user_factory, membership_factory, employee_factory, organization_factory, assignment_dimensions_factory,
+):
+    from django.core.exceptions import ValidationError
+
+    from apps.employees.models import Employment
+
+    institution = institution_factory(code="OVERTIME-JUNIOR")
+    hr, employee, _ = _ghana_employee(
+        institution, user_factory, membership_factory, employee_factory, organization_factory, assignment_dimensions_factory,
+        staff_category=Employment.StaffCategory.JUNIOR,
+    )
+    _approved_overtime(institution, hr, employee, taxable=True)
+    _period, run = _period_and_run(institution, hr, key="overtime-junior")
+
+    with pytest.raises(ValidationError, match="legal validation"):
+        calculate_payroll_run(payroll_run=run, actor=hr)
+
+
+def test_a_voided_reversal_does_not_block_a_new_one(institution_factory, user_factory, membership_factory):
+    from apps.accounting.services import create_reversal, post_journal
+
+    institution = institution_factory(code="REVERSE-AGAIN")
+    accountant, _membership, finance, period = _accounting(institution, user_factory, membership_factory)
+    journal = post_journal(journal=approve_journal(journal=_journal(institution, accountant, period, 3), actor=finance), actor=finance)
+
+    first = create_reversal(journal=journal, actor=finance, entry_date=date(2026, 9, 20), accounting_period=period)
+    void_journal(journal=first, actor=finance)
+    second = create_reversal(journal=journal, actor=finance, entry_date=date(2026, 9, 21), accounting_period=period)
+
+    assert second.id != first.id
+    assert second.status == JournalEntry.Status.DRAFT
+    assert create_reversal(journal=journal, actor=finance, entry_date=date(2026, 9, 22), accounting_period=period).id == second.id
+
+
+def test_a_draft_moved_to_another_year_is_renumbered(institution_factory, user_factory, membership_factory):
+    from apps.accounting.services import update_draft_journal
+
+    institution = institution_factory(code="RENUMBER")
+    accountant, _membership, _finance, period = _accounting(institution, user_factory, membership_factory)
+    fy2027 = FiscalYear.objects.create(institution=institution, name="FY2027", start_date=date(2027, 1, 1), end_date=date(2027, 12, 31))
+    january = AccountingPeriod.objects.create(institution=institution, fiscal_year=fy2027, name="January 2027", start_date=date(2027, 1, 1), end_date=date(2027, 1, 31))
+    cash = create_account(institution=institution, actor=accountant, code="1099", name="Cash", account_type="ASSET", normal_balance="DEBIT")
+    journal = create_journal(
+        institution=institution, actor=accountant, accounting_period=period, entry_date=date(2026, 9, 10), description="Draft",
+        lines=[{"account": cash, "debit": Decimal("1.00"), "credit": Decimal("0.00")}],
+    )
+    assert journal.journal_number.startswith("JE-2026-")
+
+    journal = update_draft_journal(journal=journal, actor=accountant, accounting_period=january, entry_date=date(2027, 1, 5))
+
+    assert journal.journal_number == "JE-2027-000001"
+
+
+def test_invitation_password_check_shares_the_sign_in_lockout(api_client, institution_factory, user_factory, membership_factory):
+    institution = institution_factory(code="INVITE-LOCK")
+    admin = user_factory(email="lock.admin@example.com")
+    membership_factory(user=admin, institution=institution, role_code="INSTITUTION_ADMIN", is_primary=True)
+    existing = user_factory(email="has.account@example.com", password="a-Strong-passphrase-42")
+    token = _invite(institution, admin, existing.email)
+
+    statuses = [api_client.post(f"/api/v1/auth/invitations/{token}/", {"password": f"wrong-{n}"}, format="json").status_code for n in range(6)]
+
+    assert statuses == [400] * 5 + [429]
+    # Locked even with the right password, exactly like sign-in.
+    assert api_client.post(f"/api/v1/auth/invitations/{token}/", {"password": "a-Strong-passphrase-42"}, format="json").status_code == 429
+
+
+def test_get_started_limit_is_per_visitor_not_per_proxy(api_client, settings):
+    settings.INSTITUTION_ACCESS_REQUEST_RATE = "1/hour"
+    settings.BFF_PROXY_SECRET = "review-secret"
+    cache.clear()
+    payload = {
+        "institution_name": "Volta Health Partners", "contact_name": "Akosua Darko", "job_title": "HR Director",
+        "phone": "+233 24 000 0000", "country_code": "gh", "organization_size": "51-200", "message": "HR and payroll.",
+    }
+
+    def submit(ip, n):
+        return api_client.post(
+            "/api/v1/auth/institution-access-requests/", {**payload, "email": f"visitor{n}@example.com"}, format="json",
+            HTTP_X_ERGONX_PROXY_SECRET="review-secret", HTTP_X_ERGONX_CLIENT_IP=ip,
+        ).status_code
+
+    assert [submit("203.0.113.1", 1), submit("203.0.113.1", 2)] == [202, 429]
+    assert submit("203.0.113.2", 3) == 202
+    cache.clear()

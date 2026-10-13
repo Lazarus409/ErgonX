@@ -481,7 +481,8 @@ def calculate_employee_record(payroll_run, employee, configuration):
             effect="DEDUCTION",
             quantity=Decimal(len(unpaid_dates)),
             rate=money(compensation.base_salary / len(working_dates)),
-            metadata={"leave_dates": [value.isoformat() for value in sorted(unpaid_dates)]},
+            # Unearned pay: it also comes off taxable income (see reconcile_payroll_run).
+            metadata={"leave_dates": [value.isoformat() for value in sorted(unpaid_dates)], "reduces_taxable": True},
         )
 
     overtime_rows = OvertimeRecord.objects.filter(

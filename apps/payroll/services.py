@@ -921,6 +921,8 @@ def reconcile_payroll_run(payroll_run):
                     recalculated["taxable_income"] += item.amount
             elif effect == "DEDUCTION":
                 recalculated["total_deductions"] += item.amount
+                if item.metadata.get("reduces_taxable"):
+                    recalculated["taxable_income"] -= item.amount
             elif effect == "EMPLOYEE_CONTRIBUTION":
                 recalculated["employee_contributions"] += item.amount
             elif effect == "EMPLOYER_CONTRIBUTION":

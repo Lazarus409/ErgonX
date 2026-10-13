@@ -100,27 +100,48 @@ async function revokeRefreshToken(request: NextRequest): Promise<void> {
   }
 }
 
+/**
+ * Each path segment must be a plain name: "." / ".." would let URL
+ * normalisation climb out of /api/v1/ (e.g. to Django admin), and a decoded
+ * "/" or "\" would smuggle extra segments.
+ */
+function safeRoute(path: string[]): string | null {
+  if (!path.length) return null;
+  for (const segment of path) {
+    if (!segment || segment === "." || segment === ".." || /[\\/?#]/.test(segment)) return null;
+  }
+  return path.map((segment) => encodeURIComponent(segment)).join("/");
+}
+
+/**
+ * A write must come from this site. Browsers send Origin on every
+ * POST/PUT/PATCH/DELETE; when it is missing, Sec-Fetch-Site must say
+ * same-origin. A request with neither is refused rather than trusted.
+ */
+function isSameOriginWrite(request: NextRequest): boolean {
+  const origin = request.headers.get("origin");
+  if (!origin) return request.headers.get("sec-fetch-site") === "same-origin";
+  try {
+    // Standalone Next may use an internal localhost origin while retaining
+    // the browser's Host header. Compare the externally requested host,
+    // including a reverse proxy's forwarded host, rather than that
+    // internal origin string.
+    const expectedHost = request.headers.get("x-forwarded-host") || request.headers.get("host");
+    return Boolean(expectedHost) && new URL(origin).host === expectedHost;
+  } catch {
+    return false;
+  }
+}
+
 export async function handler(request: NextRequest, context: RouteContext): Promise<NextResponse> {
   const { path } = await context.params;
-  const route = path.join("/");
+  const route = safeRoute(path);
+  if (route === null) {
+    return jsonResponse({ success: false, message: "Not found.", code: "not_found" }, 404);
+  }
 
-  if (UNSAFE_METHODS.has(request.method)) {
-    const origin = request.headers.get("origin");
-    if (origin) {
-      try {
-        const originUrl = new URL(origin);
-        // Standalone Next may use an internal localhost origin while retaining
-        // the browser's Host header. Compare the externally requested host,
-        // including a reverse proxy's forwarded host, rather than that
-        // internal origin string.
-        const expectedHost = request.headers.get("x-forwarded-host") || request.headers.get("host");
-        if (!expectedHost || originUrl.host !== expectedHost) {
-          return jsonResponse({ success: false, message: "Cross-origin requests are not accepted.", code: "csrf_failed" }, 403);
-        }
-      } catch {
-        return jsonResponse({ success: false, message: "Cross-origin requests are not accepted.", code: "csrf_failed" }, 403);
-      }
-    }
+  if (UNSAFE_METHODS.has(request.method) && !isSameOriginWrite(request)) {
+    return jsonResponse({ success: false, message: "Cross-origin requests are not accepted.", code: "csrf_failed" }, 403);
   }
 
   if (route === "auth/logout" && request.method === "POST") {

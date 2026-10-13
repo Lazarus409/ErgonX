@@ -1,0 +1,89 @@
+name: Release gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Ergonx-backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.13" }
+      - run: pip install -r requirements/production.txt pytest pytest-django
+      - run: python manage.py check --settings=config.settings.test
+      - run: python manage.py makemigrations --check --dry-run --settings=config.settings.test
+      - run: python manage.py spectacular --file /tmp/openapi.yml --validate --settings=config.settings.test
+      - run: pytest -q
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ergonx-frontend
+    env:
+      ERGONX_API_PROXY_URL: https://api.example.invalid
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm, cache-dependency-path: ergonx-frontend/package-lock.json }
+      - run: npm ci
+      - run: npm run build
+      - run: npx tsc --noEmit
+      - run: npm run lint
+
+  e2e-smoke:
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.13" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm, cache-dependency-path: ergonx-frontend/package-lock.json }
+      - name: Install backend and frontend dependencies
+        run: |
+          pip install -r Ergonx-backend/requirements/production.txt
+          npm ci --prefix ergonx-frontend
+          cd ergonx-frontend
+          npx playwright install --with-deps chromium
+      - name: Build deterministic browser fixture
+        working-directory: Ergonx-backend
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+        run: |
+          python manage.py migrate --noinput
+          python manage.py shell -c "from django.conf import settings; settings.DEBUG = True; from django.core.management import call_command; call_command('seed_ergonx_demo', password='ErgonxDemo!2026')"
+      - name: Execute Playwright release smoke
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+          E2E_BASE_URL: http://127.0.0.1:3000
+          E2E_INSTITUTION_ADMIN_EMAIL: kwame.mensah@apexdemo.example
+          E2E_INSTITUTION_ADMIN_PASSWORD: ErgonxDemo!2026
+          E2E_DIRECTOR_EMAIL: evelyn.darko@apexdemo.example
+          E2E_DIRECTOR_PASSWORD: ErgonxDemo!2026
+          E2E_FINANCE_MANAGER_EMAIL: yaw.osei@apexdemo.example
+          E2E_FINANCE_MANAGER_PASSWORD: ErgonxDemo!2026
+          E2E_AUDITOR_EMAIL: sandra.appiah@apexdemo.example
+          E2E_AUDITOR_PASSWORD: ErgonxDemo!2026
+          E2E_EMPLOYEE_EMAIL: nana.nyarko@apexdemo.example
+          E2E_EMPLOYEE_PASSWORD: ErgonxDemo!2026
+        run: |
+          cd Ergonx-backend
+          python manage.py runserver 127.0.0.1:8000 --noreload > /tmp/ergonx-backend.log 2>&1 &
+          cd ../ergonx-frontend
+          npm run dev -- --hostname 127.0.0.1 > /tmp/ergonx-frontend.log 2>&1 &
+          for attempt in {1..60}; do
+            curl --fail --silent http://127.0.0.1:8000/api/v1/health/ready/ >/dev/null && \
+              curl --fail --silent http://127.0.0.1:3000/login >/dev/null && break
+            sleep 2
+          done
+          curl --fail http://127.0.0.1:8000/api/v1/health/ready/
+          curl --fail http://127.0.0.1:3000/login >/dev/null
+          npx playwright test e2e/specs/release-smoke.spec.ts

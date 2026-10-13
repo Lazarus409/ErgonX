@@ -94,6 +94,8 @@ export interface VendorBill {
   submitted_by_name?: string | null; submitted_at?: string | null; approved_by_name?: string | null; approved_at?: string | null;
   rejected_by_name?: string | null; rejected_at?: string | null; rejection_reason?: string;
   on_hold?: boolean; hold_reason?: string; scheduled_payment_date?: string | null; scheduled_payment_method?: string;
+  /** The viewer entered or submitted this pending bill, so someone else must approve it. */
+  prepared_by_viewer?: boolean;
 }
 
 export interface PayablesSummary {

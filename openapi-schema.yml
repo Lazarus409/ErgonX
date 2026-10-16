@@ -24554,6 +24554,60 @@ paths:
       - tenant_mismatch
       - module_disabled
       - permission_denied
+  /api/v1/home/my-work/:
+    get:
+      operationId: home_my_work_retrieve
+      description: 'My Work: approvals, own tasks, team onboarding/offboarding items
+        and own requests waiting on others, each with the route where it is handled.'
+      summary: My work home
+      tags:
+      - home
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
   /api/v1/images/:
     get:
       operationId: images_list

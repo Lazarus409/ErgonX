@@ -1006,6 +1006,19 @@ class HomeViewSet(ViewSet):
     @extend_schema(
         responses={200: OpenApiTypes.OBJECT},
         description=(
+            "My Work: approvals, own tasks, team onboarding/offboarding items and own requests "
+            "waiting on others, each with the route where it is handled."
+        ),
+    )
+    @action(detail=False, methods=("get",), url_path="my-work")
+    def my_work(self, request):
+        from apps.dashboards.my_work import my_work
+
+        return Response(my_work(request, permission_codes=effective_permission_codes(request.membership)))
+
+    @extend_schema(
+        responses={200: OpenApiTypes.OBJECT},
+        description=(
             "Cross-module Insights for the selected range (months=3|6|12|24). Each section is "
             "null unless its module is enabled and the caller has the matching dashboard access."
         ),

@@ -1,5 +1,6 @@
 from rest_framework.routers import DefaultRouter
 
+from apps.scheduling.swap_views import ShiftSwapViewSet
 from apps.scheduling.views import (
     FlexibleWorkRuleViewSet,
     RotationPatternViewSet,
@@ -20,6 +21,7 @@ router.register("rotation-patterns", RotationPatternViewSet, basename="rotation-
 router.register("rotation-steps", RotationStepViewSet, basename="rotation-step")
 router.register("flexible-work-rules", FlexibleWorkRuleViewSet, basename="flexible-work-rule")
 router.register("work-schedules", WorkScheduleViewSet, basename="work-schedule")
+router.register("shift-swaps", ShiftSwapViewSet, basename="shift-swap")
 router.register("schedule-assignments", ScheduleAssignmentViewSet, basename="schedule-assignment")
 
 urlpatterns = router.urls

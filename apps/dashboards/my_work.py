@@ -100,6 +100,11 @@ def _to_do(institution, user, employee, permissions, today):
         renew_by = today + timedelta(days=30)
         for enrollment in enrollments.filter(status=TrainingEnrollment.Status.COMPLETED, certificate_expires_on__isnull=False, certificate_expires_on__lte=renew_by):
             items.append(_item(kind="training.renewal", key=enrollment.id, title=f"Renew certificate: {enrollment.course.title}", subtitle="Expired" if enrollment.certificate_expires_on < today else "Expires soon", route="/me/training", due_date=enrollment.certificate_expires_on, today=today))
+    if employee is not None:
+        from apps.scheduling.models import ShiftSwap
+
+        for swap in ShiftSwap.objects.for_institution(institution).filter(counterpart=employee, status=ShiftSwap.Status.AWAITING_COLLEAGUE).select_related("requester"):
+            items.append(_item(kind="swap.answer", key=swap.id, title=f"Answer {swap.requester.full_name}'s shift swap", subtitle=f"{swap.swap_date:%a %d %b}: you'd work {swap.requester_shift_label}", route="/me/attendance/swaps", due_date=swap.swap_date, today=today))
     reviews = PerformanceReview.objects.for_institution(institution).filter(reviewer=user, status=PerformanceReview.Status.MANAGER_REVIEW).select_related("cycle", "employee")
     for review in reviews:
         items.append(_item(kind="review.manager", key=review.id, title=f"Review {review.employee.full_name}", subtitle=review.cycle.name, route=f"/reviews/{review.id}", due_date=review.cycle.manager_review_due, today=today))
@@ -150,6 +155,10 @@ def _waiting(institution, user, employee, today):
         items.append(_item(kind="request.leave", key=leave.id, title=f"{leave.leave_type.name} request", subtitle=f"{leave.start_date:%d %b} – {leave.end_date:%d %b} · awaiting approval", route="/me/leave", waiting_since=leave.created_at, today=today))
     for adjustment in AttendanceAdjustment.objects.for_institution(institution).filter(attendance_record__employee=employee, status=AttendanceAdjustment.Status.PENDING).select_related("attendance_record"):
         items.append(_item(kind="request.attendance", key=adjustment.id, title="Attendance correction", subtitle=f"{adjustment.attendance_record.attendance_date:%d %b} · awaiting review", route="/me/attendance", waiting_since=adjustment.created_at, today=today))
+    from apps.scheduling.models import ShiftSwap
+
+    for swap in ShiftSwap.objects.for_institution(institution).filter(requester=employee, status__in=ShiftSwap.OPEN_STATUSES).select_related("counterpart"):
+        items.append(_item(kind="request.swap", key=swap.id, title=f"Shift swap with {swap.counterpart.full_name}", subtitle=f"{swap.swap_date:%a %d %b} · {swap.get_status_display().lower()}", route="/me/attendance/swaps", waiting_since=swap.created_at, today=today))
     expenses = Expense.objects.for_institution(institution).filter(claimant=employee)
     for expense in expenses.filter(status__in=(Expense.Status.PENDING, Expense.Status.FINANCE_REVIEW)):
         items.append(_item(kind="request.expense", key=expense.id, title=f"Expense claim: {expense.description[:60]}", subtitle=f"{expense.get_status_display()} · {expense.currency} {expense.amount:,.2f}", route="/me/expenses", waiting_since=expense.created_at, today=today))
@@ -183,7 +192,8 @@ def my_work(request, *, permission_codes):
     if "LEAVE" not in enabled:
         waiting = [row for row in waiting if row["kind"] != "request.leave"]
     if "ATTENDANCE" not in enabled:
-        waiting = [row for row in waiting if row["kind"] != "request.attendance"]
+        waiting = [row for row in waiting if row["kind"] not in ("request.attendance", "request.swap")]
+        to_do = [row for row in to_do if row["kind"] != "swap.answer"]
 
     sections = [
         _section("approvals", "Approvals", "Requests waiting for your decision. Open one to approve, reject or ask for changes; anything waiting more than three days is flagged.", _approvals(request, permission_codes, today), route="/approvals"),

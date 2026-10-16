@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { BarChart3, CalendarCheck, CalendarX, ChevronLeft, ChevronRight, Clock3, LogIn, LogOut, PencilLine } from "lucide-react";
+import { BarChart3, CalendarCheck, CalendarX, ChevronLeft, ChevronRight, Clock3, LogIn, LogOut, MapPin, PencilLine } from "lucide-react";
 
+import ClockSiteBadge from "@/components/attendance/ClockSiteBadge";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { MetricCard } from "@/components/ui/Card";
@@ -13,13 +14,14 @@ import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { attendanceApi, employeesApi, getApiErrorMessage } from "@/lib/api";
 import { cx } from "@/lib/cx";
+import { getDevicePosition } from "@/lib/geolocation";
 import { EM_DASH, formatDate, toISODate } from "@/lib/format";
 import { useApiResource } from "@/lib/useApiResource";
 import { MAX_PAGE_SIZE } from "@/types/api";
-import type { AttendanceRecord } from "@/types/attendance";
+import type { AttendanceRecord, ClockPolicy } from "@/types/attendance";
 import type { Employee } from "@/types/hr";
 
-interface MyAttendance { employee: Employee | null; history: AttendanceRecord[] }
+interface MyAttendance { employee: Employee | null; history: AttendanceRecord[]; policy: ClockPolicy | null }
 
 const DOT: Record<string, string> = { PRESENT: "bg-success", REMOTE: "bg-success", LATE: "bg-warning", ABSENT: "bg-danger", ON_LEAVE: "bg-mod-leave", HOLIDAY: "bg-mod-recruitment", OFF_DAY: "bg-line-strong" };
 
@@ -41,9 +43,12 @@ export default function MyAttendancePage() {
 
   const load = useCallback(async (): Promise<MyAttendance> => {
     const employee = await employeesApi.getCurrentEmployee();
-    if (!employee) return { employee: null, history: [] };
-    const history = await attendanceApi.listAttendanceRecords({ employee: employee.id, page_size: MAX_PAGE_SIZE, ordering: "-attendance_date" }).then((page) => page.results).catch(() => [] as AttendanceRecord[]);
-    return { employee, history };
+    if (!employee) return { employee: null, history: [], policy: null };
+    const [history, policy] = await Promise.all([
+      attendanceApi.listAttendanceRecords({ employee: employee.id, page_size: MAX_PAGE_SIZE, ordering: "-attendance_date" }).then((page) => page.results).catch(() => [] as AttendanceRecord[]),
+      attendanceApi.getClockPolicy().catch(() => null),
+    ]);
+    return { employee, history, policy };
   }, []);
   const { data, loading, error, reload } = useApiResource(load);
   const employee = data?.employee ?? null;
@@ -61,13 +66,26 @@ export default function MyAttendancePage() {
   const averageMinutes = worked.length ? Math.round(worked.reduce((sum, record) => sum + record.worked_minutes, 0) / worked.length) : null;
   const averageLate = late.length ? Math.round(late.reduce((sum, record) => sum + record.late_minutes, 0) / late.length) : null;
 
-  /** Clock-in and clock-out are backend actions; the backend applies the schedule and leave rules. */
+  const policy = data?.policy ?? null;
+  const checksLocation = Boolean(policy && policy.rule !== "OFF");
+
+  /**
+   * Clock-in and clock-out are backend actions; the backend applies the schedule,
+   * leave and site-location rules. The device position is asked for only when the
+   * work location checks it, and only at the moment of clocking.
+   */
   const clock = async () => {
     if (!employee) return;
     setActionRunning(true); setActionError("");
     try {
-      if (today && clockedIn) await attendanceApi.clockOut(today.id);
-      else await attendanceApi.clockIn({ employee: employee.id, source: "WEB" });
+      let position = null;
+      if (checksLocation) {
+        const result = await getDevicePosition();
+        if (result.error && policy?.rule === "REQUIRE") { setActionError(`${result.error} ${policy.location_name} only allows clocking on site.`); return; }
+        position = result.position;
+      }
+      if (today && clockedIn) await attendanceApi.clockOut(today.id, { position });
+      else await attendanceApi.clockIn({ employee: employee.id, source: "WEB", position });
       reload();
     } catch (caught) { setActionError(getApiErrorMessage(caught)); }
     finally { setActionRunning(false); }
@@ -97,6 +115,14 @@ export default function MyAttendancePage() {
           </Button>
         )}
       />
+      {checksLocation && policy && !clockedOut && (
+        <p className="flex items-start gap-2 rounded-lg border border-line bg-surface-muted px-4 py-3 text-support text-ink">
+          <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary-ink" aria-hidden="true" />
+          <span>{policy.rule === "REQUIRE"
+            ? `You can clock in and out only within ${policy.radius_m} m of ${policy.location_name}. Your browser will ask to share your location when you clock; it is checked once and not tracked.`
+            : `${policy.location_name} records where you clock in and out. Your browser will ask to share your location when you clock; it is checked once and not tracked.`}</span>
+        </p>
+      )}
       {error && <ErrorState message={error} onRetry={reload} />}
       {actionError && !correcting && <ErrorState variant="inline" title="Action failed" message={actionError} />}
       {submitted && <p className="rounded-lg border border-success/25 bg-success-soft px-4 py-3 text-sm text-success-ink">Your correction request was submitted for approval.</p>}
@@ -138,8 +164,8 @@ export default function MyAttendancePage() {
                       {inMonth.map((record) => (
                         <tr key={record.id} className={cx(record.late_minutes > 0 && "bg-warning-soft/30")}>
                           <td className="whitespace-nowrap px-5 py-3 font-medium text-ink-strong">{formatDate(record.attendance_date)}</td>
-                          <td className={cx("px-5 py-3 tabular-nums", record.late_minutes > 0 ? "font-semibold text-warning-ink" : "text-ink")}>{clockTime(record.check_in)}</td>
-                          <td className="px-5 py-3 tabular-nums text-ink">{clockTime(record.check_out)}</td>
+                          <td className={cx("px-5 py-3 tabular-nums", record.late_minutes > 0 ? "font-semibold text-warning-ink" : "text-ink")}><span className="flex flex-wrap items-center gap-1.5">{clockTime(record.check_in)}<ClockSiteBadge site={record.check_in_site} position={record.check_in_position} /></span></td>
+                          <td className="px-5 py-3 tabular-nums text-ink"><span className="flex flex-wrap items-center gap-1.5">{clockTime(record.check_out)}<ClockSiteBadge site={record.check_out_site} position={record.check_out_position} /></span></td>
                           <td className="px-5 py-3 tabular-nums text-ink">{attendanceApi.formatMinutes(record.worked_minutes)}</td>
                           <td className="px-5 py-3"><StatusBadge status={record.status} size="sm" />{record.late_minutes > 0 && <span className="ml-1 text-caption text-warning-ink">({attendanceApi.formatMinutes(record.late_minutes)})</span>}</td>
                           <td className="px-5 py-3 text-right"><button type="button" onClick={() => { setActionError(""); setSubmitted(false); setReason(""); setCorrecting(record); }} className="inline-flex items-center gap-1 text-caption font-semibold text-primary-ink hover:underline"><PencilLine className="h-3.5 w-3.5" aria-hidden="true" />Request correction</button></td>

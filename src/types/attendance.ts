@@ -61,8 +61,31 @@ export interface AttendanceRecord {
   status: AttendanceStatus | string;
   source: AttendanceSource | string;
   notes: string;
+  /** Blank when the work location doesn't check where people clock. */
+  check_in_site: ClockSiteCheck | "";
+  check_in_position: ClockPosition | null;
+  check_out_site: ClockSiteCheck | "";
+  check_out_position: ClockPosition | null;
   created_at: string;
   updated_at: string;
+}
+
+export type ClockSiteCheck = "ON_SITE" | "OFF_SITE" | "NO_POSITION";
+
+export interface ClockPosition {
+  lat: number;
+  lng: number;
+  accuracy_m: number | null;
+  distance_m: number;
+  location: string;
+}
+
+/** Whether the signed-in employee's work location asks for their position when clocking. */
+export interface ClockPolicy {
+  rule: "OFF" | "RECORD" | "REQUIRE";
+  location_id: string | null;
+  location_name: string;
+  radius_m: number | null;
 }
 
 export interface AttendanceAdjustment {

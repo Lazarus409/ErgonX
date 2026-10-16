@@ -1,5 +1,6 @@
 "use client";
 
+import ClockSiteBadge from "@/components/attendance/ClockSiteBadge";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
@@ -515,11 +516,11 @@ export default function LiveAttendancePage() {
                     </td>
 
                     <td className="px-5 py-4 text-sm text-ink">
-                      {clockTime(record.check_in)}
+                      <span className="flex flex-col items-start gap-1">{clockTime(record.check_in)}<ClockSiteBadge site={record.check_in_site} position={record.check_in_position} /></span>
                     </td>
 
                     <td className="px-5 py-4 text-sm text-ink">
-                      {clockTime(record.check_out)}
+                      <span className="flex flex-col items-start gap-1">{clockTime(record.check_out)}<ClockSiteBadge site={record.check_out_site} position={record.check_out_position} /></span>
                     </td>
 
                     <td className="px-5 py-4 text-sm text-ink">

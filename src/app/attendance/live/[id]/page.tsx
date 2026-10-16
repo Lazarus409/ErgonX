@@ -24,6 +24,7 @@ import {
   schedulingApi,
 } from "@/lib/api";
 import { useApiResource } from "@/lib/useApiResource";
+import ClockSiteBadge from "@/components/attendance/ClockSiteBadge";
 import { MAX_PAGE_SIZE } from "@/types/api";
 import type { AttendanceRecord, WorkSchedule } from "@/types/attendance";
 import type { Employee } from "@/types/hr";
@@ -336,12 +337,12 @@ export default function AttendanceRecordDetailPage() {
             <DetailItem
               icon={<Clock3 className="h-4 w-4" />}
               label="Check In"
-              value={clockTime(record.check_in)}
+              value={<span className="flex flex-wrap items-center gap-2">{clockTime(record.check_in)}<ClockSiteBadge site={record.check_in_site} position={record.check_in_position} showLink /></span>}
             />
             <DetailItem
               icon={<Clock3 className="h-4 w-4" />}
               label="Check Out"
-              value={clockTime(record.check_out)}
+              value={<span className="flex flex-wrap items-center gap-2">{clockTime(record.check_out)}<ClockSiteBadge site={record.check_out_site} position={record.check_out_position} showLink /></span>}
             />
             <DetailItem
               icon={<CalendarDays className="h-4 w-4" />}
@@ -596,7 +597,7 @@ function DetailItem({
 }: {
   icon: React.ReactNode;
   label: string;
-  value: string;
+  value: React.ReactNode;
 }) {
   return (
     <div>

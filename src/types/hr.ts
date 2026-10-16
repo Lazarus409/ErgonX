@@ -345,9 +345,21 @@ export interface Location {
   timezone: string;
   is_remote: boolean;
   is_active: boolean;
+  /** Site position for location-checked clocking (decimal strings), or null. */
+  latitude: string | null;
+  longitude: string | null;
+  geofence_radius_m: number;
+  clock_location_rule: ClockLocationRule;
   created_at: string;
   updated_at: string;
 }
+
+export type ClockLocationRule = "OFF" | "RECORD" | "REQUIRE";
+export const CLOCK_LOCATION_RULE_LABELS: Record<ClockLocationRule, string> = {
+  OFF: "Don't check location",
+  RECORD: "Record location and flag off-site clocks",
+  REQUIRE: "Only allow clocking on site",
+};
 
 /** Filters supported by `EmployeeFilter` on `GET /employees/`. */
 export interface EmployeeFilters {

@@ -8,7 +8,8 @@ import { Checkbox, Field, Input, Select, Textarea } from "@/components/ui/Field"
 import { Drawer } from "@/components/ui/Overlay";
 import { getApiErrorMessage, institutionsApi, isApiRequestError, organizationApi } from "@/lib/api";
 import { useApiResource } from "@/lib/useApiResource";
-import type { Department, Grade, Location, Position } from "@/types/hr";
+import { CLOCK_LOCATION_RULE_LABELS, type ClockLocationRule, type Department, type Grade, type Location, type Position } from "@/types/hr";
+import { getDevicePosition } from "@/lib/geolocation";
 import type { OrganizationResourceKind } from "@/components/organization/OrganizationResource";
 
 type Record_ = Department | Position | Grade | Location;
@@ -26,12 +27,16 @@ interface Values {
   timezone: string;
   is_remote: boolean;
   is_active: boolean;
+  latitude: string;
+  longitude: string;
+  geofence_radius_m: string;
+  clock_location_rule: ClockLocationRule;
 }
 
 const singular: Record<OrganizationResourceKind, string> = { departments: "department", positions: "position", grades: "grade", locations: "location" };
 
 function initialValues(kind: OrganizationResourceKind, record: Record_ | null): Values {
-  const values: Values = { name: "", code: "", description: "", parent: "", department: "", level: "", address: "", city: "", country: "", timezone: "", is_remote: false, is_active: true };
+  const values: Values = { name: "", code: "", description: "", parent: "", department: "", level: "", address: "", city: "", country: "", timezone: "", is_remote: false, is_active: true, latitude: "", longitude: "", geofence_radius_m: "200", clock_location_rule: "OFF" };
   if (!record) return values;
   values.code = record.code;
   values.is_active = record.is_active;
@@ -48,7 +53,10 @@ function initialValues(kind: OrganizationResourceKind, record: Record_ | null): 
     return { ...values, name: grade.name, level: grade.level == null ? "" : String(grade.level), description: grade.description };
   }
   const location = record as Location;
-  return { ...values, name: location.name, address: location.address, city: location.city, country: location.country, timezone: location.timezone, is_remote: location.is_remote };
+  return {
+    ...values, name: location.name, address: location.address, city: location.city, country: location.country, timezone: location.timezone, is_remote: location.is_remote,
+    latitude: location.latitude ?? "", longitude: location.longitude ?? "", geofence_radius_m: String(location.geofence_radius_m ?? 200), clock_location_rule: location.clock_location_rule ?? "OFF",
+  };
 }
 
 function payload(kind: OrganizationResourceKind, values: Values): Record<string, unknown> {
@@ -56,7 +64,12 @@ function payload(kind: OrganizationResourceKind, values: Values): Record<string,
   if (kind === "positions") return { ...common, title: values.name.trim(), department: values.department || null, description: values.description.trim() };
   if (kind === "departments") return { ...common, name: values.name.trim(), parent: values.parent || null, description: values.description.trim() };
   if (kind === "grades") return { ...common, name: values.name.trim(), level: values.level === "" ? null : Number(values.level), description: values.description.trim() };
-  return { ...common, name: values.name.trim(), address: values.address.trim(), city: values.city.trim(), country: values.country, timezone: values.timezone, is_remote: values.is_remote };
+  const coordinate = (value: string) => (value.trim() === "" || Number.isNaN(Number(value)) ? null : Number(value).toFixed(6));
+  return {
+    ...common, name: values.name.trim(), address: values.address.trim(), city: values.city.trim(), country: values.country, timezone: values.timezone, is_remote: values.is_remote,
+    latitude: coordinate(values.latitude), longitude: coordinate(values.longitude), geofence_radius_m: Number(values.geofence_radius_m) || 200,
+    clock_location_rule: values.is_remote ? "OFF" : values.clock_location_rule,
+  };
 }
 
 export function saveOrganizationRecord(kind: OrganizationResourceKind, id: string | null, body: Record<string, unknown>): Promise<Record_> {
@@ -86,6 +99,16 @@ export default function OrganizationForm({ kind, record, open, onClose, onSaved 
   const noun = singular[kind];
   const set = <K extends keyof Values>(key: K, value: Values[K]) => setValues((current) => ({ ...current, [key]: value }));
   const fieldError = (name: string) => fieldErrors[name] ?? null;
+  const [locating, setLocating] = useState(false);
+  const [locateError, setLocateError] = useState("");
+  const fillCurrentPosition = async () => {
+    setLocating(true); setLocateError("");
+    const result = await getDevicePosition();
+    setLocating(false);
+    if (!result.position) { setLocateError(result.error); return; }
+    setValues((current) => ({ ...current, latitude: result.position.lat.toFixed(6), longitude: result.position.lng.toFixed(6) }));
+    if (result.position.accuracy_m && result.position.accuracy_m > 100) setLocateError(`Position found, but only to about ${Math.round(result.position.accuracy_m)} m. Check it on a map, or enter the site's coordinates.`);
+  };
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -181,6 +204,26 @@ export default function OrganizationForm({ kind, record, open, onClose, onSaved 
               )}
             </Field>
             <Checkbox checked={values.is_remote} onChange={(event) => set("is_remote", event.target.checked)} label="Remote or hybrid location" description="For people who don't work from a fixed site." />
+            {!values.is_remote && (
+              <fieldset className="space-y-3 rounded-lg border border-line p-4">
+                <legend className="px-1 text-sm font-semibold text-ink-strong">Clock-in location check</legend>
+                <p className="text-caption text-ink-muted">Ask for the phone or browser position when people based here clock in and out. It is checked once per clock, never tracked. Entries HR makes for someone else are not checked.</p>
+                <Field label="Rule" error={fieldError("clock_location_rule")}>
+                  <Select value={values.clock_location_rule} onChange={(event) => set("clock_location_rule", event.target.value as ClockLocationRule)}>
+                    {Object.entries(CLOCK_LOCATION_RULE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  </Select>
+                </Field>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Latitude" optional={values.clock_location_rule === "OFF"} required={values.clock_location_rule !== "OFF"} error={fieldError("latitude")}><Input inputMode="decimal" value={values.latitude} onChange={(event) => set("latitude", event.target.value)} placeholder="5.603700" /></Field>
+                  <Field label="Longitude" optional={values.clock_location_rule === "OFF"} required={values.clock_location_rule !== "OFF"} error={fieldError("longitude")}><Input inputMode="decimal" value={values.longitude} onChange={(event) => set("longitude", event.target.value)} placeholder="-0.187000" /></Field>
+                </div>
+                <div className="flex flex-wrap items-end gap-3">
+                  <Button type="button" variant="secondary" size="sm" loading={locating} onClick={() => void fillCurrentPosition()}>Use my current position</Button>
+                  <Field label="Radius (metres)" error={fieldError("geofence_radius_m")} className="w-40"><Input type="number" min={25} max={20000} value={values.geofence_radius_m} onChange={(event) => set("geofence_radius_m", event.target.value)} /></Field>
+                </div>
+                {locateError && <p className="text-caption text-warning-ink">{locateError}</p>}
+              </fieldset>
+            )}
           </>
         )}
         {kind !== "locations" && (

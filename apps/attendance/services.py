@@ -175,9 +175,12 @@ def _sync_overtime(record):
 
 
 @transaction.atomic
-def clock_in(*, employee, actor, at=None, source=AttendanceRecord.Source.WEB):
+def clock_in(*, employee, actor, at=None, source=AttendanceRecord.Source.WEB, position=None):
+    from apps.attendance.geofence import check_clock_position
+
     _can_manage(actor, employee)
     at = _clock_time(actor, employee, at)
+    stored_position, site = check_clock_position(employee=employee, actor=actor, position=position)
     attendance_date = _local_date(employee, at)
     if _approved_leave_exists(employee, attendance_date):
         raise ValidationError({"attendance_date": "Employee is on approved leave."})
@@ -198,6 +201,8 @@ def clock_in(*, employee, actor, at=None, source=AttendanceRecord.Source.WEB):
         raise ValidationError({"check_in": "Employee is already checked in for this date."})
     record.check_in = at
     record.source = source
+    record.check_in_position = stored_position
+    record.check_in_site = site
     _recalculate(record)
     record.save()
     record_audit_event(
@@ -205,13 +210,15 @@ def clock_in(*, employee, actor, at=None, source=AttendanceRecord.Source.WEB):
         institution=record.institution,
         entity=record,
         action="attendance.clocked_in",
-        metadata={"source": source},
+        metadata={"source": source, **({"site": site} if site else {})},
     )
     return record
 
 
 @transaction.atomic
-def clock_out(*, attendance_record, actor, at=None):
+def clock_out(*, attendance_record, actor, at=None, position=None):
+    from apps.attendance.geofence import check_clock_position
+
     # PostgreSQL cannot apply FOR UPDATE to the nullable side of the
     # schedule_assignment outer join. Lock only the attendance row and allow
     # related objects to load separately inside the same transaction.
@@ -224,6 +231,9 @@ def clock_out(*, attendance_record, actor, at=None):
     if attendance_record.check_out is not None:
         raise ValidationError({"check_out": "Employee is already checked out."})
     attendance_record.check_out = _clock_time(actor, attendance_record.employee, at)
+    attendance_record.check_out_position, attendance_record.check_out_site = check_clock_position(
+        employee=attendance_record.employee, actor=actor, position=position
+    )
     _recalculate(attendance_record)
     attendance_record.save()
     _sync_overtime(attendance_record)
@@ -232,7 +242,7 @@ def clock_out(*, attendance_record, actor, at=None):
         institution=attendance_record.institution,
         entity=attendance_record,
         action="attendance.clocked_out",
-        metadata={"worked_minutes": attendance_record.worked_minutes},
+        metadata={"worked_minutes": attendance_record.worked_minutes, **({"site": attendance_record.check_out_site} if attendance_record.check_out_site else {})},
     )
     return attendance_record
 

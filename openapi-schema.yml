@@ -5574,6 +5574,66 @@ paths:
       - module_disabled
       - permission_denied
       - validation_error
+  /api/v1/attendance-records/clock-policy/:
+    get:
+      operationId: attendance_records_clock_policy_retrieve
+      description: |-
+        Whether the caller's work location asks for their position when they clock.
+
+        Requires an authenticated user, an active institution context, the `ATTENDANCE` module enabled, the `attendance.clock` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: Clock policy attendance record
+      tags:
+      - attendance-records
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
   /api/v1/audit/:
     get:
       operationId: audit_list
@@ -61933,6 +61993,36 @@ components:
         notes:
           type: string
           readOnly: true
+        check_in_site:
+          enum:
+          - ON_SITE
+          - OFF_SITE
+          - NO_POSITION
+          type: string
+          description: |-
+            * `ON_SITE` - On site
+            * `OFF_SITE` - Off site
+            * `NO_POSITION` - Location not shared
+          x-spec-enum-id: 1686293924c179b1
+          readOnly: true
+        check_in_position:
+          readOnly: true
+          nullable: true
+        check_out_site:
+          enum:
+          - ON_SITE
+          - OFF_SITE
+          - NO_POSITION
+          type: string
+          description: |-
+            * `ON_SITE` - On site
+            * `OFF_SITE` - Off site
+            * `NO_POSITION` - Location not shared
+          x-spec-enum-id: 1686293924c179b1
+          readOnly: true
+        check_out_position:
+          readOnly: true
+          nullable: true
         created_at:
           type: string
           format: date-time
@@ -61944,7 +62034,11 @@ components:
       required:
       - attendance_date
       - check_in
+      - check_in_position
+      - check_in_site
       - check_out
+      - check_out_position
+      - check_out_site
       - created_at
       - early_departure_minutes
       - employee
@@ -67534,6 +67628,31 @@ components:
           type: boolean
         is_active:
           type: boolean
+        latitude:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,6})?$
+          nullable: true
+        longitude:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,6})?$
+          nullable: true
+        geofence_radius_m:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        clock_location_rule:
+          enum:
+          - 'OFF'
+          - RECORD
+          - REQUIRE
+          type: string
+          description: |-
+            * `OFF` - Don't check location
+            * `RECORD` - Record location and flag off-site clocks
+            * `REQUIRE` - Only allow clocking on site
+          x-spec-enum-id: eaa2ff0c72268a87
         created_at:
           type: string
           format: date-time
@@ -73629,6 +73748,31 @@ components:
           type: boolean
         is_active:
           type: boolean
+        latitude:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,6})?$
+          nullable: true
+        longitude:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,6})?$
+          nullable: true
+        geofence_radius_m:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        clock_location_rule:
+          enum:
+          - 'OFF'
+          - RECORD
+          - REQUIRE
+          type: string
+          description: |-
+            * `OFF` - Don't check location
+            * `RECORD` - Record location and flag off-site clocks
+            * `REQUIRE` - Only allow clocking on site
+          x-spec-enum-id: eaa2ff0c72268a87
         created_at:
           type: string
           format: date-time

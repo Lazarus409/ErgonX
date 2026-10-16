@@ -255,6 +255,21 @@ export async function deleteLifecycleTask(employeeId: string, taskId: string): P
   return apiDelete(`/employees/${employeeId}/lifecycle-tasks/${taskId}/`);
 }
 
+/** The signed-in employee's own open checklists; ``can_complete`` marks the items they tick off themselves. */
+export type MyLifecycleRecord<T> = Omit<T, "tasks"> & { tasks: (LifecycleTask & { can_complete: boolean })[] };
+export interface MyLifecycle {
+  onboarding: MyLifecycleRecord<EmployeeOnboarding> | null;
+  offboarding: MyLifecycleRecord<EmployeeOffboarding> | null;
+}
+
+export async function getMyLifecycle(): Promise<MyLifecycle> {
+  return apiGet<MyLifecycle>("/employees/me/lifecycle/");
+}
+
+export async function updateMyLifecycleTask(taskId: string, status: "OPEN" | "DONE"): Promise<MyLifecycle> {
+  return apiPatch<MyLifecycle, { status: string }>(`/employees/me/lifecycle-tasks/${taskId}/`, { status });
+}
+
 export type LifecycleTaskTemplatePayload = Pick<LifecycleTaskTemplate, "process" | "title" | "description" | "category" | "owner" | "due_offset_days" | "is_required" | "is_active" | "sort_order">;
 
 export async function listLifecycleTemplates(params: ListParams = {}): Promise<PaginatedData<LifecycleTaskTemplate>> {

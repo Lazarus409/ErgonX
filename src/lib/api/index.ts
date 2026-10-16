@@ -65,6 +65,7 @@ export * as notificationsApi from "./notifications";
 export * as imagesApi from "./images";
 export * as reportLibraryApi from "./reportLibrary";
 export * as documentChecklistApi from "./documentChecklist";
+export * as policiesApi from "./policies";
 export * as trainingApi from "./training";
 export * as performanceApi from "./performance";
 export * as complaintsApi from "./complaints";

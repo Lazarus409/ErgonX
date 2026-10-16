@@ -109,6 +109,13 @@ def save_emergency_contact(*, institution, employee, instance=None, **values):
     return contact
 
 
+def _sync_policy_tasks(institution, employee, actor):
+    # Policies already acknowledged (e.g. on a rehire) tick off the new policy item.
+    from apps.documents.policies import sync_policy_tasks
+
+    sync_policy_tasks(institution=institution, employee=employee, actor=actor)
+
+
 @transaction.atomic
 def start_employee_onboarding(*, institution, employee, actor):
     locked_employee = Employee.objects.select_for_update().get(pk=employee.pk)
@@ -124,7 +131,8 @@ def start_employee_onboarding(*, institution, employee, actor):
     onboarding.started_at = onboarding.started_at or timezone.now()
     onboarding.blocked_reason = ""
     onboarding.save()
-    generate_lifecycle_tasks(onboarding)
+    if generate_lifecycle_tasks(onboarding):
+        _sync_policy_tasks(institution, locked_employee, actor)
     record_audit_event(actor=actor, institution=institution, entity=onboarding, action="employee.onboarding.started")
     return onboarding
 
@@ -240,6 +248,7 @@ def rehire_employee(*, institution, employee, actor, department, position, grade
         if membership and membership.status == InstitutionMembership.Status.INACTIVE:
             update_membership(membership=membership, institution=institution, actor=actor, status=InstitutionMembership.Status.INVITED)
     onboarding = EmployeeOnboarding.objects.create(institution=institution, employee=locked_employee, status=EmployeeOnboarding.Status.IN_PROGRESS, started_at=timezone.now(), notes="Rehire onboarding started.")
-    generate_lifecycle_tasks(onboarding)
+    if generate_lifecycle_tasks(onboarding):
+        _sync_policy_tasks(institution, locked_employee, actor)
     record_audit_event(actor=actor, institution=institution, entity=employment, action="employee.rehired", metadata={"employee_id": str(locked_employee.id), "start_date": str(start_date)})
     return employment, onboarding

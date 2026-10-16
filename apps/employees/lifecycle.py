@@ -185,3 +185,29 @@ def install_standard_checklists(*, institution, actor):
     if any(created.values()):
         record_audit_event(actor=actor, institution=institution, entity=institution, action="employee.lifecycle_templates.installed", metadata={"created": created})
     return created
+
+
+def policy_items_are_automatic(institution, employee):
+    """True when a required policy applies to the employee, so policy items tick themselves off."""
+    from apps.documents.policies import READ_ONLY, policies_for_employee
+
+    return any(status != READ_ONLY for _, status, _, _ in policies_for_employee(institution, employee))
+
+
+def employee_can_complete(task, *, policy_automatic):
+    record = task.onboarding or task.offboarding
+    return (
+        task.owner == Owner.EMPLOYEE
+        and task.status != LifecycleTask.Status.NOT_APPLICABLE
+        and record.status not in CLOSED_RECORD_STATUSES
+        and not (task.category == Category.POLICY and policy_automatic)
+    )
+
+
+def self_update_lifecycle_task(*, institution, task, employee, user, status):
+    """An employee ticks off (or reopens) an item they are responsible for."""
+    if status not in (LifecycleTask.Status.OPEN, LifecycleTask.Status.DONE):
+        raise ValidationError({"status": "Mark the item done or open."})
+    if task.employee_id != employee.id or not employee_can_complete(task, policy_automatic=policy_items_are_automatic(institution, employee)):
+        raise ValidationError({"task": "HR completes this item."})
+    return update_lifecycle_task(institution=institution, task=task, actor=user, status=status)

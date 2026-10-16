@@ -259,6 +259,23 @@ def _personal_snapshot(*, user, institution, permission_codes):
         if rejected:
             add("MY_ADJUSTMENT_REJECTED", "HIGH", "Attendance correction was not approved", f"{rejected} correction request(s) were rejected in the last two weeks.", "/me/attendance")
         activity["attendance_corrections_pending"] = pending_adjustments
+    # Core HR is always on: policies and lifecycle checklists need no module check.
+    from apps.documents.policies import OVERDUE, PENDING, policies_for_employee
+    from apps.employees.lifecycle import employee_can_complete, policy_items_are_automatic
+    from apps.employees.models import LifecycleTask
+
+    statuses = [status for _, status, _, _ in policies_for_employee(institution, employee, today=today)]
+    overdue, pending = statuses.count(OVERDUE), statuses.count(PENDING)
+    if overdue or pending:
+        add(
+            "MY_POLICIES_TO_ACKNOWLEDGE", "HIGH" if overdue else "NORMAL", "Policies to read and acknowledge",
+            f"{overdue + pending} {'policy needs' if overdue + pending == 1 else 'policies need'} your signature" + (f", {overdue} overdue." if overdue else "."), "/me/policies",
+        )
+    open_tasks = LifecycleTask.objects.filter(institution=institution, employee=employee, status=LifecycleTask.Status.OPEN, owner="EMPLOYEE").select_related("onboarding", "offboarding")
+    automatic = policy_items_are_automatic(institution, employee) if open_tasks else False
+    mine = sum(1 for task in open_tasks if employee_can_complete(task, policy_automatic=automatic))
+    if mine:
+        add("MY_CHECKLIST_ITEMS", "NORMAL", "Checklist items for you", f"{mine} onboarding or offboarding item(s) are yours to complete.", "/me")
     unread = Notification.objects.for_institution(institution).filter(user=user, status__in=(Notification.Status.PENDING, Notification.Status.SENT)).count()
     if unread:
         add("MY_NOTIFICATIONS_UNREAD", "NORMAL", "Unread notifications", f"You have {unread} unread update(s).", "/notifications")

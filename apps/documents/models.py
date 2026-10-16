@@ -162,3 +162,95 @@ class DocumentRequirementWaiver(TenantOwnedModel):
                 errors[name] = "Referenced record must belong to the same institution."
         if errors:
             raise ValidationError(errors)
+
+
+POLICY_ENTITY_TYPE = "POLICY"
+
+
+class Policy(TenantOwnedModel):
+    """A workplace policy employees must read and acknowledge.
+
+    Content can be edited only while the policy is a draft. Publishing a new
+    version bumps ``version``; acknowledgements count only for the current one.
+    """
+
+    class Status(models.TextChoices):
+        DRAFT = "DRAFT", "Draft"
+        PUBLISHED = "PUBLISHED", "Published"
+        RETIRED = "RETIRED", "Retired"
+
+    class Category(models.TextChoices):
+        CODE_OF_CONDUCT = "CODE_OF_CONDUCT", "Code of conduct"
+        HR = "HR", "HR & employment"
+        HEALTH_SAFETY = "HEALTH_SAFETY", "Health & safety"
+        IT_SECURITY = "IT_SECURITY", "IT & security"
+        DATA_PROTECTION = "DATA_PROTECTION", "Data protection"
+        FINANCE = "FINANCE", "Finance"
+        OTHER = "OTHER", "Other"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="policies")
+    title = models.CharField(max_length=150)
+    category = models.CharField(max_length=20, choices=Category.choices, default=Category.HR)
+    summary = models.TextField(blank=True, max_length=1000)
+    body = models.TextField(blank=True, max_length=100_000)
+    document = models.ForeignKey(Document, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    # Empty means every employment type; otherwise e.g. ["PERMANENT", "CONTRACT"].
+    employment_types = models.JSONField(default=list, blank=True)
+    requires_acknowledgement = models.BooleanField(default=True)
+    acknowledge_within_days = models.PositiveSmallIntegerField(default=14)
+    version = models.PositiveIntegerField(default=1)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.DRAFT)
+    published_at = models.DateTimeField(null=True, blank=True)
+    published_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    change_summary = models.CharField(max_length=500, blank=True)
+
+    class Meta:
+        ordering = ("title",)
+        indexes = [models.Index(fields=("institution", "status"))]
+
+    def clean(self):
+        from apps.employees.models import Employment
+
+        self.title = self.title.strip()
+        errors = {}
+        allowed = set(Employment.EmploymentType.values)
+        if not isinstance(self.employment_types, list) or any(value not in allowed for value in self.employment_types):
+            errors["employment_types"] = f"Use employment types from: {', '.join(sorted(allowed))}."
+        if not 1 <= self.acknowledge_within_days <= 365:
+            errors["acknowledge_within_days"] = "Use between 1 and 365 days."
+        if self.document_id and self.document.institution_id != self.institution_id:
+            errors["document"] = "Document must belong to the same institution."
+        if errors:
+            raise ValidationError(errors)
+
+    def applies_to(self, employment_type):
+        return not self.employment_types or employment_type in self.employment_types
+
+    def __str__(self):
+        return self.title
+
+
+class PolicyAcknowledgement(TenantOwnedModel):
+    """An employee's signed confirmation that they read one version of a policy."""
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="policy_acknowledgements")
+    policy = models.ForeignKey(Policy, on_delete=models.CASCADE, related_name="acknowledgements")
+    employee = models.ForeignKey("employees.Employee", on_delete=models.PROTECT, related_name="policy_acknowledgements")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    version = models.PositiveIntegerField()
+    signed_name = models.CharField(max_length=200)
+    acknowledged_at = models.DateTimeField()
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=500, blank=True)
+
+    class Meta:
+        ordering = ("-acknowledged_at",)
+        constraints = [
+            models.UniqueConstraint(fields=("policy", "employee", "version"), name="uniq_policy_ack_per_version"),
+        ]
+
+    def clean(self):
+        if self.policy_id and self.policy.institution_id != self.institution_id:
+            raise ValidationError({"policy": "Policy must belong to the same institution."})
+        if self.employee_id and self.employee.institution_id != self.institution_id:
+            raise ValidationError({"employee": "Employee must belong to the same institution."})

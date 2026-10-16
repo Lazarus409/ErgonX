@@ -3,7 +3,7 @@ import mimetypes
 from django.conf import settings
 from rest_framework import serializers
 
-from apps.documents.models import Document, DocumentRequirement, DocumentRequirementWaiver, ImageAsset
+from apps.documents.models import Document, DocumentRequirement, DocumentRequirementWaiver, ImageAsset, Policy, PolicyAcknowledgement
 from common.serializers import ValidatedModelSerializer
 
 
@@ -116,3 +116,70 @@ class DocumentRequirementWaiverSerializer(ValidatedModelSerializer):
 
     def get_waived_by_name(self, obj) -> str:
         return (obj.waived_by.get_full_name() or obj.waived_by.email) if obj.waived_by else ""
+
+
+class PolicyFileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Document
+        fields = ("id", "original_filename", "content_type", "size_bytes", "created_at")
+        read_only_fields = fields
+
+
+class PolicySerializer(ValidatedModelSerializer):
+    """HR's view of a policy. Content changes only while it is a draft."""
+
+    CONTENT_FIELDS = ("title", "category", "summary", "body", "employment_types", "requires_acknowledgement", "acknowledge_within_days")
+
+    category_label = serializers.CharField(source="get_category_display", read_only=True)
+    document = PolicyFileSerializer(read_only=True)
+    published_by_name = serializers.SerializerMethodField()
+    acknowledgement_summary = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Policy
+        fields = (
+            "id", "title", "category", "category_label", "summary", "body", "document", "employment_types",
+            "requires_acknowledgement", "acknowledge_within_days", "version", "status", "published_at",
+            "published_by_name", "change_summary", "acknowledgement_summary", "created_at", "updated_at",
+        )
+        read_only_fields = ("id", "document", "version", "status", "published_at", "published_by_name", "change_summary", "acknowledgement_summary", "created_at", "updated_at")
+
+    def get_published_by_name(self, policy):
+        user = policy.published_by
+        return (user.get_full_name() or user.email) if user else ""
+
+    def get_acknowledgement_summary(self, policy):
+        summaries = self.context.get("acknowledgement_summaries") or {}
+        return summaries.get(policy.id)
+
+    def validate(self, attrs):
+        if self.instance is not None and self.instance.status != Policy.Status.DRAFT and any(field in attrs for field in self.CONTENT_FIELDS):
+            raise serializers.ValidationError({"status": "A published policy can't be edited. Publish a new version instead."})
+        return attrs
+
+
+class PolicyNewVersionSerializer(serializers.Serializer):
+    change_summary = serializers.CharField(max_length=500)
+    title = serializers.CharField(max_length=150, required=False)
+    category = serializers.ChoiceField(choices=Policy.Category.choices, required=False)
+    summary = serializers.CharField(max_length=1000, required=False, allow_blank=True)
+    body = serializers.CharField(max_length=100_000, required=False, allow_blank=True)
+    requires_acknowledgement = serializers.BooleanField(required=False)
+    acknowledge_within_days = serializers.IntegerField(min_value=1, max_value=365, required=False)
+
+
+class PolicyAcknowledgementSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PolicyAcknowledgement
+        fields = ("id", "version", "signed_name", "acknowledged_at")
+        read_only_fields = fields
+
+
+class PolicyAcknowledgeSerializer(serializers.Serializer):
+    signed_name = serializers.CharField(max_length=200)
+    confirm = serializers.BooleanField()
+
+    def validate_confirm(self, value):
+        if not value:
+            raise serializers.ValidationError("Confirm that you have read and understood the policy.")
+        return value

@@ -4,7 +4,7 @@ from smtplib import SMTPException
 from django.conf import settings
 from django.core.mail import BadHeaderError
 from django.utils import timezone
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiTypes, extend_schema
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -16,7 +16,7 @@ from rest_framework.exceptions import NotFound, PermissionDenied, ValidationErro
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 
 from apps.employees.filters import EmergencyContactFilter, EmployeeFilter
-from apps.employees.lifecycle import add_lifecycle_task, delete_lifecycle_task, install_standard_checklists, update_lifecycle_task
+from apps.employees.lifecycle import add_lifecycle_task, delete_lifecycle_task, employee_can_complete, install_standard_checklists, policy_items_are_automatic, self_update_lifecycle_task, update_lifecycle_task
 from apps.employees.models import EmergencyContact, Employee, EmployeeOffboarding, EmployeeOnboarding, Employment, LifecycleProcess, LifecycleTask, LifecycleTaskTemplate
 from apps.employees.selectors import employment_history_for_employee
 from apps.employees.serializers import EmergencyContactSerializer, EmployeeOffboardingSerializer, EmployeeOffboardingStartSerializer, EmployeeOnboardingSerializer, EmployeeRehireSerializer, LifecycleTaskCreateSerializer, LifecycleTaskSerializer, LifecycleTaskTemplateSerializer, LifecycleTaskUpdateSerializer, EmployeeSelfServiceInvitationSerializer, NewEmployeeSelfServiceInvitationSerializer, EmployeeSerializer, EmploymentSerializer, SelfServiceProfileSerializer
@@ -95,6 +95,44 @@ class SelfServiceEmergencyContactDetailView(SelfServiceBaseView):
     def delete(self, request, pk):
         self._contact(request, pk).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+def _own_lifecycle_payload(request, employee):
+    """The employee's open onboarding/offboarding checklists, marking the items they can tick off."""
+    automatic = policy_items_are_automatic(request.institution, employee)
+    payload = {}
+    for key, model, serializer in (("onboarding", EmployeeOnboarding, EmployeeOnboardingSerializer), ("offboarding", EmployeeOffboarding, EmployeeOffboardingSerializer)):
+        record = model.objects.for_institution(request.institution).filter(employee=employee).exclude(
+            status__in=("NOT_STARTED", "COMPLETED", "CANCELLED")
+        ).prefetch_related(Prefetch("tasks", queryset=LifecycleTask.objects.select_related("completed_by", "onboarding", "offboarding"))).order_by("-created_at").first()
+        if record is None:
+            payload[key] = None
+            continue
+        data = serializer(record).data
+        can = {str(task.id): employee_can_complete(task, policy_automatic=automatic) for task in record.tasks.all()}
+        for item in data["tasks"]:
+            item["can_complete"] = can.get(item["id"], False)
+        payload[key] = data
+    return payload
+
+
+class SelfServiceLifecycleView(SelfServiceBaseView):
+    """The signed-in employee's own onboarding or offboarding checklist."""
+
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
+    def get(self, request):
+        return Response(_own_lifecycle_payload(request, self.employee(request)))
+
+
+class SelfServiceLifecycleTaskView(SelfServiceBaseView):
+    @extend_schema(request=LifecycleTaskUpdateSerializer, responses={200: OpenApiTypes.OBJECT})
+    def patch(self, request, pk):
+        employee = self.employee(request)
+        task = get_object_or_404(LifecycleTask.objects.for_institution(request.institution).select_related("onboarding", "offboarding"), pk=pk, employee=employee)
+        payload = LifecycleTaskUpdateSerializer(data=request.data, partial=True)
+        payload.is_valid(raise_exception=True)
+        call_validated_service(self_update_lifecycle_task, institution=request.institution, task=task, employee=employee, user=request.user, status=payload.validated_data.get("status"))
+        return Response(_own_lifecycle_payload(request, employee))
 
 
 # Categories an employee can file their own documents under. HR-shared

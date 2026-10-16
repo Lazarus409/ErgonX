@@ -19262,6 +19262,441 @@ paths:
       - module_disabled
       - permission_denied
       - not_found
+  /api/v1/employees/me/lifecycle/:
+    get:
+      operationId: employees_me_lifecycle_retrieve
+      description: |-
+        The signed-in employee's own onboarding or offboarding checklist.
+
+        Requires an authenticated user, an active institution context, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: Get self service lifecycle view
+      tags:
+      - employees
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+  /api/v1/employees/me/lifecycle-tasks/{id}/:
+    patch:
+      operationId: employees_me_lifecycle_tasks_partial_update
+      description: |-
+        Patch self service lifecycle task view.
+
+        Requires an authenticated user, an active institution context, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Patch self service lifecycle task view
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - employees
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedLifecycleTaskUpdate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedLifecycleTaskUpdate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedLifecycleTaskUpdate'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+  /api/v1/employees/me/policies/:
+    get:
+      operationId: employees_me_policies_retrieve
+      description: |-
+        The published policies that apply to the signed-in employee, with their acknowledgement status.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: Get self service policies view
+      tags:
+      - employees
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+  /api/v1/employees/me/policies/{id}/:
+    get:
+      operationId: employees_me_policies_retrieve_2
+      description: |-
+        Get self service policy detail view.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
+      summary: Get self service policy detail view
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - employees
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+  /api/v1/employees/me/policies/{id}/acknowledge/:
+    post:
+      operationId: employees_me_policies_acknowledge_create
+      description: |-
+        Post self service policy acknowledge view.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Post self service policy acknowledge view
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - employees
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PolicyAcknowledge'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PolicyAcknowledge'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PolicyAcknowledge'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+  /api/v1/employees/me/policies/{id}/file/:
+    get:
+      operationId: employees_me_policies_file_retrieve
+      description: |-
+        Get self service policy file view.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
+      summary: Get self service policy file view
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - employees
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
   /api/v1/employees/me/profile/:
     get:
       operationId: employees_me_profile_retrieve
@@ -41264,6 +41699,879 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/policies/:
+    get:
+      operationId: policies_list
+      description: |-
+        Workplace policies HR publishes for employees to read and acknowledge.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `policy.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: List policys
+      parameters:
+      - in: query
+        name: category
+        schema:
+          type: string
+          x-spec-enum-id: a5da3c4bbbdcb754
+          enum:
+          - CODE_OF_CONDUCT
+          - DATA_PROTECTION
+          - FINANCE
+          - HEALTH_SAFETY
+          - HR
+          - IT_SECURITY
+          - OTHER
+        description: |-
+          * `CODE_OF_CONDUCT` - Code of conduct
+          * `HR` - HR & employment
+          * `HEALTH_SAFETY` - Health & safety
+          * `IT_SECURITY` - IT & security
+          * `DATA_PROTECTION` - Data protection
+          * `FINANCE` - Finance
+          * `OTHER` - Other
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      - in: query
+        name: status
+        schema:
+          type: string
+          x-spec-enum-id: 4901de1c0551f432
+          enum:
+          - DRAFT
+          - PUBLISHED
+          - RETIRED
+        description: |-
+          * `DRAFT` - Draft
+          * `PUBLISHED` - Published
+          * `RETIRED` - Retired
+      tags:
+      - policies
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/PaginatedPolicyList'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+    post:
+      operationId: policies_create
+      description: |-
+        Workplace policies HR publishes for employees to read and acknowledge.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `policy.manage` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `validation_error`.
+      summary: Create policy
+      tags:
+      - policies
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Policy'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Policy'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Policy'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/Policy'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - validation_error
+  /api/v1/policies/{id}/:
+    get:
+      operationId: policies_retrieve
+      description: |-
+        Workplace policies HR publishes for employees to read and acknowledge.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `policy.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
+      summary: Retrieve policy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this policy.
+        required: true
+      tags:
+      - policies
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/Policy'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+    patch:
+      operationId: policies_partial_update
+      description: |-
+        Workplace policies HR publishes for employees to read and acknowledge.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `policy.manage` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Update policy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this policy.
+        required: true
+      tags:
+      - policies
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedPolicy'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedPolicy'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedPolicy'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/Policy'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+    delete:
+      operationId: policies_destroy
+      description: |-
+        Workplace policies HR publishes for employees to read and acknowledge.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `policy.manage` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
+      summary: Delete policy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this policy.
+        required: true
+      tags:
+      - policies
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+  /api/v1/policies/{id}/acknowledgements/:
+    get:
+      operationId: policies_acknowledgements_retrieve
+      description: |-
+        Who has and has not acknowledged the current version, within the caller's employee scope.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `policy.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
+      summary: Acknowledgements policy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this policy.
+        required: true
+      tags:
+      - policies
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+  /api/v1/policies/{id}/file/:
+    get:
+      operationId: policies_file_retrieve
+      description: |-
+        GET downloads the policy document; POST (multipart ``uploaded_file``) replaces it on a draft.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `policy.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
+      summary: File policy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this policy.
+        required: true
+      tags:
+      - policies
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+    post:
+      operationId: policies_file_create
+      description: |-
+        GET downloads the policy document; POST (multipart ``uploaded_file``) replaces it on a draft.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `policy.manage` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: File policy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this policy.
+        required: true
+      tags:
+      - policies
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Policy'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Policy'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Policy'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+  /api/v1/policies/{id}/new-version/:
+    post:
+      operationId: policies_new_version_create
+      description: |-
+        Workplace policies HR publishes for employees to read and acknowledge.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `policy.manage` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: New version policy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this policy.
+        required: true
+      tags:
+      - policies
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PolicyNewVersion'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PolicyNewVersion'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PolicyNewVersion'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/Policy'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+  /api/v1/policies/{id}/publish/:
+    post:
+      operationId: policies_publish_create
+      description: |-
+        Workplace policies HR publishes for employees to read and acknowledge.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `policy.manage` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Publish policy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this policy.
+        required: true
+      tags:
+      - policies
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/Policy'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+  /api/v1/policies/{id}/retire/:
+    post:
+      operationId: policies_retire_create
+      description: |-
+        Workplace policies HR publishes for employees to read and acknowledge.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `policy.manage` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Retire policy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this policy.
+        required: true
+      tags:
+      - policies
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/Policy'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
   /api/v1/positions/:
     get:
       operationId: positions_list
@@ -68728,6 +70036,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PlatformInstitution'
+    PaginatedPolicyList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Policy'
     PaginatedPositionList:
       type: object
       required:
@@ -72178,6 +73509,42 @@ components:
           type: string
           format: date-time
           readOnly: true
+    PatchedLifecycleTaskUpdate:
+      type: object
+      properties:
+        status:
+          enum:
+          - OPEN
+          - DONE
+          - NOT_APPLICABLE
+          type: string
+          description: |-
+            * `OPEN` - Open
+            * `DONE` - Done
+            * `NOT_APPLICABLE` - Not applicable
+          x-spec-enum-id: 92e487d5475b0ed2
+        note:
+          type: string
+          maxLength: 2000
+        due_date:
+          type: string
+          format: date
+          nullable: true
+        owner:
+          enum:
+          - HR
+          - MANAGER
+          - IT
+          - FINANCE
+          - EMPLOYEE
+          type: string
+          description: |-
+            * `HR` - HR
+            * `MANAGER` - Line manager
+            * `IT` - IT
+            * `FINANCE` - Finance
+            * `EMPLOYEE` - Employee
+          x-spec-enum-id: 37c5df92674556f8
     PatchedLocation:
       type: object
       description: Runs model validation so domain invariants also protect non-form
@@ -72585,6 +73952,93 @@ components:
           type: string
           format: uuid
           nullable: true
+    PatchedPolicy:
+      type: object
+      description: HR's view of a policy. Content changes only while it is a draft.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        title:
+          type: string
+          maxLength: 150
+        category:
+          enum:
+          - CODE_OF_CONDUCT
+          - HR
+          - HEALTH_SAFETY
+          - IT_SECURITY
+          - DATA_PROTECTION
+          - FINANCE
+          - OTHER
+          type: string
+          description: |-
+            * `CODE_OF_CONDUCT` - Code of conduct
+            * `HR` - HR & employment
+            * `HEALTH_SAFETY` - Health & safety
+            * `IT_SECURITY` - IT & security
+            * `DATA_PROTECTION` - Data protection
+            * `FINANCE` - Finance
+            * `OTHER` - Other
+          x-spec-enum-id: a5da3c4bbbdcb754
+        category_label:
+          type: string
+          readOnly: true
+        summary:
+          type: string
+          maxLength: 1000
+        body:
+          type: string
+          maxLength: 100000
+        document:
+          allOf:
+          - $ref: '#/components/schemas/PolicyFile'
+          readOnly: true
+        employment_types: {}
+        requires_acknowledgement:
+          type: boolean
+        acknowledge_within_days:
+          type: integer
+          maximum: 32767
+          minimum: 0
+        version:
+          type: integer
+          readOnly: true
+        status:
+          enum:
+          - DRAFT
+          - PUBLISHED
+          - RETIRED
+          type: string
+          description: |-
+            * `DRAFT` - Draft
+            * `PUBLISHED` - Published
+            * `RETIRED` - Retired
+          x-spec-enum-id: 4901de1c0551f432
+          readOnly: true
+        published_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        published_by_name:
+          type: string
+          readOnly: true
+        change_summary:
+          type: string
+          readOnly: true
+        acknowledgement_summary:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
     PatchedPosition:
       type: object
       description: Runs model validation so domain invariants also protect non-form
@@ -74876,6 +76330,185 @@ components:
       - onboarding_status
       - primary_admin
       - suspended_at
+    Policy:
+      type: object
+      description: HR's view of a policy. Content changes only while it is a draft.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        title:
+          type: string
+          maxLength: 150
+        category:
+          enum:
+          - CODE_OF_CONDUCT
+          - HR
+          - HEALTH_SAFETY
+          - IT_SECURITY
+          - DATA_PROTECTION
+          - FINANCE
+          - OTHER
+          type: string
+          description: |-
+            * `CODE_OF_CONDUCT` - Code of conduct
+            * `HR` - HR & employment
+            * `HEALTH_SAFETY` - Health & safety
+            * `IT_SECURITY` - IT & security
+            * `DATA_PROTECTION` - Data protection
+            * `FINANCE` - Finance
+            * `OTHER` - Other
+          x-spec-enum-id: a5da3c4bbbdcb754
+        category_label:
+          type: string
+          readOnly: true
+        summary:
+          type: string
+          maxLength: 1000
+        body:
+          type: string
+          maxLength: 100000
+        document:
+          allOf:
+          - $ref: '#/components/schemas/PolicyFile'
+          readOnly: true
+        employment_types: {}
+        requires_acknowledgement:
+          type: boolean
+        acknowledge_within_days:
+          type: integer
+          maximum: 32767
+          minimum: 0
+        version:
+          type: integer
+          readOnly: true
+        status:
+          enum:
+          - DRAFT
+          - PUBLISHED
+          - RETIRED
+          type: string
+          description: |-
+            * `DRAFT` - Draft
+            * `PUBLISHED` - Published
+            * `RETIRED` - Retired
+          x-spec-enum-id: 4901de1c0551f432
+          readOnly: true
+        published_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        published_by_name:
+          type: string
+          readOnly: true
+        change_summary:
+          type: string
+          readOnly: true
+        acknowledgement_summary:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - acknowledgement_summary
+      - category_label
+      - change_summary
+      - created_at
+      - document
+      - id
+      - published_at
+      - published_by_name
+      - status
+      - title
+      - updated_at
+      - version
+    PolicyAcknowledge:
+      type: object
+      properties:
+        signed_name:
+          type: string
+          maxLength: 200
+        confirm:
+          type: boolean
+      required:
+      - confirm
+      - signed_name
+    PolicyFile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        original_filename:
+          type: string
+          readOnly: true
+        content_type:
+          type: string
+          readOnly: true
+        size_bytes:
+          type: integer
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - content_type
+      - created_at
+      - id
+      - original_filename
+      - size_bytes
+    PolicyNewVersion:
+      type: object
+      properties:
+        change_summary:
+          type: string
+          maxLength: 500
+        title:
+          type: string
+          maxLength: 150
+        category:
+          enum:
+          - CODE_OF_CONDUCT
+          - HR
+          - HEALTH_SAFETY
+          - IT_SECURITY
+          - DATA_PROTECTION
+          - FINANCE
+          - OTHER
+          type: string
+          description: |-
+            * `CODE_OF_CONDUCT` - Code of conduct
+            * `HR` - HR & employment
+            * `HEALTH_SAFETY` - Health & safety
+            * `IT_SECURITY` - IT & security
+            * `DATA_PROTECTION` - Data protection
+            * `FINANCE` - Finance
+            * `OTHER` - Other
+          x-spec-enum-id: a5da3c4bbbdcb754
+        summary:
+          type: string
+          maxLength: 1000
+        body:
+          type: string
+          maxLength: 100000
+        requires_acknowledgement:
+          type: boolean
+        acknowledge_within_days:
+          type: integer
+          maximum: 365
+          minimum: 1
+      required:
+      - change_summary
     Position:
       type: object
       description: Runs model validation so domain invariants also protect non-form

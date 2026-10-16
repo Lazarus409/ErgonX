@@ -139,6 +139,7 @@ export const navigation: NavigationItem[] = [
       { label: "Performance", href: "/performance", module: "HR", anyPermissions: ["performance.view", "performance.manage"] },
       { label: "Training", href: "/training", module: "HR", anyPermissions: ["training.view", "training.manage"] },
       { label: "Document Checklist", href: "/hr/documents", module: "HR", permission: "document_requirement.view" },
+      { label: "Onboarding Checklists", href: "/hr/lifecycle-checklists", module: "HR", permission: "employment.view" },
       { label: "Complaints", href: "/complaints", module: "HR", anyPermissions: ["complaint.view", "complaint.manage"] },
     ],
   },

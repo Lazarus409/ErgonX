@@ -17,7 +17,7 @@ const areas = [
   { title: "Training", description: "Courses, enrolments and certificates to renew.", href: "/training", icon: GraduationCap, permission: "training.view" },
   { title: "Document Checklist", description: "Required documents and who is still missing them.", href: "/hr/documents", icon: FileCheck2, permission: "document_requirement.view" },
   { title: "Onboarding Checklists", description: "Standard onboarding and offboarding items: IT access, equipment, clearance and final pay.", href: "/hr/lifecycle-checklists", icon: ClipboardCheck, permission: "employment.view" },
-  { title: "Policies", description: "Workplace policies and who has read and signed them.", href: "/hr/policies", icon: ScrollText, permission: "policy.view" },
+  { title: "Policies", description: "Workplace policies and who has read and signed them.", href: "/policies", icon: ScrollText, permission: "policy.view" },
   { title: "Complaints", description: "Confidential employee complaints, investigations and outcomes.", href: "/complaints", icon: MessageSquareWarning, permission: "complaint.view" },
 ];
 

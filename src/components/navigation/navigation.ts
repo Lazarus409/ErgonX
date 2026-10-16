@@ -9,6 +9,7 @@ import {
   FileBarChart,
   House,
   LayoutDashboard,
+  ListTodo,
   MessageSquareWarning,
   Network,
   Receipt,
@@ -96,6 +97,7 @@ export const APPROVAL_PERMISSIONS = ["approval_request.view", "leave.approve", "
 export const navigation: NavigationItem[] = [
   // Ordered by how often people need each area: daily work first, oversight and setup last.
   { label: "Home", href: "/", icon: House, permission: "home.view" },
+  { label: "My Work", href: "/my-work", icon: ListTodo, permission: "home.view" },
   { label: "Executive Dashboard", href: "/dashboard", icon: LayoutDashboard, permission: "dashboard.executive.view" },
   {
     label: "My Department / Functional Area",
@@ -142,7 +144,7 @@ export const navigation: NavigationItem[] = [
       { label: "Training", href: "/training", module: "HR", anyPermissions: ["training.view", "training.manage"] },
       { label: "Document Checklist", href: "/hr/documents", module: "HR", permission: "document_requirement.view" },
       { label: "Onboarding Checklists", href: "/hr/lifecycle-checklists", module: "HR", permission: "employment.view" },
-      { label: "Policies", href: "/hr/policies", module: "HR", anyPermissions: ["policy.view", "policy.manage"] },
+      { label: "Policies", href: "/policies", module: "HR", anyPermissions: ["policy.view", "policy.manage"] },
       { label: "Complaints", href: "/complaints", module: "HR", anyPermissions: ["complaint.view", "complaint.manage"] },
     ],
   },

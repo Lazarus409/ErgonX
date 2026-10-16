@@ -1,9 +1,10 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
-from apps.employees.views import EmergencyContactViewSet, EmployeeViewSet, EmploymentViewSet, SelfServiceDocumentDetailView, SelfServiceDocumentsView, SelfServiceEmergencyContactDetailView, SelfServiceEmergencyContactsView, SelfServiceProfileView
+from apps.employees.views import EmergencyContactViewSet, EmployeeViewSet, EmploymentViewSet, LifecycleTaskTemplateViewSet, SelfServiceDocumentDetailView, SelfServiceDocumentsView, SelfServiceEmergencyContactDetailView, SelfServiceEmergencyContactsView, SelfServiceProfileView
 
 router = DefaultRouter()
+router.register("lifecycle-task-templates", LifecycleTaskTemplateViewSet, basename="lifecycle-task-template")
 router.register("employees", EmployeeViewSet, basename="employee")
 router.register("emergency-contacts", EmergencyContactViewSet, basename="emergency-contact")
 router.register("employments", EmploymentViewSet, basename="employment")

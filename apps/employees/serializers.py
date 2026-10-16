@@ -1,6 +1,8 @@
 from rest_framework import serializers
 
-from apps.employees.models import EmergencyContact, Employee, EmployeeOffboarding, EmployeeOnboarding, Employment
+from django.utils import timezone
+
+from apps.employees.models import EmergencyContact, Employee, EmployeeOffboarding, EmployeeOnboarding, Employment, LifecycleProcess, LifecycleTask, LifecycleTaskCategory, LifecycleTaskOwner, LifecycleTaskTemplate
 from apps.employees.services import change_current_employment, create_employment, save_emergency_contact
 from apps.organization.models import Department, Grade, Location, Position
 from common.scoping import is_team_scoped
@@ -174,18 +176,88 @@ class EmergencyContactSerializer(serializers.ModelSerializer):
         )
 
 
-class EmployeeOnboardingSerializer(serializers.ModelSerializer):
+class LifecycleTaskSerializer(serializers.ModelSerializer):
+    category_label = serializers.CharField(source="get_category_display", read_only=True)
+    owner_label = serializers.CharField(source="get_owner_display", read_only=True)
+    completed_by_name = serializers.SerializerMethodField()
+    is_standard = serializers.SerializerMethodField()
+    is_overdue = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LifecycleTask
+        fields = (
+            "id", "title", "description", "category", "category_label", "owner", "owner_label", "is_required",
+            "due_date", "status", "note", "completed_at", "completed_by_name", "is_standard", "is_overdue",
+        )
+        read_only_fields = fields
+
+    def get_completed_by_name(self, task):
+        user = task.completed_by
+        return (user.get_full_name() or user.email) if user else ""
+
+    def get_is_standard(self, task):
+        return task.template_id is not None
+
+    def get_is_overdue(self, task):
+        return task.status == LifecycleTask.Status.OPEN and task.due_date is not None and task.due_date < timezone.localdate()
+
+
+class LifecycleRecordSerializerMixin(serializers.Serializer):
+    tasks = LifecycleTaskSerializer(many=True, read_only=True)
+    checklist = serializers.SerializerMethodField()
+
+    def get_checklist(self, record):
+        tasks = list(record.tasks.all())
+        open_tasks = [task for task in tasks if task.status == LifecycleTask.Status.OPEN]
+        return {
+            "total": len(tasks),
+            "closed": len(tasks) - len(open_tasks),
+            "required_open": sum(1 for task in open_tasks if task.is_required),
+        }
+
+
+class EmployeeOnboardingSerializer(LifecycleRecordSerializerMixin, serializers.ModelSerializer):
     class Meta:
         model = EmployeeOnboarding
-        fields = ("id", "employee", "status", "started_at", "completed_at", "notes", "created_at", "updated_at")
+        fields = ("id", "employee", "status", "started_at", "completed_at", "notes", "blocked_reason", "tasks", "checklist", "created_at", "updated_at")
         read_only_fields = fields
 
 
-class EmployeeOffboardingSerializer(serializers.ModelSerializer):
+class EmployeeOffboardingSerializer(LifecycleRecordSerializerMixin, serializers.ModelSerializer):
     class Meta:
         model = EmployeeOffboarding
-        fields = ("id", "employee", "status", "initiated_at", "completed_at", "last_working_day", "reason", "notes", "created_at", "updated_at")
-        read_only_fields = ("id", "employee", "status", "initiated_at", "completed_at", "created_at", "updated_at")
+        fields = ("id", "employee", "status", "initiated_at", "completed_at", "last_working_day", "reason", "notes", "blocked_reason", "tasks", "checklist", "created_at", "updated_at")
+        read_only_fields = ("id", "employee", "status", "initiated_at", "completed_at", "blocked_reason", "created_at", "updated_at")
+
+
+class LifecycleTaskUpdateSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(choices=LifecycleTask.Status.choices, required=False)
+    note = serializers.CharField(required=False, allow_blank=True, max_length=2000)
+    due_date = serializers.DateField(required=False, allow_null=True)
+    owner = serializers.ChoiceField(choices=LifecycleTaskOwner.choices, required=False)
+
+
+class LifecycleTaskCreateSerializer(serializers.Serializer):
+    process = serializers.ChoiceField(choices=LifecycleProcess.choices)
+    title = serializers.CharField(max_length=150)
+    description = serializers.CharField(required=False, allow_blank=True, max_length=2000)
+    category = serializers.ChoiceField(choices=LifecycleTaskCategory.choices, default=LifecycleTaskCategory.OTHER)
+    owner = serializers.ChoiceField(choices=LifecycleTaskOwner.choices, default=LifecycleTaskOwner.HR)
+    due_date = serializers.DateField(required=False, allow_null=True)
+    is_required = serializers.BooleanField(default=True)
+
+
+class LifecycleTaskTemplateSerializer(ValidatedModelSerializer):
+    category_label = serializers.CharField(source="get_category_display", read_only=True)
+    owner_label = serializers.CharField(source="get_owner_display", read_only=True)
+
+    class Meta:
+        model = LifecycleTaskTemplate
+        fields = (
+            "id", "process", "title", "description", "category", "category_label", "owner", "owner_label",
+            "due_offset_days", "is_required", "is_active", "sort_order", "created_at", "updated_at",
+        )
+        read_only_fields = ("id", "created_at", "updated_at")
 
 
 class EmployeeOffboardingStartSerializer(serializers.Serializer):

@@ -17825,6 +17825,248 @@ paths:
       - module_disabled
       - permission_denied
       - not_found
+  /api/v1/employees/{id}/lifecycle-tasks/:
+    post:
+      operationId: employees_lifecycle_tasks_create
+      description: |-
+        Adds an ad-hoc item to the employee's current onboarding or offboarding checklist.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `employee.update` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Lifecycle task add employee
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - employees
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Employee'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Employee'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Employee'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/Employee'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+  /api/v1/employees/{id}/lifecycle-tasks/{task_id}/:
+    patch:
+      operationId: employees_lifecycle_tasks_partial_update
+      description: |-
+        Lifecycle task detail employee.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `employee.update` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Lifecycle task detail employee
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: task_id
+        schema:
+          type: string
+          pattern: ^[0-9a-f-]+$
+        required: true
+      tags:
+      - employees
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedEmployee'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedEmployee'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedEmployee'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/Employee'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+    delete:
+      operationId: employees_lifecycle_tasks_destroy
+      description: |-
+        Lifecycle task detail employee.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `employee.update` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
+      summary: Lifecycle task detail employee
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: task_id
+        schema:
+          type: string
+          pattern: ^[0-9a-f-]+$
+        required: true
+      tags:
+      - employees
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
   /api/v1/employees/{id}/offboarding/complete/:
     post:
       operationId: employees_offboarding_complete_create
@@ -32677,6 +32919,568 @@ paths:
       - module_disabled
       - permission_denied
       - not_found
+  /api/v1/lifecycle-task-templates/:
+    get:
+      operationId: lifecycle_task_templates_list
+      description: |-
+        The institution's standard onboarding and offboarding checklist items.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `employment.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: List lifecycle task templates
+      parameters:
+      - in: query
+        name: is_active
+        schema:
+          type: boolean
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: process
+        schema:
+          type: string
+          x-spec-enum-id: 6d857b4db867e12e
+          enum:
+          - OFFBOARDING
+          - ONBOARDING
+        description: |-
+          * `ONBOARDING` - Onboarding
+          * `OFFBOARDING` - Offboarding
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - lifecycle-task-templates
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/PaginatedLifecycleTaskTemplateList'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+    post:
+      operationId: lifecycle_task_templates_create
+      description: |-
+        The institution's standard onboarding and offboarding checklist items.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `employee.update` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `validation_error`.
+      summary: Create lifecycle task template
+      tags:
+      - lifecycle-task-templates
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LifecycleTaskTemplate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LifecycleTaskTemplate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LifecycleTaskTemplate'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/LifecycleTaskTemplate'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - validation_error
+  /api/v1/lifecycle-task-templates/{id}/:
+    get:
+      operationId: lifecycle_task_templates_retrieve
+      description: |-
+        The institution's standard onboarding and offboarding checklist items.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `employment.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
+      summary: Retrieve lifecycle task template
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this lifecycle task template.
+        required: true
+      tags:
+      - lifecycle-task-templates
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/LifecycleTaskTemplate'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+    put:
+      operationId: lifecycle_task_templates_update
+      description: |-
+        The institution's standard onboarding and offboarding checklist items.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `employee.update` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Update lifecycle task template
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this lifecycle task template.
+        required: true
+      tags:
+      - lifecycle-task-templates
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LifecycleTaskTemplate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LifecycleTaskTemplate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LifecycleTaskTemplate'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/LifecycleTaskTemplate'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+    patch:
+      operationId: lifecycle_task_templates_partial_update
+      description: |-
+        The institution's standard onboarding and offboarding checklist items.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `employee.update` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Update lifecycle task template
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this lifecycle task template.
+        required: true
+      tags:
+      - lifecycle-task-templates
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedLifecycleTaskTemplate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedLifecycleTaskTemplate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedLifecycleTaskTemplate'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/LifecycleTaskTemplate'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+    delete:
+      operationId: lifecycle_task_templates_destroy
+      description: |-
+        The institution's standard onboarding and offboarding checklist items.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `employee.update` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
+      summary: Delete lifecycle task template
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this lifecycle task template.
+        required: true
+      tags:
+      - lifecycle-task-templates
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+  /api/v1/lifecycle-task-templates/install-standard/:
+    post:
+      operationId: lifecycle_task_templates_install_standard_create
+      description: |-
+        Adds the standard checklist for each process that has no items yet.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `employee.update` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `validation_error`.
+      summary: Install standard lifecycle task template
+      tags:
+      - lifecycle-task-templates
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LifecycleTaskTemplate'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LifecycleTaskTemplate'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LifecycleTaskTemplate'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/LifecycleTaskTemplate'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - validation_error
   /api/v1/locations/:
     get:
       operationId: locations_list
@@ -59481,9 +60285,8 @@ components:
           format: uuid
         order:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
         name:
           type: string
           maxLength: 150
@@ -59510,9 +60313,8 @@ components:
           nullable: true
         due_after_hours:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
           nullable: true
         created_at:
           type: string
@@ -60464,9 +61266,8 @@ components:
           maxLength: 200
         years_experience:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
           nullable: true
         highest_qualification:
           enum:
@@ -60499,9 +61300,8 @@ components:
           maxLength: 2000
         notice_period_weeks:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
           nullable: true
         created_at:
           type: string
@@ -60628,9 +61428,8 @@ components:
           type: string
         sort_order:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
         is_active:
           type: boolean
           readOnly: true
@@ -61014,15 +61813,13 @@ components:
         calculation_rule: {}
         offset_days:
           type: integer
-          maximum: 9223372036854775807
-          minimum: -9223372036854775808
-          format: int64
+          maximum: 2147483647
+          minimum: -2147483648
           nullable: true
         day_of_month:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
           nullable: true
         effective_from:
           type: string
@@ -61382,17 +62179,15 @@ components:
         employment_types: {}
         validity_months:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
           nullable: true
         is_mandatory:
           type: boolean
         sort_order:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
         is_active:
           type: boolean
           readOnly: true
@@ -61802,9 +62597,8 @@ components:
           format: uuid
         tax_year:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
         claimed_amount:
           type: string
           format: decimal
@@ -61987,9 +62781,8 @@ components:
           nullable: true
         notice_period_weeks:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
           nullable: true
         created_at:
           type: string
@@ -62721,9 +63514,8 @@ components:
           format: time
         required_minutes:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         core_start:
           type: string
           format: time
@@ -62924,9 +63716,8 @@ components:
           maxLength: 50
         level:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
           nullable: true
         description:
           type: string
@@ -63525,9 +64316,8 @@ components:
         statutory_profile_metadata: {}
         fiscal_year_start_month:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
         is_configured:
           type: boolean
         configured_by:
@@ -64063,9 +64853,8 @@ components:
           format: date-time
         duration_minutes:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         interview_type:
           type: string
           maxLength: 100
@@ -64409,9 +65198,8 @@ components:
           x-spec-enum-id: dd6ed05aecdfa2b3
         openings:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         status:
           enum:
           - DRAFT
@@ -64899,9 +65687,8 @@ components:
           format: uuid
         year:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
         opening_balance:
           type: string
           format: decimal
@@ -64983,9 +65770,8 @@ components:
           pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
         min_service_days:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         max_consecutive_days:
           type: string
           format: decimal
@@ -65227,6 +66013,110 @@ components:
       - journal_entry_id
       - journal_number
       - running_balance
+    LifecycleTaskTemplate:
+      type: object
+      description: Runs model validation so domain invariants also protect non-form
+        API writes.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        process:
+          enum:
+          - ONBOARDING
+          - OFFBOARDING
+          type: string
+          description: |-
+            * `ONBOARDING` - Onboarding
+            * `OFFBOARDING` - Offboarding
+          x-spec-enum-id: 6d857b4db867e12e
+        title:
+          type: string
+          maxLength: 150
+        description:
+          type: string
+          maxLength: 2000
+        category:
+          enum:
+          - DOCUMENTS
+          - IT_ACCESS
+          - EQUIPMENT
+          - POLICY
+          - ORIENTATION
+          - PROBATION
+          - HANDOVER
+          - ASSET_RETURN
+          - CLEARANCE
+          - EXIT_INTERVIEW
+          - ACCESS_REVOCATION
+          - FINAL_PAY
+          - OTHER
+          type: string
+          description: |-
+            * `DOCUMENTS` - Documents & contract
+            * `IT_ACCESS` - IT access
+            * `EQUIPMENT` - Equipment
+            * `POLICY` - Policy acknowledgement
+            * `ORIENTATION` - Orientation
+            * `PROBATION` - Probation
+            * `HANDOVER` - Handover
+            * `ASSET_RETURN` - Asset return
+            * `CLEARANCE` - Clearance
+            * `EXIT_INTERVIEW` - Exit interview
+            * `ACCESS_REVOCATION` - Access revocation
+            * `FINAL_PAY` - Final pay
+            * `OTHER` - Other
+          x-spec-enum-id: abb641a48f10c4b2
+        category_label:
+          type: string
+          readOnly: true
+        owner:
+          enum:
+          - HR
+          - MANAGER
+          - IT
+          - FINANCE
+          - EMPLOYEE
+          type: string
+          description: |-
+            * `HR` - HR
+            * `MANAGER` - Line manager
+            * `IT` - IT
+            * `FINANCE` - Finance
+            * `EMPLOYEE` - Employee
+          x-spec-enum-id: 37c5df92674556f8
+        owner_label:
+          type: string
+          readOnly: true
+        due_offset_days:
+          type: integer
+          maximum: 32767
+          minimum: -32768
+        is_required:
+          type: boolean
+        is_active:
+          type: boolean
+        sort_order:
+          type: integer
+          maximum: 32767
+          minimum: 0
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - category_label
+      - created_at
+      - id
+      - owner_label
+      - process
+      - title
+      - updated_at
     LocaleCatalogues:
       type: object
       properties:
@@ -65683,9 +66573,8 @@ components:
           maxLength: 3
         contract_length_months:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
           nullable: true
         working_pattern:
           enum:
@@ -67356,6 +68245,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/LeaveType'
+    PaginatedLifecycleTaskTemplateList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/LifecycleTaskTemplate'
     PaginatedLocationList:
       type: object
       required:
@@ -68786,9 +69698,8 @@ components:
           format: uuid
         order:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
         name:
           type: string
           maxLength: 150
@@ -68815,9 +69726,8 @@ components:
           nullable: true
         due_after_hours:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
           nullable: true
         created_at:
           type: string
@@ -69099,9 +70009,8 @@ components:
           maxLength: 200
         years_experience:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
           nullable: true
         highest_qualification:
           enum:
@@ -69134,9 +70043,8 @@ components:
           maxLength: 2000
         notice_period_weeks:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
           nullable: true
         created_at:
           type: string
@@ -69162,9 +70070,8 @@ components:
           type: string
         sort_order:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
         is_active:
           type: boolean
           readOnly: true
@@ -69358,17 +70265,15 @@ components:
         employment_types: {}
         validity_months:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
           nullable: true
         is_mandatory:
           type: boolean
         sort_order:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
         is_active:
           type: boolean
           readOnly: true
@@ -69685,9 +70590,8 @@ components:
           nullable: true
         notice_period_weeks:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
           nullable: true
         created_at:
           type: string
@@ -70019,9 +70923,8 @@ components:
           format: time
         required_minutes:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         core_start:
           type: string
           format: time
@@ -70118,9 +71021,8 @@ components:
           maxLength: 50
         level:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
           nullable: true
         description:
           type: string
@@ -70175,9 +71077,8 @@ components:
         statutory_profile_metadata: {}
         fiscal_year_start_month:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
         is_configured:
           type: boolean
         configured_by:
@@ -70394,9 +71295,8 @@ components:
           format: date-time
         duration_minutes:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         interview_type:
           type: string
           maxLength: 100
@@ -70654,9 +71554,8 @@ components:
           x-spec-enum-id: dd6ed05aecdfa2b3
         openings:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         status:
           enum:
           - DRAFT
@@ -70925,9 +71824,8 @@ components:
           format: uuid
         year:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
         opening_balance:
           type: string
           format: decimal
@@ -71000,9 +71898,8 @@ components:
           pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
         min_service_days:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         max_consecutive_days:
           type: string
           format: decimal
@@ -71177,6 +72074,102 @@ components:
           type: boolean
         is_active:
           type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedLifecycleTaskTemplate:
+      type: object
+      description: Runs model validation so domain invariants also protect non-form
+        API writes.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        process:
+          enum:
+          - ONBOARDING
+          - OFFBOARDING
+          type: string
+          description: |-
+            * `ONBOARDING` - Onboarding
+            * `OFFBOARDING` - Offboarding
+          x-spec-enum-id: 6d857b4db867e12e
+        title:
+          type: string
+          maxLength: 150
+        description:
+          type: string
+          maxLength: 2000
+        category:
+          enum:
+          - DOCUMENTS
+          - IT_ACCESS
+          - EQUIPMENT
+          - POLICY
+          - ORIENTATION
+          - PROBATION
+          - HANDOVER
+          - ASSET_RETURN
+          - CLEARANCE
+          - EXIT_INTERVIEW
+          - ACCESS_REVOCATION
+          - FINAL_PAY
+          - OTHER
+          type: string
+          description: |-
+            * `DOCUMENTS` - Documents & contract
+            * `IT_ACCESS` - IT access
+            * `EQUIPMENT` - Equipment
+            * `POLICY` - Policy acknowledgement
+            * `ORIENTATION` - Orientation
+            * `PROBATION` - Probation
+            * `HANDOVER` - Handover
+            * `ASSET_RETURN` - Asset return
+            * `CLEARANCE` - Clearance
+            * `EXIT_INTERVIEW` - Exit interview
+            * `ACCESS_REVOCATION` - Access revocation
+            * `FINAL_PAY` - Final pay
+            * `OTHER` - Other
+          x-spec-enum-id: abb641a48f10c4b2
+        category_label:
+          type: string
+          readOnly: true
+        owner:
+          enum:
+          - HR
+          - MANAGER
+          - IT
+          - FINANCE
+          - EMPLOYEE
+          type: string
+          description: |-
+            * `HR` - HR
+            * `MANAGER` - Line manager
+            * `IT` - IT
+            * `FINANCE` - Finance
+            * `EMPLOYEE` - Employee
+          x-spec-enum-id: 37c5df92674556f8
+        owner_label:
+          type: string
+          readOnly: true
+        due_offset_days:
+          type: integer
+          maximum: 32767
+          minimum: -32768
+        is_required:
+          type: boolean
+        is_active:
+          type: boolean
+        sort_order:
+          type: integer
+          maximum: 32767
+          minimum: 0
         created_at:
           type: string
           format: date-time
@@ -71396,9 +72389,8 @@ components:
           maxLength: 3
         contract_length_months:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
           nullable: true
         working_pattern:
           enum:
@@ -71640,9 +72632,8 @@ components:
           maxLength: 100
         sequence:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
         is_terminal:
           type: boolean
         is_active:
@@ -71813,9 +72804,8 @@ components:
           format: uuid
         sequence:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
         shift_pattern:
           type: string
           format: uuid
@@ -71826,9 +72816,8 @@ components:
           nullable: true
         duration_days:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
         created_at:
           type: string
           format: date-time
@@ -71895,9 +72884,8 @@ components:
           nullable: true
         sequence:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         is_required:
           type: boolean
         created_at:
@@ -72020,14 +73008,12 @@ components:
           type: boolean
         break_minutes:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         grace_period_minutes:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         scheduled_minutes:
           type: integer
           readOnly: true
@@ -72058,9 +73044,8 @@ components:
           maxLength: 50
         cycle_length_days:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
         is_active:
           type: boolean
         created_at:
@@ -72085,9 +73070,8 @@ components:
           format: uuid
         day_index:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
         shift:
           type: string
           format: uuid
@@ -72162,9 +73146,8 @@ components:
           nullable: true
         certificate_validity_months:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
           nullable: true
         is_mandatory:
           type: boolean
@@ -74061,9 +75044,8 @@ components:
           maxLength: 100
         sequence:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
         is_terminal:
           type: boolean
         is_active:
@@ -74378,9 +75360,8 @@ components:
           format: uuid
         sequence:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
         shift_pattern:
           type: string
           format: uuid
@@ -74391,9 +75372,8 @@ components:
           nullable: true
         duration_days:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
         created_at:
           type: string
           format: date-time
@@ -74472,9 +75452,8 @@ components:
           nullable: true
         sequence:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         is_required:
           type: boolean
         created_at:
@@ -74719,14 +75698,12 @@ components:
           type: boolean
         break_minutes:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         grace_period_minutes:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         scheduled_minutes:
           type: integer
           readOnly: true
@@ -74765,9 +75742,8 @@ components:
           maxLength: 50
         cycle_length_days:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
         is_active:
           type: boolean
         created_at:
@@ -74798,9 +75774,8 @@ components:
           format: uuid
         day_index:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
         shift:
           type: string
           format: uuid
@@ -74936,9 +75911,8 @@ components:
           format: uuid
         sequence:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         lower_bound:
           type: string
           format: decimal
@@ -75053,9 +76027,8 @@ components:
           maxLength: 100
         sequence:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
         tax_code:
           type: string
           format: uuid
@@ -75101,9 +76074,8 @@ components:
           nullable: true
         max_count:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
           nullable: true
         percentage:
           type: string
@@ -75182,9 +76154,8 @@ components:
           x-spec-enum-id: 1bea2fe28666e683
         sequence:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 2147483647
           minimum: 0
-          format: int64
         active:
           type: boolean
         created_at:
@@ -75270,9 +76241,8 @@ components:
           nullable: true
         certificate_validity_months:
           type: integer
-          maximum: 9223372036854775807
+          maximum: 32767
           minimum: 0
-          format: int64
           nullable: true
         is_mandatory:
           type: boolean

@@ -10,14 +10,16 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
 from django.http import FileResponse
+from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 
 from apps.employees.filters import EmergencyContactFilter, EmployeeFilter
-from apps.employees.models import EmergencyContact, Employee, EmployeeOffboarding, EmployeeOnboarding, Employment
+from apps.employees.lifecycle import add_lifecycle_task, delete_lifecycle_task, install_standard_checklists, update_lifecycle_task
+from apps.employees.models import EmergencyContact, Employee, EmployeeOffboarding, EmployeeOnboarding, Employment, LifecycleProcess, LifecycleTask, LifecycleTaskTemplate
 from apps.employees.selectors import employment_history_for_employee
-from apps.employees.serializers import EmergencyContactSerializer, EmployeeOffboardingSerializer, EmployeeOffboardingStartSerializer, EmployeeOnboardingSerializer, EmployeeRehireSerializer, EmployeeSelfServiceInvitationSerializer, NewEmployeeSelfServiceInvitationSerializer, EmployeeSerializer, EmploymentSerializer, SelfServiceProfileSerializer
+from apps.employees.serializers import EmergencyContactSerializer, EmployeeOffboardingSerializer, EmployeeOffboardingStartSerializer, EmployeeOnboardingSerializer, EmployeeRehireSerializer, LifecycleTaskCreateSerializer, LifecycleTaskSerializer, LifecycleTaskTemplateSerializer, LifecycleTaskUpdateSerializer, EmployeeSelfServiceInvitationSerializer, NewEmployeeSelfServiceInvitationSerializer, EmployeeSerializer, EmploymentSerializer, SelfServiceProfileSerializer
 from apps.employees.services import complete_employee_offboarding, complete_employee_onboarding, ensure_not_self_hr_mutation, initiate_employee_offboarding, rehire_employee, start_employee_onboarding
 from apps.accounts.emails import send_employee_self_service_invitation
 from apps.institutions.models import Role
@@ -258,7 +260,7 @@ class EmployeeViewSet(TenantModelViewSet):
             return "home.view"
         if self.action in ("employment_history", "lifecycle"):
             return "employment.view"
-        if self.action in ("onboarding_start", "onboarding_complete", "offboarding_start", "offboarding_complete", "rehire", "invite_self_service", "invite_new_self_service"):
+        if self.action in ("onboarding_start", "onboarding_complete", "offboarding_start", "offboarding_complete", "lifecycle_task_add", "lifecycle_task_detail", "rehire", "invite_self_service", "invite_new_self_service"):
             return "employee.update"
         return super().get_required_permission()
 
@@ -366,16 +368,43 @@ class EmployeeViewSet(TenantModelViewSet):
     def lifecycle(self, request, pk=None):
         """Returns the latest onboarding and offboarding records for an employee."""
         employee = self.get_object()
-        onboarding = EmployeeOnboarding.objects.for_institution(request.institution).filter(
-            employee=employee
-        ).order_by("-created_at").first()
-        offboarding = EmployeeOffboarding.objects.for_institution(request.institution).filter(
-            employee=employee
-        ).order_by("-created_at").first()
+        onboarding = self._latest_lifecycle_record(EmployeeOnboarding, employee)
+        offboarding = self._latest_lifecycle_record(EmployeeOffboarding, employee)
         return Response({
             "onboarding": EmployeeOnboardingSerializer(onboarding).data if onboarding else None,
             "offboarding": EmployeeOffboardingSerializer(offboarding).data if offboarding else None,
         })
+
+    def _latest_lifecycle_record(self, model, employee):
+        return model.objects.for_institution(self.request.institution).filter(employee=employee).prefetch_related(
+            Prefetch("tasks", queryset=LifecycleTask.objects.select_related("completed_by"))
+        ).order_by("-created_at").first()
+
+    @action(detail=True, methods=("post",), url_path="lifecycle-tasks")
+    def lifecycle_task_add(self, request, pk=None):
+        """Adds an ad-hoc item to the employee's current onboarding or offboarding checklist."""
+        payload = LifecycleTaskCreateSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        values = dict(payload.validated_data)
+        employee = self.get_object(); ensure_not_self_hr_mutation(actor=request.user, employee=employee)
+        model = EmployeeOnboarding if values.pop("process") == LifecycleProcess.ONBOARDING else EmployeeOffboarding
+        record = self._latest_lifecycle_record(model, employee)
+        if record is None:
+            raise ValidationError({"process": f"Start {model._meta.verbose_name.replace('employee ', '')} before adding checklist items."})
+        task = call_validated_service(add_lifecycle_task, institution=request.institution, record=record, actor=request.user, **values)
+        return Response(LifecycleTaskSerializer(task).data, status=201)
+
+    @action(detail=True, methods=("patch", "delete"), url_path=r"lifecycle-tasks/(?P<task_id>[0-9a-f-]+)")
+    def lifecycle_task_detail(self, request, pk=None, task_id=None):
+        employee = self.get_object(); ensure_not_self_hr_mutation(actor=request.user, employee=employee)
+        task = get_object_or_404(LifecycleTask.objects.for_institution(request.institution), pk=task_id, employee=employee)
+        if request.method == "DELETE":
+            call_validated_service(delete_lifecycle_task, institution=request.institution, task=task, actor=request.user)
+            return Response(status=204)
+        payload = LifecycleTaskUpdateSerializer(data=request.data, partial=True)
+        payload.is_valid(raise_exception=True)
+        task = call_validated_service(update_lifecycle_task, institution=request.institution, task=task, actor=request.user, **payload.validated_data)
+        return Response(LifecycleTaskSerializer(task).data)
 
     @action(detail=True, methods=("post",), url_path="onboarding/start")
     def onboarding_start(self, request, pk=None):
@@ -463,3 +492,37 @@ class EmergencyContactViewSet(TenantModelViewSet):
     def get_queryset(self):
         # Emergency contacts are personal data: team leads see only their own.
         return scope_to_employees(super().get_queryset().select_related("employee"), self.request, allow_team=False)
+
+
+class LifecycleTaskTemplateViewSet(TenantModelViewSet):
+    """The institution's standard onboarding and offboarding checklist items."""
+
+    model = LifecycleTaskTemplate
+    serializer_class = LifecycleTaskTemplateSerializer
+    filterset_fields = ("process", "is_active")
+    search_fields = ("title",)
+    ordering_fields = ("process", "sort_order", "title", "created_at")
+    ordering = ("process", "sort_order", "title")
+
+    def get_required_permission(self):
+        if self.action in ("list", "retrieve"):
+            return "employment.view"
+        return "employee.update"
+
+    def perform_create(self, serializer):
+        template = serializer.save(institution=self.request.institution)
+        record_audit_event(actor=self.request.user, institution=self.request.institution, entity=template, action="employee.lifecycle_template.created", metadata={"title": template.title, "process": template.process})
+
+    def perform_update(self, serializer):
+        template = serializer.save()
+        record_audit_event(actor=self.request.user, institution=self.request.institution, entity=template, action="employee.lifecycle_template.updated", metadata={"title": template.title, "process": template.process})
+
+    def perform_destroy(self, instance):
+        record_audit_event(actor=self.request.user, institution=self.request.institution, entity=instance, action="employee.lifecycle_template.deleted", metadata={"title": instance.title, "process": instance.process})
+        instance.delete()
+
+    @action(detail=False, methods=("post",), url_path="install-standard")
+    def install_standard(self, request):
+        """Adds the standard checklist for each process that has no items yet."""
+        created = install_standard_checklists(institution=request.institution, actor=request.user)
+        return Response({"created": created})

@@ -48,6 +48,8 @@ from apps.compensation.models import EmployeeCompensation
 from apps.compensation.services import change_current_compensation
 from apps.documents.models import EMPLOYEE_ENTITY_TYPE, Document, DocumentRequirement, DocumentRequirementWaiver
 from apps.employees.models import EmergencyContact, Employee, EmployeeOffboarding, EmployeeOnboarding, Employment
+from apps.employees.lifecycle import generate_lifecycle_tasks, install_standard_checklists, update_lifecycle_task
+from apps.employees.models import LifecycleTask
 from apps.employees.services import complete_employee_onboarding, create_employment, initiate_employee_offboarding, save_emergency_contact, start_employee_onboarding
 from apps.institutions.management.commands.seed_ergonx_demo import DEFAULT_DEMO_PASSWORD, DEMO_ADMIN_EMAIL, DEMO_EMAIL_DOMAIN, DEMO_INSTITUTION_CODE, DEMO_SEED_REFUSAL, EMPLOYEES, demo_seed_allowed
 from apps.institutions.models import Institution, InstitutionMembership
@@ -176,6 +178,7 @@ class Command(BaseCommand):
             ("october hires", self._hires),
             ("emergency contacts", self._emergency_contacts),
             ("offboarding", self._offboarding),
+            ("lifecycle checklists", self._lifecycle_checklists),
             ("tax relief", self._tax_relief),
             ("performance", self._performance),
             ("training", self._training),
@@ -351,6 +354,31 @@ class Command(BaseCommand):
                 continue
             initiate_employee_offboarding(institution=self.institution, employee=employee, actor=self.hr, last_working_day=last_day, reason=reason, notes=notes)
             self._count("offboarding")
+
+    # ------------------------------------------------------ lifecycle checklists
+
+    def _lifecycle_checklists(self):
+        """Standard checklists, copied onto the open onboarding and offboarding records.
+
+        Items already past due are ticked off, except onboarding documents, which
+        matches the depot hires still waiting on SSNIT registration.
+        """
+        created = install_standard_checklists(institution=self.institution, actor=self.admin)
+        if any(created.values()):
+            self._count("lifecycle checklists", sum(created.values()))
+        open_statuses = ("IN_PROGRESS", "BLOCKED")
+        records = [
+            *EmployeeOnboarding.objects.for_institution(self.institution).filter(status__in=open_statuses).select_related("employee"),
+            *EmployeeOffboarding.objects.for_institution(self.institution).filter(status__in=open_statuses).select_related("employee"),
+        ]
+        for record in records:
+            tasks = generate_lifecycle_tasks(record)
+            for task in tasks:
+                waiting = isinstance(record, EmployeeOnboarding) and task.category == "DOCUMENTS"
+                if task.due_date and task.due_date < self.today and not waiting:
+                    update_lifecycle_task(institution=self.institution, task=task, actor=self.hr, status=LifecycleTask.Status.DONE)
+            if tasks:
+                self._count("lifecycle checklists", len(tasks))
 
     # ----------------------------------------------------------------- tax relief
 

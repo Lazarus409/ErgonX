@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { BarChart3, CalendarCheck, CalendarX, ChevronLeft, ChevronRight, Clock3, LogIn, LogOut, MapPin, PencilLine } from "lucide-react";
+import { ArrowLeftRight, BarChart3, CalendarCheck, CalendarX, ChevronLeft, ChevronRight, Clock3, LogIn, LogOut, MapPin, PencilLine } from "lucide-react";
 
 import ClockSiteBadge from "@/components/attendance/ClockSiteBadge";
 import { Badge } from "@/components/ui/Badge";
-import { Button } from "@/components/ui/Button";
+import { Button, ButtonLink } from "@/components/ui/Button";
 import { MetricCard } from "@/components/ui/Card";
 import EmptyState from "@/components/ui/EmptyState";
 import ErrorState from "@/components/ui/ErrorState";
@@ -110,9 +110,12 @@ export default function MyAttendancePage() {
         icon={Clock3}
         accent="attendance"
         actions={employee && (
+          <span className="flex flex-wrap items-center gap-2">
+          <ButtonLink href="/me/attendance/swaps" variant="secondary" size="lg" leadingIcon={<ArrowLeftRight className="h-4 w-4" />}>Shift swaps</ButtonLink>
           <Button size="lg" variant={clockedIn ? "danger" : "primary"} onClick={() => void clock()} disabled={actionRunning || clockedOut} leadingIcon={clockedIn ? <LogOut className="h-4 w-4" /> : <LogIn className="h-4 w-4" />}>
             {actionRunning ? "Working…" : clockedOut ? "Clocked out for today" : clockedIn ? "Clock out" : "Clock in"}
           </Button>
+          </span>
         )}
       />
       {checksLocation && policy && !clockedOut && (

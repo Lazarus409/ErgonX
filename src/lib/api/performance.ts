@@ -147,3 +147,92 @@ export function releaseReview(id: string): Promise<PerformanceReview> {
 export function cancelReview(id: string, reason: string): Promise<PerformanceReview> {
   return apiPost<PerformanceReview, { reason: string }>(`/performance-reviews/${id}/cancel/`, { reason });
 }
+
+/* Goals (OKRs) ---------------------------------------------------------- */
+
+export type GoalLevel = "COMPANY" | "DEPARTMENT" | "INDIVIDUAL";
+export type GoalStatus = "DRAFT" | "ACTIVE" | "COMPLETED" | "CANCELLED";
+export type GoalHealth = "ON_TRACK" | "AT_RISK" | "OFF_TRACK";
+
+export const GOAL_HEALTH_LABELS: Record<GoalHealth, string> = { ON_TRACK: "On track", AT_RISK: "At risk", OFF_TRACK: "Off track" };
+export const GOAL_HEALTH_TONES: Record<GoalHealth, "success" | "warning" | "danger"> = { ON_TRACK: "success", AT_RISK: "warning", OFF_TRACK: "danger" };
+export const GOAL_STATUS_TONES: Record<GoalStatus, "neutral" | "info" | "success" | "warning"> = { DRAFT: "neutral", ACTIVE: "info", COMPLETED: "success", CANCELLED: "warning" };
+
+export interface KeyResult {
+  id?: string;
+  title: string;
+  unit: string;
+  start_value: string | number;
+  target_value: string | number;
+  current_value?: string | number;
+  progress?: number;
+}
+
+export interface GoalCheckIn { id: string; author_name: string; health: GoalHealth; health_label: string; progress: number; note: string; created_at: string }
+
+export interface Goal {
+  id: string;
+  level: GoalLevel;
+  level_label: string;
+  employee: string | null;
+  department: string | null;
+  parent: string | null;
+  parent_title: string;
+  owner_name: string;
+  title: string;
+  description: string;
+  period_start: string;
+  period_end: string;
+  status: GoalStatus;
+  status_label: string;
+  health: GoalHealth;
+  health_label: string;
+  progress: number;
+  key_results: KeyResult[];
+  children_count: number;
+  agreed_by_name: string;
+  agreed_at: string | null;
+  last_check_in_at: string | null;
+  viewer: { can_edit: boolean; can_manage: boolean; can_check_in: boolean; is_owner: boolean };
+  created_at: string;
+  updated_at: string;
+  /** Detail only. */
+  check_ins?: GoalCheckIn[];
+  children?: { id: string; title: string; level: GoalLevel; owner_name: string; progress: number; health: GoalHealth; status: GoalStatus }[];
+}
+
+export interface GoalPayload {
+  level: GoalLevel;
+  employee?: string | null;
+  department?: string | null;
+  parent?: string | null;
+  title: string;
+  description: string;
+  period_start: string;
+  period_end: string;
+  key_results: KeyResult[];
+}
+
+export function listGoals(params: ListParams & { mine?: boolean; team?: boolean; level?: GoalLevel; status?: GoalStatus } = {}): Promise<PaginatedData<Goal>> {
+  return apiGetList<Goal>("/goals/", { page_size: MAX_PAGE_SIZE, ...params });
+}
+
+export function getGoal(id: string): Promise<Goal> {
+  return apiGet<Goal>(`/goals/${id}/`);
+}
+
+export function createGoal(payload: GoalPayload): Promise<Goal> {
+  return apiPost<Goal, GoalPayload>("/goals/", payload);
+}
+
+export function updateGoal(id: string, payload: Partial<GoalPayload>): Promise<Goal> {
+  return apiPatch<Goal, Partial<GoalPayload>>(`/goals/${id}/`, payload);
+}
+
+export function goalAction(id: string, action: "activate" | "complete" | "cancel"): Promise<Goal> {
+  return apiPost<Goal>(`/goals/${id}/${action}/`);
+}
+
+export function checkInGoal(id: string, payload: { health: GoalHealth; note?: string; values?: Record<string, string>; progress?: number }): Promise<Goal> {
+  return apiPost<Goal>(`/goals/${id}/check-in/`, payload);
+}

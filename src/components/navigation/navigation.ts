@@ -98,6 +98,7 @@ export const navigation: NavigationItem[] = [
   // Ordered by how often people need each area: daily work first, oversight and setup last.
   { label: "Home", href: "/", icon: House, permission: "home.view" },
   { label: "My Work", href: "/my-work", icon: ListTodo, permission: "home.view" },
+  { label: "Goals", href: "/goals", icon: Target, permission: "home.view" },
   { label: "Executive Dashboard", href: "/dashboard", icon: LayoutDashboard, permission: "dashboard.executive.view" },
   {
     label: "My Department / Functional Area",

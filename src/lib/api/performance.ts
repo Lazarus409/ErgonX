@@ -74,7 +74,11 @@ export interface PerformanceReview extends ReviewListItem {
   hr_comment: string | null;
   signed_off_by_name: string | null;
   ratings: ReviewRating[];
-  viewer: { is_employee: boolean; is_reviewer: boolean; is_hr: boolean; can_self_assess: boolean; can_manager_review: boolean; can_sign_off: boolean; can_manage: boolean };
+  /** HR's calibrated rating, when it differs from the manager's; final_rating is what counts. */
+  calibrated_rating: number | null;
+  calibration_note: string;
+  final_rating: number | null;
+  viewer: { is_employee: boolean; is_reviewer: boolean; is_hr: boolean; can_self_assess: boolean; can_manager_review: boolean; can_sign_off: boolean; can_manage: boolean; can_calibrate: boolean; can_request_feedback: boolean };
 }
 
 export interface CycleSummary {
@@ -235,4 +239,71 @@ export function goalAction(id: string, action: "activate" | "complete" | "cancel
 
 export function checkInGoal(id: string, payload: { health: GoalHealth; note?: string; values?: Record<string, string>; progress?: number }): Promise<Goal> {
   return apiPost<Goal>(`/goals/${id}/check-in/`, payload);
+}
+
+/* 360 feedback and calibration -------------------------------------------- */
+
+export type FeedbackRelationship = "PEER" | "DIRECT_REPORT" | "MANAGER" | "OTHER";
+export const FEEDBACK_RELATIONSHIP_LABELS: Record<FeedbackRelationship, string> = { PEER: "Peer", DIRECT_REPORT: "Direct report", MANAGER: "Manager", OTHER: "Other colleague" };
+
+export interface FeedbackSummary {
+  requested: number;
+  submitted: number;
+  declined: number;
+  min_responses: number;
+  /** False until enough colleagues have answered for the summary to stay anonymous (HR always sees it). */
+  visible: boolean;
+  competencies: { competency: string; average: number; responses: number }[];
+  comments: { strengths: string; improvements: string; name?: string; relationship?: string }[];
+  /** HR only. */
+  respondents: { id: string; name: string; relationship: string; status: "PENDING" | "SUBMITTED" | "DECLINED" }[];
+}
+
+export interface FeedbackRequestItem {
+  id: string;
+  employee_name: string;
+  cycle_name: string;
+  relationship: FeedbackRelationship;
+  relationship_label: string;
+  status: "PENDING" | "SUBMITTED" | "DECLINED";
+  status_label: string;
+  strengths: string;
+  improvements: string;
+  submitted_at: string | null;
+  competencies: { id: string; name: string; description: string; rating: number | null }[];
+  open: boolean;
+  created_at: string;
+}
+
+export interface CalibrationBoard {
+  reviews: { id: string; employee: string; department: string; reviewer: string; status: ReviewStatus; manager_rating: number | null; calibrated_rating: number | null; final_rating: number | null; calibration_note: string }[];
+  distribution: { rating: number; manager: number; final: number }[];
+}
+
+export function getReviewFeedback(reviewId: string): Promise<FeedbackSummary> {
+  return apiGet<FeedbackSummary>(`/performance-reviews/${reviewId}/feedback/`);
+}
+
+export function requestReviewFeedback(reviewId: string, respondents: string[], relationship: FeedbackRelationship): Promise<FeedbackSummary> {
+  return apiPost<FeedbackSummary>(`/performance-reviews/${reviewId}/feedback/`, { respondents, relationship });
+}
+
+export function listMyFeedbackRequests(): Promise<PaginatedData<FeedbackRequestItem>> {
+  return apiGetList<FeedbackRequestItem>("/feedback-requests/", { page_size: MAX_PAGE_SIZE });
+}
+
+export function submitFeedback(id: string, payload: { ratings: Record<string, number>; strengths: string; improvements: string }): Promise<FeedbackRequestItem> {
+  return apiPost<FeedbackRequestItem>(`/feedback-requests/${id}/submit/`, payload);
+}
+
+export function declineFeedback(id: string): Promise<FeedbackRequestItem> {
+  return apiPost<FeedbackRequestItem>(`/feedback-requests/${id}/decline/`);
+}
+
+export function calibrateReview(reviewId: string, rating: number | null, note: string): Promise<PerformanceReview> {
+  return apiPost<PerformanceReview>(`/performance-reviews/${reviewId}/calibrate/`, { rating, note });
+}
+
+export function getCalibrationBoard(cycleId: string): Promise<CalibrationBoard> {
+  return apiGet<CalibrationBoard>(`/review-cycles/${cycleId}/calibration/`);
 }

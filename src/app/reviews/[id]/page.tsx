@@ -9,9 +9,10 @@ import BackNavigation from "@/components/ui/BackNavigation";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { Field, Textarea } from "@/components/ui/Field";
+import { Field, Select, Textarea } from "@/components/ui/Field";
 import { Dialog } from "@/components/ui/Overlay";
 import PageHeader from "@/components/ui/PageHeader";
+import ReviewFeedbackCard from "@/components/performance/ReviewFeedbackCard";
 import { getApiErrorMessage, performanceApi } from "@/lib/api";
 import { RATING_LABELS, REVIEW_STATUS_LABELS, REVIEW_STATUS_TONES, type PerformanceReview, type RatingInput } from "@/lib/api/performance";
 import { cx } from "@/lib/cx";
@@ -63,6 +64,8 @@ function ReviewBody({ review, reload }: { review: PerformanceReview; reload: () 
   const [actionError, setActionError] = useState("");
   const [hrDialog, setHrDialog] = useState<"sign-off" | "return" | null>(null);
   const [hrComment, setHrComment] = useState("");
+  const [calibratedRating, setCalibratedRating] = useState<string>(String(review.calibrated_rating ?? review.overall_rating ?? ""));
+  const [calibrationNote, setCalibrationNote] = useState(review.calibration_note ?? "");
 
   const run = async (work: () => Promise<PerformanceReview>, done: string) => {
     setSaving(true);
@@ -160,11 +163,29 @@ function ReviewBody({ review, reload }: { review: PerformanceReview; reload: () 
             </div>
           ) : (
             <div className="space-y-3">
-              <p className="text-support">Overall: <Score value={review.overall_rating} /></p>
+              <p className="text-support">Overall: <Score value={review.overall_rating} />{review.final_rating && review.final_rating !== review.overall_rating && <> · Final after calibration: <Score value={review.final_rating} /></>}</p>
               {review.manager_summary && <p className="whitespace-pre-line text-support text-ink">{review.manager_summary}</p>}
               {review.development_plan && <div><p className="text-caption font-semibold uppercase tracking-[0.06em] text-ink-muted">Development plan</p><p className="whitespace-pre-line text-support text-ink">{review.development_plan}</p></div>}
             </div>
           )}
+        </Card>
+      )}
+
+      <ReviewFeedbackCard reviewId={id} employeeId={review.employee} canRequest={viewer.can_request_feedback} />
+
+      {viewer.can_calibrate && (
+        <Card title="Calibration" description="Adjust the final rating to keep ratings consistent across teams. It replaces the manager's rating when you sign off; your reason stays with HR." icon={Star} accent="hr">
+          <div className="grid gap-4 sm:grid-cols-[12rem_minmax(0,1fr)]">
+            <Field label="Final rating">
+              <Select value={calibratedRating} onChange={(event) => setCalibratedRating(event.target.value)}>
+                {[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value} · {RATING_LABELS[value]}{value === review.overall_rating ? " (manager)" : ""}</option>)}
+              </Select>
+            </Field>
+            <Field label="Reason" required={Number(calibratedRating) !== review.overall_rating} optional={Number(calibratedRating) === review.overall_rating}>
+              <Textarea rows={2} value={calibrationNote} onChange={(event) => setCalibrationNote(event.target.value)} placeholder="e.g. Brought in line with the department's evidence and peers' ratings" />
+            </Field>
+          </div>
+          <div className="mt-3 flex justify-end"><Button variant="secondary" loading={saving} onClick={() => void run(() => performanceApi.calibrateReview(id, Number(calibratedRating) || null, calibrationNote), Number(calibratedRating) === review.overall_rating ? "Calibration cleared; the manager's rating stands." : "Calibrated rating saved.")}>Save calibration</Button></div>
         </Card>
       )}
 

@@ -168,6 +168,11 @@ export default function RequisitionDetailPage() {
           )}
           {editable && <ButtonLink href={`/recruitment/job-postings/${id}/edit`} size="lg" variant="secondary" leadingIcon={<Pencil className="h-5 w-5" />}>Edit</ButtonLink>}
           {publishable && <Button size="lg" leadingIcon={<Send className="h-5 w-5" />} onClick={() => setAction("publish")}>Publish</Button>}
+          {canUpdate && (posting.status === "OPEN" || posting.status === "APPROVED") && (
+            <Button size="lg" variant={posting.is_public ? "secondary" : "ghost"} onClick={() => void run(() => recruitmentApi.setJobPostingPublic(id, !posting.is_public))} title={posting.is_public ? "Listed on your public careers site" : "Only staff can see this posting"}>
+              {posting.is_public ? "On careers site · hide" : "Show on careers site"}
+            </Button>
+          )}
           {canUpdate && posting.status === "OPEN" && <Button size="lg" variant="secondary" leadingIcon={<X className="h-5 w-5" />} onClick={() => setAction("close")}>Close</Button>}
         </div>
       </header>

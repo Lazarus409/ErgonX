@@ -44541,6 +44541,702 @@ paths:
       - module_disabled
       - permission_denied
       - not_found
+  /api/v1/public/careers/{slug}/:
+    get:
+      operationId: public_careers_retrieve
+      description: Get careers site view.
+      summary: Get careers site view
+      parameters:
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - public
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - not_found
+  /api/v1/public/careers/{slug}/jobs/{job_id}/:
+    get:
+      operationId: public_careers_jobs_retrieve
+      description: Get careers job view.
+      summary: Get careers job view
+      parameters:
+      - in: path
+        name: job_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - public
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - not_found
+  /api/v1/public/careers/{slug}/jobs/{job_id}/apply/:
+    post:
+      operationId: public_careers_jobs_apply_create
+      description: Post careers apply view.
+      summary: Post careers apply view
+      parameters:
+      - in: path
+        name: job_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: slug
+        schema:
+          type: string
+        required: true
+      tags:
+      - public
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PublicApplication'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PublicApplication'
+        required: true
+      security:
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - not_found
+      - validation_error
+  /api/v1/public/careers/track/{token}/:
+    get:
+      operationId: public_careers_track_retrieve
+      description: Get tracking view.
+      summary: Get tracking view
+      parameters:
+      - in: path
+        name: token
+        schema:
+          type: string
+        required: true
+      tags:
+      - public
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - not_found
+  /api/v1/public/careers/track/{token}/documents/:
+    get:
+      operationId: public_careers_track_documents_retrieve
+      description: Get tracking documents view.
+      summary: Get tracking documents view
+      parameters:
+      - in: path
+        name: token
+        schema:
+          type: string
+        required: true
+      tags:
+      - public
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - not_found
+    post:
+      operationId: public_careers_track_documents_create
+      description: Post tracking documents view.
+      summary: Post tracking documents view
+      parameters:
+      - in: path
+        name: token
+        schema:
+          type: string
+        required: true
+      tags:
+      - public
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - not_found
+      - validation_error
+  /api/v1/public/careers/track/{token}/interviews/{interview_id}/:
+    get:
+      operationId: public_careers_track_interviews_retrieve
+      description: Get tracking interview view.
+      summary: Get tracking interview view
+      parameters:
+      - in: path
+        name: interview_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: token
+        schema:
+          type: string
+        required: true
+      tags:
+      - public
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - not_found
+    post:
+      operationId: public_careers_track_interviews_create
+      description: Post tracking interview view.
+      summary: Post tracking interview view
+      parameters:
+      - in: path
+        name: interview_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: token
+        schema:
+          type: string
+        required: true
+      tags:
+      - public
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - not_found
+      - validation_error
+  /api/v1/public/careers/track/{token}/withdraw/:
+    get:
+      operationId: public_careers_track_withdraw_retrieve
+      description: Get tracking withdraw view.
+      summary: Get tracking withdraw view
+      parameters:
+      - in: path
+        name: token
+        schema:
+          type: string
+        required: true
+      tags:
+      - public
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - not_found
+    post:
+      operationId: public_careers_track_withdraw_create
+      description: Post tracking withdraw view.
+      summary: Post tracking withdraw view
+      parameters:
+      - in: path
+        name: token
+        schema:
+          type: string
+        required: true
+      tags:
+      - public
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - not_found
+      - validation_error
   /api/v1/receipts/:
     get:
       operationId: receipts_list
@@ -47072,6 +47768,142 @@ paths:
       - tenant_mismatch
       - module_disabled
       - permission_denied
+  /api/v1/recruitment/careers-site/:
+    get:
+      operationId: recruitment_careers_site_retrieve
+      description: |-
+        HR's careers-site settings for the active institution.
+
+        Requires an authenticated user, an active institution context, the `RECRUITMENT` module enabled, the `job_posting.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: Get careers site settings view
+      tags:
+      - recruitment
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/CareersSiteSettings'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+    put:
+      operationId: recruitment_careers_site_update
+      description: |-
+        HR's careers-site settings for the active institution.
+
+        Requires an authenticated user, an active institution context, the `RECRUITMENT` module enabled, the `job_posting.update` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `validation_error`.
+      summary: Put careers site settings view
+      tags:
+      - recruitment
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CareersSiteSettings'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CareersSiteSettings'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CareersSiteSettings'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/CareersSiteSettings'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - validation_error
   /api/v1/recruitment/evaluations/:
     get:
       operationId: recruitment_evaluations_list
@@ -64343,6 +65175,26 @@ components:
           readOnly: true
         notes:
           type: string
+        source:
+          enum:
+          - INTERNAL
+          - CAREERS_SITE
+          type: string
+          description: |-
+            * `INTERNAL` - Added by HR
+            * `CAREERS_SITE` - Careers site
+          x-spec-enum-id: 8afcacbe08bbdd19
+          readOnly: true
+        cover_letter:
+          type: string
+          readOnly: true
+        applicant_details:
+          readOnly: true
+        consent_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
         created_at:
           type: string
           format: date-time
@@ -64352,14 +65204,18 @@ components:
           format: date-time
           readOnly: true
       required:
+      - applicant_details
       - applied_at
       - candidate
+      - consent_at
+      - cover_letter
       - created_at
       - current_stage
       - id
       - job_posting
       - rejected_at
       - rejection_reason
+      - source
       - status
       - updated_at
       - withdrawn_at
@@ -65718,6 +66574,31 @@ components:
       - interviewer
       - recommendation
       - score
+      - updated_at
+    CareersSiteSettings:
+      type: object
+      properties:
+        slug:
+          type: string
+          maxLength: 60
+          pattern: ^[-a-zA-Z0-9_]+$
+        is_enabled:
+          type: boolean
+        headline:
+          type: string
+          maxLength: 150
+        introduction:
+          type: string
+          maxLength: 3000
+        privacy_notice:
+          type: string
+          maxLength: 4000
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - slug
       - updated_at
     CashTransactionVoid:
       type: object
@@ -69934,6 +70815,8 @@ components:
         application_counts:
           type: string
           readOnly: true
+        is_public:
+          type: boolean
         created_at:
           type: string
           format: date-time
@@ -74369,6 +75252,26 @@ components:
           readOnly: true
         notes:
           type: string
+        source:
+          enum:
+          - INTERNAL
+          - CAREERS_SITE
+          type: string
+          description: |-
+            * `INTERNAL` - Added by HR
+            * `CAREERS_SITE` - Careers site
+          x-spec-enum-id: 8afcacbe08bbdd19
+          readOnly: true
+        cover_letter:
+          type: string
+          readOnly: true
+        applicant_details:
+          readOnly: true
+        consent_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
         created_at:
           type: string
           format: date-time
@@ -76579,6 +77482,8 @@ components:
         application_counts:
           type: string
           readOnly: true
+        is_public:
+          type: boolean
         created_at:
           type: string
           format: date-time
@@ -80243,6 +81148,78 @@ components:
           x-spec-enum-id: 0ffc5d7e9878ba58
       required:
       - priority
+    PublicApplication:
+      type: object
+      properties:
+        first_name:
+          type: string
+          maxLength: 100
+        last_name:
+          type: string
+          maxLength: 100
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        phone:
+          type: string
+          maxLength: 30
+        location:
+          type: string
+          maxLength: 150
+        linkedin_url:
+          oneOf:
+          - type: string
+            format: uri
+          - type: string
+            maxLength: 0
+        current_title:
+          type: string
+          maxLength: 200
+        current_employer:
+          type: string
+          maxLength: 200
+        years_experience:
+          type: integer
+          maximum: 60
+          minimum: 0
+          nullable: true
+        highest_qualification:
+          enum:
+          - SECONDARY
+          - DIPLOMA
+          - BACHELORS
+          - MASTERS
+          - DOCTORATE
+          - PROFESSIONAL
+          - OTHER
+          - ''
+          type: string
+          description: |-
+            * `SECONDARY` - Secondary school
+            * `DIPLOMA` - Diploma or certificate
+            * `BACHELORS` - Bachelor's degree
+            * `MASTERS` - Master's degree
+            * `DOCTORATE` - Doctorate
+            * `PROFESSIONAL` - Professional qualification
+            * `OTHER` - Other
+          x-spec-enum-id: 72326be0bb19c7a7
+        cover_letter:
+          type: string
+          maxLength: 6000
+        consent:
+          type: boolean
+        cv:
+          type: string
+          format: uri
+        website:
+          type: string
+      required:
+      - consent
+      - cv
+      - email
+      - first_name
+      - last_name
     RatingInput:
       type: object
       properties:

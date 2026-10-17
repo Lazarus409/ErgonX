@@ -285,6 +285,7 @@ class ApplicationViewSet(RecruitmentViewSet):
                 "created_at": application.created_at, "notes": application.notes, "rejection_reason": application.rejection_reason,
                 "current_stage": str(application.current_stage_id) if application.current_stage_id else None,
                 "current_stage_name": application.current_stage.name if application.current_stage else None,
+                "source": application.source, "cover_letter": application.cover_letter, "consent_at": application.consent_at,
             },
             "candidate": CandidateSerializer(candidate, context={"request": request}).data,
             "job": {

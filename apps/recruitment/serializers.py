@@ -59,7 +59,7 @@ class JobPostingSerializer(TenantRelationSerializer):
             "hiring_reason", "grade", "grade_name", "reports_to", "reports_to_title", "target_start_date", "salary_currency",
             "salary_min", "salary_max", "interview_plan", "responsibilities", "qualifications_essential", "qualifications_desirable",
             "submitted_by", "submitted_by_name", "submitted_at", "approved_by", "approved_by_name", "approved_at", "approval_note",
-            "application_counts", "created_at", "updated_at",
+            "application_counts", "is_public", "created_at", "updated_at",
         )
         read_only_fields = (
             "id", "status", "opens_on", "submitted_by", "submitted_at", "approved_by", "approved_at", "approval_note",
@@ -148,8 +148,8 @@ class ApplicationSerializer(TenantRelationSerializer):
 
     class Meta:
         model = Application
-        fields = ("id", "job_posting", "candidate", "current_stage", "status", "applied_at", "withdrawn_at", "rejected_at", "rejection_reason", "notes", "created_at", "updated_at")
-        read_only_fields = ("id", "current_stage", "status", "applied_at", "withdrawn_at", "rejected_at", "rejection_reason", "created_at", "updated_at")
+        fields = ("id", "job_posting", "candidate", "current_stage", "status", "applied_at", "withdrawn_at", "rejected_at", "rejection_reason", "notes", "source", "cover_letter", "applicant_details", "consent_at", "created_at", "updated_at")
+        read_only_fields = ("id", "current_stage", "status", "applied_at", "withdrawn_at", "rejected_at", "rejection_reason", "source", "cover_letter", "applicant_details", "consent_at", "created_at", "updated_at")
 
 
 class ApplicationStageHistorySerializer(serializers.ModelSerializer):

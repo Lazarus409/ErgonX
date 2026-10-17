@@ -321,3 +321,78 @@ class FeedbackRating(TenantOwnedModel):
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=("request", "competency"), name="uniq_feedback_rating_per_competency")]
+
+
+class SuccessionPlan(TenantOwnedModel):
+    """Succession cover for one position: how critical it is and who could step in."""
+
+    class Level(models.TextChoices):
+        LOW = "LOW", "Low"
+        MEDIUM = "MEDIUM", "Medium"
+        HIGH = "HIGH", "High"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="succession_plans")
+    position = models.ForeignKey("organization.Position", on_delete=models.PROTECT, related_name="succession_plans")
+    is_critical = models.BooleanField(default=True)
+    risk_of_loss = models.CharField(max_length=6, choices=Level.choices, default=Level.MEDIUM)
+    impact_of_loss = models.CharField(max_length=6, choices=Level.choices, default=Level.HIGH)
+    notes = models.TextField(blank=True, max_length=3000)
+    reviewed_at = models.DateField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("position__title",)
+        constraints = [models.UniqueConstraint(fields=("institution", "position"), name="uniq_succession_plan_per_position")]
+
+    def clean(self):
+        if self.position_id and self.position.institution_id != self.institution_id:
+            raise ValidationError({"position": "Referenced record must belong to the same institution."})
+
+
+class Successor(TenantOwnedModel):
+    class Readiness(models.TextChoices):
+        READY_NOW = "READY_NOW", "Ready now"
+        ONE_TO_TWO_YEARS = "ONE_TO_TWO_YEARS", "Ready in 1-2 years"
+        THREE_PLUS_YEARS = "THREE_PLUS_YEARS", "Ready in 3+ years"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="+")
+    plan = models.ForeignKey(SuccessionPlan, on_delete=models.CASCADE, related_name="successors")
+    employee = models.ForeignKey(Employee, on_delete=models.PROTECT, related_name="succession_candidacies")
+    readiness = models.CharField(max_length=18, choices=Readiness.choices, default=Readiness.ONE_TO_TWO_YEARS)
+    development_notes = models.TextField(blank=True, max_length=2000)
+    sort_order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ("sort_order", "created_at")
+        constraints = [models.UniqueConstraint(fields=("plan", "employee"), name="uniq_successor_per_plan")]
+
+    def clean(self):
+        if self.employee_id and self.employee.institution_id != self.institution_id:
+            raise ValidationError({"employee": "Referenced record must belong to the same institution."})
+
+
+class TalentProfile(TenantOwnedModel):
+    """HR's confidential talent view of one employee: potential, flight risk and pool membership.
+
+    Performance on the 9-box grid comes from the latest final review rating unless
+    HR overrides it here.
+    """
+
+    class Level(models.TextChoices):
+        LOW = "LOW", "Low"
+        MEDIUM = "MEDIUM", "Medium"
+        HIGH = "HIGH", "High"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="talent_profiles")
+    employee = models.OneToOneField(Employee, on_delete=models.CASCADE, related_name="talent_profile")
+    potential = models.CharField(max_length=6, choices=Level.choices, blank=True)
+    performance_override = models.CharField(max_length=6, choices=Level.choices, blank=True)
+    flight_risk = models.CharField(max_length=6, choices=Level.choices, blank=True)
+    in_talent_pool = models.BooleanField(default=False)
+    career_aspiration = models.CharField(max_length=300, blank=True)
+    notes = models.TextField(blank=True, max_length=3000)
+    assessed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    assessed_at = models.DateTimeField(null=True, blank=True)
+
+    def clean(self):
+        if self.employee_id and self.employee.institution_id != self.institution_id:
+            raise ValidationError({"employee": "Referenced record must belong to the same institution."})

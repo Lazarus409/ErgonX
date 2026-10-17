@@ -189,6 +189,8 @@ PERMISSIONS = {
     "training.manage": "Manage training courses and enrol employees",
     "performance.view": "View performance review cycles and results",
     "performance.manage": "Run review cycles and sign off performance reviews",
+    "talent.view": "View succession plans and the confidential talent grid",
+    "talent.manage": "Maintain succession plans, successors and talent assessments",
     "complaint.view": "View employee complaints, except any that name you",
     "complaint.manage": "Handle employee complaints: assign, investigate, resolve and close",
     "report.view": "View and export institution reports",
@@ -335,6 +337,7 @@ ROLE_PERMISSION_CODES = {
         "policy.view",
         "training.view",
         "performance.view",
+        "talent.view",
         "complaint.view",
     ),
     "EMPLOYEE": (
@@ -461,6 +464,7 @@ ROLE_PERMISSION_CODES = {
         "policy.view",
         "training.view",
         "performance.view",
+        "talent.view",
         "complaint.view",
     ),
 }

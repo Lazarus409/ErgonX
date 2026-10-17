@@ -58133,6 +58133,702 @@ paths:
       - module_disabled
       - permission_denied
       - not_found
+  /api/v1/succession-plans/:
+    get:
+      operationId: succession_plans_list
+      description: |-
+        List succession plans.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `talent.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: List succession plans
+      parameters:
+      - in: query
+        name: impact_of_loss
+        schema:
+          type: string
+          x-spec-enum-id: f6b091eeaa84bee3
+          enum:
+          - HIGH
+          - LOW
+          - MEDIUM
+        description: |-
+          * `LOW` - Low
+          * `MEDIUM` - Medium
+          * `HIGH` - High
+      - in: query
+        name: is_critical
+        schema:
+          type: boolean
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: risk_of_loss
+        schema:
+          type: string
+          x-spec-enum-id: f6b091eeaa84bee3
+          enum:
+          - HIGH
+          - LOW
+          - MEDIUM
+        description: |-
+          * `LOW` - Low
+          * `MEDIUM` - Medium
+          * `HIGH` - High
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - succession-plans
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/PaginatedSuccessionPlanList'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+    post:
+      operationId: succession_plans_create
+      description: |-
+        Create succession plan.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `talent.manage` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `validation_error`.
+      summary: Create succession plan
+      tags:
+      - succession-plans
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SuccessionPlan'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SuccessionPlan'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SuccessionPlan'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/SuccessionPlan'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - validation_error
+  /api/v1/succession-plans/{id}/:
+    get:
+      operationId: succession_plans_retrieve
+      description: |-
+        Retrieve succession plan.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `talent.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
+      summary: Retrieve succession plan
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this succession plan.
+        required: true
+      tags:
+      - succession-plans
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/SuccessionPlan'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+    patch:
+      operationId: succession_plans_partial_update
+      description: |-
+        Update succession plan.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `talent.manage` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Update succession plan
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this succession plan.
+        required: true
+      tags:
+      - succession-plans
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSuccessionPlan'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSuccessionPlan'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSuccessionPlan'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/SuccessionPlan'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+    delete:
+      operationId: succession_plans_destroy
+      description: |-
+        Delete succession plan.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `talent.manage` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
+      summary: Delete succession plan
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this succession plan.
+        required: true
+      tags:
+      - succession-plans
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+  /api/v1/succession-plans/{id}/successors/:
+    post:
+      operationId: succession_plans_successors_create
+      description: |-
+        Adds a successor, or updates their readiness if already named.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `talent.manage` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Successors succession plan
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this succession plan.
+        required: true
+      tags:
+      - succession-plans
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SuccessorInput'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SuccessorInput'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SuccessorInput'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/SuccessionPlan'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+  /api/v1/succession-plans/{id}/successors/{successor_id}/:
+    delete:
+      operationId: succession_plans_successors_destroy
+      description: |-
+        Remove successor succession plan.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `talent.manage` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
+      summary: Remove successor succession plan
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this succession plan.
+        required: true
+      - in: path
+        name: successor_id
+        schema:
+          type: string
+          pattern: ^[0-9a-f-]+$
+        required: true
+      tags:
+      - succession-plans
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+  /api/v1/talent-grid/:
+    get:
+      operationId: talent_grid_retrieve
+      description: |-
+        GET: every active employee in scope on the 9-box grid. POST: save one employee's assessment.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `talent.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: Get talent grid view
+      tags:
+      - talent-grid
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+    post:
+      operationId: talent_grid_create
+      description: |-
+        GET: every active employee in scope on the 9-box grid. POST: save one employee's assessment.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `talent.manage` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `validation_error`.
+      summary: Post talent grid view
+      tags:
+      - talent-grid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TalentAssessment'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TalentAssessment'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TalentAssessment'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - validation_error
   /api/v1/tax-bands/:
     get:
       operationId: tax_bands_list
@@ -73132,6 +73828,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/StatutoryThreshold'
+    PaginatedSuccessionPlanList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SuccessionPlan'
     PaginatedTaxBandList:
       type: object
       required:
@@ -77411,6 +78130,79 @@ components:
           type: string
           format: date-time
           readOnly: true
+    PatchedSuccessionPlan:
+      type: object
+      description: Runs model validation so domain invariants also protect non-form
+        API writes.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        position:
+          type: string
+          format: uuid
+        position_title:
+          type: string
+          readOnly: true
+        department_name:
+          type: string
+          readOnly: true
+          default: ''
+        is_critical:
+          type: boolean
+        risk_of_loss:
+          enum:
+          - LOW
+          - MEDIUM
+          - HIGH
+          type: string
+          description: |-
+            * `LOW` - Low
+            * `MEDIUM` - Medium
+            * `HIGH` - High
+          x-spec-enum-id: f6b091eeaa84bee3
+        risk_of_loss_label:
+          type: string
+          readOnly: true
+        impact_of_loss:
+          enum:
+          - LOW
+          - MEDIUM
+          - HIGH
+          type: string
+          description: |-
+            * `LOW` - Low
+            * `MEDIUM` - Medium
+            * `HIGH` - High
+          x-spec-enum-id: f6b091eeaa84bee3
+        impact_of_loss_label:
+          type: string
+          readOnly: true
+        notes:
+          type: string
+          maxLength: 3000
+        reviewed_at:
+          type: string
+          format: date
+          nullable: true
+        incumbents:
+          type: string
+          readOnly: true
+        successors:
+          type: string
+          readOnly: true
+        cover:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
     PatchedTrainingCourse:
       type: object
       description: Runs model validation so domain invariants also protect non-form
@@ -80500,6 +81292,114 @@ components:
       - preset_version
       - unit
       - updated_at
+    SuccessionPlan:
+      type: object
+      description: Runs model validation so domain invariants also protect non-form
+        API writes.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        position:
+          type: string
+          format: uuid
+        position_title:
+          type: string
+          readOnly: true
+        department_name:
+          type: string
+          readOnly: true
+          default: ''
+        is_critical:
+          type: boolean
+        risk_of_loss:
+          enum:
+          - LOW
+          - MEDIUM
+          - HIGH
+          type: string
+          description: |-
+            * `LOW` - Low
+            * `MEDIUM` - Medium
+            * `HIGH` - High
+          x-spec-enum-id: f6b091eeaa84bee3
+        risk_of_loss_label:
+          type: string
+          readOnly: true
+        impact_of_loss:
+          enum:
+          - LOW
+          - MEDIUM
+          - HIGH
+          type: string
+          description: |-
+            * `LOW` - Low
+            * `MEDIUM` - Medium
+            * `HIGH` - High
+          x-spec-enum-id: f6b091eeaa84bee3
+        impact_of_loss_label:
+          type: string
+          readOnly: true
+        notes:
+          type: string
+          maxLength: 3000
+        reviewed_at:
+          type: string
+          format: date
+          nullable: true
+        incumbents:
+          type: string
+          readOnly: true
+        successors:
+          type: string
+          readOnly: true
+        cover:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - cover
+      - created_at
+      - department_name
+      - id
+      - impact_of_loss_label
+      - incumbents
+      - position
+      - position_title
+      - risk_of_loss_label
+      - successors
+      - updated_at
+    SuccessorInput:
+      type: object
+      properties:
+        employee:
+          type: string
+          format: uuid
+        readiness:
+          enum:
+          - READY_NOW
+          - ONE_TO_TWO_YEARS
+          - THREE_PLUS_YEARS
+          type: string
+          description: |-
+            * `READY_NOW` - Ready now
+            * `ONE_TO_TWO_YEARS` - Ready in 1-2 years
+            * `THREE_PLUS_YEARS` - Ready in 3+ years
+          x-spec-enum-id: cac9719a53a8d54c
+        development_notes:
+          type: string
+          maxLength: 2000
+      required:
+      - employee
+      - readiness
     SuspendInstitution:
       type: object
       properties:
@@ -80508,6 +81408,58 @@ components:
           maxLength: 1000
       required:
       - reason
+    TalentAssessment:
+      type: object
+      properties:
+        employee:
+          type: string
+          format: uuid
+        potential:
+          enum:
+          - LOW
+          - MEDIUM
+          - HIGH
+          - ''
+          type: string
+          description: |-
+            * `LOW` - Low
+            * `MEDIUM` - Medium
+            * `HIGH` - High
+          x-spec-enum-id: f6b091eeaa84bee3
+        performance_override:
+          enum:
+          - LOW
+          - MEDIUM
+          - HIGH
+          - ''
+          type: string
+          description: |-
+            * `LOW` - Low
+            * `MEDIUM` - Medium
+            * `HIGH` - High
+          x-spec-enum-id: f6b091eeaa84bee3
+        flight_risk:
+          enum:
+          - LOW
+          - MEDIUM
+          - HIGH
+          - ''
+          type: string
+          description: |-
+            * `LOW` - Low
+            * `MEDIUM` - Medium
+            * `HIGH` - High
+          x-spec-enum-id: f6b091eeaa84bee3
+        in_talent_pool:
+          type: boolean
+        career_aspiration:
+          type: string
+          maxLength: 300
+        notes:
+          type: string
+          maxLength: 3000
+      required:
+      - employee
     TaxBand:
       type: object
       properties:

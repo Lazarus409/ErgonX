@@ -8,6 +8,7 @@ from apps.recruitment.careers_views import (
     CareersSiteView,
     TrackingDocumentsView,
     TrackingInterviewView,
+    TrackingOfferView,
     TrackingView,
     TrackingWithdrawView,
 )
@@ -29,6 +30,7 @@ urlpatterns = [
     path("public/careers/track/<str:token>/", TrackingView.as_view(), name="careers-track"),
     path("public/careers/track/<str:token>/documents/", TrackingDocumentsView.as_view(), name="careers-track-documents"),
     path("public/careers/track/<str:token>/withdraw/", TrackingWithdrawView.as_view(), name="careers-track-withdraw"),
+    path("public/careers/track/<str:token>/offer/", TrackingOfferView.as_view(), name="careers-track-offer"),
     path("public/careers/track/<str:token>/interviews/<uuid:interview_id>/", TrackingInterviewView.as_view(), name="careers-track-interview"),
     path("public/careers/<slug:slug>/", CareersSiteView.as_view(), name="careers-site"),
     path("public/careers/<slug:slug>/jobs/<uuid:job_id>/", CareersJobView.as_view(), name="careers-job"),

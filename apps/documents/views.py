@@ -1,6 +1,7 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q
 from django.http import FileResponse
+from rest_framework import serializers
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
@@ -13,7 +14,7 @@ from rest_framework.views import APIView
 from apps.audit.services import field_changes, record_audit_event, snapshot
 from apps.documents.checklist import checklists, compliance_overview, summarize
 from apps.documents import policies as policy_service
-from apps.documents.models import POLICY_ENTITY_TYPE, Document, DocumentRequirement, DocumentRequirementWaiver, ImageAsset, Policy
+from apps.documents.models import POLICY_ENTITY_TYPE, Document, DocumentRequirement, DocumentRequirementWaiver, ImageAsset, Policy, SignatureRequest
 from apps.documents.serializers import DocumentRequirementSerializer, DocumentRequirementWaiverSerializer, DocumentSerializer, ImageAssetSerializer, PolicyAcknowledgementSerializer, PolicyAcknowledgeSerializer, PolicyFileSerializer, PolicyNewVersionSerializer, PolicySerializer
 from apps.employees.models import Employee
 from apps.employees.services import ensure_not_self_hr_mutation
@@ -497,3 +498,144 @@ class SelfServicePolicyAcknowledgeView(SelfServicePolicyBaseView):
         call_validated_service(policy_service.acknowledge_policy, institution=request.institution, policy=policy, employee=employee, user=request.user, signed_name=payload.validated_data["signed_name"])
         _, policy, status, due_date, acknowledgement = self.policy_row(request, pk)
         return Response(_policy_row(policy, status, due_date, acknowledgement, with_body=True))
+
+
+# ---------------------------------------------------------------- signatures
+
+
+class SignatureRequestSerializer(serializers.ModelSerializer):
+    employee_name = serializers.CharField(source="employee.full_name", read_only=True)
+    document_name = serializers.CharField(source="document.original_filename", read_only=True)
+    status_label = serializers.CharField(source="get_status_display", read_only=True)
+    requested_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SignatureRequest
+        fields = (
+            "id", "document", "document_name", "employee", "employee_name", "title", "message", "due_date", "status", "status_label",
+            "requested_by_name", "document_sha256", "signed_name", "signed_at", "decline_reason", "created_at",
+        )
+        read_only_fields = fields
+
+    def get_requested_by_name(self, request):
+        user = request.requested_by
+        return (user.get_full_name() or user.email) if user else ""
+
+
+class SignatureRequestCreateSerializer(serializers.Serializer):
+    document = serializers.UUIDField()
+    employee = serializers.UUIDField()
+    title = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    message = serializers.CharField(max_length=2000, required=False, allow_blank=True)
+    due_date = serializers.DateField(required=False, allow_null=True)
+
+
+def _certificate_response(request):
+    from django.http import HttpResponse
+
+    from apps.documents.signatures import certificate
+
+    response = HttpResponse(certificate(request), content_type="text/plain; charset=utf-8")
+    response["Content-Disposition"] = f'attachment; filename="signature-record-{request.id}.txt"'
+    return response
+
+
+class SignatureRequestViewSet(TenantModelViewSet):
+    """HR's signature requests for employees in the caller's scope."""
+
+    model = SignatureRequest
+    serializer_class = SignatureRequestSerializer
+    http_method_names = ("get", "post", "head", "options")
+    filterset_fields = ("employee", "status", "document")
+    ordering = ("-created_at",)
+
+    def get_required_permission(self):
+        return "employee.view" if self.action in ("list", "retrieve", "certificate") else "employee.update"
+
+    def get_queryset(self):
+        return scope_to_employees(super().get_queryset().select_related("employee", "document", "requested_by"), self.request)
+
+    def create(self, request, *args, **kwargs):
+        from apps.documents.signatures import request_signature
+
+        payload = SignatureRequestCreateSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        values = payload.validated_data
+        employee = get_object_or_404(scope_to_employees(Employee.objects.for_institution(request.institution), request, ""), pk=values["employee"])
+        document = get_object_or_404(Document.objects.for_institution(request.institution), pk=values["document"])
+        signature = call_validated_service(
+            request_signature, institution=request.institution, document=document, employee=employee, actor=request.user,
+            title=values.get("title") or "", message=values.get("message") or "", due_date=values.get("due_date"),
+        )
+        return Response(self.get_serializer(signature).data, status=201)
+
+    @extend_schema(request=None, responses=SignatureRequestSerializer)
+    @action(detail=True, methods=("post",))
+    def cancel(self, request, pk=None):
+        from apps.documents.signatures import cancel
+
+        signature = call_validated_service(cancel, request=self.get_object(), actor=request.user)
+        return Response(self.get_serializer(signature).data)
+
+    @extend_schema(responses={(200, "text/plain"): OpenApiTypes.STR})
+    @action(detail=True, methods=("get",))
+    def certificate(self, request, pk=None):
+        return _certificate_response(self.get_object())
+
+
+class SelfServiceSignatureBase(APIView):
+    permission_classes = (TenantContextPermission, TenantRBACPermission)
+    required_module = "CORE_HR"
+
+    def get_required_permission(self):
+        return "home.view"
+
+    def requests(self, request):
+        employee = get_object_or_404(Employee.objects.for_institution(request.institution), user=request.user)
+        return SignatureRequest.objects.for_institution(request.institution).filter(employee=employee).select_related("document", "employee", "requested_by")
+
+    def one(self, request, pk):
+        return get_object_or_404(self.requests(request), pk=pk)
+
+
+class SelfServiceSignaturesView(SelfServiceSignatureBase):
+    @extend_schema(responses=SignatureRequestSerializer(many=True))
+    def get(self, request):
+        return Response(SignatureRequestSerializer(self.requests(request).exclude(status=SignatureRequest.Status.CANCELLED), many=True).data)
+
+
+class SelfServiceSignatureFileView(SelfServiceSignatureBase):
+    @extend_schema(responses={(200, "application/octet-stream"): OpenApiTypes.BINARY})
+    def get(self, request, pk):
+        document = self.one(request, pk).document
+        if not document.stored_file:
+            raise NotFound("This document has no file.")
+        response = FileResponse(document.stored_file.open("rb"), as_attachment=True, filename=document.original_filename, content_type=document.content_type or "application/octet-stream")
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
+
+
+class SelfServiceSignatureSignView(SelfServiceSignatureBase):
+    @extend_schema(request=OpenApiTypes.OBJECT, responses=SignatureRequestSerializer)
+    def post(self, request, pk):
+        from apps.documents.signatures import sign
+
+        if request.data.get("confirm") not in (True, "true", "True", "1", 1):
+            raise ValidationError({"confirm": "Confirm that you have read the document and agree to sign it."})
+        signature = call_validated_service(sign, request=self.one(request, pk), user=request.user, signed_name=str(request.data.get("signed_name") or ""))
+        return Response(SignatureRequestSerializer(signature).data)
+
+
+class SelfServiceSignatureDeclineView(SelfServiceSignatureBase):
+    @extend_schema(request=OpenApiTypes.OBJECT, responses=SignatureRequestSerializer)
+    def post(self, request, pk):
+        from apps.documents.signatures import decline
+
+        signature = call_validated_service(decline, request=self.one(request, pk), user=request.user, reason=str(request.data.get("reason") or ""))
+        return Response(SignatureRequestSerializer(signature).data)
+
+
+class SelfServiceSignatureCertificateView(SelfServiceSignatureBase):
+    @extend_schema(responses={(200, "text/plain"): OpenApiTypes.STR})
+    def get(self, request, pk):
+        return _certificate_response(self.one(request, pk))

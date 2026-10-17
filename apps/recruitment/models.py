@@ -381,6 +381,11 @@ class Offer(TenantOwnedModel):
     hired_employee = models.OneToOneField(Employee, null=True, blank=True, on_delete=models.PROTECT, related_name="recruitment_offer")
     terms = models.TextField(blank=True)
     contract_length_months = models.PositiveSmallIntegerField(null=True, blank=True)
+    # Set when the candidate accepts on their tracking link: their typed name and the evidence.
+    candidate_signed_name = models.CharField(max_length=200, blank=True)
+    candidate_signed_at = models.DateTimeField(null=True, blank=True)
+    candidate_signature_ip = models.GenericIPAddressField(null=True, blank=True)
+    candidate_signature_user_agent = models.CharField(max_length=500, blank=True)
     working_pattern = models.CharField(max_length=12, choices=Employment.WorkingPattern.choices, blank=True)
     reports_to = models.ForeignKey(Position, null=True, blank=True, on_delete=models.PROTECT, related_name="recruitment_offers_reporting")
     letter_body = models.TextField(blank=True, max_length=20000)

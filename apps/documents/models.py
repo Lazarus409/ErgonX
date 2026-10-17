@@ -254,3 +254,45 @@ class PolicyAcknowledgement(TenantOwnedModel):
             raise ValidationError({"policy": "Policy must belong to the same institution."})
         if self.employee_id and self.employee.institution_id != self.institution_id:
             raise ValidationError({"employee": "Employee must belong to the same institution."})
+
+
+class SignatureRequest(TenantOwnedModel):
+    """HR asks one employee to sign one document (a contract, letter or form).
+
+    The document's SHA-256 is taken when the request is made; signing is refused
+    if the stored file no longer matches, so the signature always covers exactly
+    the file HR sent. The signature is the employee's typed name, with time, IP
+    address and browser recorded as evidence.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Waiting for signature"
+        SIGNED = "SIGNED", "Signed"
+        DECLINED = "DECLINED", "Declined"
+        CANCELLED = "CANCELLED", "Cancelled"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="signature_requests")
+    document = models.ForeignKey(Document, on_delete=models.PROTECT, related_name="signature_requests")
+    employee = models.ForeignKey("employees.Employee", on_delete=models.PROTECT, related_name="signature_requests")
+    title = models.CharField(max_length=150)
+    message = models.TextField(blank=True, max_length=2000)
+    due_date = models.DateField(null=True, blank=True)
+    requested_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="+")
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    document_sha256 = models.CharField(max_length=64)
+    signed_name = models.CharField(max_length=200, blank=True)
+    signed_at = models.DateTimeField(null=True, blank=True)
+    signed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=500, blank=True)
+    decline_reason = models.TextField(blank=True, max_length=2000)
+
+    class Meta:
+        ordering = ("-created_at",)
+        indexes = [models.Index(fields=("institution", "status")), models.Index(fields=("employee", "status"))]
+
+    def clean(self):
+        for name in ("document", "employee"):
+            related = getattr(self, name, None)
+            if related is not None and related.institution_id != self.institution_id:
+                raise ValidationError({name: "Referenced record must belong to the same institution."})

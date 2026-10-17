@@ -213,6 +213,25 @@ class TrackingInterviewView(TrackingView):
         return Response(careers.tracking_view(application))
 
 
+class TrackingOfferView(TrackingView):
+    @extend_schema(request=OpenApiTypes.OBJECT, responses={200: OpenApiTypes.OBJECT})
+    def post(self, request, token):
+        from apps.documents.signatures import candidate_answer_offer
+
+        application = self.application(token)
+        response = str(request.data.get("response") or "").upper()
+        if response not in ("ACCEPT", "DECLINE"):
+            raise serializers.ValidationError({"response": "Answer ACCEPT or DECLINE."})
+        if response == "ACCEPT" and request.data.get("confirm") not in (True, "true", "True", "1", 1):
+            raise serializers.ValidationError({"confirm": "Confirm that you accept the offer and its terms."})
+        call_validated_service(
+            candidate_answer_offer, application=application, accept=response == "ACCEPT",
+            signed_name=str(request.data.get("signed_name") or ""), note=str(request.data.get("note") or ""),
+        )
+        application.refresh_from_db()
+        return Response(careers.tracking_view(application))
+
+
 class CareersSiteSettingsSerializer(serializers.ModelSerializer):
     class Meta:
         model = CareersSite

@@ -87,6 +87,10 @@ def _to_do(institution, user, employee, permissions, today):
         for policy, status, due, _ in policies_for_employee(institution, employee, today=today):
             if status in (PENDING, OVERDUE):
                 items.append(_item(kind="policy", key=policy.id, title=f"Read and sign: {policy.title}", subtitle=policy.get_category_display(), route="/me/policies", due_date=due, today=today))
+        from apps.documents.models import SignatureRequest
+
+        for request in SignatureRequest.objects.for_institution(institution).filter(employee=employee, status=SignatureRequest.Status.PENDING):
+            items.append(_item(kind="signature", key=request.id, title=f"Sign: {request.title}", subtitle="Document from HR", route="/me/documents", due_date=request.due_date, today=today))
         tasks = list(LifecycleTask.objects.filter(institution=institution, employee=employee, status=LifecycleTask.Status.OPEN, owner="EMPLOYEE").select_related("onboarding", "offboarding"))
         automatic = policy_items_are_automatic(institution, employee) if tasks else False
         for task in tasks:

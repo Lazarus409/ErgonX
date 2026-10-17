@@ -190,6 +190,23 @@ def tracking_view(application):
             for interview in interviews
         ],
         "documents": [{"id": str(document.id), "name": document.original_filename, "category": document.category, "uploaded_at": document.created_at} for document in documents],
+        "offer": _offer_view(application),
+    }
+
+
+def _offer_view(application):
+    """The offer as the candidate sees it, once it has been sent to them."""
+    from apps.recruitment.models import Offer
+
+    offer = Offer.objects.select_related("position", "location", "department").filter(application=application).first()
+    if offer is None or offer.status not in (Offer.Status.EXTENDED, Offer.Status.ACCEPTED, Offer.Status.DECLINED, Offer.Status.HIRED):
+        return None
+    return {
+        "status": offer.status, "status_label": offer.get_status_display(), "position": offer.position.title, "department": offer.department.name,
+        "location": offer.location.name, "employment_type": offer.get_employment_type_display(), "proposed_start_date": offer.proposed_start_date,
+        "expires_on": offer.expires_on, "base_salary": str(offer.base_salary) if offer.base_salary is not None else None, "currency": offer.currency,
+        "contract_length_months": offer.contract_length_months, "terms": offer.terms, "signed_name": offer.candidate_signed_name,
+        "signed_at": offer.candidate_signed_at, "can_answer": offer.status == Offer.Status.EXTENDED and not (offer.expires_on and offer.expires_on < timezone.localdate()),
     }
 
 

@@ -105,6 +105,15 @@ class PerformanceReview(TenantOwnedModel):
     hr_comment = models.TextField(blank=True)
     signed_off_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
     signed_off_at = models.DateTimeField(null=True, blank=True)
+    # HR's calibrated rating, set while the review awaits sign-off; it replaces the manager's as the final rating.
+    calibrated_rating = models.PositiveSmallIntegerField(null=True, blank=True, validators=RATING_VALIDATORS)
+    calibration_note = models.TextField(blank=True, max_length=2000)
+    calibrated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    calibrated_at = models.DateTimeField(null=True, blank=True)
+
+    @property
+    def final_rating(self):
+        return self.calibrated_rating or self.overall_rating
 
     class Meta:
         ordering = ("employee__last_name", "employee__first_name")
@@ -259,3 +268,56 @@ class GoalCheckIn(TenantOwnedModel):
 
     class Meta:
         ordering = ("-created_at",)
+
+
+class FeedbackRequest(TenantOwnedModel):
+    """A colleague's 360 feedback on one performance review.
+
+    The employee and their reviewer see only an anonymous summary, and only
+    once ``MIN_ANONYMOUS_RESPONSES`` colleagues have responded; HR sees names.
+    """
+
+    MIN_ANONYMOUS_RESPONSES = 3
+    MAX_PER_REVIEW = 10
+
+    class Relationship(models.TextChoices):
+        PEER = "PEER", "Peer"
+        DIRECT_REPORT = "DIRECT_REPORT", "Direct report"
+        MANAGER = "MANAGER", "Manager"
+        OTHER = "OTHER", "Other colleague"
+
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Waiting"
+        SUBMITTED = "SUBMITTED", "Submitted"
+        DECLINED = "DECLINED", "Declined"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="feedback_requests")
+    review = models.ForeignKey(PerformanceReview, on_delete=models.CASCADE, related_name="feedback_requests")
+    respondent = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="feedback_to_give")
+    relationship = models.CharField(max_length=14, choices=Relationship.choices, default=Relationship.PEER)
+    requested_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="+")
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    strengths = models.TextField(blank=True, max_length=3000)
+    improvements = models.TextField(blank=True, max_length=3000)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("created_at",)
+        constraints = [models.UniqueConstraint(fields=("review", "respondent"), name="uniq_feedback_per_review_respondent")]
+        indexes = [models.Index(fields=("respondent", "status"))]
+
+    def clean(self):
+        if self.review_id and self.review.institution_id != self.institution_id:
+            raise ValidationError({"review": "Referenced record must belong to the same institution."})
+        if self.review_id and self.respondent_id and self.review.employee.user_id == self.respondent_id:
+            raise ValidationError({"respondent": "Employees don't give 360 feedback on themselves."})
+
+
+class FeedbackRating(TenantOwnedModel):
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="+")
+    request = models.ForeignKey(FeedbackRequest, on_delete=models.CASCADE, related_name="ratings")
+    competency = models.ForeignKey(Competency, on_delete=models.PROTECT, related_name="+")
+    rating = models.PositiveSmallIntegerField(validators=RATING_VALIDATORS)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=("request", "competency"), name="uniq_feedback_rating_per_competency")]

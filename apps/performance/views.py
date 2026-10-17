@@ -8,7 +8,7 @@ from rest_framework.response import Response
 from apps.accounts.models import User
 from apps.audit.services import record_audit_event
 from apps.employees.models import Employee
-from apps.performance.models import Competency, PerformanceReview, ReviewCycle
+from apps.performance.models import Competency, FeedbackRequest, PerformanceReview, ReviewCycle
 from apps.performance.serializers import (
     CompetencySerializer,
     LaunchSerializer,
@@ -47,7 +47,7 @@ class CompetencyViewSet(TenantModelViewSet):
     ordering = ("sort_order", "name")
 
     def get_required_permission(self):
-        return "performance.view" if self.action in READ else "performance.manage"
+        return "performance.view" if self.action in READ or self.action == "calibration" else "performance.manage"
 
 
 class ReviewCycleViewSet(TenantModelViewSet):
@@ -91,6 +91,16 @@ class ReviewCycleViewSet(TenantModelViewSet):
         call_validated_service(launch_cycle, cycle=cycle, actor=request.user, employees=list(employees.distinct()))
         return Response(ReviewCycleSerializer(self.get_queryset().get(pk=cycle.pk), context={"request": request}).data)
 
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
+    @action(detail=True, methods=("get",))
+    def calibration(self, request, pk=None):
+        """Manager and final ratings for reviews awaiting or past sign-off, within the caller's scope."""
+        from apps.performance.feedback import calibration_board
+
+        cycle = self.get_object()
+        reviews = scope_to_employees(PerformanceReview.objects.for_institution(request.institution).filter(cycle=cycle), request)
+        return Response(calibration_board(reviews))
+
     @extend_schema(request=None, responses=ReviewCycleSerializer)
     @action(detail=True, methods=("post",))
     def close(self, request, pk=None):
@@ -125,7 +135,7 @@ class PerformanceReviewViewSet(TenantModelViewSet):
         return {**super().get_serializer_context(), "is_hr": self.is_hr(), "can_manage": "performance.manage" in permission_codes(self.request)}
 
     def get_required_permission(self):
-        if self.action in ("list", "retrieve", "self_assessment", "manager_review"):
+        if self.action in ("list", "retrieve", "self_assessment", "manager_review", "feedback"):
             # Rows are limited in get_queryset; the service checks that the caller is
             # the employee (self-assessment) or the assigned reviewer (manager review).
             return "home.view"
@@ -193,7 +203,122 @@ class PerformanceReviewViewSet(TenantModelViewSet):
         reviewer = get_object_or_404(User, pk=reviewer_id)
         return self._respond(call_validated_service(reassign_reviewer, review=self.get_object(), actor=request.user, reviewer=reviewer))
 
+    @extend_schema(request=OpenApiTypes.OBJECT, responses={200: OpenApiTypes.OBJECT})
+    @action(detail=True, methods=("get", "post"))
+    def feedback(self, request, pk=None):
+        """GET: the 360 feedback this viewer may see. POST {respondents: [user ids], relationship}: ask colleagues."""
+        from apps.performance import feedback as feedback_service
+
+        review = self.get_object()
+        can_manage = "performance.manage" in permission_codes(request)
+        hr_view = self.is_hr() and review.employee.user_id != request.user.id
+        if request.method == "POST":
+            payload = FeedbackRequestInputSerializer(data=request.data)
+            payload.is_valid(raise_exception=True)
+            wanted = set(payload.validated_data["respondents"])
+            users = list(User.objects.filter(pk__in=wanted))
+            if len(users) != len(wanted):
+                raise serializers.ValidationError({"respondents": "Unknown person."})
+            call_validated_service(
+                feedback_service.request_feedback, review=review, actor=request.user, respondents=users,
+                relationship=payload.validated_data["relationship"], is_hr_manager=can_manage,
+            )
+        # Names are for HR only: the employee and reviewer see the anonymous summary.
+        return Response(feedback_service.feedback_summary(review, show_names=hr_view and can_manage))
+
+    @extend_schema(request=OpenApiTypes.OBJECT, responses=PerformanceReviewSerializer)
+    @action(detail=True, methods=("post",))
+    def calibrate(self, request, pk=None):
+        from apps.performance.feedback import calibrate
+
+        rating = request.data.get("rating")
+        rating = serializers.IntegerField(min_value=1, max_value=5, allow_null=True).run_validation(rating if rating not in ("", None) else None)
+        return self._respond(call_validated_service(calibrate, review=self.get_object(), actor=request.user, rating=rating, note=str(request.data.get("note") or "")))
+
     @extend_schema(request=OpenApiTypes.OBJECT, responses=PerformanceReviewSerializer)
     @action(detail=True, methods=("post",), url_path="cancel")
     def cancel(self, request, pk=None):
         return self._respond(call_validated_service(cancel_review, review=self.get_object(), actor=request.user, reason=str(request.data.get("reason") or "")))
+
+
+class FeedbackRequestInputSerializer(serializers.Serializer):
+    respondents = serializers.ListField(child=serializers.UUIDField(), min_length=1, max_length=10)
+    relationship = serializers.ChoiceField(choices=FeedbackRequest.Relationship.choices, default=FeedbackRequest.Relationship.PEER)
+
+
+class FeedbackSubmitSerializer(serializers.Serializer):
+    ratings = serializers.DictField(child=serializers.IntegerField(min_value=1, max_value=5), required=False)
+    strengths = serializers.CharField(required=False, allow_blank=True, max_length=3000)
+    improvements = serializers.CharField(required=False, allow_blank=True, max_length=3000)
+
+
+class FeedbackRequestSerializer(serializers.ModelSerializer):
+    employee_name = serializers.CharField(source="review.employee.full_name", read_only=True)
+    cycle_name = serializers.CharField(source="review.cycle.name", read_only=True)
+    relationship_label = serializers.CharField(source="get_relationship_display", read_only=True)
+    status_label = serializers.CharField(source="get_status_display", read_only=True)
+    competencies = serializers.SerializerMethodField()
+    open = serializers.SerializerMethodField()
+
+    class Meta:
+        model = FeedbackRequest
+        fields = (
+            "id", "employee_name", "cycle_name", "relationship", "relationship_label", "status", "status_label",
+            "strengths", "improvements", "submitted_at", "competencies", "open", "created_at",
+        )
+        read_only_fields = fields
+
+    def get_competencies(self, item):
+        given = {str(rating.competency_id): rating.rating for rating in item.ratings.all()}
+        return [
+            {"id": str(competency.id), "name": competency.name, "description": competency.description, "rating": given.get(str(competency.id))}
+            for competency in item.review.cycle.competencies.filter(is_active=True).order_by("sort_order", "name")
+        ]
+
+    def get_open(self, item):
+        return (
+            item.status == FeedbackRequest.Status.PENDING
+            and item.review.status in PerformanceReview.OPEN_STATUSES
+            and item.review.cycle.status == ReviewCycle.Status.ACTIVE
+        )
+
+
+class FeedbackRequestViewSet(TenantModelViewSet):
+    """360 feedback the signed-in person has been asked to give."""
+
+    model = FeedbackRequest
+    serializer_class = FeedbackRequestSerializer
+    http_method_names = ("get", "post", "head", "options")
+    filterset_fields = ("status",)
+    ordering = ("-created_at",)
+
+    def get_required_permission(self):
+        return "home.view"
+
+    def get_queryset(self):
+        return super().get_queryset().filter(respondent=self.request.user).select_related("review__employee", "review__cycle").prefetch_related("ratings")
+
+    def create(self, request, *args, **kwargs):
+        raise serializers.ValidationError({"detail": "Ask for feedback from the performance review."})
+
+    @extend_schema(request=FeedbackSubmitSerializer, responses=FeedbackRequestSerializer)
+    @action(detail=True, methods=("post",))
+    def submit(self, request, pk=None):
+        from apps.performance.feedback import submit_feedback
+
+        payload = FeedbackSubmitSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        values = payload.validated_data
+        item = call_validated_service(
+            submit_feedback, request=self.get_object(), actor=request.user, ratings=values.get("ratings") or {},
+            strengths=values.get("strengths", ""), improvements=values.get("improvements", ""),
+        )
+        return Response(self.get_serializer(self.get_queryset().get(pk=item.pk)).data)
+
+    @extend_schema(request=None, responses=FeedbackRequestSerializer)
+    @action(detail=True, methods=("post",))
+    def decline(self, request, pk=None):
+        from apps.performance.feedback import decline_feedback
+
+        item = call_validated_service(decline_feedback, request=self.get_object(), actor=request.user)
+        return Response(self.get_serializer(self.get_queryset().get(pk=item.pk)).data)

@@ -4,7 +4,7 @@ from apps.performance.models import Competency, PerformanceReview, ReviewCycle
 from common.serializers import ValidatedModelSerializer
 
 SELF_FIELDS = ("self_summary", "self_submitted_at")
-MANAGER_FIELDS = ("manager_summary", "development_plan", "overall_rating", "manager_submitted_at", "hr_comment", "signed_off_by_name", "signed_off_at")
+MANAGER_FIELDS = ("manager_summary", "development_plan", "overall_rating", "manager_submitted_at", "hr_comment", "signed_off_by_name", "signed_off_at", "calibrated_rating", "final_rating")
 
 
 def _name(user):
@@ -68,6 +68,9 @@ class ViewerMixin:
 
     def hide(self, data, obj):
         is_hr, is_employee, is_reviewer = self.viewer(obj)
+        if not is_hr and "calibration_note" in data:
+            # HR's reasons for calibrating are internal to HR.
+            data["calibration_note"] = ""
         if not is_hr and not is_reviewer and obj.status != PerformanceReview.Status.COMPLETED:
             # The employee sees the manager's assessment once HR has signed it off.
             for field in MANAGER_FIELDS:
@@ -106,6 +109,7 @@ class PerformanceReviewListSerializer(ViewerMixin, serializers.ModelSerializer):
 
 
 class PerformanceReviewSerializer(PerformanceReviewListSerializer):
+    final_rating = serializers.IntegerField(read_only=True)
     cycle_status = serializers.CharField(source="cycle.status", read_only=True)
     self_assessment_due = serializers.DateField(source="cycle.self_assessment_due", read_only=True)
     manager_review_due = serializers.DateField(source="cycle.manager_review_due", read_only=True)
@@ -116,7 +120,7 @@ class PerformanceReviewSerializer(PerformanceReviewListSerializer):
     class Meta(PerformanceReviewListSerializer.Meta):
         fields = PerformanceReviewListSerializer.Meta.fields + (
             "cycle_status", "self_assessment_due", "manager_review_due", "self_summary", "manager_summary", "development_plan",
-            "hr_comment", "signed_off_by_name", "ratings", "viewer",
+            "hr_comment", "signed_off_by_name", "ratings", "viewer", "calibrated_rating", "calibration_note", "final_rating",
         )
         read_only_fields = fields
 
@@ -146,6 +150,8 @@ class PerformanceReviewSerializer(PerformanceReviewListSerializer):
             "can_manager_review": is_reviewer and open_cycle and status == PerformanceReview.Status.MANAGER_REVIEW,
             "can_sign_off": can_manage and status == PerformanceReview.Status.HR_REVIEW,
             "can_manage": can_manage and status in PerformanceReview.OPEN_STATUSES,
+            "can_calibrate": can_manage and status == PerformanceReview.Status.HR_REVIEW and not is_employee,
+            "can_request_feedback": open_cycle and status in PerformanceReview.OPEN_STATUSES and (is_employee or is_reviewer or can_manage),
         }
 
 

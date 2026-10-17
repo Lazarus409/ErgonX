@@ -105,6 +105,13 @@ def _to_do(institution, user, employee, permissions, today):
 
         for swap in ShiftSwap.objects.for_institution(institution).filter(counterpart=employee, status=ShiftSwap.Status.AWAITING_COLLEAGUE).select_related("requester"):
             items.append(_item(kind="swap.answer", key=swap.id, title=f"Answer {swap.requester.full_name}'s shift swap", subtitle=f"{swap.swap_date:%a %d %b}: you'd work {swap.requester_shift_label}", route="/me/attendance/swaps", due_date=swap.swap_date, today=today))
+    from apps.performance.models import FeedbackRequest
+
+    feedback = FeedbackRequest.objects.for_institution(institution).filter(
+        respondent=user, status=FeedbackRequest.Status.PENDING, review__status__in=PerformanceReview.OPEN_STATUSES,
+    ).select_related("review__employee", "review__cycle")
+    for request in feedback:
+        items.append(_item(kind="feedback.give", key=request.id, title=f"Give feedback on {request.review.employee.full_name}", subtitle=f"360 feedback · {request.review.cycle.name}", route="/feedback", due_date=request.review.cycle.manager_review_due, today=today))
     reviews = PerformanceReview.objects.for_institution(institution).filter(reviewer=user, status=PerformanceReview.Status.MANAGER_REVIEW).select_related("cycle", "employee")
     for review in reviews:
         items.append(_item(kind="review.manager", key=review.id, title=f"Review {review.employee.full_name}", subtitle=review.cycle.name, route=f"/reviews/{review.id}", due_date=review.cycle.manager_review_due, today=today))

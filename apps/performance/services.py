@@ -205,8 +205,8 @@ def sign_off(*, review, actor, comment=""):
     review.signed_off_by = actor
     review.signed_off_at = timezone.now()
     review.save()
-    _audit(review, actor, "signed_off", overall_rating=review.overall_rating)
-    _notify(review.employee.user, review, "PERFORMANCE_COMPLETED", "Your performance review is complete", f"{review.cycle.name}: {RATING_LABELS.get(review.overall_rating, '')}.")
+    _audit(review, actor, "signed_off", overall_rating=review.overall_rating, final_rating=review.final_rating)
+    _notify(review.employee.user, review, "PERFORMANCE_COMPLETED", "Your performance review is complete", f"{review.cycle.name}: {RATING_LABELS.get(review.final_rating, '')}.")
     return review
 
 
@@ -220,7 +220,8 @@ def return_to_reviewer(*, review, actor, comment):
         raise ValidationError({"comment": "Explain what the reviewer should change."})
     review.status = Status.MANAGER_REVIEW
     review.hr_comment = comment.strip()
-    review.save(update_fields=("status", "hr_comment", "updated_at"))
+    review.calibrated_rating, review.calibration_note, review.calibrated_by, review.calibrated_at = None, "", None, None
+    review.save(update_fields=("status", "hr_comment", "calibrated_rating", "calibration_note", "calibrated_by", "calibrated_at", "updated_at"))
     _audit(review, actor, "returned", comment=comment.strip())
     _notify(review.reviewer, review, "PERFORMANCE_RETURNED", "Performance review returned", f"{review.employee.full_name}: {comment.strip()}")
     return review
@@ -264,12 +265,12 @@ def cycle_summary(reviews):
     statuses = Counter(review.status for review in reviews)
     live = [review for review in reviews if review.status != Status.CANCELLED]
     completed = [review for review in live if review.status == Status.COMPLETED]
-    ratings = Counter(review.overall_rating for review in completed if review.overall_rating)
+    ratings = Counter(review.final_rating for review in completed if review.final_rating)
     departments = dict(Employment.objects.filter(employee__in=[review.employee_id for review in completed], is_current=True).values_list("employee_id", "department__name"))
     by_department = {}
     for review in completed:
-        if review.overall_rating:
-            by_department.setdefault(departments.get(review.employee_id) or "Unassigned", []).append(review.overall_rating)
+        if review.final_rating:
+            by_department.setdefault(departments.get(review.employee_id) or "Unassigned", []).append(review.final_rating)
     return {
         "total": len(live),
         "by_status": {status: statuses.get(status, 0) for status in Status.values},

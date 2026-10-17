@@ -138,3 +138,124 @@ class ReviewRating(TenantOwnedModel):
     class Meta:
         ordering = ("competency__sort_order", "competency__name")
         constraints = [models.UniqueConstraint(fields=("review", "competency"), name="uniq_rating_per_review_competency")]
+
+
+class Goal(TenantOwnedModel):
+    """An objective at company, department or individual level, measured by key results.
+
+    Goals align upwards through ``parent`` (individual -> department -> company).
+    Progress is the average of the key results' progress, or the last check-in's
+    figure when a goal has no key results.
+    """
+
+    class Level(models.TextChoices):
+        COMPANY = "COMPANY", "Company"
+        DEPARTMENT = "DEPARTMENT", "Department"
+        INDIVIDUAL = "INDIVIDUAL", "Individual"
+
+    class Status(models.TextChoices):
+        DRAFT = "DRAFT", "Draft"
+        ACTIVE = "ACTIVE", "Active"
+        COMPLETED = "COMPLETED", "Completed"
+        CANCELLED = "CANCELLED", "Cancelled"
+
+    class Health(models.TextChoices):
+        ON_TRACK = "ON_TRACK", "On track"
+        AT_RISK = "AT_RISK", "At risk"
+        OFF_TRACK = "OFF_TRACK", "Off track"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="goals")
+    level = models.CharField(max_length=10, choices=Level.choices)
+    department = models.ForeignKey("organization.Department", on_delete=models.PROTECT, null=True, blank=True, related_name="goals")
+    employee = models.ForeignKey(Employee, on_delete=models.PROTECT, null=True, blank=True, related_name="goals")
+    parent = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True, related_name="children")
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True, max_length=4000)
+    period_start = models.DateField()
+    period_end = models.DateField()
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.DRAFT)
+    health = models.CharField(max_length=10, choices=Health.choices, default=Health.ON_TRACK)
+    progress = models.PositiveSmallIntegerField(default=0)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    agreed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    agreed_at = models.DateTimeField(null=True, blank=True)
+    last_check_in_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("level", "-period_end", "title")
+        indexes = [
+            models.Index(fields=("institution", "level", "status")),
+            models.Index(fields=("employee", "status")),
+        ]
+
+    def clean(self):
+        errors = {}
+        if self.level == self.Level.INDIVIDUAL and not self.employee_id:
+            errors["employee"] = "Choose whose goal this is."
+        if self.level == self.Level.DEPARTMENT and not self.department_id:
+            errors["department"] = "Choose the department."
+        if self.level != self.Level.INDIVIDUAL:
+            self.employee = None
+        if self.level != self.Level.DEPARTMENT:
+            self.department = None
+        if self.period_start and self.period_end and self.period_end < self.period_start:
+            errors["period_end"] = "The end date can't be before the start."
+        if self.progress > 100:
+            errors["progress"] = "Progress is a percentage."
+        for name in ("employee", "department", "parent"):
+            related = getattr(self, name, None)
+            if related is not None and related.institution_id != self.institution_id:
+                errors[name] = "Must belong to the same institution."
+        if self.parent_id:
+            order = {self.Level.COMPANY: 0, self.Level.DEPARTMENT: 1, self.Level.INDIVIDUAL: 2}
+            if self.parent_id == self.id:
+                errors["parent"] = "A goal can't align to itself."
+            elif order[self.parent.level] >= order[self.level] and not (self.level == self.parent.level == self.Level.DEPARTMENT):
+                errors["parent"] = "Align to a goal at a higher level."
+        if errors:
+            raise ValidationError(errors)
+
+    def __str__(self):
+        return self.title
+
+
+class KeyResult(TenantOwnedModel):
+    """A measurable outcome for a goal: progress runs from ``start_value`` to ``target_value``."""
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="key_results")
+    goal = models.ForeignKey(Goal, on_delete=models.CASCADE, related_name="key_results")
+    title = models.CharField(max_length=200)
+    unit = models.CharField(max_length=30, blank=True)
+    start_value = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    target_value = models.DecimalField(max_digits=16, decimal_places=2)
+    current_value = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    sort_order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ("sort_order", "created_at")
+
+    @property
+    def progress(self):
+        span = self.target_value - self.start_value
+        if span == 0:
+            return 100 if self.current_value >= self.target_value else 0
+        return max(0, min(100, round(float((self.current_value - self.start_value) / span) * 100)))
+
+    def clean(self):
+        if self.goal_id and self.goal.institution_id != self.institution_id:
+            raise ValidationError({"goal": "Must belong to the same institution."})
+
+
+class GoalCheckIn(TenantOwnedModel):
+    """A dated update on a goal: health, a note and the progress at that moment."""
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="goal_check_ins")
+    goal = models.ForeignKey(Goal, on_delete=models.CASCADE, related_name="check_ins")
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    health = models.CharField(max_length=10, choices=Goal.Health.choices)
+    progress = models.PositiveSmallIntegerField()
+    note = models.TextField(blank=True, max_length=2000)
+    values = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ("-created_at",)

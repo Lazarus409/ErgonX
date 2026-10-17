@@ -24029,6 +24029,732 @@ paths:
       - module_disabled
       - permission_denied
       - not_found
+  /api/v1/goals/:
+    get:
+      operationId: goals_list
+      description: |-
+        Goals the caller may see: active company and department goals for everyone,
+        individual goals for the person, their manager and HR.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: List goals
+      parameters:
+      - in: query
+        name: department
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: employee
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: health
+        schema:
+          type: string
+          x-spec-enum-id: 04dd41d8e71db0b6
+          enum:
+          - AT_RISK
+          - OFF_TRACK
+          - ON_TRACK
+        description: |-
+          * `ON_TRACK` - On track
+          * `AT_RISK` - At risk
+          * `OFF_TRACK` - Off track
+      - in: query
+        name: level
+        schema:
+          type: string
+          x-spec-enum-id: e0f12402903af9d0
+          enum:
+          - COMPANY
+          - DEPARTMENT
+          - INDIVIDUAL
+        description: |-
+          * `COMPANY` - Company
+          * `DEPARTMENT` - Department
+          * `INDIVIDUAL` - Individual
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: parent
+        schema:
+          type: string
+          format: uuid
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      - in: query
+        name: status
+        schema:
+          type: string
+          x-spec-enum-id: 2c1afef730ae5901
+          enum:
+          - ACTIVE
+          - CANCELLED
+          - COMPLETED
+          - DRAFT
+        description: |-
+          * `DRAFT` - Draft
+          * `ACTIVE` - Active
+          * `COMPLETED` - Completed
+          * `CANCELLED` - Cancelled
+      tags:
+      - goals
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/PaginatedGoalList'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+    post:
+      operationId: goals_create
+      description: |-
+        Goals the caller may see: active company and department goals for everyone,
+        individual goals for the person, their manager and HR.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `validation_error`.
+      summary: Create goal
+      tags:
+      - goals
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Goal'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Goal'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Goal'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/Goal'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - validation_error
+  /api/v1/goals/{id}/:
+    get:
+      operationId: goals_retrieve
+      description: |-
+        Goals the caller may see: active company and department goals for everyone,
+        individual goals for the person, their manager and HR.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
+      summary: Retrieve goal
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this goal.
+        required: true
+      tags:
+      - goals
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/Goal'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+    patch:
+      operationId: goals_partial_update
+      description: |-
+        Goals the caller may see: active company and department goals for everyone,
+        individual goals for the person, their manager and HR.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Update goal
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this goal.
+        required: true
+      tags:
+      - goals
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedGoal'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedGoal'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedGoal'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/Goal'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+  /api/v1/goals/{id}/activate/:
+    post:
+      operationId: goals_activate_create
+      description: |-
+        Goals the caller may see: active company and department goals for everyone,
+        individual goals for the person, their manager and HR.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Activate goal
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this goal.
+        required: true
+      tags:
+      - goals
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/Goal'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+  /api/v1/goals/{id}/cancel/:
+    post:
+      operationId: goals_cancel_create
+      description: |-
+        Goals the caller may see: active company and department goals for everyone,
+        individual goals for the person, their manager and HR.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Cancel goal
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this goal.
+        required: true
+      tags:
+      - goals
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/Goal'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+  /api/v1/goals/{id}/check-in/:
+    post:
+      operationId: goals_check_in_create
+      description: |-
+        Goals the caller may see: active company and department goals for everyone,
+        individual goals for the person, their manager and HR.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Check in goal
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this goal.
+        required: true
+      tags:
+      - goals
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GoalCheckInRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/GoalCheckInRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/GoalCheckInRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/Goal'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+  /api/v1/goals/{id}/complete/:
+    post:
+      operationId: goals_complete_create
+      description: |-
+        Goals the caller may see: active company and department goals for everyone,
+        individual goals for the person, their manager and HR.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Complete goal
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this goal.
+        required: true
+      tags:
+      - goals
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/Goal'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
   /api/v1/grades/:
     get:
       operationId: grades_list
@@ -65886,6 +66612,174 @@ components:
       - tax_authority
       - updated_at
       - version
+    Goal:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        level:
+          enum:
+          - COMPANY
+          - DEPARTMENT
+          - INDIVIDUAL
+          type: string
+          description: |-
+            * `COMPANY` - Company
+            * `DEPARTMENT` - Department
+            * `INDIVIDUAL` - Individual
+          x-spec-enum-id: e0f12402903af9d0
+        level_label:
+          type: string
+          readOnly: true
+        employee:
+          type: string
+          format: uuid
+          nullable: true
+        department:
+          type: string
+          format: uuid
+          nullable: true
+        parent:
+          type: string
+          format: uuid
+          nullable: true
+        parent_title:
+          type: string
+          readOnly: true
+        owner_name:
+          type: string
+          readOnly: true
+        title:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 4000
+        period_start:
+          type: string
+          format: date
+        period_end:
+          type: string
+          format: date
+        status:
+          enum:
+          - DRAFT
+          - ACTIVE
+          - COMPLETED
+          - CANCELLED
+          type: string
+          description: |-
+            * `DRAFT` - Draft
+            * `ACTIVE` - Active
+            * `COMPLETED` - Completed
+            * `CANCELLED` - Cancelled
+          x-spec-enum-id: 2c1afef730ae5901
+          readOnly: true
+        status_label:
+          type: string
+          readOnly: true
+        health:
+          enum:
+          - ON_TRACK
+          - AT_RISK
+          - OFF_TRACK
+          type: string
+          description: |-
+            * `ON_TRACK` - On track
+            * `AT_RISK` - At risk
+            * `OFF_TRACK` - Off track
+          x-spec-enum-id: 04dd41d8e71db0b6
+          readOnly: true
+        health_label:
+          type: string
+          readOnly: true
+        progress:
+          type: integer
+          readOnly: true
+        key_results:
+          type: array
+          items:
+            $ref: '#/components/schemas/KeyResult'
+        children_count:
+          type: integer
+          readOnly: true
+          default: 0
+        agreed_by_name:
+          type: string
+          readOnly: true
+        agreed_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        last_check_in_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        viewer:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - agreed_at
+      - agreed_by_name
+      - children_count
+      - created_at
+      - health
+      - health_label
+      - id
+      - last_check_in_at
+      - level
+      - level_label
+      - owner_name
+      - parent_title
+      - period_end
+      - period_start
+      - progress
+      - status
+      - status_label
+      - title
+      - updated_at
+      - viewer
+    GoalCheckInRequest:
+      type: object
+      properties:
+        health:
+          enum:
+          - ON_TRACK
+          - AT_RISK
+          - OFF_TRACK
+          type: string
+          description: |-
+            * `ON_TRACK` - On track
+            * `AT_RISK` - At risk
+            * `OFF_TRACK` - Off track
+          x-spec-enum-id: 04dd41d8e71db0b6
+        note:
+          type: string
+          maxLength: 2000
+        values:
+          type: object
+          additionalProperties:
+            type: string
+            format: decimal
+            pattern: ^-?\d{0,14}(?:\.\d{0,2})?$
+        progress:
+          type: integer
+          maximum: 100
+          minimum: 0
+      required:
+      - health
     Grade:
       type: object
       description: Runs model validation so domain invariants also protect non-form
@@ -67771,6 +68665,37 @@ components:
       required:
       - accounting_period
       - entry_date
+    KeyResult:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+          maxLength: 200
+        unit:
+          type: string
+          maxLength: 30
+        start_value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,2})?$
+        target_value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,2})?$
+        current_value:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,14}(?:\.\d{0,2})?$
+        progress:
+          type: integer
+          readOnly: true
+      required:
+      - progress
+      - target_value
+      - title
     Launch:
       type: object
       properties:
@@ -70043,6 +70968,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/GhanaLocalizationVersion'
+    PaginatedGoalList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Goal'
     PaginatedGradeList:
       type: object
       required:
@@ -73262,6 +74210,124 @@ components:
           format: uuid
           readOnly: true
           nullable: true
+    PatchedGoal:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        level:
+          enum:
+          - COMPANY
+          - DEPARTMENT
+          - INDIVIDUAL
+          type: string
+          description: |-
+            * `COMPANY` - Company
+            * `DEPARTMENT` - Department
+            * `INDIVIDUAL` - Individual
+          x-spec-enum-id: e0f12402903af9d0
+        level_label:
+          type: string
+          readOnly: true
+        employee:
+          type: string
+          format: uuid
+          nullable: true
+        department:
+          type: string
+          format: uuid
+          nullable: true
+        parent:
+          type: string
+          format: uuid
+          nullable: true
+        parent_title:
+          type: string
+          readOnly: true
+        owner_name:
+          type: string
+          readOnly: true
+        title:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 4000
+        period_start:
+          type: string
+          format: date
+        period_end:
+          type: string
+          format: date
+        status:
+          enum:
+          - DRAFT
+          - ACTIVE
+          - COMPLETED
+          - CANCELLED
+          type: string
+          description: |-
+            * `DRAFT` - Draft
+            * `ACTIVE` - Active
+            * `COMPLETED` - Completed
+            * `CANCELLED` - Cancelled
+          x-spec-enum-id: 2c1afef730ae5901
+          readOnly: true
+        status_label:
+          type: string
+          readOnly: true
+        health:
+          enum:
+          - ON_TRACK
+          - AT_RISK
+          - OFF_TRACK
+          type: string
+          description: |-
+            * `ON_TRACK` - On track
+            * `AT_RISK` - At risk
+            * `OFF_TRACK` - Off track
+          x-spec-enum-id: 04dd41d8e71db0b6
+          readOnly: true
+        health_label:
+          type: string
+          readOnly: true
+        progress:
+          type: integer
+          readOnly: true
+        key_results:
+          type: array
+          items:
+            $ref: '#/components/schemas/KeyResult'
+        children_count:
+          type: integer
+          readOnly: true
+          default: 0
+        agreed_by_name:
+          type: string
+          readOnly: true
+        agreed_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        last_check_in_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        viewer:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
     PatchedGrade:
       type: object
       description: Runs model validation so domain invariants also protect non-form

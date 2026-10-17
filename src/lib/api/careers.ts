@@ -43,6 +43,23 @@ export interface TrackingView {
   can_upload: boolean;
   interviews: { id: string; scheduled_at: string; duration_minutes: number; mode: string; where: string; time_zone: string; message: string; response: string }[];
   documents: { id: string; name: string; category: string; uploaded_at: string }[];
+  offer: {
+    status: "EXTENDED" | "ACCEPTED" | "DECLINED" | "HIRED";
+    status_label: string;
+    position: string;
+    department: string;
+    location: string;
+    employment_type: string;
+    proposed_start_date: string;
+    expires_on: string | null;
+    base_salary: string | null;
+    currency: string;
+    contract_length_months: number | null;
+    terms: string;
+    signed_name: string;
+    signed_at: string | null;
+    can_answer: boolean;
+  } | null;
 }
 
 export interface CareersSiteSettings {
@@ -96,4 +113,8 @@ export function getCareersSettings(): Promise<CareersSiteSettings> {
 
 export function saveCareersSettings(payload: Omit<CareersSiteSettings, "updated_at" | "exists">): Promise<CareersSiteSettings> {
   return apiPut<CareersSiteSettings>("/recruitment/careers-site/", payload);
+}
+
+export function answerOffer(token: string, response: "ACCEPT" | "DECLINE", signedName = "", note = ""): Promise<TrackingView> {
+  return apiPost<TrackingView>(`/public/careers/track/${encodeURIComponent(token)}/offer/`, { response, signed_name: signedName, note, confirm: response === "ACCEPT" });
 }

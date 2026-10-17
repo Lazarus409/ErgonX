@@ -2,14 +2,14 @@
 
 import { useCallback, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import { CalendarClock, FileText, Upload } from "lucide-react";
+import { CalendarClock, FileSignature, FileText, Upload } from "lucide-react";
 
 import CareersShell from "@/components/careers/CareersShell";
 import Alert from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { Select } from "@/components/ui/Field";
+import { Checkbox, Field, Input, Select } from "@/components/ui/Field";
 import { careersApi, getApiErrorMessage } from "@/lib/api";
 import { CANDIDATE_DOCUMENT_TYPES, type TrackingView } from "@/lib/api/careers";
 import { formatDate, formatDateTime } from "@/lib/format";
@@ -47,6 +47,8 @@ export default function TrackApplicationPage() {
             <p className="mt-1 flex flex-wrap items-center gap-2 text-support text-ink-muted"><Badge tone={TONES[data.status]}>{data.status_label}</Badge>{data.applied_at && <span>Applied {formatDate(data.applied_at)}</span>}</p>
           </header>
           {actionError && <Alert tone="danger" onDismiss={() => setActionError("")}>{actionError}</Alert>}
+
+          {data.offer && <OfferCard token={token} offer={data.offer} busy={busy} onAnswer={(work) => void run(work)} />}
 
           {data.interviews.length > 0 && (
             <Card title="Interviews" icon={CalendarClock} accent="recruitment">
@@ -90,5 +92,34 @@ export default function TrackApplicationPage() {
         </>
       )}
     </CareersShell>
+  );
+}
+
+function OfferCard({ token, offer, busy, onAnswer }: { token: string; offer: NonNullable<TrackingView["offer"]>; busy: boolean; onAnswer: (work: () => Promise<TrackingView>) => void }) {
+  const [name, setName] = useState("");
+  const [confirmed, setConfirmed] = useState(false);
+  return (
+    <Card title="Your offer" icon={FileSignature} accent="recruitment" actions={<Badge tone={offer.status === "DECLINED" ? "neutral" : "success"}>{offer.status_label}</Badge>}>
+      <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+        <div><dt className="text-caption text-ink-muted">Position</dt><dd className="font-medium text-ink-strong">{offer.position}</dd></div>
+        <div><dt className="text-caption text-ink-muted">Department · location</dt><dd className="font-medium text-ink-strong">{offer.department} · {offer.location}</dd></div>
+        <div><dt className="text-caption text-ink-muted">Start date</dt><dd className="font-medium text-ink-strong">{formatDate(offer.proposed_start_date)}</dd></div>
+        <div><dt className="text-caption text-ink-muted">Employment</dt><dd className="font-medium text-ink-strong">{offer.employment_type}{offer.contract_length_months ? ` · ${offer.contract_length_months} months` : ""}</dd></div>
+        {offer.base_salary && <div><dt className="text-caption text-ink-muted">Salary</dt><dd className="font-medium text-ink-strong">{offer.currency} {Number(offer.base_salary).toLocaleString()} per month</dd></div>}
+        {offer.expires_on && <div><dt className="text-caption text-ink-muted">Answer by</dt><dd className="font-medium text-ink-strong">{formatDate(offer.expires_on)}</dd></div>}
+      </dl>
+      {offer.terms && <p className="mt-3 whitespace-pre-line text-support text-ink">{offer.terms}</p>}
+      {offer.signed_at && <p className="mt-3 text-support text-success-ink">Accepted and signed as “{offer.signed_name}” on {formatDateTime(offer.signed_at)}.</p>}
+      {offer.can_answer && (
+        <div className="mt-4 space-y-3 border-t border-line-soft pt-4">
+          <Checkbox label="I accept this offer and its terms." checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
+          <Field label="Type your full name to sign"><Input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" maxLength={200} /></Field>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="ghost" disabled={busy} onClick={() => window.confirm("Decline this offer? This can't be undone.") && onAnswer(() => careersApi.answerOffer(token, "DECLINE"))}>Decline offer</Button>
+            <Button loading={busy} disabled={!confirmed || !name.trim()} leadingIcon={<FileSignature className="h-4 w-4" />} onClick={() => onAnswer(() => careersApi.answerOffer(token, "ACCEPT", name.trim()))}>Accept and sign</Button>
+          </div>
+        </div>
+      )}
+    </Card>
   );
 }

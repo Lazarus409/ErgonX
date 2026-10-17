@@ -48,6 +48,7 @@ import { EmployeeAttendanceTab, EmployeeLeaveTab, EmployeePayrollTab } from "@/c
 import DocumentChecklistPanel from "@/components/hr/DocumentChecklistPanel";
 import EmployeeTrainingList from "@/components/hr/EmployeeTrainingList";
 import LifecycleChecklist from "@/components/hr/LifecycleChecklist";
+import { EmployeeSignaturesPanel } from "@/components/hr/SignaturePanels";
 import { useAccess } from "@/lib/access";
 import { EM_DASH, formatDate, humanizeEnum } from "@/lib/format";
 import { Avatar } from "@/components/ui/Card";
@@ -1702,6 +1703,7 @@ export default function EmployeeDetailPage() {
           {tab === "training" && <EmployeeTrainingList employeeId={employee.id} />}
           {tab === "payroll" && <EmployeePayrollTab employeeId={employee.id} />}
           {tab === "documents" && <div className="mb-6"><DocumentChecklistPanel mode="hr" employeeId={employee.id} onChanged={() => void refreshDocuments()} /></div>}
+          {tab === "documents" && <div className="mb-6"><EmployeeSignaturesPanel employeeId={employee.id} documents={documents.filter((document) => document.is_active !== false)} canSend={canManageLifecycle} /></div>}
           {tab === "documents" && (
           <SectionCard
             id="documents"

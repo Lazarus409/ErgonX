@@ -1,6 +1,6 @@
 "use client";
 
-import { Banknote, Briefcase, Building2, CalendarDays, ClipboardCheck, Clock3, FileCheck2, GraduationCap, LayoutDashboard, MessageSquareWarning, ScrollText, Target, Users } from "lucide-react";
+import { Banknote, Crown, Briefcase, Building2, CalendarDays, ClipboardCheck, Clock3, FileCheck2, GraduationCap, LayoutDashboard, MessageSquareWarning, ScrollText, Target, Users } from "lucide-react";
 
 import ModuleLanding from "@/components/home/ModuleLanding";
 
@@ -14,6 +14,7 @@ const areas = [
   { title: "Recruitment", description: "Requisitions, candidates, interviews and offers.", href: "/recruitment", icon: Briefcase, permission: "job_posting.view" },
   { title: "Organization", description: "Departments, positions, grades and locations.", href: "/hr/organization", icon: Building2, permission: "organization.view" },
   { title: "Performance", description: "Review cycles, self-assessments, manager reviews and sign-off.", href: "/performance", icon: Target, permission: "performance.view" },
+  { title: "Talent & Succession", description: "Critical positions, successors and the confidential 9-box talent grid.", href: "/talent", icon: Crown, permission: "talent.view" },
   { title: "Training", description: "Courses, enrolments and certificates to renew.", href: "/training", icon: GraduationCap, permission: "training.view" },
   { title: "Document Checklist", description: "Required documents and who is still missing them.", href: "/hr/documents", icon: FileCheck2, permission: "document_requirement.view" },
   { title: "Onboarding Checklists", description: "Standard onboarding and offboarding items: IT access, equipment, clearance and final pay.", href: "/hr/lifecycle-checklists", icon: ClipboardCheck, permission: "employment.view" },

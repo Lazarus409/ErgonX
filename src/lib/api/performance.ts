@@ -307,3 +307,96 @@ export function calibrateReview(reviewId: string, rating: number | null, note: s
 export function getCalibrationBoard(cycleId: string): Promise<CalibrationBoard> {
   return apiGet<CalibrationBoard>(`/review-cycles/${cycleId}/calibration/`);
 }
+
+/* Talent and succession ------------------------------------------------- */
+
+export type TalentLevel = "LOW" | "MEDIUM" | "HIGH";
+export type Readiness = "READY_NOW" | "ONE_TO_TWO_YEARS" | "THREE_PLUS_YEARS";
+export const READINESS_LABELS: Record<Readiness, string> = { READY_NOW: "Ready now", ONE_TO_TWO_YEARS: "1-2 years", THREE_PLUS_YEARS: "3+ years" };
+export const READINESS_TONES: Record<Readiness, "success" | "info" | "neutral"> = { READY_NOW: "success", ONE_TO_TWO_YEARS: "info", THREE_PLUS_YEARS: "neutral" };
+export const TALENT_LEVEL_LABELS: Record<TalentLevel, string> = { LOW: "Low", MEDIUM: "Medium", HIGH: "High" };
+
+export interface SuccessorRow {
+  id: string;
+  employee: string;
+  employee_name: string;
+  employee_number: string;
+  current_position: string;
+  readiness: Readiness;
+  readiness_label: string;
+  development_notes: string;
+  latest_rating: number | null;
+}
+
+export interface SuccessionPlan {
+  id: string;
+  position: string;
+  position_title: string;
+  department_name: string;
+  is_critical: boolean;
+  risk_of_loss: TalentLevel;
+  risk_of_loss_label: string;
+  impact_of_loss: TalentLevel;
+  impact_of_loss_label: string;
+  notes: string;
+  reviewed_at: string | null;
+  incumbents: { id: string; name: string }[];
+  successors: SuccessorRow[];
+  cover: { status: "READY" | "DEVELOPING" | "NONE"; READY_NOW: number; ONE_TO_TWO_YEARS: number; THREE_PLUS_YEARS: number };
+}
+
+export interface TalentRow {
+  employee_id: string;
+  employee: string;
+  employee_number: string;
+  department: string;
+  position: string;
+  latest_rating: number | null;
+  performance: TalentLevel | "";
+  performance_overridden: boolean;
+  potential: TalentLevel | "";
+  flight_risk: TalentLevel | "";
+  in_talent_pool: boolean;
+  career_aspiration: string;
+  notes: string;
+  assessed_at: string | null;
+  assessed_by: string;
+}
+
+export interface TalentGrid {
+  employees: TalentRow[];
+  boxes: Record<string, number>;
+  summary: { employees: number; placed: number; talent_pool: number; high_flight_risk: number };
+}
+
+export function listSuccessionPlans(): Promise<PaginatedData<SuccessionPlan>> {
+  return apiGetList<SuccessionPlan>("/succession-plans/", { page_size: MAX_PAGE_SIZE });
+}
+
+export function createSuccessionPlan(payload: Partial<Pick<SuccessionPlan, "position" | "is_critical" | "risk_of_loss" | "impact_of_loss" | "notes">>): Promise<SuccessionPlan> {
+  return apiPost<SuccessionPlan>("/succession-plans/", payload);
+}
+
+export function updateSuccessionPlan(id: string, payload: Partial<Pick<SuccessionPlan, "is_critical" | "risk_of_loss" | "impact_of_loss" | "notes" | "reviewed_at">>): Promise<SuccessionPlan> {
+  return apiPatch<SuccessionPlan>(`/succession-plans/${id}/`, payload);
+}
+
+export function deleteSuccessionPlan(id: string): Promise<void> {
+  return apiDelete(`/succession-plans/${id}/`);
+}
+
+export function saveSuccessor(planId: string, payload: { employee: string; readiness: Readiness; development_notes?: string }): Promise<SuccessionPlan> {
+  return apiPost<SuccessionPlan>(`/succession-plans/${planId}/successors/`, payload);
+}
+
+export async function removeSuccessor(planId: string, successorId: string): Promise<void> {
+  return apiDelete(`/succession-plans/${planId}/successors/${successorId}/`);
+}
+
+export function getTalentGrid(): Promise<TalentGrid> {
+  return apiGet<TalentGrid>("/talent-grid/");
+}
+
+export function assessTalent(payload: { employee: string; potential?: TalentLevel | ""; performance_override?: TalentLevel | ""; flight_risk?: TalentLevel | ""; in_talent_pool?: boolean; career_aspiration?: string; notes?: string }): Promise<TalentRow> {
+  return apiPost<TalentRow>("/talent-grid/", payload);
+}

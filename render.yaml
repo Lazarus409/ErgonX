@@ -106,6 +106,33 @@ services:
       - key: EMAIL_DELIVERY_ENABLED
         value: "false"
 
+  - type: cron
+    runtime: docker
+    name: ergonx-webhook-retries
+    dockerfilePath: Ergonx-backend/Dockerfile
+    dockerContext: Ergonx-backend
+    # Every 5 minutes: retry webhook deliveries that failed and are due again.
+    schedule: "*/5 * * * *"
+    dockerCommand: python manage.py deliver_webhooks
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.production
+      - key: DJANGO_SECRET_KEY
+        fromService:
+          type: web
+          name: ergonx-api
+          envVarKey: DJANGO_SECRET_KEY
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ergonx-postgres
+          property: connectionString
+      - key: DJANGO_ALLOWED_HOSTS
+        value: localhost
+      - key: FRONTEND_PUBLIC_URL
+        sync: false
+      - key: EMAIL_DELIVERY_ENABLED
+        value: "false"
+
 
 databases:
   - name: ergonx-postgres

@@ -19,6 +19,8 @@ export const settingsAreas: Array<{ title: string; description: string; href: st
   { title: "Modules", description: "Review enabled ERP modules and configuration status.", href: "/settings/modules", icon: Puzzle, permission: "settings.modules.manage" },
   { title: "Roles & Permissions", description: "Manage institution roles and assigned permissions.", href: "/settings/roles", icon: ShieldCheck, permission: "settings.roles.manage" },
   { title: "Integrations", description: "API keys for other systems and attendance devices, and webhooks that notify them of changes.", href: "/settings/integrations", icon: Plug, permission: "integrations.manage" },
+  { title: "Privacy & Data Protection", description: "Data subject requests, retention rules, legal holds and the consent register.", href: "/privacy", icon: ShieldCheck, anyPermissions: ["privacy.view", "privacy.manage"] },
+  { title: "My Data & Privacy", description: "Ask for a copy of your data, a correction, or erasure, and follow your requests.", href: "/settings/privacy", icon: ShieldCheck, permission: "home.view" },
   { title: "Calendar Subscription", description: "Add your shifts, leave and interviews to Google, Outlook or Apple Calendar.", href: "/settings/calendar", icon: CalendarPlus, permission: "home.view" },
   { title: "Approval Workflows", description: "Review approval definitions used by operational processes.", href: "/settings/approval-workflows", icon: GitPullRequest, permission: "approval_workflow.view" },
   { title: "Notifications", description: "Review in-app notification history for your active institution.", href: "/notifications", icon: Bell, permission: "home.view" },

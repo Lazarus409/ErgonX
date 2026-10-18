@@ -72,3 +72,4 @@ export * as complaintsApi from "./complaints";
 export * as careersApi from "./careers";
 export * as signaturesApi from "./signatures";
 export * as integrationsApi from "./integrations";
+export * as privacyApi from "./privacy";

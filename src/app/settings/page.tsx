@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Building2, BriefcaseBusiness, CalendarDays, Clock3, GitPullRequest, KeyRound, type LucideIcon, Puzzle, ShieldCheck, SlidersHorizontal, UserRound } from "lucide-react";
+import { Bell, Building2, BriefcaseBusiness, CalendarDays, Clock3, GitPullRequest, KeyRound, type LucideIcon, Puzzle, ShieldCheck, SlidersHorizontal, UserRound, Plug, CalendarPlus } from "lucide-react";
 
 import { useAuth } from "@/components/guards/AuthProvider";
 import { ActionCard } from "@/components/ui/Card";
@@ -18,6 +18,8 @@ export const settingsAreas: Array<{ title: string; description: string; href: st
   { title: "Institution Settings", description: "Manage the institution's identity, logo and operational locale.", href: "/settings/institution", icon: Building2, permission: "settings.institution.manage" },
   { title: "Modules", description: "Review enabled ERP modules and configuration status.", href: "/settings/modules", icon: Puzzle, permission: "settings.modules.manage" },
   { title: "Roles & Permissions", description: "Manage institution roles and assigned permissions.", href: "/settings/roles", icon: ShieldCheck, permission: "settings.roles.manage" },
+  { title: "Integrations", description: "API keys for other systems and attendance devices, and webhooks that notify them of changes.", href: "/settings/integrations", icon: Plug, permission: "integrations.manage" },
+  { title: "Calendar Subscription", description: "Add your shifts, leave and interviews to Google, Outlook or Apple Calendar.", href: "/settings/calendar", icon: CalendarPlus, permission: "home.view" },
   { title: "Approval Workflows", description: "Review approval definitions used by operational processes.", href: "/settings/approval-workflows", icon: GitPullRequest, permission: "approval_workflow.view" },
   { title: "Notifications", description: "Review in-app notification history for your active institution.", href: "/notifications", icon: Bell, permission: "home.view" },
   { title: "Organization", description: "Review the institution's department / functional area, position, grade, and location catalogues.", href: "/hr/departments", icon: BriefcaseBusiness, permission: "organization.view", module: "HR", scopes: INSTITUTION_WIDE },

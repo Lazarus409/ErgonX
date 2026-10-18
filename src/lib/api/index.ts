@@ -74,3 +74,4 @@ export * as signaturesApi from "./signatures";
 export * as integrationsApi from "./integrations";
 export * as privacyApi from "./privacy";
 export * as securityApi from "./security";
+export * as reportBuilderApi from "./reportBuilder";

@@ -192,6 +192,8 @@ PERMISSIONS = {
     "talent.view": "View succession plans and the confidential talent grid",
     "talent.manage": "Maintain succession plans, successors and talent assessments",
     "integrations.manage": "Manage API keys, webhooks and device integrations",
+    "privacy.view": "View data subject requests, retention rules, legal holds and consent records",
+    "privacy.manage": "Handle data subject requests, retention and legal holds",
     "complaint.view": "View employee complaints, except any that name you",
     "complaint.manage": "Handle employee complaints: assign, investigate, resolve and close",
     "report.view": "View and export institution reports",
@@ -468,6 +470,7 @@ ROLE_PERMISSION_CODES = {
         "training.view",
         "performance.view",
         "talent.view",
+        "privacy.view",
         "complaint.view",
     ),
 }
@@ -482,6 +485,7 @@ SYSTEM_READ_ONLY_ROLES = frozenset({"AUDITOR"})
 # on a built-in role may grant them (Wave 0 decision PERM-03).
 PRIVILEGED_PERMISSIONS = frozenset({
     "integrations.manage",
+    "privacy.manage",
     "settings.institution.manage",
     "settings.modules.manage",
     "settings.users.manage",

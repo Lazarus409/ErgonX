@@ -37331,6 +37331,146 @@ paths:
       - tenant_mismatch
       - module_disabled
       - permission_denied
+  /api/v1/me/privacy/:
+    get:
+      operationId: me_privacy_retrieve
+      description: |-
+        The signed-in employee's own requests, and making a new one.
+
+        Requires an authenticated user, an active institution context, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: Get my privacy view
+      tags:
+      - me
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+    post:
+      operationId: me_privacy_create
+      description: |-
+        The signed-in employee's own requests, and making a new one.
+
+        Requires an authenticated user, an active institution context, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `validation_error`.
+      summary: Post my privacy view
+      tags:
+      - me
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - validation_error
   /api/v1/notifications/:
     get:
       operationId: notifications_list
@@ -46246,6 +46386,1471 @@ paths:
       - module_disabled
       - permission_denied
       - not_found
+  /api/v1/privacy/legal-holds/:
+    get:
+      operationId: privacy_legal_holds_list
+      description: |-
+        List legal holds.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `privacy.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: List legal holds
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - privacy
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/PaginatedLegalHoldList'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+    post:
+      operationId: privacy_legal_holds_create
+      description: |-
+        Create legal hold.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `privacy.manage` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `validation_error`.
+      summary: Create legal hold
+      tags:
+      - privacy
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LegalHold'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LegalHold'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LegalHold'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/LegalHold'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - validation_error
+  /api/v1/privacy/legal-holds/{id}/:
+    get:
+      operationId: privacy_legal_holds_retrieve
+      description: |-
+        Retrieve legal hold.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `privacy.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
+      summary: Retrieve legal hold
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this legal hold.
+        required: true
+      tags:
+      - privacy
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/LegalHold'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+    patch:
+      operationId: privacy_legal_holds_partial_update
+      description: |-
+        Update legal hold.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `privacy.manage` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Update legal hold
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this legal hold.
+        required: true
+      tags:
+      - privacy
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedLegalHold'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedLegalHold'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedLegalHold'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/LegalHold'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+  /api/v1/privacy/legal-holds/{id}/release/:
+    post:
+      operationId: privacy_legal_holds_release_create
+      description: |-
+        Release legal hold.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `privacy.manage` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Release legal hold
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this legal hold.
+        required: true
+      tags:
+      - privacy
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/LegalHold'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+  /api/v1/privacy/requests/:
+    get:
+      operationId: privacy_requests_list
+      description: |-
+        Requests HR handles, including those received by email or letter and entered here.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `privacy.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: List data subject requests
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: request_type
+        schema:
+          type: string
+          x-spec-enum-id: ea5f652312f1753a
+          enum:
+          - ACCESS
+          - ERASURE
+          - OBJECTION
+          - RECTIFICATION
+        description: |-
+          * `ACCESS` - Copy of my data
+          * `RECTIFICATION` - Correct my data
+          * `ERASURE` - Erase my data
+          * `OBJECTION` - Object to processing
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      - in: query
+        name: status
+        schema:
+          type: string
+          x-spec-enum-id: c43fa8d47f7f13a6
+          enum:
+          - COMPLETED
+          - IN_PROGRESS
+          - RECEIVED
+          - REJECTED
+        description: |-
+          * `RECEIVED` - Received
+          * `IN_PROGRESS` - In progress
+          * `COMPLETED` - Completed
+          * `REJECTED` - Refused
+      tags:
+      - privacy
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/PaginatedDataSubjectRequestList'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+    post:
+      operationId: privacy_requests_create
+      description: |-
+        Requests HR handles, including those received by email or letter and entered here.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `privacy.manage` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `validation_error`.
+      summary: Create data subject request
+      tags:
+      - privacy
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DataSubjectRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/DataSubjectRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/DataSubjectRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DataSubjectRequest'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - validation_error
+  /api/v1/privacy/requests/{id}/:
+    get:
+      operationId: privacy_requests_retrieve
+      description: |-
+        Requests HR handles, including those received by email or letter and entered here.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `privacy.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
+      summary: Retrieve data subject request
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this data subject request.
+        required: true
+      tags:
+      - privacy
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DataSubjectRequest'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+  /api/v1/privacy/requests/{id}/erase/:
+    post:
+      operationId: privacy_requests_erase_create
+      description: |-
+        Carries out an erasure request for a candidate. Employees' records are kept under employment law; record the outcome instead.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `privacy.manage` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Erase data subject request
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this data subject request.
+        required: true
+      tags:
+      - privacy
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+  /api/v1/privacy/requests/{id}/export/:
+    get:
+      operationId: privacy_requests_export_retrieve
+      description: |-
+        Requests HR handles, including those received by email or letter and entered here.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `privacy.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
+      summary: Export data subject request
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this data subject request.
+        required: true
+      tags:
+      - privacy
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+  /api/v1/privacy/requests/{id}/status/:
+    post:
+      operationId: privacy_requests_status_create
+      description: |-
+        Requests HR handles, including those received by email or letter and entered here.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `privacy.manage` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Update status data subject request
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this data subject request.
+        required: true
+      tags:
+      - privacy
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: {}
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              additionalProperties: {}
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: {}
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/DataSubjectRequest'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+  /api/v1/privacy/requests/consents/:
+    get:
+      operationId: privacy_requests_consents_retrieve
+      description: |-
+        Requests HR handles, including those received by email or letter and entered here.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `privacy.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: Consents data subject request
+      tags:
+      - privacy
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+  /api/v1/privacy/retention-rules/:
+    get:
+      operationId: privacy_retention_rules_list
+      description: |-
+        List retention rules.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `privacy.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: List retention rules
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - privacy
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/PaginatedRetentionRuleList'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+    post:
+      operationId: privacy_retention_rules_create
+      description: |-
+        Create retention rule.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `privacy.manage` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `validation_error`.
+      summary: Create retention rule
+      tags:
+      - privacy
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RetentionRule'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RetentionRule'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RetentionRule'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/RetentionRule'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - validation_error
+  /api/v1/privacy/retention-rules/{id}/:
+    get:
+      operationId: privacy_retention_rules_retrieve
+      description: |-
+        Retrieve retention rule.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `privacy.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
+      summary: Retrieve retention rule
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this retention rule.
+        required: true
+      tags:
+      - privacy
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/RetentionRule'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+    patch:
+      operationId: privacy_retention_rules_partial_update
+      description: |-
+        Update retention rule.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `privacy.manage` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Update retention rule
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this retention rule.
+        required: true
+      tags:
+      - privacy
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedRetentionRule'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedRetentionRule'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedRetentionRule'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/RetentionRule'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+  /api/v1/privacy/retention-rules/{id}/run/:
+    post:
+      operationId: privacy_retention_rules_run_create
+      description: |-
+        Run retention rule.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `privacy.manage` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Run retention rule
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this retention rule.
+        required: true
+      tags:
+      - privacy
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+  /api/v1/privacy/retention-rules/report/:
+    get:
+      operationId: privacy_retention_rules_report_retrieve
+      description: |-
+        Report retention rule.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `privacy.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: Report retention rule
+      tags:
+      - privacy
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
   /api/v1/public/calendar/{token}.ics:
     get:
       operationId: public_calendar_.ics_retrieve
@@ -69603,6 +71208,106 @@ components:
       - id
       - name
       - updated_at
+    DataSubjectRequest:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        request_type:
+          enum:
+          - ACCESS
+          - RECTIFICATION
+          - ERASURE
+          - OBJECTION
+          type: string
+          description: |-
+            * `ACCESS` - Copy of my data
+            * `RECTIFICATION` - Correct my data
+            * `ERASURE` - Erase my data
+            * `OBJECTION` - Object to processing
+          x-spec-enum-id: ea5f652312f1753a
+          readOnly: true
+        type_label:
+          type: string
+          readOnly: true
+        employee:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        candidate:
+          type: string
+          format: uuid
+          readOnly: true
+          nullable: true
+        subject:
+          type: string
+          readOnly: true
+        requester_name:
+          type: string
+          readOnly: true
+        requester_email:
+          type: string
+          format: email
+          readOnly: true
+        details:
+          type: string
+          readOnly: true
+        status:
+          enum:
+          - RECEIVED
+          - IN_PROGRESS
+          - COMPLETED
+          - REJECTED
+          type: string
+          description: |-
+            * `RECEIVED` - Received
+            * `IN_PROGRESS` - In progress
+            * `COMPLETED` - Completed
+            * `REJECTED` - Refused
+          x-spec-enum-id: c43fa8d47f7f13a6
+          readOnly: true
+        status_label:
+          type: string
+          readOnly: true
+        received_at:
+          type: string
+          format: date-time
+          readOnly: true
+        due_on:
+          type: string
+          format: date
+          readOnly: true
+        overdue:
+          type: string
+          readOnly: true
+        outcome:
+          type: string
+          readOnly: true
+        closed_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+      required:
+      - candidate
+      - closed_at
+      - details
+      - due_on
+      - employee
+      - id
+      - outcome
+      - overdue
+      - received_at
+      - request_type
+      - requester_email
+      - requester_name
+      - status
+      - status_label
+      - subject
+      - type_label
     Department:
       type: object
       description: Runs model validation so domain invariants also protect non-form
@@ -73877,6 +75582,52 @@ components:
       - journal_entry_id
       - journal_number
       - running_balance
+    LegalHold:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        title:
+          type: string
+          maxLength: 150
+        reason:
+          type: string
+          maxLength: 2000
+        employees:
+          type: array
+          items:
+            type: string
+            format: uuid
+        candidates:
+          type: array
+          items:
+            type: string
+            format: uuid
+        employee_names:
+          type: string
+          readOnly: true
+        candidate_names:
+          type: string
+          readOnly: true
+        released_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - candidate_names
+      - created_at
+      - employee_names
+      - id
+      - reason
+      - released_at
+      - title
     LifecycleTaskTemplate:
       type: object
       description: Runs model validation so domain invariants also protect non-form
@@ -75306,6 +77057,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Customer'
+    PaginatedDataSubjectRequestList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/DataSubjectRequest'
     PaginatedDepartmentList:
       type: object
       required:
@@ -76203,6 +77977,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/LeaveType'
+    PaginatedLegalHoldList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/LegalHold'
     PaginatedLifecycleTaskTemplateList:
       type: object
       required:
@@ -76778,6 +78575,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/RecruitmentStage'
+    PaginatedRetentionRuleList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/RetentionRule'
     PaginatedReviewCycleList:
       type: object
       required:
@@ -80318,6 +82138,44 @@ components:
           type: string
           format: date-time
           readOnly: true
+    PatchedLegalHold:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        title:
+          type: string
+          maxLength: 150
+        reason:
+          type: string
+          maxLength: 2000
+        employees:
+          type: array
+          items:
+            type: string
+            format: uuid
+        candidates:
+          type: array
+          items:
+            type: string
+            format: uuid
+        employee_names:
+          type: string
+          readOnly: true
+        candidate_names:
+          type: string
+          readOnly: true
+        released_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
     PatchedLifecycleTaskTemplate:
       type: object
       description: Runs model validation so domain invariants also protect non-form
@@ -81026,6 +82884,58 @@ components:
           type: string
           format: date-time
           readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedRetentionRule:
+      type: object
+      description: Runs model validation so domain invariants also protect non-form
+        API writes.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        category:
+          enum:
+          - CANDIDATES
+          - FORMER_EMPLOYEES
+          - ATTENDANCE
+          - AUDIT
+          type: string
+          description: |-
+            * `CANDIDATES` - Unsuccessful and withdrawn candidates
+            * `FORMER_EMPLOYEES` - Former employees' personal contact details
+            * `ATTENDANCE` - Attendance records
+            * `AUDIT` - Audit trail
+          x-spec-enum-id: c8c28b5a992344e2
+        category_label:
+          type: string
+          readOnly: true
+        keep_months:
+          type: integer
+          maximum: 32767
+          minimum: 0
+        action:
+          enum:
+          - ANONYMISE
+          - REVIEW
+          type: string
+          description: |-
+            * `ANONYMISE` - Anonymise when due
+            * `REVIEW` - List for review only
+          x-spec-enum-id: 5880ffc4c2b7e092
+        is_active:
+          type: boolean
+        notes:
+          type: string
+          maxLength: 1000
+        last_run_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
         updated_at:
           type: string
           format: date-time
@@ -83898,6 +85808,65 @@ components:
       - percentage_base_component_id
       - resolved_amount
       - source
+    RetentionRule:
+      type: object
+      description: Runs model validation so domain invariants also protect non-form
+        API writes.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        category:
+          enum:
+          - CANDIDATES
+          - FORMER_EMPLOYEES
+          - ATTENDANCE
+          - AUDIT
+          type: string
+          description: |-
+            * `CANDIDATES` - Unsuccessful and withdrawn candidates
+            * `FORMER_EMPLOYEES` - Former employees' personal contact details
+            * `ATTENDANCE` - Attendance records
+            * `AUDIT` - Audit trail
+          x-spec-enum-id: c8c28b5a992344e2
+        category_label:
+          type: string
+          readOnly: true
+        keep_months:
+          type: integer
+          maximum: 32767
+          minimum: 0
+        action:
+          enum:
+          - ANONYMISE
+          - REVIEW
+          type: string
+          description: |-
+            * `ANONYMISE` - Anonymise when due
+            * `REVIEW` - List for review only
+          x-spec-enum-id: 5880ffc4c2b7e092
+        is_active:
+          type: boolean
+        notes:
+          type: string
+          maxLength: 1000
+        last_run_at:
+          type: string
+          format: date-time
+          readOnly: true
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - category
+      - category_label
+      - id
+      - keep_months
+      - last_run_at
+      - updated_at
     ReviewCycle:
       type: object
       description: Runs model validation so domain invariants also protect non-form

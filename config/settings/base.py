@@ -62,6 +62,7 @@ LOCAL_APPS = [
     "apps.performance.apps.PerformanceConfig",
     "apps.complaints.apps.ComplaintsConfig",
     "apps.integrations.apps.IntegrationsConfig",
+    "apps.privacy.apps.PrivacyConfig",
     "apps.filestore.apps.FilestoreConfig",
 ]
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS

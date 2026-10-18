@@ -49,17 +49,20 @@ export default function GoalsPage() {
   const { showToast } = useToast();
   const { can } = useAccess();
   const isHr = can("performance.manage");
+  const canSeePeople = can("employee.view");
+  const canSeeDepartments = can("organization.view");
   const [view, setView] = useState<View>("mine");
 
+  // Only ask for lists the person may see: everyone else sets goals for themselves.
   const load = useCallback(async () => {
     const [goals, me, people, departments] = await Promise.all([
       performanceApi.listGoals(),
       employeesApi.getCurrentEmployee(),
-      employeesApi.listEmployees({ page_size: 100, status: "ACTIVE", ordering: "first_name" }).then((page) => page.results).catch(() => []),
-      organizationApi.listDepartments({ page_size: 100, ordering: "name" }).then((page) => page.results).catch(() => []),
+      canSeePeople ? employeesApi.listEmployees({ page_size: 100, status: "ACTIVE", ordering: "first_name" }).then((page) => page.results).catch(() => []) : Promise.resolve([]),
+      canSeeDepartments ? organizationApi.listDepartments({ page_size: 100, ordering: "name" }).then((page) => page.results).catch(() => []) : Promise.resolve([]),
     ]);
     return { goals: goals.results, me, people, departments };
-  }, []);
+  }, [canSeePeople, canSeeDepartments]);
   const { data, loading, error, reload } = useApiResource(load);
   const goals = useMemo(() => data?.goals ?? [], [data]);
   const me = data?.me ?? null;

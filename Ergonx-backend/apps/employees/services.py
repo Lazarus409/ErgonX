@@ -6,6 +6,7 @@ from django.utils import timezone
 
 from apps.audit.services import record_audit_event
 from apps.employees.models import EmergencyContact, Employee, EmployeeOffboarding, EmployeeOnboarding, Employment
+from apps.employees.lifecycle import checklist_blocker, generate_lifecycle_tasks, reschedule_offboarding_tasks
 from apps.institutions.models import InstitutionMembership
 from apps.institutions.services import update_membership
 from common.exceptions import CodedValidationError
@@ -108,6 +109,13 @@ def save_emergency_contact(*, institution, employee, instance=None, **values):
     return contact
 
 
+def _sync_policy_tasks(institution, employee, actor):
+    # Policies already acknowledged (e.g. on a rehire) tick off the new policy item.
+    from apps.documents.policies import sync_policy_tasks
+
+    sync_policy_tasks(institution=institution, employee=employee, actor=actor)
+
+
 @transaction.atomic
 def start_employee_onboarding(*, institution, employee, actor):
     locked_employee = Employee.objects.select_for_update().get(pk=employee.pk)
@@ -121,7 +129,10 @@ def start_employee_onboarding(*, institution, employee, actor):
         onboarding = EmployeeOnboarding(institution=institution, employee=locked_employee)
     onboarding.status = EmployeeOnboarding.Status.IN_PROGRESS
     onboarding.started_at = onboarding.started_at or timezone.now()
+    onboarding.blocked_reason = ""
     onboarding.save()
+    if generate_lifecycle_tasks(onboarding):
+        _sync_policy_tasks(institution, locked_employee, actor)
     record_audit_event(actor=actor, institution=institution, entity=onboarding, action="employee.onboarding.started")
     return onboarding
 
@@ -131,10 +142,13 @@ def complete_employee_onboarding(*, institution, employee, actor):
     onboarding = start_employee_onboarding(institution=institution, employee=employee, actor=actor)
     locked_employee = Employee.objects.select_for_update().get(pk=employee.pk)
     has_current_employment = Employment.objects.filter(employee=locked_employee, is_current=True, status=Employment.Status.ACTIVE).exists()
-    if not has_current_employment:
+    blockers = [] if has_current_employment else ["A current active employment record is required before activation."]
+    if pending := checklist_blocker(onboarding):
+        blockers.append(pending)
+    if blockers:
         onboarding.status = EmployeeOnboarding.Status.BLOCKED
-        onboarding.notes = "A current active employment record is required before activation."
-        onboarding.save(update_fields=("status", "notes", "updated_at"))
+        onboarding.blocked_reason = " ".join(blockers)
+        onboarding.save(update_fields=("status", "blocked_reason", "updated_at"))
         return onboarding
     onboarding.status = EmployeeOnboarding.Status.COMPLETED
     onboarding.completed_at = timezone.now()
@@ -169,7 +183,10 @@ def initiate_employee_offboarding(*, institution, employee, actor, last_working_
     offboarding.last_working_day = last_working_day or offboarding.last_working_day
     offboarding.reason = reason or offboarding.reason
     offboarding.notes = notes or offboarding.notes
+    offboarding.blocked_reason = ""
     offboarding.save()
+    if not generate_lifecycle_tasks(offboarding) and last_working_day:
+        reschedule_offboarding_tasks(offboarding)
     record_audit_event(actor=actor, institution=institution, entity=offboarding, action="employee.offboarding.initiated")
     return offboarding
 
@@ -182,10 +199,12 @@ def complete_employee_offboarding(*, institution, employee, actor):
     from apps.leave.models import LeaveRequest
     if LeaveRequest.objects.for_institution(institution).filter(employee=locked_employee, status=LeaveRequest.Status.PENDING).exists():
         blockers.append("Pending leave requests must be resolved.")
+    if pending := checklist_blocker(offboarding):
+        blockers.append(pending)
     if blockers:
         offboarding.status = EmployeeOffboarding.Status.BLOCKED
-        offboarding.notes = " ".join(blockers)
-        offboarding.save(update_fields=("status", "notes", "updated_at"))
+        offboarding.blocked_reason = " ".join(blockers)
+        offboarding.save(update_fields=("status", "blocked_reason", "updated_at"))
         return offboarding
     end_date = offboarding.last_working_day or timezone.localdate()
     current = Employment.objects.select_for_update().filter(employee=locked_employee, is_current=True).first()
@@ -229,5 +248,7 @@ def rehire_employee(*, institution, employee, actor, department, position, grade
         if membership and membership.status == InstitutionMembership.Status.INACTIVE:
             update_membership(membership=membership, institution=institution, actor=actor, status=InstitutionMembership.Status.INVITED)
     onboarding = EmployeeOnboarding.objects.create(institution=institution, employee=locked_employee, status=EmployeeOnboarding.Status.IN_PROGRESS, started_at=timezone.now(), notes="Rehire onboarding started.")
+    if generate_lifecycle_tasks(onboarding):
+        _sync_policy_tasks(institution, locked_employee, actor)
     record_audit_event(actor=actor, institution=institution, entity=employment, action="employee.rehired", metadata={"employee_id": str(locked_employee.id), "start_date": str(start_date)})
     return employment, onboarding

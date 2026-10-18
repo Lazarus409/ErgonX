@@ -151,6 +151,17 @@ class Location(AutoCodeMixin, TenantOwnedModel):
     is_remote = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
 
+    class ClockLocationRule(models.TextChoices):
+        OFF = "OFF", "Don't check location"
+        RECORD = "RECORD", "Record location and flag off-site clocks"
+        REQUIRE = "REQUIRE", "Only allow clocking on site"
+
+    # Site position for location-checked clocking (self-service clocks only).
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    geofence_radius_m = models.PositiveIntegerField(default=200)
+    clock_location_rule = models.CharField(max_length=8, choices=ClockLocationRule.choices, default=ClockLocationRule.OFF)
+
     class Meta:
         ordering = ("name",)
         constraints = [
@@ -164,6 +175,19 @@ class Location(AutoCodeMixin, TenantOwnedModel):
     def clean(self):
         self.code = self.code.strip().upper()
         self.country = self.country.strip().upper()
+        errors = {}
+        if (self.latitude is None) != (self.longitude is None):
+            errors["latitude"] = "Enter both latitude and longitude, or neither."
+        if self.latitude is not None and not -90 <= self.latitude <= 90:
+            errors["latitude"] = "Latitude must be between -90 and 90."
+        if self.longitude is not None and not -180 <= self.longitude <= 180:
+            errors["longitude"] = "Longitude must be between -180 and 180."
+        if not 25 <= self.geofence_radius_m <= 20_000:
+            errors["geofence_radius_m"] = "Use a radius between 25 m and 20 km."
+        if self.clock_location_rule != self.ClockLocationRule.OFF and (self.latitude is None or self.is_remote):
+            errors["clock_location_rule"] = "Set the site's position first. Remote locations can't check where people clock in."
+        if errors:
+            raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
         self.code = self.code.strip().upper()

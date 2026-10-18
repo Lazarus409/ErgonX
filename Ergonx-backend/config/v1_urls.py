@@ -29,4 +29,7 @@ urlpatterns = [
     path("", include("apps.performance.urls")),
     path("", include("apps.complaints.urls")),
     path("", include("apps.notifications.urls")),
+    path("", include("apps.integrations.urls")),
+    path("", include("apps.privacy.urls")),
+    path("", include("apps.security.urls")),
 ]

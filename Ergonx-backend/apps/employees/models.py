@@ -295,6 +295,7 @@ class EmployeeOnboarding(TenantOwnedModel):
     started_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     notes = models.TextField(blank=True)
+    blocked_reason = models.TextField(blank=True)
 
     class Meta:
         ordering = ("-created_at",)
@@ -329,6 +330,7 @@ class EmployeeOffboarding(TenantOwnedModel):
     last_working_day = models.DateField(null=True, blank=True)
     reason = models.TextField(blank=True)
     notes = models.TextField(blank=True)
+    blocked_reason = models.TextField(blank=True)
 
     class Meta:
         ordering = ("-created_at",)
@@ -339,3 +341,106 @@ class EmployeeOffboarding(TenantOwnedModel):
             raise ValidationError(
                 {"employee": "Employee must belong to the same institution."}
             )
+
+
+class LifecycleProcess(models.TextChoices):
+    ONBOARDING = "ONBOARDING", "Onboarding"
+    OFFBOARDING = "OFFBOARDING", "Offboarding"
+
+
+class LifecycleTaskCategory(models.TextChoices):
+    DOCUMENTS = "DOCUMENTS", "Documents & contract"
+    IT_ACCESS = "IT_ACCESS", "IT access"
+    EQUIPMENT = "EQUIPMENT", "Equipment"
+    POLICY = "POLICY", "Policy acknowledgement"
+    ORIENTATION = "ORIENTATION", "Orientation"
+    PROBATION = "PROBATION", "Probation"
+    HANDOVER = "HANDOVER", "Handover"
+    ASSET_RETURN = "ASSET_RETURN", "Asset return"
+    CLEARANCE = "CLEARANCE", "Clearance"
+    EXIT_INTERVIEW = "EXIT_INTERVIEW", "Exit interview"
+    ACCESS_REVOCATION = "ACCESS_REVOCATION", "Access revocation"
+    FINAL_PAY = "FINAL_PAY", "Final pay"
+    OTHER = "OTHER", "Other"
+
+
+class LifecycleTaskOwner(models.TextChoices):
+    HR = "HR", "HR"
+    MANAGER = "MANAGER", "Line manager"
+    IT = "IT", "IT"
+    FINANCE = "FINANCE", "Finance"
+    EMPLOYEE = "EMPLOYEE", "Employee"
+
+
+class LifecycleTaskTemplate(TenantOwnedModel):
+    """One checklist item copied onto every new onboarding or offboarding record.
+
+    ``due_offset_days`` counts from the employment start date (onboarding) or the
+    last working day (offboarding); negative values fall before it.
+    """
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="lifecycle_task_templates")
+    process = models.CharField(max_length=12, choices=LifecycleProcess.choices)
+    title = models.CharField(max_length=150)
+    description = models.TextField(blank=True, max_length=2000)
+    category = models.CharField(max_length=20, choices=LifecycleTaskCategory.choices, default=LifecycleTaskCategory.OTHER)
+    owner = models.CharField(max_length=10, choices=LifecycleTaskOwner.choices, default=LifecycleTaskOwner.HR)
+    due_offset_days = models.SmallIntegerField(default=0)
+    is_required = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True)
+    sort_order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ("process", "sort_order", "title")
+        indexes = [models.Index(fields=("institution", "process", "is_active"))]
+
+    def clean(self):
+        if not -365 <= self.due_offset_days <= 365:
+            raise ValidationError({"due_offset_days": "Use a value between -365 and 365 days."})
+
+
+class LifecycleTask(TenantOwnedModel):
+    """A checklist item on one employee's onboarding or offboarding record."""
+
+    class Status(models.TextChoices):
+        OPEN = "OPEN", "Open"
+        DONE = "DONE", "Done"
+        NOT_APPLICABLE = "NOT_APPLICABLE", "Not applicable"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="lifecycle_tasks")
+    employee = models.ForeignKey(Employee, on_delete=models.PROTECT, related_name="lifecycle_tasks")
+    onboarding = models.ForeignKey(EmployeeOnboarding, on_delete=models.CASCADE, null=True, blank=True, related_name="tasks")
+    offboarding = models.ForeignKey(EmployeeOffboarding, on_delete=models.CASCADE, null=True, blank=True, related_name="tasks")
+    template = models.ForeignKey(LifecycleTaskTemplate, on_delete=models.SET_NULL, null=True, blank=True, related_name="tasks")
+    title = models.CharField(max_length=150)
+    description = models.TextField(blank=True, max_length=2000)
+    category = models.CharField(max_length=20, choices=LifecycleTaskCategory.choices, default=LifecycleTaskCategory.OTHER)
+    owner = models.CharField(max_length=10, choices=LifecycleTaskOwner.choices, default=LifecycleTaskOwner.HR)
+    is_required = models.BooleanField(default=True)
+    sort_order = models.PositiveSmallIntegerField(default=0)
+    due_date = models.DateField(null=True, blank=True)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.OPEN)
+    note = models.TextField(blank=True, max_length=2000)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    completed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+
+    class Meta:
+        ordering = ("sort_order", "created_at")
+        indexes = [models.Index(fields=("institution", "employee", "status"))]
+        constraints = [
+            models.CheckConstraint(
+                condition=(models.Q(onboarding__isnull=False, offboarding__isnull=True) | models.Q(onboarding__isnull=True, offboarding__isnull=False)),
+                name="lifecycle_task_one_parent",
+            ),
+        ]
+
+    @property
+    def process(self):
+        return LifecycleProcess.ONBOARDING if self.onboarding_id else LifecycleProcess.OFFBOARDING
+
+    def clean(self):
+        parent = self.onboarding or self.offboarding
+        if parent is not None and (parent.institution_id != self.institution_id or parent.employee_id != self.employee_id):
+            raise ValidationError({"employee": "Task must belong to the same employee and institution as its record."})
+        if self.status == self.Status.NOT_APPLICABLE and self.is_required and not self.note.strip():
+            raise ValidationError({"note": "Give a reason when marking a required item not applicable."})

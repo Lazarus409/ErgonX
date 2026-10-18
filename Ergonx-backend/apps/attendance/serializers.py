@@ -23,10 +23,22 @@ class AttendanceRecordSerializer(serializers.ModelSerializer):
             "status",
             "source",
             "notes",
+            "check_in_site",
+            "check_in_position",
+            "check_out_site",
+            "check_out_position",
             "created_at",
             "updated_at",
         )
         read_only_fields = fields
+
+
+class ClockPositionSerializer(serializers.Serializer):
+    """The device's position at the moment of clocking, when the work location asks for it."""
+
+    lat = serializers.FloatField(min_value=-90, max_value=90)
+    lng = serializers.FloatField(min_value=-180, max_value=180)
+    accuracy_m = serializers.FloatField(min_value=0, max_value=1_000_000, required=False, allow_null=True)
 
 
 class ClockInSerializer(serializers.Serializer):
@@ -36,6 +48,7 @@ class ClockInSerializer(serializers.Serializer):
         choices=AttendanceRecord.Source.choices,
         default=AttendanceRecord.Source.WEB,
     )
+    position = ClockPositionSerializer(required=False, allow_null=True)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -46,6 +59,7 @@ class ClockInSerializer(serializers.Serializer):
 
 class ClockOutSerializer(serializers.Serializer):
     at = serializers.DateTimeField(required=False)
+    position = ClockPositionSerializer(required=False, allow_null=True)
 
 
 class AttendanceClassificationSerializer(serializers.Serializer):

@@ -458,3 +458,54 @@ class ScheduleAssignment(TenantOwnedModel):
         if errors:
             raise ValidationError(errors)
 
+
+
+class ShiftSwap(TenantOwnedModel):
+    """Two employees exchange their shifts on one date.
+
+    The colleague accepts first, then someone with ``attendance.approve`` (not one
+    of the two) approves. Once approved, each person's expected hours on that date
+    are the other's, so lateness, worked time and overtime follow the swap. One
+    side may be an off day: the other then covers the shift and takes the day off.
+    """
+
+    class Status(models.TextChoices):
+        AWAITING_COLLEAGUE = "AWAITING_COLLEAGUE", "Waiting for colleague"
+        AWAITING_APPROVAL = "AWAITING_APPROVAL", "Waiting for approval"
+        APPROVED = "APPROVED", "Approved"
+        DECLINED = "DECLINED", "Declined by colleague"
+        REJECTED = "REJECTED", "Rejected"
+        CANCELLED = "CANCELLED", "Cancelled"
+
+    OPEN_STATUSES = (Status.AWAITING_COLLEAGUE, Status.AWAITING_APPROVAL)
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="shift_swaps")
+    requester = models.ForeignKey(Employee, on_delete=models.PROTECT, related_name="shift_swaps_requested")
+    counterpart = models.ForeignKey(Employee, on_delete=models.PROTECT, related_name="shift_swaps_offered")
+    swap_date = models.DateField()
+    reason = models.TextField(blank=True, max_length=1000)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.AWAITING_COLLEAGUE)
+    # What each person was due to work before the swap, for the record ("Night 22:00-06:00", "Off day").
+    requester_shift_label = models.CharField(max_length=120, blank=True)
+    counterpart_shift_label = models.CharField(max_length=120, blank=True)
+    colleague_responded_at = models.DateTimeField(null=True, blank=True)
+    decided_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    decided_at = models.DateTimeField(null=True, blank=True)
+    decision_note = models.TextField(blank=True, max_length=1000)
+
+    class Meta:
+        ordering = ("-swap_date", "-created_at")
+        indexes = [
+            models.Index(fields=("institution", "status")),
+            models.Index(fields=("requester", "swap_date")),
+            models.Index(fields=("counterpart", "swap_date")),
+        ]
+        constraints = [
+            models.CheckConstraint(condition=~models.Q(requester=models.F("counterpart")), name="shift_swap_two_people"),
+        ]
+
+    def clean(self):
+        for name in ("requester", "counterpart"):
+            employee = getattr(self, name, None)
+            if employee is not None and employee.institution_id != self.institution_id:
+                raise ValidationError({name: "Employee must belong to the same institution."})

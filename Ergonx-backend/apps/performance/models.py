@@ -105,6 +105,15 @@ class PerformanceReview(TenantOwnedModel):
     hr_comment = models.TextField(blank=True)
     signed_off_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
     signed_off_at = models.DateTimeField(null=True, blank=True)
+    # HR's calibrated rating, set while the review awaits sign-off; it replaces the manager's as the final rating.
+    calibrated_rating = models.PositiveSmallIntegerField(null=True, blank=True, validators=RATING_VALIDATORS)
+    calibration_note = models.TextField(blank=True, max_length=2000)
+    calibrated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    calibrated_at = models.DateTimeField(null=True, blank=True)
+
+    @property
+    def final_rating(self):
+        return self.calibrated_rating or self.overall_rating
 
     class Meta:
         ordering = ("employee__last_name", "employee__first_name")
@@ -138,3 +147,252 @@ class ReviewRating(TenantOwnedModel):
     class Meta:
         ordering = ("competency__sort_order", "competency__name")
         constraints = [models.UniqueConstraint(fields=("review", "competency"), name="uniq_rating_per_review_competency")]
+
+
+class Goal(TenantOwnedModel):
+    """An objective at company, department or individual level, measured by key results.
+
+    Goals align upwards through ``parent`` (individual -> department -> company).
+    Progress is the average of the key results' progress, or the last check-in's
+    figure when a goal has no key results.
+    """
+
+    class Level(models.TextChoices):
+        COMPANY = "COMPANY", "Company"
+        DEPARTMENT = "DEPARTMENT", "Department"
+        INDIVIDUAL = "INDIVIDUAL", "Individual"
+
+    class Status(models.TextChoices):
+        DRAFT = "DRAFT", "Draft"
+        ACTIVE = "ACTIVE", "Active"
+        COMPLETED = "COMPLETED", "Completed"
+        CANCELLED = "CANCELLED", "Cancelled"
+
+    class Health(models.TextChoices):
+        ON_TRACK = "ON_TRACK", "On track"
+        AT_RISK = "AT_RISK", "At risk"
+        OFF_TRACK = "OFF_TRACK", "Off track"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="goals")
+    level = models.CharField(max_length=10, choices=Level.choices)
+    department = models.ForeignKey("organization.Department", on_delete=models.PROTECT, null=True, blank=True, related_name="goals")
+    employee = models.ForeignKey(Employee, on_delete=models.PROTECT, null=True, blank=True, related_name="goals")
+    parent = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True, related_name="children")
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True, max_length=4000)
+    period_start = models.DateField()
+    period_end = models.DateField()
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.DRAFT)
+    health = models.CharField(max_length=10, choices=Health.choices, default=Health.ON_TRACK)
+    progress = models.PositiveSmallIntegerField(default=0)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    agreed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    agreed_at = models.DateTimeField(null=True, blank=True)
+    last_check_in_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("level", "-period_end", "title")
+        indexes = [
+            models.Index(fields=("institution", "level", "status")),
+            models.Index(fields=("employee", "status")),
+        ]
+
+    def clean(self):
+        errors = {}
+        if self.level == self.Level.INDIVIDUAL and not self.employee_id:
+            errors["employee"] = "Choose whose goal this is."
+        if self.level == self.Level.DEPARTMENT and not self.department_id:
+            errors["department"] = "Choose the department."
+        if self.level != self.Level.INDIVIDUAL:
+            self.employee = None
+        if self.level != self.Level.DEPARTMENT:
+            self.department = None
+        if self.period_start and self.period_end and self.period_end < self.period_start:
+            errors["period_end"] = "The end date can't be before the start."
+        if self.progress > 100:
+            errors["progress"] = "Progress is a percentage."
+        for name in ("employee", "department", "parent"):
+            related = getattr(self, name, None)
+            if related is not None and related.institution_id != self.institution_id:
+                errors[name] = "Must belong to the same institution."
+        if self.parent_id:
+            order = {self.Level.COMPANY: 0, self.Level.DEPARTMENT: 1, self.Level.INDIVIDUAL: 2}
+            if self.parent_id == self.id:
+                errors["parent"] = "A goal can't align to itself."
+            elif order[self.parent.level] >= order[self.level] and not (self.level == self.parent.level == self.Level.DEPARTMENT):
+                errors["parent"] = "Align to a goal at a higher level."
+        if errors:
+            raise ValidationError(errors)
+
+    def __str__(self):
+        return self.title
+
+
+class KeyResult(TenantOwnedModel):
+    """A measurable outcome for a goal: progress runs from ``start_value`` to ``target_value``."""
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="key_results")
+    goal = models.ForeignKey(Goal, on_delete=models.CASCADE, related_name="key_results")
+    title = models.CharField(max_length=200)
+    unit = models.CharField(max_length=30, blank=True)
+    start_value = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    target_value = models.DecimalField(max_digits=16, decimal_places=2)
+    current_value = models.DecimalField(max_digits=16, decimal_places=2, default=0)
+    sort_order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ("sort_order", "created_at")
+
+    @property
+    def progress(self):
+        span = self.target_value - self.start_value
+        if span == 0:
+            return 100 if self.current_value >= self.target_value else 0
+        return max(0, min(100, round(float((self.current_value - self.start_value) / span) * 100)))
+
+    def clean(self):
+        if self.goal_id and self.goal.institution_id != self.institution_id:
+            raise ValidationError({"goal": "Must belong to the same institution."})
+
+
+class GoalCheckIn(TenantOwnedModel):
+    """A dated update on a goal: health, a note and the progress at that moment."""
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="goal_check_ins")
+    goal = models.ForeignKey(Goal, on_delete=models.CASCADE, related_name="check_ins")
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    health = models.CharField(max_length=10, choices=Goal.Health.choices)
+    progress = models.PositiveSmallIntegerField()
+    note = models.TextField(blank=True, max_length=2000)
+    values = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+
+
+class FeedbackRequest(TenantOwnedModel):
+    """A colleague's 360 feedback on one performance review.
+
+    The employee and their reviewer see only an anonymous summary, and only
+    once ``MIN_ANONYMOUS_RESPONSES`` colleagues have responded; HR sees names.
+    """
+
+    MIN_ANONYMOUS_RESPONSES = 3
+    MAX_PER_REVIEW = 10
+
+    class Relationship(models.TextChoices):
+        PEER = "PEER", "Peer"
+        DIRECT_REPORT = "DIRECT_REPORT", "Direct report"
+        MANAGER = "MANAGER", "Manager"
+        OTHER = "OTHER", "Other colleague"
+
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Waiting"
+        SUBMITTED = "SUBMITTED", "Submitted"
+        DECLINED = "DECLINED", "Declined"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="feedback_requests")
+    review = models.ForeignKey(PerformanceReview, on_delete=models.CASCADE, related_name="feedback_requests")
+    respondent = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="feedback_to_give")
+    relationship = models.CharField(max_length=14, choices=Relationship.choices, default=Relationship.PEER)
+    requested_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="+")
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    strengths = models.TextField(blank=True, max_length=3000)
+    improvements = models.TextField(blank=True, max_length=3000)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("created_at",)
+        constraints = [models.UniqueConstraint(fields=("review", "respondent"), name="uniq_feedback_per_review_respondent")]
+        indexes = [models.Index(fields=("respondent", "status"))]
+
+    def clean(self):
+        if self.review_id and self.review.institution_id != self.institution_id:
+            raise ValidationError({"review": "Referenced record must belong to the same institution."})
+        if self.review_id and self.respondent_id and self.review.employee.user_id == self.respondent_id:
+            raise ValidationError({"respondent": "Employees don't give 360 feedback on themselves."})
+
+
+class FeedbackRating(TenantOwnedModel):
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="+")
+    request = models.ForeignKey(FeedbackRequest, on_delete=models.CASCADE, related_name="ratings")
+    competency = models.ForeignKey(Competency, on_delete=models.PROTECT, related_name="+")
+    rating = models.PositiveSmallIntegerField(validators=RATING_VALIDATORS)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=("request", "competency"), name="uniq_feedback_rating_per_competency")]
+
+
+class SuccessionPlan(TenantOwnedModel):
+    """Succession cover for one position: how critical it is and who could step in."""
+
+    class Level(models.TextChoices):
+        LOW = "LOW", "Low"
+        MEDIUM = "MEDIUM", "Medium"
+        HIGH = "HIGH", "High"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="succession_plans")
+    position = models.ForeignKey("organization.Position", on_delete=models.PROTECT, related_name="succession_plans")
+    is_critical = models.BooleanField(default=True)
+    risk_of_loss = models.CharField(max_length=6, choices=Level.choices, default=Level.MEDIUM)
+    impact_of_loss = models.CharField(max_length=6, choices=Level.choices, default=Level.HIGH)
+    notes = models.TextField(blank=True, max_length=3000)
+    reviewed_at = models.DateField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("position__title",)
+        constraints = [models.UniqueConstraint(fields=("institution", "position"), name="uniq_succession_plan_per_position")]
+
+    def clean(self):
+        if self.position_id and self.position.institution_id != self.institution_id:
+            raise ValidationError({"position": "Referenced record must belong to the same institution."})
+
+
+class Successor(TenantOwnedModel):
+    class Readiness(models.TextChoices):
+        READY_NOW = "READY_NOW", "Ready now"
+        ONE_TO_TWO_YEARS = "ONE_TO_TWO_YEARS", "Ready in 1-2 years"
+        THREE_PLUS_YEARS = "THREE_PLUS_YEARS", "Ready in 3+ years"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="+")
+    plan = models.ForeignKey(SuccessionPlan, on_delete=models.CASCADE, related_name="successors")
+    employee = models.ForeignKey(Employee, on_delete=models.PROTECT, related_name="succession_candidacies")
+    readiness = models.CharField(max_length=18, choices=Readiness.choices, default=Readiness.ONE_TO_TWO_YEARS)
+    development_notes = models.TextField(blank=True, max_length=2000)
+    sort_order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ("sort_order", "created_at")
+        constraints = [models.UniqueConstraint(fields=("plan", "employee"), name="uniq_successor_per_plan")]
+
+    def clean(self):
+        if self.employee_id and self.employee.institution_id != self.institution_id:
+            raise ValidationError({"employee": "Referenced record must belong to the same institution."})
+
+
+class TalentProfile(TenantOwnedModel):
+    """HR's confidential talent view of one employee: potential, flight risk and pool membership.
+
+    Performance on the 9-box grid comes from the latest final review rating unless
+    HR overrides it here.
+    """
+
+    class Level(models.TextChoices):
+        LOW = "LOW", "Low"
+        MEDIUM = "MEDIUM", "Medium"
+        HIGH = "HIGH", "High"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="talent_profiles")
+    employee = models.OneToOneField(Employee, on_delete=models.CASCADE, related_name="talent_profile")
+    potential = models.CharField(max_length=6, choices=Level.choices, blank=True)
+    performance_override = models.CharField(max_length=6, choices=Level.choices, blank=True)
+    flight_risk = models.CharField(max_length=6, choices=Level.choices, blank=True)
+    in_talent_pool = models.BooleanField(default=False)
+    career_aspiration = models.CharField(max_length=300, blank=True)
+    notes = models.TextField(blank=True, max_length=3000)
+    assessed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    assessed_at = models.DateTimeField(null=True, blank=True)
+
+    def clean(self):
+        if self.employee_id and self.employee.institution_id != self.institution_id:
+            raise ValidationError({"employee": "Referenced record must belong to the same institution."})

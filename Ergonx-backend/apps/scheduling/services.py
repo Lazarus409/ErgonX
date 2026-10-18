@@ -104,7 +104,27 @@ def _rotation_shift(rotation, day_offset):
     raise ValidationError({"rotation_pattern": "Rotation could not resolve the date."})
 
 
-def schedule_expectation(assignment, attendance_date):
+def _swap_partner(employee_id, attendance_date):
+    """The colleague whose shift this employee works on the date, through an approved swap."""
+    from apps.scheduling.models import ShiftSwap
+
+    swap = ShiftSwap.objects.filter(swap_date=attendance_date, status=ShiftSwap.Status.APPROVED).filter(
+        Q(requester_id=employee_id) | Q(counterpart_id=employee_id)
+    ).select_related("requester", "counterpart").first()
+    if swap is None:
+        return None, None
+    return swap, (swap.counterpart if swap.requester_id == employee_id else swap.requester)
+
+
+def schedule_expectation(assignment, attendance_date, *, apply_swaps=True):
+    """The hours an assignment expects on a date. An approved shift swap substitutes the colleague's hours."""
+    if apply_swaps:
+        swap, partner = _swap_partner(assignment.employee_id, attendance_date)
+        partner_assignment = schedule_assignment_for(partner, attendance_date) if partner else None
+        if partner_assignment is not None:
+            expectation = schedule_expectation(partner_assignment, attendance_date, apply_swaps=False)
+            expectation["swap_id"] = swap.id
+            return expectation
     schedule = assignment.work_schedule
     if attendance_date < schedule.effective_from or (
         schedule.effective_to and attendance_date > schedule.effective_to

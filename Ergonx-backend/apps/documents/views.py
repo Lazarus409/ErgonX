@@ -1,8 +1,10 @@
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q
 from django.http import FileResponse
+from rest_framework import serializers
 from rest_framework.decorators import action
-from rest_framework.exceptions import NotFound, PermissionDenied
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiTypes, extend_schema
@@ -11,8 +13,9 @@ from rest_framework.views import APIView
 
 from apps.audit.services import field_changes, record_audit_event, snapshot
 from apps.documents.checklist import checklists, compliance_overview, summarize
-from apps.documents.models import Document, DocumentRequirement, DocumentRequirementWaiver, ImageAsset
-from apps.documents.serializers import DocumentRequirementSerializer, DocumentRequirementWaiverSerializer, DocumentSerializer, ImageAssetSerializer
+from apps.documents import policies as policy_service
+from apps.documents.models import POLICY_ENTITY_TYPE, Document, DocumentRequirement, DocumentRequirementWaiver, ImageAsset, Policy, SignatureRequest
+from apps.documents.serializers import DocumentRequirementSerializer, DocumentRequirementWaiverSerializer, DocumentSerializer, ImageAssetSerializer, PolicyAcknowledgementSerializer, PolicyAcknowledgeSerializer, PolicyFileSerializer, PolicyNewVersionSerializer, PolicySerializer
 from apps.employees.models import Employee
 from apps.employees.services import ensure_not_self_hr_mutation
 from common.permissions import TenantContextPermission, TenantRBACPermission
@@ -271,3 +274,368 @@ class SelfServiceDocumentChecklistView(APIView):
         employee = get_object_or_404(Employee.objects.for_institution(request.institution), user=request.user)
         return Response(_checklist_payload(request.institution, employee))
 
+
+# ---------------------------------------------------------------- policies
+
+
+def _file_response(document):
+    if document is None or not document.stored_file:
+        raise NotFound("This policy has no attached document.")
+    response = FileResponse(document.stored_file.open("rb"), as_attachment=True, filename=document.original_filename, content_type=document.content_type or "application/octet-stream")
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+def _store_policy_file(request, policy):
+    """Saves an uploaded policy document; earlier versions' files are kept for the record."""
+    uploaded = request.FILES.get("uploaded_file")
+    if uploaded is None:
+        return None
+    serializer = DocumentSerializer(data={"uploaded_file": uploaded, "category": "Policy", "classification": Document.Classification.INTERNAL})
+    serializer.is_valid(raise_exception=True)
+    return serializer.save(institution=request.institution, uploaded_by=request.user, entity_type=POLICY_ENTITY_TYPE, entity_id=policy.id)
+
+
+def _policy_row(policy, status, due_date, acknowledgement, *, with_body=False):
+    row = {
+        "id": str(policy.id), "title": policy.title, "category": policy.category, "category_label": policy.get_category_display(),
+        "summary": policy.summary, "version": policy.version, "published_at": policy.published_at, "change_summary": policy.change_summary,
+        "requires_acknowledgement": policy.requires_acknowledgement,
+        "document": PolicyFileSerializer(policy.document).data if policy.document_id else None,
+        "status": status, "due_date": due_date,
+        "acknowledgement": PolicyAcknowledgementSerializer(acknowledgement).data if acknowledgement else None,
+    }
+    if with_body:
+        row["body"] = policy.body
+    return row
+
+
+class PolicyViewSet(TenantModelViewSet):
+    """Workplace policies HR publishes for employees to read and acknowledge."""
+
+    model = Policy
+    serializer_class = PolicySerializer
+    parser_classes = (JSONParser, MultiPartParser, FormParser)
+    http_method_names = ("get", "post", "patch", "delete", "head", "options")
+    filterset_fields = ("status", "category")
+    search_fields = ("title", "summary")
+    ordering_fields = ("title", "published_at", "created_at")
+    ordering = ("title",)
+
+    def get_required_permission(self):
+        if self.action == "file" and self.request.method == "POST":
+            return "policy.manage"
+        return "policy.view" if self.action in ("list", "retrieve", "acknowledgements", "file") else "policy.manage"
+
+    def get_queryset(self):
+        return super().get_queryset().select_related("document", "published_by")
+
+    def _summaries(self, policies):
+        employees = list(scope_to_employees(policy_service.active_employees(self.request.institution), self.request, ""))
+        return {
+            policy.id: policy_service.summarize([row["status"] for row in policy_service.policy_compliance(self.request.institution, policy, employees)])
+            for policy in policies if policy.status == Policy.Status.PUBLISHED
+        }
+
+    def _context(self, policies):
+        return {**self.get_serializer_context(), "acknowledgement_summaries": self._summaries(policies)}
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        rows = page if page is not None else list(queryset)
+        serializer = PolicySerializer(rows, many=True, context=self._context(rows))
+        return self.get_paginated_response(serializer.data) if page is not None else Response(serializer.data)
+
+    def retrieve(self, request, *args, **kwargs):
+        policy = self.get_object()
+        return Response(PolicySerializer(policy, context=self._context([policy])).data)
+
+    def perform_create(self, serializer):
+        policy = serializer.save(institution=self.request.institution)
+        document = _store_policy_file(self.request, policy)
+        if document is not None:
+            policy.document = document
+            policy.save(update_fields=("document", "updated_at"))
+        record_audit_event(actor=self.request.user, institution=self.request.institution, entity=policy, action="policy.created", metadata={"title": policy.title})
+
+    def perform_update(self, serializer):
+        if "uploaded_file" in self.request.FILES and serializer.instance.status != Policy.Status.DRAFT:
+            raise ValidationError({"uploaded_file": "A published policy can't be edited. Publish a new version instead."})
+        policy = serializer.save()
+        document = _store_policy_file(self.request, policy)
+        if document is not None:
+            policy.document = document
+            policy.save(update_fields=("document", "updated_at"))
+        record_audit_event(actor=self.request.user, institution=self.request.institution, entity=policy, action="policy.updated", metadata={"title": policy.title})
+
+    def perform_destroy(self, instance):
+        if instance.status != Policy.Status.DRAFT:
+            raise ValidationError({"status": "Only drafts can be deleted. Retire a published policy instead."})
+        record_audit_event(actor=self.request.user, institution=self.request.institution, entity=instance, action="policy.deleted", metadata={"title": instance.title})
+        instance.delete()
+
+    def _respond(self, policy):
+        policy = self.get_queryset().get(pk=policy.pk)
+        return Response(PolicySerializer(policy, context=self._context([policy])).data)
+
+    @extend_schema(request=None, responses=PolicySerializer)
+    @action(detail=True, methods=("post",))
+    def publish(self, request, pk=None):
+        return self._respond(call_validated_service(policy_service.publish_policy, institution=request.institution, policy=self.get_object(), actor=request.user))
+
+    @extend_schema(request=PolicyNewVersionSerializer, responses=PolicySerializer)
+    @action(detail=True, methods=("post",), url_path="new-version")
+    def new_version(self, request, pk=None):
+        policy = self.get_object()
+        payload = PolicyNewVersionSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        content = dict(payload.validated_data)
+        change_summary = content.pop("change_summary")
+        if policy.status != Policy.Status.PUBLISHED:
+            raise ValidationError({"status": "Only a published policy can get a new version."})
+        document = _store_policy_file(request, policy)
+        if document is not None:
+            content["document"] = document
+        policy = call_validated_service(policy_service.publish_new_version, institution=request.institution, policy=policy, actor=request.user, change_summary=change_summary, **content)
+        return self._respond(policy)
+
+    @extend_schema(request=None, responses=PolicySerializer)
+    @action(detail=True, methods=("post",))
+    def retire(self, request, pk=None):
+        return self._respond(call_validated_service(policy_service.retire_policy, institution=request.institution, policy=self.get_object(), actor=request.user))
+
+    @extend_schema(responses={(200, "application/octet-stream"): OpenApiTypes.BINARY})
+    @action(detail=True, methods=("get", "post"))
+    def file(self, request, pk=None):
+        """GET downloads the policy document; POST (multipart ``uploaded_file``) replaces it on a draft."""
+        policy = self.get_object()
+        if request.method == "GET":
+            return _file_response(policy.document)
+        if policy.status != Policy.Status.DRAFT:
+            raise ValidationError({"uploaded_file": "A published policy can't be edited. Publish a new version instead."})
+        document = _store_policy_file(request, policy)
+        if document is None:
+            raise ValidationError({"uploaded_file": "Choose a file to upload."})
+        policy.document = document
+        policy.save(update_fields=("document", "updated_at"))
+        record_audit_event(actor=request.user, institution=request.institution, entity=policy, action="policy.updated", metadata={"title": policy.title, "file": document.original_filename})
+        return self._respond(policy)
+
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
+    @action(detail=True, methods=("get",))
+    def acknowledgements(self, request, pk=None):
+        """Who has and has not acknowledged the current version, within the caller's employee scope."""
+        policy = self.get_object()
+        employees = scope_to_employees(policy_service.active_employees(request.institution), request, "").order_by("first_name", "last_name")
+        rows = policy_service.policy_compliance(request.institution, policy, employees)
+        return Response({
+            "policy_id": str(policy.id), "version": policy.version,
+            "summary": policy_service.summarize([row["status"] for row in rows]),
+            "employees": [
+                {
+                    "employee_id": str(row["employee"].id), "employee": row["employee"].full_name, "employee_number": row["employee"].employee_number,
+                    "status": row["status"], "due_date": row["due_date"],
+                    "acknowledgement": PolicyAcknowledgementSerializer(row["acknowledgement"]).data if row["acknowledgement"] else None,
+                }
+                for row in rows
+            ],
+        })
+
+
+class SelfServicePolicyBaseView(APIView):
+    permission_classes = (TenantContextPermission, TenantRBACPermission)
+    required_module = "CORE_HR"
+
+    def get_required_permission(self):
+        return "home.view"
+
+    def employee(self, request):
+        return get_object_or_404(Employee.objects.for_institution(request.institution), user=request.user)
+
+    def policy_row(self, request, pk):
+        employee = self.employee(request)
+        for policy, status, due_date, acknowledgement in policy_service.policies_for_employee(request.institution, employee):
+            if str(policy.id) == str(pk):
+                return employee, policy, status, due_date, acknowledgement
+        raise NotFound("Policy not found.")
+
+
+class SelfServicePoliciesView(SelfServicePolicyBaseView):
+    """The published policies that apply to the signed-in employee, with their acknowledgement status."""
+
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
+    def get(self, request):
+        employee = self.employee(request)
+        rows = policy_service.policies_for_employee(request.institution, employee)
+        outstanding = (policy_service.OVERDUE, policy_service.PENDING)
+        return Response({
+            "summary": policy_service.summarize([status for _, status, _, _ in rows]),
+            "policies": [_policy_row(*row) for row in sorted(rows, key=lambda row: (row[1] not in outstanding, row[0].title))],
+        })
+
+
+class SelfServicePolicyDetailView(SelfServicePolicyBaseView):
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
+    def get(self, request, pk):
+        _, policy, status, due_date, acknowledgement = self.policy_row(request, pk)
+        return Response(_policy_row(policy, status, due_date, acknowledgement, with_body=True))
+
+
+class SelfServicePolicyFileView(SelfServicePolicyBaseView):
+    @extend_schema(responses={(200, "application/octet-stream"): OpenApiTypes.BINARY})
+    def get(self, request, pk):
+        _, policy, _, _, _ = self.policy_row(request, pk)
+        return _file_response(policy.document)
+
+
+class SelfServicePolicyAcknowledgeView(SelfServicePolicyBaseView):
+    @extend_schema(request=PolicyAcknowledgeSerializer, responses={200: OpenApiTypes.OBJECT})
+    def post(self, request, pk):
+        employee, policy, _, _, _ = self.policy_row(request, pk)
+        payload = PolicyAcknowledgeSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        call_validated_service(policy_service.acknowledge_policy, institution=request.institution, policy=policy, employee=employee, user=request.user, signed_name=payload.validated_data["signed_name"])
+        _, policy, status, due_date, acknowledgement = self.policy_row(request, pk)
+        return Response(_policy_row(policy, status, due_date, acknowledgement, with_body=True))
+
+
+# ---------------------------------------------------------------- signatures
+
+
+class SignatureRequestSerializer(serializers.ModelSerializer):
+    employee_name = serializers.CharField(source="employee.full_name", read_only=True)
+    document_name = serializers.CharField(source="document.original_filename", read_only=True)
+    status_label = serializers.CharField(source="get_status_display", read_only=True)
+    requested_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SignatureRequest
+        fields = (
+            "id", "document", "document_name", "employee", "employee_name", "title", "message", "due_date", "status", "status_label",
+            "requested_by_name", "document_sha256", "signed_name", "signed_at", "decline_reason", "created_at",
+        )
+        read_only_fields = fields
+
+    def get_requested_by_name(self, request):
+        user = request.requested_by
+        return (user.get_full_name() or user.email) if user else ""
+
+
+class SignatureRequestCreateSerializer(serializers.Serializer):
+    document = serializers.UUIDField()
+    employee = serializers.UUIDField()
+    title = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    message = serializers.CharField(max_length=2000, required=False, allow_blank=True)
+    due_date = serializers.DateField(required=False, allow_null=True)
+
+
+def _certificate_response(request):
+    from django.http import HttpResponse
+
+    from apps.documents.signatures import certificate
+
+    response = HttpResponse(certificate(request), content_type="text/plain; charset=utf-8")
+    response["Content-Disposition"] = f'attachment; filename="signature-record-{request.id}.txt"'
+    return response
+
+
+class SignatureRequestViewSet(TenantModelViewSet):
+    """HR's signature requests for employees in the caller's scope."""
+
+    model = SignatureRequest
+    serializer_class = SignatureRequestSerializer
+    http_method_names = ("get", "post", "head", "options")
+    filterset_fields = ("employee", "status", "document")
+    ordering = ("-created_at",)
+
+    def get_required_permission(self):
+        return "employee.view" if self.action in ("list", "retrieve", "certificate") else "employee.update"
+
+    def get_queryset(self):
+        return scope_to_employees(super().get_queryset().select_related("employee", "document", "requested_by"), self.request)
+
+    def create(self, request, *args, **kwargs):
+        from apps.documents.signatures import request_signature
+
+        payload = SignatureRequestCreateSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        values = payload.validated_data
+        employee = get_object_or_404(scope_to_employees(Employee.objects.for_institution(request.institution), request, ""), pk=values["employee"])
+        document = get_object_or_404(Document.objects.for_institution(request.institution), pk=values["document"])
+        signature = call_validated_service(
+            request_signature, institution=request.institution, document=document, employee=employee, actor=request.user,
+            title=values.get("title") or "", message=values.get("message") or "", due_date=values.get("due_date"),
+        )
+        return Response(self.get_serializer(signature).data, status=201)
+
+    @extend_schema(request=None, responses=SignatureRequestSerializer)
+    @action(detail=True, methods=("post",))
+    def cancel(self, request, pk=None):
+        from apps.documents.signatures import cancel
+
+        signature = call_validated_service(cancel, request=self.get_object(), actor=request.user)
+        return Response(self.get_serializer(signature).data)
+
+    @extend_schema(responses={(200, "text/plain"): OpenApiTypes.STR})
+    @action(detail=True, methods=("get",))
+    def certificate(self, request, pk=None):
+        return _certificate_response(self.get_object())
+
+
+class SelfServiceSignatureBase(APIView):
+    permission_classes = (TenantContextPermission, TenantRBACPermission)
+    required_module = "CORE_HR"
+
+    def get_required_permission(self):
+        return "home.view"
+
+    def requests(self, request):
+        employee = get_object_or_404(Employee.objects.for_institution(request.institution), user=request.user)
+        return SignatureRequest.objects.for_institution(request.institution).filter(employee=employee).select_related("document", "employee", "requested_by")
+
+    def one(self, request, pk):
+        return get_object_or_404(self.requests(request), pk=pk)
+
+
+class SelfServiceSignaturesView(SelfServiceSignatureBase):
+    @extend_schema(responses=SignatureRequestSerializer(many=True))
+    def get(self, request):
+        return Response(SignatureRequestSerializer(self.requests(request).exclude(status=SignatureRequest.Status.CANCELLED), many=True).data)
+
+
+class SelfServiceSignatureFileView(SelfServiceSignatureBase):
+    @extend_schema(responses={(200, "application/octet-stream"): OpenApiTypes.BINARY})
+    def get(self, request, pk):
+        document = self.one(request, pk).document
+        if not document.stored_file:
+            raise NotFound("This document has no file.")
+        response = FileResponse(document.stored_file.open("rb"), as_attachment=True, filename=document.original_filename, content_type=document.content_type or "application/octet-stream")
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
+
+
+class SelfServiceSignatureSignView(SelfServiceSignatureBase):
+    @extend_schema(request=OpenApiTypes.OBJECT, responses=SignatureRequestSerializer)
+    def post(self, request, pk):
+        from apps.documents.signatures import sign
+
+        if request.data.get("confirm") not in (True, "true", "True", "1", 1):
+            raise ValidationError({"confirm": "Confirm that you have read the document and agree to sign it."})
+        signature = call_validated_service(sign, request=self.one(request, pk), user=request.user, signed_name=str(request.data.get("signed_name") or ""))
+        return Response(SignatureRequestSerializer(signature).data)
+
+
+class SelfServiceSignatureDeclineView(SelfServiceSignatureBase):
+    @extend_schema(request=OpenApiTypes.OBJECT, responses=SignatureRequestSerializer)
+    def post(self, request, pk):
+        from apps.documents.signatures import decline
+
+        signature = call_validated_service(decline, request=self.one(request, pk), user=request.user, reason=str(request.data.get("reason") or ""))
+        return Response(SignatureRequestSerializer(signature).data)
+
+
+class SelfServiceSignatureCertificateView(SelfServiceSignatureBase):
+    @extend_schema(responses={(200, "text/plain"): OpenApiTypes.STR})
+    def get(self, request, pk):
+        return _certificate_response(self.one(request, pk))

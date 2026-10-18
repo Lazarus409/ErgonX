@@ -46,8 +46,11 @@ from apps.complaints.models import Complaint
 from apps.complaints.services import add_note, assign_complaint, close_complaint, file_complaint, resolve_complaint, set_priority, start_investigation, withdraw_complaint
 from apps.compensation.models import EmployeeCompensation
 from apps.compensation.services import change_current_compensation
-from apps.documents.models import EMPLOYEE_ENTITY_TYPE, Document, DocumentRequirement, DocumentRequirementWaiver
+from apps.documents.models import EMPLOYEE_ENTITY_TYPE, Document, DocumentRequirement, DocumentRequirementWaiver, Policy, PolicyAcknowledgement
+from apps.documents.policies import acknowledge_policy, publish_policy
 from apps.employees.models import EmergencyContact, Employee, EmployeeOffboarding, EmployeeOnboarding, Employment
+from apps.employees.lifecycle import generate_lifecycle_tasks, install_standard_checklists, update_lifecycle_task
+from apps.employees.models import LifecycleTask
 from apps.employees.services import complete_employee_onboarding, create_employment, initiate_employee_offboarding, save_emergency_contact, start_employee_onboarding
 from apps.institutions.management.commands.seed_ergonx_demo import DEFAULT_DEMO_PASSWORD, DEMO_ADMIN_EMAIL, DEMO_EMAIL_DOMAIN, DEMO_INSTITUTION_CODE, DEMO_SEED_REFUSAL, EMPLOYEES, demo_seed_allowed
 from apps.institutions.models import Institution, InstitutionMembership
@@ -176,6 +179,8 @@ class Command(BaseCommand):
             ("october hires", self._hires),
             ("emergency contacts", self._emergency_contacts),
             ("offboarding", self._offboarding),
+            ("lifecycle checklists", self._lifecycle_checklists),
+            ("policies", self._policies),
             ("tax relief", self._tax_relief),
             ("performance", self._performance),
             ("training", self._training),
@@ -351,6 +356,73 @@ class Command(BaseCommand):
                 continue
             initiate_employee_offboarding(institution=self.institution, employee=employee, actor=self.hr, last_working_day=last_day, reason=reason, notes=notes)
             self._count("offboarding")
+
+    # ------------------------------------------------------ lifecycle checklists
+
+    def _lifecycle_checklists(self):
+        """Standard checklists, copied onto the open onboarding and offboarding records.
+
+        Items already past due are ticked off, except onboarding documents, which
+        matches the depot hires still waiting on SSNIT registration.
+        """
+        created = install_standard_checklists(institution=self.institution, actor=self.admin)
+        if any(created.values()):
+            self._count("lifecycle checklists", sum(created.values()))
+        open_statuses = ("IN_PROGRESS", "BLOCKED")
+        records = [
+            *EmployeeOnboarding.objects.for_institution(self.institution).filter(status__in=open_statuses).select_related("employee"),
+            *EmployeeOffboarding.objects.for_institution(self.institution).filter(status__in=open_statuses).select_related("employee"),
+        ]
+        for record in records:
+            tasks = generate_lifecycle_tasks(record)
+            for task in tasks:
+                waiting = isinstance(record, EmployeeOnboarding) and task.category == "DOCUMENTS"
+                if task.due_date and task.due_date < self.today and not waiting:
+                    update_lifecycle_task(institution=self.institution, task=task, actor=self.hr, status=LifecycleTask.Status.DONE)
+            if tasks:
+                self._count("lifecycle checklists", len(tasks))
+
+    # ------------------------------------------------------------------ policies
+
+    POLICIES = (
+        ("Code of conduct", Policy.Category.CODE_OF_CONDUCT, date(2026, 7, 1), 0.9,
+         "How we treat colleagues, customers and the public, and how to raise concerns.",
+         "1. Act honestly and with integrity in all dealings.\n2. Treat colleagues, customers and contractors with respect; harassment and discrimination are not tolerated.\n"
+         "3. Declare any conflict of interest to your line manager and HR.\n4. Do not offer or accept gifts above GHS 500 without written approval.\n"
+         "5. Protect company property and confidential information.\n6. Report breaches to HR or through the confidential complaints process."),
+        ("IT acceptable use", Policy.Category.IT_SECURITY, date(2026, 8, 15), 0.75,
+         "Rules for company laptops, email, passwords and personal devices.",
+         "1. Company devices and accounts are for work; limited personal use is allowed.\n2. Never share your password or one-time codes.\n"
+         "3. Lock your screen when you leave your desk.\n4. Report lost devices and suspicious emails to IT immediately.\n5. Do not install unlicensed software."),
+        ("Depot health and safety", Policy.Category.HEALTH_SAFETY, date(2026, 9, 20), 0.6,
+         "Fuel depot safety: PPE, hot work, spills and emergency assembly points.",
+         "1. Wear safety boots, hi-vis vests and hard hats in operational areas.\n2. No smoking, open flames or mobile phones near loading bays.\n"
+         "3. Hot work needs a signed permit from the depot supervisor.\n4. Report every spill, near miss and injury the same day.\n5. Know your assembly point and attend fire drills."),
+    )
+
+    def _policies(self):
+        people = [employee for employee in self._people() if employee.user_id and employee.status == Employee.Status.ACTIVE]
+        for title, category, published_on, share, summary, body in self.POLICIES:
+            policy = Policy.objects.for_institution(self.institution).filter(title=title).first()
+            if policy is None:
+                policy = Policy(institution=self.institution, title=title, category=category, summary=summary, body=body, acknowledge_within_days=21)
+                policy.save()
+                publish_policy(institution=self.institution, policy=policy, actor=self.hr)
+                Policy.objects.filter(pk=policy.pk).update(published_at=self._stamp(published_on, 9))
+                policy.refresh_from_db()
+                self._count("policies")
+            rng = random.Random(f"apex-policy-{title}")
+            for employee in people:
+                # October hires are still working through their reading.
+                is_new = employee.hire_date and employee.hire_date >= date(2026, 10, 1)
+                if rng.random() >= (0.3 if is_new else share):
+                    continue
+                if PolicyAcknowledgement.objects.filter(policy=policy, employee=employee, version=policy.version).exists():
+                    continue
+                acknowledgement = acknowledge_policy(institution=self.institution, policy=policy, employee=employee, user=employee.user, signed_name=f"{employee.first_name} {employee.last_name}")
+                signed_on = min(self.today, max(published_on, employee.hire_date or published_on) + timedelta(days=rng.randint(0, 12)))
+                PolicyAcknowledgement.objects.filter(pk=acknowledgement.pk).update(acknowledged_at=self._stamp(signed_on, rng.randint(8, 16), rng.randint(0, 59)))
+                self._count("policies")
 
     # ----------------------------------------------------------------- tax relief
 

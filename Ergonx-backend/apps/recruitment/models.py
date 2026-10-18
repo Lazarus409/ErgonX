@@ -67,6 +67,8 @@ class JobPosting(AutoCodeMixin, TenantOwnedModel):
     approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="approved_job_postings")
     approved_at = models.DateTimeField(null=True, blank=True)
     approval_note = models.TextField(blank=True)
+    # Listed on the public careers site while the posting is open.
+    is_public = models.BooleanField(default=False)
 
     class Meta:
         ordering = ("-created_at",)
@@ -225,6 +227,16 @@ class Application(TenantOwnedModel):
     rejection_reason = models.TextField(blank=True)
     notes = models.TextField(blank=True)
 
+    class Source(models.TextChoices):
+        INTERNAL = "INTERNAL", "Added by HR"
+        CAREERS_SITE = "CAREERS_SITE", "Careers site"
+
+    source = models.CharField(max_length=14, choices=Source.choices, default=Source.INTERNAL)
+    cover_letter = models.TextField(blank=True, max_length=6000)
+    # What the applicant typed on the public form, kept as submitted.
+    applicant_details = models.JSONField(default=dict, blank=True)
+    consent_at = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         ordering = ("-applied_at", "-created_at")
         constraints = [models.UniqueConstraint(fields=("job_posting", "candidate"), name="uniq_candidate_application_per_job")]
@@ -245,7 +257,7 @@ class ApplicationStageHistory(TenantOwnedModel):
     application = models.ForeignKey(Application, on_delete=models.CASCADE, related_name="stage_history")
     from_stage = models.ForeignKey(RecruitmentStage, null=True, blank=True, on_delete=models.PROTECT, related_name="stage_departures")
     to_stage = models.ForeignKey(RecruitmentStage, on_delete=models.PROTECT, related_name="stage_arrivals")
-    changed_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="recruitment_stage_changes")
+    changed_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="recruitment_stage_changes")
     comment = models.TextField(blank=True)
 
     class Meta:
@@ -369,6 +381,11 @@ class Offer(TenantOwnedModel):
     hired_employee = models.OneToOneField(Employee, null=True, blank=True, on_delete=models.PROTECT, related_name="recruitment_offer")
     terms = models.TextField(blank=True)
     contract_length_months = models.PositiveSmallIntegerField(null=True, blank=True)
+    # Set when the candidate accepts on their tracking link: their typed name and the evidence.
+    candidate_signed_name = models.CharField(max_length=200, blank=True)
+    candidate_signed_at = models.DateTimeField(null=True, blank=True)
+    candidate_signature_ip = models.GenericIPAddressField(null=True, blank=True)
+    candidate_signature_user_agent = models.CharField(max_length=500, blank=True)
     working_pattern = models.CharField(max_length=12, choices=Employment.WorkingPattern.choices, blank=True)
     reports_to = models.ForeignKey(Position, null=True, blank=True, on_delete=models.PROTECT, related_name="recruitment_offers_reporting")
     letter_body = models.TextField(blank=True, max_length=20000)
@@ -443,3 +460,29 @@ class CompetencyRating(TenantOwnedModel):
         ordering = ("competency__sequence",)
         constraints = [models.UniqueConstraint(fields=("application", "competency", "evaluator"), name="uniq_competency_rating_per_evaluator")]
         indexes = [models.Index(fields=("institution", "application"))]
+
+
+class CareersSite(TenantOwnedModel):
+    """An institution's public careers page at /careers/<slug>."""
+
+    institution = models.OneToOneField(Institution, on_delete=models.CASCADE, related_name="careers_site")
+    slug = models.SlugField(max_length=60, unique=True)
+    is_enabled = models.BooleanField(default=False)
+    headline = models.CharField(max_length=150, blank=True)
+    introduction = models.TextField(blank=True, max_length=3000)
+    privacy_notice = models.TextField(blank=True, max_length=4000)
+
+    def clean(self):
+        self.slug = (self.slug or "").strip().lower()
+        if self.slug in {"track", "admin", "api", "apply"}:
+            raise ValidationError({"slug": "Choose another address."})
+
+
+class CandidateAccessToken(TenantOwnedModel):
+    """A private tracking link for one application. Only the token's hash is stored."""
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="+")
+    application = models.ForeignKey(Application, on_delete=models.CASCADE, related_name="access_tokens")
+    token_hash = models.CharField(max_length=64, unique=True)
+    expires_at = models.DateTimeField()
+    last_used_at = models.DateTimeField(null=True, blank=True)

@@ -141,6 +141,25 @@ def _attendance(ctx):
             actions=(_approve(f"{base}/approve/"), _reject(f"{base}/reject/")),
             blocked_reason="This is your own overtime; another approver must decide it." if record.employee.user_id == ctx.user.id else "",
         ))
+    from apps.employees.models import Employee
+    from apps.scheduling.models import ShiftSwap
+
+    employees = scope_to_employees(Employee.objects.for_institution(ctx.institution), ctx.request, "", broad=ATTENDANCE_BROAD)
+    swaps = ShiftSwap.objects.for_institution(ctx.institution).filter(
+        status=ShiftSwap.Status.AWAITING_APPROVAL, requester__in=employees, counterpart__in=employees,
+    ).select_related("requester", "counterpart")
+    for swap in swaps:
+        base = f"/shift-swaps/{swap.pk}"
+        involved = ctx.user.id in (swap.requester.user_id, swap.counterpart.user_id)
+        rows.append(_item(
+            kind="SHIFT_SWAP", module="ATTENDANCE", record=swap,
+            title=f"Shift swap · {swap.requester.full_name} ⇄ {swap.counterpart.full_name}",
+            subtitle=f"{swap.swap_date:%a %d %b %Y}: {swap.requester_shift_label} ⇄ {swap.counterpart_shift_label}",
+            requested_by=swap.requester.full_name, submitted_at=swap.colleague_responded_at or swap.created_at,
+            route="/attendance/swaps",
+            actions=(_approve(f"{base}/approve/", "note"), _reject(f"{base}/reject/", "note", required=True)),
+            blocked_reason="You are part of this swap; another approver must decide it." if involved else "",
+        ))
     return rows
 
 
@@ -339,6 +358,8 @@ DECISION_ACTIONS = {
     "attendance.adjustment.decided": ("ATTENDANCE_ADJUSTMENT", None),
     "attendance.adjustment.returned": ("ATTENDANCE_ADJUSTMENT", "RETURNED"),
     "attendance.overtime.decided": ("OVERTIME", None),
+    "shift_swap.approved": ("SHIFT_SWAP", "APPROVED"),
+    "shift_swap.rejected": ("SHIFT_SWAP", "REJECTED"),
     "payroll.run.approved": ("PAYROLL_RUN", "APPROVED"),
     "payroll.adjustment.approved": ("PAYROLL_ADJUSTMENT", "APPROVED"),
     "payroll.adjustment.rejected": ("PAYROLL_ADJUSTMENT", "REJECTED"),
@@ -366,6 +387,7 @@ KINDS = {
     "LEAVE_REQUEST": ("LEAVE", "leave.approve", "Leave request", lambda pk: f"/leave/requests/{pk}"),
     "ATTENDANCE_ADJUSTMENT": ("ATTENDANCE", "attendance.approve", "Attendance correction", lambda pk: f"/attendance/adjustments/{pk}"),
     "OVERTIME": ("ATTENDANCE", "attendance.approve", "Overtime", lambda pk: "/attendance/overtime"),
+    "SHIFT_SWAP": ("ATTENDANCE", "attendance.approve", "Shift swap", lambda pk: "/attendance/swaps"),
     "PAYROLL_RUN": ("PAYROLL", "payroll.approve", "Payroll run", lambda pk: f"/payroll/runs/{pk}"),
     "PAYROLL_ADJUSTMENT": ("PAYROLL", "payroll.approve", "Payroll adjustment", lambda pk: "/payroll/adjustments"),
     "TAX_RELIEF_CLAIM": ("PAYROLL", "tax_relief.approve", "Tax relief claim", None),

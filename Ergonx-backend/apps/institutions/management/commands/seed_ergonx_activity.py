@@ -65,7 +65,7 @@ from apps.attendance.services import classify_attendance_date, clock_in, clock_o
 from apps.documents.models import Document
 from apps.institutions.models import Institution
 from apps.leave.models import LeaveRequest, LeaveType
-from apps.leave.services import approve_leave_request, create_leave_request, submit_leave_request
+from apps.leave.services import approve_leave_request, create_leave_request, submit_leave_request, working_days
 from apps.payroll.models import PayrollPeriod, PayrollRun
 from apps.payroll.services import approve_payroll_run, calculate_payroll_run, create_payroll_period, create_payroll_run, finalize_payroll_run, submit_payroll_run_for_review
 from apps.recruitment.models import Application, Candidate, Interview, JobPosting, Offer, RecruitmentStage
@@ -79,15 +79,6 @@ MINIMAL_PDF = (
     b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n"
     b"3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n"
 )
-
-
-def weekdays_between(start, end):
-    days, cursor = 0, start
-    while cursor <= end:
-        if cursor.weekday() < 5:
-            days += 1
-        cursor += timedelta(days=1)
-    return Decimal(days)
 
 
 def next_weekday(day):
@@ -265,7 +256,8 @@ class Command(BaseCommand):
         if overlapping.exists():
             return
         try:
-            request = create_leave_request(institution=self.institution, actor=employee.user, employee=employee, leave_type=leave_type, start_date=start, end_date=end, requested_days=weekdays_between(start, end), reason=reason)
+            # Count days the way the leave service does: the employee's own schedule (some staff work Saturdays).
+            request = create_leave_request(institution=self.institution, actor=employee.user, employee=employee, leave_type=leave_type, start_date=start, end_date=end, requested_days=working_days(employee, start, end), reason=reason)
             if target in {"PENDING", "APPROVED"}:
                 request = submit_leave_request(leave_request=request, actor=employee.user)
             if target == "APPROVED":
@@ -395,9 +387,10 @@ class Command(BaseCommand):
         """Older overtime is decided; the last week stays pending for review."""
         cutoff = self.today - timedelta(days=7)
         pending = OvertimeRecord.objects.filter(institution=self.institution, status=OvertimeRecord.Status.PENDING, attendance_record__attendance_date__lt=cutoff)
-        approver = self.admin
-        for record in pending.select_related("attendance_record"):
+        for record in pending.select_related("attendance_record", "employee"):
             rng = random.Random(f"apex-overtime-{record.id}")
+            # Nobody decides their own overtime: the admin's goes to the second attendance manager.
+            approver = self._punch_recorder(record.employee)
             try:
                 decide_overtime(overtime_record=record, actor=approver, approve=rng.random() < 0.85, approved_minutes=record.calculated_minutes)
             except SERVICE_ERRORS:

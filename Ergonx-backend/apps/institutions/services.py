@@ -183,10 +183,17 @@ PERMISSIONS = {
     "document.delete": "Deactivate shared documents",
     "document_requirement.view": "View document requirements and employee document checklists",
     "document_requirement.manage": "Manage document requirements and waivers",
+    "policy.view": "View workplace policies and who has acknowledged them",
+    "policy.manage": "Write, publish and retire workplace policies",
     "training.view": "View training courses, enrolments and certificates",
     "training.manage": "Manage training courses and enrol employees",
     "performance.view": "View performance review cycles and results",
     "performance.manage": "Run review cycles and sign off performance reviews",
+    "talent.view": "View succession plans and the confidential talent grid",
+    "talent.manage": "Maintain succession plans, successors and talent assessments",
+    "integrations.manage": "Manage API keys, webhooks and device integrations",
+    "privacy.view": "View data subject requests, retention rules, legal holds and consent records",
+    "privacy.manage": "Handle data subject requests, retention and legal holds",
     "complaint.view": "View employee complaints, except any that name you",
     "complaint.manage": "Handle employee complaints: assign, investigate, resolve and close",
     "report.view": "View and export institution reports",
@@ -288,6 +295,8 @@ ROLE_PERMISSION_CODES = {
             "settings.notifications.manage",
             "settings.security.manage",
             "onboarding.manage",
+            # API keys and webhooks reach outside ErgonX: administrators only.
+            "integrations.manage",
             # The audit trail is an oversight record for administrators, directors
             # and auditors; HR's own actions are recorded there.
             "audit.view",
@@ -330,8 +339,10 @@ ROLE_PERMISSION_CODES = {
         "report.publish",
         "report.all",
         "document_requirement.view",
+        "policy.view",
         "training.view",
         "performance.view",
+        "talent.view",
         "complaint.view",
     ),
     "EMPLOYEE": (
@@ -455,8 +466,11 @@ ROLE_PERMISSION_CODES = {
         "report.all",
         "audit.view",
         "document_requirement.view",
+        "policy.view",
         "training.view",
         "performance.view",
+        "talent.view",
+        "privacy.view",
         "complaint.view",
     ),
 }
@@ -470,6 +484,8 @@ SYSTEM_READ_ONLY_ROLES = frozenset({"AUDITOR"})
 # Administration, oversight and approval-configuration powers. Only a member
 # on a built-in role may grant them (Wave 0 decision PERM-03).
 PRIVILEGED_PERMISSIONS = frozenset({
+    "integrations.manage",
+    "privacy.manage",
     "settings.institution.manage",
     "settings.modules.manage",
     "settings.users.manage",

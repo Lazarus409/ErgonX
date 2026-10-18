@@ -1,0 +1,9 @@
+from django.apps import AppConfig
+
+
+class IntegrationsConfig(AppConfig):
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "apps.integrations"
+
+    def ready(self):
+        from apps.integrations import signals  # noqa: F401 - connects the webhook trigger

@@ -124,6 +124,10 @@ class LocationSerializer(ValidatedModelSerializer):
             "timezone",
             "is_remote",
             "is_active",
+            "latitude",
+            "longitude",
+            "geofence_radius_m",
+            "clock_location_rule",
             "created_at",
             "updated_at",
         )

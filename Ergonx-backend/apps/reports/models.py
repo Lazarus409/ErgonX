@@ -107,3 +107,26 @@ class AnalyticsShare(TenantOwnedModel):
     def clean(self):
         if self.item_id and self.item.institution_id != self.institution_id:
             raise ValidationError({"item": "Item belongs to another institution."})
+
+
+class CustomReport(TenantOwnedModel):
+    """A report built in the report builder: a dataset and a definition (see apps.reports.builder).
+
+    Shared reports are re-run with each viewer's own access, so sharing never
+    widens what anyone can see.
+    """
+
+    class Visibility(models.TextChoices):
+        PRIVATE = "PRIVATE", "Only me"
+        INSTITUTION = "INSTITUTION", "Everyone with access to the data"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="custom_reports")
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="custom_reports")
+    name = models.CharField(max_length=150)
+    description = models.TextField(blank=True, max_length=2000)
+    dataset = models.CharField(max_length=40)
+    definition = models.JSONField(default=dict)
+    visibility = models.CharField(max_length=12, choices=Visibility.choices, default=Visibility.PRIVATE)
+
+    class Meta:
+        ordering = ("name",)

@@ -52,6 +52,18 @@ class AttendanceRecord(TenantOwnedModel):
     source = models.CharField(max_length=10, choices=Source.choices)
     notes = models.TextField(blank=True)
 
+    class SiteCheck(models.TextChoices):
+        ON_SITE = "ON_SITE", "On site"
+        OFF_SITE = "OFF_SITE", "Off site"
+        NO_POSITION = "NO_POSITION", "Location not shared"
+
+    # Where a self-service clock happened, when the work location checks it:
+    # {"lat", "lng", "accuracy_m", "distance_m", "location"}. Blank when not checked.
+    check_in_position = models.JSONField(null=True, blank=True)
+    check_in_site = models.CharField(max_length=12, choices=SiteCheck.choices, blank=True)
+    check_out_position = models.JSONField(null=True, blank=True)
+    check_out_site = models.CharField(max_length=12, choices=SiteCheck.choices, blank=True)
+
     class Meta:
         ordering = ("-attendance_date", "employee")
         constraints = [

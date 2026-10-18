@@ -1,6 +1,7 @@
 from rest_framework.decorators import action
 from django.utils.dateparse import parse_date
-from rest_framework.exceptions import MethodNotAllowed, ValidationError
+from drf_spectacular.utils import OpenApiTypes, extend_schema
+from rest_framework.exceptions import MethodNotAllowed, NotFound, ValidationError
 from rest_framework.response import Response
 
 from apps.attendance.models import AttendanceAdjustment, AttendanceRecord, OvertimeRecord
@@ -27,6 +28,7 @@ from apps.attendance.services import (
     return_adjustment,
     decide_overtime,
 )
+from apps.employees.models import Employee
 from common.scoping import ATTENDANCE_BROAD, scope_to_employees
 from common.serializers import call_validated_service
 from common.viewsets import TenantModelViewSet
@@ -49,7 +51,7 @@ class AttendanceRecordViewSet(EmployeeScopedQuerysetMixin, TenantModelViewSet):
     def get_required_permission(self):
         if self.action == "classify":
             return "attendance.manage"
-        if self.action in {"clock_in", "clock_out"}:
+        if self.action in {"clock_in", "clock_out", "clock_policy"}:
             return "attendance.clock"
         return "attendance.view"
 
@@ -80,6 +82,17 @@ class AttendanceRecordViewSet(EmployeeScopedQuerysetMixin, TenantModelViewSet):
         if page is not None:
             return self.get_paginated_response(self.get_serializer(page, many=True).data)
         return Response(self.get_serializer(queryset, many=True).data)
+
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
+    @action(detail=False, methods=("get",), url_path="clock-policy")
+    def clock_policy(self, request):
+        """Whether the caller's work location asks for their position when they clock."""
+        from apps.attendance.geofence import clock_policy
+
+        employee = Employee.objects.for_institution(request.institution).filter(user=request.user).first()
+        if employee is None:
+            raise NotFound("No employee record is linked to your account.")
+        return Response(clock_policy(employee))
 
     @action(detail=False, methods=("post",), url_path="clock-in")
     def clock_in(self, request):

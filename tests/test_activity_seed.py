@@ -34,7 +34,13 @@ def test_activity_seed_populates_every_dashboard(api_client, seeded):
 
     attendance = _get(api_client, "attendance")
     assert any(day["present"] or day["late"] for day in attendance["weekly_attendance"])
-    assert attendance["by_department"]
+    # "By department" covers today only; on an off day (e.g. Sunday) nobody is scheduled.
+    from datetime import date
+
+    from apps.attendance.models import AttendanceRecord
+
+    if AttendanceRecord.objects.filter(attendance_date=date.today()).exists():
+        assert attendance["by_department"]
 
     leave = _get(api_client, "leave")
     assert leave["currently_on_leave"] > 0

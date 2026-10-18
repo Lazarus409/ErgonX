@@ -45044,6 +45044,207 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorEnvelope'
+  /api/v1/platform/restore-tests/:
+    get:
+      operationId: platform_restore_tests_list
+      description: Platform administrators record backup restore tests; records are
+        kept, never edited away.
+      summary: List restore tests
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - platform
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/PaginatedRestoreTestList'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    post:
+      operationId: platform_restore_tests_create
+      description: Platform administrators record backup restore tests; records are
+        kept, never edited away.
+      summary: Create restore test
+      tags:
+      - platform
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RestoreTest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RestoreTest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RestoreTest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/RestoreTest'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - validation_error
+  /api/v1/platform/restore-tests/{id}/:
+    get:
+      operationId: platform_restore_tests_retrieve
+      description: Platform administrators record backup restore tests; records are
+        kept, never edited away.
+      summary: Retrieve restore test
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this restore test.
+        required: true
+      tags:
+      - platform
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/RestoreTest'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - not_found
   /api/v1/policies/:
     get:
       operationId: policies_list
@@ -59959,6 +60160,108 @@ paths:
       summary: Delete search entries view
       tags:
       - search
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+  /api/v1/security/evidence/:
+    get:
+      operationId: security_evidence_retrieve
+      description: |-
+        Administrators and auditors (settings.security.manage or audit.view).
+
+        Requires an authenticated user, an active institution context, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: Get evidence view
+      tags:
+      - security
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+  /api/v1/security/overview/:
+    get:
+      operationId: security_overview_retrieve
+      description: |-
+        Administrators and auditors (settings.security.manage or audit.view).
+
+        Requires an authenticated user, an active institution context, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: Get security overview view
+      tags:
+      - security
       security:
       - jwtAuth: []
       responses:
@@ -78575,6 +78878,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/RecruitmentStage'
+    PaginatedRestoreTestList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/RestoreTest'
     PaginatedRetentionRuleList:
       type: object
       required:
@@ -85808,6 +86134,68 @@ components:
       - percentage_base_component_id
       - resolved_amount
       - source
+    RestoreTest:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        performed_on:
+          type: string
+          format: date
+        backup_reference:
+          type: string
+          description: Which backup was restored, e.g. the dump file name or snapshot
+            id.
+          maxLength: 200
+        environment:
+          type: string
+          description: Where it was restored, e.g. a scratch database.
+          maxLength: 100
+        result:
+          enum:
+          - PASSED
+          - PARTIAL
+          - FAILED
+          type: string
+          description: |-
+            * `PASSED` - Passed
+            * `PARTIAL` - Passed with issues
+            * `FAILED` - Failed
+          x-spec-enum-id: 7b874949e4ade1ee
+        result_label:
+          type: string
+          readOnly: true
+        duration_minutes:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+          nullable: true
+        checks:
+          type: string
+          description: What was verified after restoring.
+          maxLength: 4000
+        issues:
+          type: string
+          maxLength: 4000
+        performed_by_name:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - backup_reference
+      - checks
+      - created_at
+      - environment
+      - id
+      - performed_by_name
+      - performed_on
+      - result
+      - result_label
     RetentionRule:
       type: object
       description: Runs model validation so domain invariants also protect non-form

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
-import { Building2, History, LogOut, MailPlus, Moon, ShieldAlert, Sun, UserRoundCog, type LucideIcon } from "lucide-react";
+import { Building2, DatabaseBackup, History, LogOut, MailPlus, Moon, ShieldAlert, Sun, UserRoundCog, type LucideIcon } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 
 import Logo from "@/components/brand/Logo";
@@ -16,6 +16,7 @@ const sections: Array<{ label: string; href: string; icon: LucideIcon }> = [
   { label: "Invitations", href: "/platform", icon: MailPlus },
   { label: "Organizations", href: "/platform/organizations", icon: Building2 },
   { label: "Audit log", href: "/platform/audit", icon: History },
+  { label: "Restore tests", href: "/platform/restore-tests", icon: DatabaseBackup },
 ];
 
 function isActive(pathname: string, href: string) {

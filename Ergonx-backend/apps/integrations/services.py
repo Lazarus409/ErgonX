@@ -165,7 +165,19 @@ def dispatch(delivery_ids):
         for delivery_id in delivery_ids:
             deliver(delivery_id)
         return
-    threading.Thread(target=lambda: [deliver(delivery_id) for delivery_id in delivery_ids], daemon=True).start()
+    threading.Thread(target=_deliver_in_background, args=(list(delivery_ids),), daemon=True).start()
+
+
+def _deliver_in_background(delivery_ids):
+    """Runs in its own thread, so it manages its own database connection."""
+    from django.db import close_old_connections, connections
+
+    close_old_connections()
+    try:
+        for delivery_id in delivery_ids:
+            deliver(delivery_id)
+    finally:
+        connections.close_all()
 
 
 def sign(secret, timestamp, body):
@@ -174,9 +186,6 @@ def sign(secret, timestamp, body):
 
 def deliver(delivery_id):
     """One delivery attempt; schedules a retry or gives up after the last delay."""
-    from django.db import close_old_connections
-
-    close_old_connections()
     delivery = WebhookDelivery.objects.select_related("endpoint").filter(pk=delivery_id, status=WebhookDelivery.Status.PENDING).first()
     if delivery is None:
         return None

@@ -119,7 +119,7 @@ def _ensure_record_open(record):
 
 @transaction.atomic
 def update_lifecycle_task(*, institution, task, actor, **changes):
-    task = LifecycleTask.objects.select_for_update().select_related("onboarding", "offboarding").get(pk=task.pk, institution=institution)
+    task = LifecycleTask.objects.select_for_update(of=("self",)).select_related("onboarding", "offboarding").get(pk=task.pk, institution=institution)
     record = task.onboarding or task.offboarding
     _ensure_record_open(record)
     previous_status = task.status
@@ -160,7 +160,7 @@ def add_lifecycle_task(*, institution, record, actor, title, description="", cat
 @transaction.atomic
 def delete_lifecycle_task(*, institution, task, actor):
     """Removes an ad-hoc item. Template items are marked not applicable instead, so the record shows they were considered."""
-    task = LifecycleTask.objects.select_for_update().select_related("onboarding", "offboarding").get(pk=task.pk, institution=institution)
+    task = LifecycleTask.objects.select_for_update(of=("self",)).select_related("onboarding", "offboarding").get(pk=task.pk, institution=institution)
     _ensure_record_open(task.onboarding or task.offboarding)
     if task.template_id:
         raise ValidationError({"task": "Standard checklist items cannot be removed; mark them not applicable with a reason."})

@@ -191,3 +191,19 @@ def test_rehire_starts_onboarding_with_a_fresh_checklist(setup):
     assert latest.tasks.count() == len(STANDARD_CHECKLISTS["ONBOARDING"])
     assert latest.tasks.get(title="Sign employment contract").due_date == date(2026, 8, 3)
     assert LifecycleTask.objects.filter(employee=employee, institution=institution).count() == 2 * len(STANDARD_CHECKLISTS["ONBOARDING"])
+
+
+@pytest.mark.postgresql
+def test_postgresql_task_updates_lock_only_the_task(setup):
+    """PostgreSQL refuses FOR UPDATE across the nullable onboarding/offboarding joins."""
+    from django.db import connection
+
+    if connection.vendor != "postgresql":
+        pytest.skip("PostgreSQL-specific verification runs in the PostgreSQL CI job")
+    client, employee = setup["client"], setup["employee"]
+    _install(client)
+    task = client.post(f"/api/v1/employees/{employee.id}/onboarding/start/", format="json").data["tasks"][0]
+    updated = client.patch(f"/api/v1/employees/{employee.id}/lifecycle-tasks/{task['id']}/", {"status": "DONE"}, format="json")
+    assert updated.status_code == 200, updated.data
+    added = client.post(f"/api/v1/employees/{employee.id}/lifecycle-tasks/", {"process": "ONBOARDING", "title": "Extra"}, format="json").data
+    assert client.delete(f"/api/v1/employees/{employee.id}/lifecycle-tasks/{added['id']}/").status_code == 204

@@ -196,6 +196,65 @@ export type OffboardingStatus =
   | "COMPLETED"
   | "CANCELLED";
 
+export type LifecycleProcess = "ONBOARDING" | "OFFBOARDING";
+export type LifecycleTaskStatus = "OPEN" | "DONE" | "NOT_APPLICABLE";
+export type LifecycleTaskOwner = "HR" | "MANAGER" | "IT" | "FINANCE" | "EMPLOYEE";
+export type LifecycleTaskCategory =
+  | "DOCUMENTS" | "IT_ACCESS" | "EQUIPMENT" | "POLICY" | "ORIENTATION" | "PROBATION"
+  | "HANDOVER" | "ASSET_RETURN" | "CLEARANCE" | "EXIT_INTERVIEW" | "ACCESS_REVOCATION" | "FINAL_PAY" | "OTHER";
+
+export const LIFECYCLE_TASK_OWNERS: Record<LifecycleTaskOwner, string> = { HR: "HR", MANAGER: "Line manager", IT: "IT", FINANCE: "Finance", EMPLOYEE: "Employee" };
+export const LIFECYCLE_TASK_CATEGORIES: Record<LifecycleProcess, LifecycleTaskCategory[]> = {
+  ONBOARDING: ["DOCUMENTS", "IT_ACCESS", "EQUIPMENT", "POLICY", "ORIENTATION", "PROBATION", "OTHER"],
+  OFFBOARDING: ["DOCUMENTS", "HANDOVER", "ASSET_RETURN", "CLEARANCE", "EXIT_INTERVIEW", "ACCESS_REVOCATION", "FINAL_PAY", "OTHER"],
+};
+export const LIFECYCLE_CATEGORY_LABELS: Record<LifecycleTaskCategory, string> = {
+  DOCUMENTS: "Documents & contract", IT_ACCESS: "IT access", EQUIPMENT: "Equipment", POLICY: "Policy acknowledgement",
+  ORIENTATION: "Orientation", PROBATION: "Probation", HANDOVER: "Handover", ASSET_RETURN: "Asset return", CLEARANCE: "Clearance",
+  EXIT_INTERVIEW: "Exit interview", ACCESS_REVOCATION: "Access revocation", FINAL_PAY: "Final pay", OTHER: "Other",
+};
+
+export interface LifecycleTask {
+  id: string;
+  title: string;
+  description: string;
+  category: LifecycleTaskCategory;
+  category_label: string;
+  owner: LifecycleTaskOwner;
+  owner_label: string;
+  is_required: boolean;
+  due_date: string | null;
+  status: LifecycleTaskStatus;
+  note: string;
+  completed_at: string | null;
+  completed_by_name: string;
+  is_standard: boolean;
+  is_overdue: boolean;
+}
+
+export interface LifecycleChecklistSummary {
+  total: number;
+  closed: number;
+  required_open: number;
+}
+
+export interface LifecycleTaskTemplate {
+  id: string;
+  process: LifecycleProcess;
+  title: string;
+  description: string;
+  category: LifecycleTaskCategory;
+  category_label: string;
+  owner: LifecycleTaskOwner;
+  owner_label: string;
+  due_offset_days: number;
+  is_required: boolean;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface EmployeeOnboarding {
   id: string;
   employee: string;
@@ -203,6 +262,10 @@ export interface EmployeeOnboarding {
   started_at: string | null;
   completed_at: string | null;
   notes: string;
+  /** Why the last completion attempt was refused; cleared when the record restarts or completes. */
+  blocked_reason: string;
+  tasks: LifecycleTask[];
+  checklist: LifecycleChecklistSummary;
   created_at: string;
   updated_at: string;
 }
@@ -216,6 +279,9 @@ export interface EmployeeOffboarding {
   last_working_day: string | null;
   reason: string;
   notes: string;
+  blocked_reason: string;
+  tasks: LifecycleTask[];
+  checklist: LifecycleChecklistSummary;
   created_at: string;
   updated_at: string;
 }
@@ -279,9 +345,21 @@ export interface Location {
   timezone: string;
   is_remote: boolean;
   is_active: boolean;
+  /** Site position for location-checked clocking (decimal strings), or null. */
+  latitude: string | null;
+  longitude: string | null;
+  geofence_radius_m: number;
+  clock_location_rule: ClockLocationRule;
   created_at: string;
   updated_at: string;
 }
+
+export type ClockLocationRule = "OFF" | "RECORD" | "REQUIRE";
+export const CLOCK_LOCATION_RULE_LABELS: Record<ClockLocationRule, string> = {
+  OFF: "Don't check location",
+  RECORD: "Record location and flag off-site clocks",
+  REQUIRE: "Only allow clocking on site",
+};
 
 /** Filters supported by `EmployeeFilter` on `GET /employees/`. */
 export interface EmployeeFilters {

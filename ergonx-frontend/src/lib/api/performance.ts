@@ -74,7 +74,11 @@ export interface PerformanceReview extends ReviewListItem {
   hr_comment: string | null;
   signed_off_by_name: string | null;
   ratings: ReviewRating[];
-  viewer: { is_employee: boolean; is_reviewer: boolean; is_hr: boolean; can_self_assess: boolean; can_manager_review: boolean; can_sign_off: boolean; can_manage: boolean };
+  /** HR's calibrated rating, when it differs from the manager's; final_rating is what counts. */
+  calibrated_rating: number | null;
+  calibration_note: string;
+  final_rating: number | null;
+  viewer: { is_employee: boolean; is_reviewer: boolean; is_hr: boolean; can_self_assess: boolean; can_manager_review: boolean; can_sign_off: boolean; can_manage: boolean; can_calibrate: boolean; can_request_feedback: boolean };
 }
 
 export interface CycleSummary {
@@ -146,4 +150,253 @@ export function releaseReview(id: string): Promise<PerformanceReview> {
 }
 export function cancelReview(id: string, reason: string): Promise<PerformanceReview> {
   return apiPost<PerformanceReview, { reason: string }>(`/performance-reviews/${id}/cancel/`, { reason });
+}
+
+/* Goals (OKRs) ---------------------------------------------------------- */
+
+export type GoalLevel = "COMPANY" | "DEPARTMENT" | "INDIVIDUAL";
+export type GoalStatus = "DRAFT" | "ACTIVE" | "COMPLETED" | "CANCELLED";
+export type GoalHealth = "ON_TRACK" | "AT_RISK" | "OFF_TRACK";
+
+export const GOAL_HEALTH_LABELS: Record<GoalHealth, string> = { ON_TRACK: "On track", AT_RISK: "At risk", OFF_TRACK: "Off track" };
+export const GOAL_HEALTH_TONES: Record<GoalHealth, "success" | "warning" | "danger"> = { ON_TRACK: "success", AT_RISK: "warning", OFF_TRACK: "danger" };
+export const GOAL_STATUS_TONES: Record<GoalStatus, "neutral" | "info" | "success" | "warning"> = { DRAFT: "neutral", ACTIVE: "info", COMPLETED: "success", CANCELLED: "warning" };
+
+export interface KeyResult {
+  id?: string;
+  title: string;
+  unit: string;
+  start_value: string | number;
+  target_value: string | number;
+  current_value?: string | number;
+  progress?: number;
+}
+
+export interface GoalCheckIn { id: string; author_name: string; health: GoalHealth; health_label: string; progress: number; note: string; created_at: string }
+
+export interface Goal {
+  id: string;
+  level: GoalLevel;
+  level_label: string;
+  employee: string | null;
+  department: string | null;
+  parent: string | null;
+  parent_title: string;
+  owner_name: string;
+  title: string;
+  description: string;
+  period_start: string;
+  period_end: string;
+  status: GoalStatus;
+  status_label: string;
+  health: GoalHealth;
+  health_label: string;
+  progress: number;
+  key_results: KeyResult[];
+  children_count: number;
+  agreed_by_name: string;
+  agreed_at: string | null;
+  last_check_in_at: string | null;
+  viewer: { can_edit: boolean; can_manage: boolean; can_check_in: boolean; is_owner: boolean };
+  created_at: string;
+  updated_at: string;
+  /** Detail only. */
+  check_ins?: GoalCheckIn[];
+  children?: { id: string; title: string; level: GoalLevel; owner_name: string; progress: number; health: GoalHealth; status: GoalStatus }[];
+}
+
+export interface GoalPayload {
+  level: GoalLevel;
+  employee?: string | null;
+  department?: string | null;
+  parent?: string | null;
+  title: string;
+  description: string;
+  period_start: string;
+  period_end: string;
+  key_results: KeyResult[];
+}
+
+export function listGoals(params: ListParams & { mine?: boolean; team?: boolean; level?: GoalLevel; status?: GoalStatus } = {}): Promise<PaginatedData<Goal>> {
+  return apiGetList<Goal>("/goals/", { page_size: MAX_PAGE_SIZE, ...params });
+}
+
+export function getGoal(id: string): Promise<Goal> {
+  return apiGet<Goal>(`/goals/${id}/`);
+}
+
+export function createGoal(payload: GoalPayload): Promise<Goal> {
+  return apiPost<Goal, GoalPayload>("/goals/", payload);
+}
+
+export function updateGoal(id: string, payload: Partial<GoalPayload>): Promise<Goal> {
+  return apiPatch<Goal, Partial<GoalPayload>>(`/goals/${id}/`, payload);
+}
+
+export function goalAction(id: string, action: "activate" | "complete" | "cancel"): Promise<Goal> {
+  return apiPost<Goal>(`/goals/${id}/${action}/`);
+}
+
+export function checkInGoal(id: string, payload: { health: GoalHealth; note?: string; values?: Record<string, string>; progress?: number }): Promise<Goal> {
+  return apiPost<Goal>(`/goals/${id}/check-in/`, payload);
+}
+
+/* 360 feedback and calibration -------------------------------------------- */
+
+export type FeedbackRelationship = "PEER" | "DIRECT_REPORT" | "MANAGER" | "OTHER";
+export const FEEDBACK_RELATIONSHIP_LABELS: Record<FeedbackRelationship, string> = { PEER: "Peer", DIRECT_REPORT: "Direct report", MANAGER: "Manager", OTHER: "Other colleague" };
+
+export interface FeedbackSummary {
+  requested: number;
+  submitted: number;
+  declined: number;
+  min_responses: number;
+  /** False until enough colleagues have answered for the summary to stay anonymous (HR always sees it). */
+  visible: boolean;
+  competencies: { competency: string; average: number; responses: number }[];
+  comments: { strengths: string; improvements: string; name?: string; relationship?: string }[];
+  /** HR only. */
+  respondents: { id: string; name: string; relationship: string; status: "PENDING" | "SUBMITTED" | "DECLINED" }[];
+}
+
+export interface FeedbackRequestItem {
+  id: string;
+  employee_name: string;
+  cycle_name: string;
+  relationship: FeedbackRelationship;
+  relationship_label: string;
+  status: "PENDING" | "SUBMITTED" | "DECLINED";
+  status_label: string;
+  strengths: string;
+  improvements: string;
+  submitted_at: string | null;
+  competencies: { id: string; name: string; description: string; rating: number | null }[];
+  open: boolean;
+  created_at: string;
+}
+
+export interface CalibrationBoard {
+  reviews: { id: string; employee: string; department: string; reviewer: string; status: ReviewStatus; manager_rating: number | null; calibrated_rating: number | null; final_rating: number | null; calibration_note: string }[];
+  distribution: { rating: number; manager: number; final: number }[];
+}
+
+export function getReviewFeedback(reviewId: string): Promise<FeedbackSummary> {
+  return apiGet<FeedbackSummary>(`/performance-reviews/${reviewId}/feedback/`);
+}
+
+export function requestReviewFeedback(reviewId: string, respondents: string[], relationship: FeedbackRelationship): Promise<FeedbackSummary> {
+  return apiPost<FeedbackSummary>(`/performance-reviews/${reviewId}/feedback/`, { respondents, relationship });
+}
+
+export function listMyFeedbackRequests(): Promise<PaginatedData<FeedbackRequestItem>> {
+  return apiGetList<FeedbackRequestItem>("/feedback-requests/", { page_size: MAX_PAGE_SIZE });
+}
+
+export function submitFeedback(id: string, payload: { ratings: Record<string, number>; strengths: string; improvements: string }): Promise<FeedbackRequestItem> {
+  return apiPost<FeedbackRequestItem>(`/feedback-requests/${id}/submit/`, payload);
+}
+
+export function declineFeedback(id: string): Promise<FeedbackRequestItem> {
+  return apiPost<FeedbackRequestItem>(`/feedback-requests/${id}/decline/`);
+}
+
+export function calibrateReview(reviewId: string, rating: number | null, note: string): Promise<PerformanceReview> {
+  return apiPost<PerformanceReview>(`/performance-reviews/${reviewId}/calibrate/`, { rating, note });
+}
+
+export function getCalibrationBoard(cycleId: string): Promise<CalibrationBoard> {
+  return apiGet<CalibrationBoard>(`/review-cycles/${cycleId}/calibration/`);
+}
+
+/* Talent and succession ------------------------------------------------- */
+
+export type TalentLevel = "LOW" | "MEDIUM" | "HIGH";
+export type Readiness = "READY_NOW" | "ONE_TO_TWO_YEARS" | "THREE_PLUS_YEARS";
+export const READINESS_LABELS: Record<Readiness, string> = { READY_NOW: "Ready now", ONE_TO_TWO_YEARS: "1-2 years", THREE_PLUS_YEARS: "3+ years" };
+export const READINESS_TONES: Record<Readiness, "success" | "info" | "neutral"> = { READY_NOW: "success", ONE_TO_TWO_YEARS: "info", THREE_PLUS_YEARS: "neutral" };
+export const TALENT_LEVEL_LABELS: Record<TalentLevel, string> = { LOW: "Low", MEDIUM: "Medium", HIGH: "High" };
+
+export interface SuccessorRow {
+  id: string;
+  employee: string;
+  employee_name: string;
+  employee_number: string;
+  current_position: string;
+  readiness: Readiness;
+  readiness_label: string;
+  development_notes: string;
+  latest_rating: number | null;
+}
+
+export interface SuccessionPlan {
+  id: string;
+  position: string;
+  position_title: string;
+  department_name: string;
+  is_critical: boolean;
+  risk_of_loss: TalentLevel;
+  risk_of_loss_label: string;
+  impact_of_loss: TalentLevel;
+  impact_of_loss_label: string;
+  notes: string;
+  reviewed_at: string | null;
+  incumbents: { id: string; name: string }[];
+  successors: SuccessorRow[];
+  cover: { status: "READY" | "DEVELOPING" | "NONE"; READY_NOW: number; ONE_TO_TWO_YEARS: number; THREE_PLUS_YEARS: number };
+}
+
+export interface TalentRow {
+  employee_id: string;
+  employee: string;
+  employee_number: string;
+  department: string;
+  position: string;
+  latest_rating: number | null;
+  performance: TalentLevel | "";
+  performance_overridden: boolean;
+  potential: TalentLevel | "";
+  flight_risk: TalentLevel | "";
+  in_talent_pool: boolean;
+  career_aspiration: string;
+  notes: string;
+  assessed_at: string | null;
+  assessed_by: string;
+}
+
+export interface TalentGrid {
+  employees: TalentRow[];
+  boxes: Record<string, number>;
+  summary: { employees: number; placed: number; talent_pool: number; high_flight_risk: number };
+}
+
+export function listSuccessionPlans(): Promise<PaginatedData<SuccessionPlan>> {
+  return apiGetList<SuccessionPlan>("/succession-plans/", { page_size: MAX_PAGE_SIZE });
+}
+
+export function createSuccessionPlan(payload: Partial<Pick<SuccessionPlan, "position" | "is_critical" | "risk_of_loss" | "impact_of_loss" | "notes">>): Promise<SuccessionPlan> {
+  return apiPost<SuccessionPlan>("/succession-plans/", payload);
+}
+
+export function updateSuccessionPlan(id: string, payload: Partial<Pick<SuccessionPlan, "is_critical" | "risk_of_loss" | "impact_of_loss" | "notes" | "reviewed_at">>): Promise<SuccessionPlan> {
+  return apiPatch<SuccessionPlan>(`/succession-plans/${id}/`, payload);
+}
+
+export function deleteSuccessionPlan(id: string): Promise<void> {
+  return apiDelete(`/succession-plans/${id}/`);
+}
+
+export function saveSuccessor(planId: string, payload: { employee: string; readiness: Readiness; development_notes?: string }): Promise<SuccessionPlan> {
+  return apiPost<SuccessionPlan>(`/succession-plans/${planId}/successors/`, payload);
+}
+
+export async function removeSuccessor(planId: string, successorId: string): Promise<void> {
+  return apiDelete(`/succession-plans/${planId}/successors/${successorId}/`);
+}
+
+export function getTalentGrid(): Promise<TalentGrid> {
+  return apiGet<TalentGrid>("/talent-grid/");
+}
+
+export function assessTalent(payload: { employee: string; potential?: TalentLevel | ""; performance_override?: TalentLevel | ""; flight_risk?: TalentLevel | ""; in_talent_pool?: boolean; career_aspiration?: string; notes?: string }): Promise<TalentRow> {
+  return apiPost<TalentRow>("/talent-grid/", payload);
 }

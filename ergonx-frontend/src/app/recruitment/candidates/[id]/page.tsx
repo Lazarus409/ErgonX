@@ -205,6 +205,12 @@ function ApplicationView({ candidateId, applicationId, onSwitch }: { candidateId
 
       {problem && <ErrorState variant="inline" title="Action not completed" message={problem} />}
       {status === "REJECTED" && application.rejection_reason && <div className="rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger-ink"><p className="font-semibold">Rejected</p><p>{application.rejection_reason}</p></div>}
+      {application.source === "CAREERS_SITE" && (
+        <div className="rounded-xl border border-line bg-surface px-4 py-3 text-sm text-ink">
+          <p className="font-semibold text-ink-strong">Applied on your careers site{application.consent_at ? ` · consented to data use ${new Date(application.consent_at).toLocaleDateString("en-GB")}` : ""}</p>
+          {application.cover_letter && <p className="mt-1 whitespace-pre-line">{application.cover_letter}</p>}
+        </div>
+      )}
 
       <ol className="flex overflow-x-auto rounded-2xl border border-line bg-surface px-2 py-4 shadow-elevation-1" aria-label="Application stages">
         {steps.map((step, index) => {

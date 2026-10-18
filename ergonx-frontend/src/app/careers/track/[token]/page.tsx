@@ -1,0 +1,125 @@
+"use client";
+
+import { useCallback, useRef, useState } from "react";
+import { useParams } from "next/navigation";
+import { CalendarClock, FileSignature, FileText, Upload } from "lucide-react";
+
+import CareersShell from "@/components/careers/CareersShell";
+import Alert from "@/components/ui/Alert";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Checkbox, Field, Input, Select } from "@/components/ui/Field";
+import { careersApi, getApiErrorMessage } from "@/lib/api";
+import { CANDIDATE_DOCUMENT_TYPES, type TrackingView } from "@/lib/api/careers";
+import { formatDate, formatDateTime } from "@/lib/format";
+import { useApiResource } from "@/lib/useApiResource";
+
+const TONES: Record<TrackingView["status"], "info" | "success" | "warning" | "neutral"> = {
+  RECEIVED: "info", IN_REVIEW: "info", INTERVIEW: "warning", OFFER: "success", HIRED: "success", CLOSED: "neutral", WITHDRAWN: "neutral",
+};
+
+/** A candidate's private view of one application, opened from their tracking link. No sign-in. */
+export default function TrackApplicationPage() {
+  const { token } = useParams<{ token: string }>();
+  const load = useCallback(() => careersApi.getTracking(token), [token]);
+  const { data, error, setData } = useApiResource(load);
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState("");
+  const [category, setCategory] = useState("CERTIFICATE");
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  const run = async (work: () => Promise<TrackingView>) => {
+    setBusy(true); setActionError("");
+    try { const next = await work(); setData(() => next); }
+    catch (caught) { setActionError(getApiErrorMessage(caught)); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <CareersShell organisation={data?.organisation}>
+      {error && <Alert tone="warning" title="Link not recognised">This tracking link is invalid or has expired. Use the latest link from your confirmation, or contact the employer.</Alert>}
+      {data && (
+        <>
+          <header>
+            <p className="text-caption font-semibold uppercase tracking-[0.08em] text-ink-muted">Your application</p>
+            <h1 className="mt-1 text-page-title font-bold text-ink-strong">{data.job.title}</h1>
+            <p className="mt-1 flex flex-wrap items-center gap-2 text-support text-ink-muted"><Badge tone={TONES[data.status]}>{data.status_label}</Badge>{data.applied_at && <span>Applied {formatDate(data.applied_at)}</span>}</p>
+          </header>
+          {actionError && <Alert tone="danger" onDismiss={() => setActionError("")}>{actionError}</Alert>}
+
+          {data.offer && <OfferCard token={token} offer={data.offer} busy={busy} onAnswer={(work) => void run(work)} />}
+
+          {data.interviews.length > 0 && (
+            <Card title="Interviews" icon={CalendarClock} accent="recruitment">
+              <ul className="divide-y divide-line-soft">
+                {data.interviews.map((interview) => (
+                  <li key={interview.id} className="space-y-2 py-3">
+                    <p className="font-semibold text-ink-strong">{formatDateTime(interview.scheduled_at)}{interview.time_zone ? ` (${interview.time_zone})` : ""} · {interview.duration_minutes} min{interview.mode ? ` · ${interview.mode}` : ""}</p>
+                    {interview.where && <p className="text-support text-ink break-all">{interview.where}</p>}
+                    {interview.message && <p className="whitespace-pre-line text-support text-ink">{interview.message}</p>}
+                    {interview.response ? <Badge tone={interview.response === "ACCEPTED" ? "success" : "neutral"}>{interview.response === "ACCEPTED" ? "You confirmed" : "You declined"}</Badge> : (
+                      <div className="flex gap-2">
+                        <Button size="sm" loading={busy} onClick={() => void run(() => careersApi.respondToInterview(token, interview.id, "ACCEPT"))}>Confirm</Button>
+                        <Button size="sm" variant="secondary" disabled={busy} onClick={() => { const note = window.prompt("Let them know why, or suggest another time (optional):") ?? ""; void run(() => careersApi.respondToInterview(token, interview.id, "DECLINE", note)); }}>Can&apos;t make it</Button>
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+
+          <Card title="Your documents" icon={FileText} accent="recruitment">
+            <ul className="divide-y divide-line-soft">
+              {data.documents.map((document) => <li key={document.id} className="flex justify-between gap-2 py-2 text-sm"><span className="truncate">{document.name}</span><span className="text-caption text-ink-muted">{CANDIDATE_DOCUMENT_TYPES[document.category] ?? document.category} · {formatDate(document.uploaded_at)}</span></li>)}
+            </ul>
+            {data.can_upload && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Select value={category} onChange={(event) => setCategory(event.target.value)} className="w-44">{Object.entries(CANDIDATE_DOCUMENT_TYPES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select>
+                <input ref={fileInput} type="file" className="sr-only" accept=".pdf,.doc,.docx,.odt,.txt,.jpg,.jpeg,.png" onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ""; if (file) void run(() => careersApi.uploadTrackingDocument(token, file, category)); }} />
+                <Button size="sm" variant="secondary" loading={busy} leadingIcon={<Upload className="h-4 w-4" />} onClick={() => fileInput.current?.click()}>Send a document</Button>
+              </div>
+            )}
+          </Card>
+
+          {data.can_withdraw && (
+            <div className="flex justify-end">
+              <Button variant="ghost" className="text-danger-ink" disabled={busy} onClick={() => window.confirm("Withdraw your application? This can't be undone.") && void run(() => careersApi.withdrawApplication(token))}>Withdraw application</Button>
+            </div>
+          )}
+          <p className="text-caption text-ink-muted">Keep this link private: anyone with it can see this application.</p>
+        </>
+      )}
+    </CareersShell>
+  );
+}
+
+function OfferCard({ token, offer, busy, onAnswer }: { token: string; offer: NonNullable<TrackingView["offer"]>; busy: boolean; onAnswer: (work: () => Promise<TrackingView>) => void }) {
+  const [name, setName] = useState("");
+  const [confirmed, setConfirmed] = useState(false);
+  return (
+    <Card title="Your offer" icon={FileSignature} accent="recruitment" actions={<Badge tone={offer.status === "DECLINED" ? "neutral" : "success"}>{offer.status_label}</Badge>}>
+      <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
+        <div><dt className="text-caption text-ink-muted">Position</dt><dd className="font-medium text-ink-strong">{offer.position}</dd></div>
+        <div><dt className="text-caption text-ink-muted">Department · location</dt><dd className="font-medium text-ink-strong">{offer.department} · {offer.location}</dd></div>
+        <div><dt className="text-caption text-ink-muted">Start date</dt><dd className="font-medium text-ink-strong">{formatDate(offer.proposed_start_date)}</dd></div>
+        <div><dt className="text-caption text-ink-muted">Employment</dt><dd className="font-medium text-ink-strong">{offer.employment_type}{offer.contract_length_months ? ` · ${offer.contract_length_months} months` : ""}</dd></div>
+        {offer.base_salary && <div><dt className="text-caption text-ink-muted">Salary</dt><dd className="font-medium text-ink-strong">{offer.currency} {Number(offer.base_salary).toLocaleString()} per month</dd></div>}
+        {offer.expires_on && <div><dt className="text-caption text-ink-muted">Answer by</dt><dd className="font-medium text-ink-strong">{formatDate(offer.expires_on)}</dd></div>}
+      </dl>
+      {offer.terms && <p className="mt-3 whitespace-pre-line text-support text-ink">{offer.terms}</p>}
+      {offer.signed_at && <p className="mt-3 text-support text-success-ink">Accepted and signed as “{offer.signed_name}” on {formatDateTime(offer.signed_at)}.</p>}
+      {offer.can_answer && (
+        <div className="mt-4 space-y-3 border-t border-line-soft pt-4">
+          <Checkbox label="I accept this offer and its terms." checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
+          <Field label="Type your full name to sign"><Input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" maxLength={200} /></Field>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="ghost" disabled={busy} onClick={() => window.confirm("Decline this offer? This can't be undone.") && onAnswer(() => careersApi.answerOffer(token, "DECLINE"))}>Decline offer</Button>
+            <Button loading={busy} disabled={!confirmed || !name.trim()} leadingIcon={<FileSignature className="h-4 w-4" />} onClick={() => onAnswer(() => careersApi.answerOffer(token, "ACCEPT", name.trim()))}>Accept and sign</Button>
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}

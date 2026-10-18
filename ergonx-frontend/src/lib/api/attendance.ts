@@ -25,7 +25,9 @@ import type {
   AttendanceRecord,
   AttendanceSource,
   OvertimeRecord,
+  ClockPolicy,
 } from "@/types/attendance";
+import type { DevicePosition } from "@/lib/geolocation";
 
 /**
  * `employee`, `attendance_date`, `status` and `source` are exact-match
@@ -71,13 +73,19 @@ export async function clockIn(payload: {
   employee: string;
   at?: string;
   source?: AttendanceSource | string;
+  position?: DevicePosition | null;
 }): Promise<AttendanceRecord> {
   return apiPost<AttendanceRecord>("/attendance-records/clock-in/", payload);
 }
 
+/** The caller's clock location rule; ask for the device position only when it isn't OFF. */
+export async function getClockPolicy(): Promise<ClockPolicy> {
+  return apiGet<ClockPolicy>("/attendance-records/clock-policy/");
+}
+
 export async function clockOut(
   id: string,
-  payload: { at?: string } = {},
+  payload: { at?: string; position?: DevicePosition | null } = {},
 ): Promise<AttendanceRecord> {
   return apiAction<AttendanceRecord>(
     `/attendance-records/${id}/clock-out/`,

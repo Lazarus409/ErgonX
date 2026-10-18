@@ -26,6 +26,7 @@ import { Timeline } from "@/components/charts/Visuals";
 import { ButtonLink } from "@/components/ui/Button";
 import { AttentionItem, Card, SummaryList } from "@/components/ui/Card";
 import ErrorState from "@/components/ui/ErrorState";
+import MyChecklistCard from "@/components/hr/MyChecklistCard";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { attendanceApi, employeesApi, homeApi, leaveApi, notificationsApi, payrollApi } from "@/lib/api";
 import { useAccess } from "@/lib/access";
@@ -181,6 +182,8 @@ export default function SelfServiceHome() {
           ))}
         </div>
       </section>
+
+      {employee && <MyChecklistCard />}
 
       {employee && (
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">

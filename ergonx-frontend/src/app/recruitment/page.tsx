@@ -1,12 +1,13 @@
 "use client";
 
-import { BriefcaseBusiness, CalendarDays, ClipboardCheck, FileText, Handshake, UsersRound, Workflow } from "lucide-react";
+import { BriefcaseBusiness, CalendarDays, ClipboardCheck, FileText, Globe, Handshake, UsersRound, Workflow } from "lucide-react";
 
 import ModuleLanding from "@/components/home/ModuleLanding";
 
 const areas = [
   { title: "Recruitment Dashboard", description: "Review open jobs, applications, interviews, offers, and pipeline distribution.", href: "/recruitment/dashboard", icon: BriefcaseBusiness, permission: "candidate.view" },
   { title: "Job Postings", description: "Create, publish, close, and monitor open roles.", href: "/recruitment/job-postings", icon: BriefcaseBusiness, permission: "job_posting.view" },
+  { title: "Careers Site", description: "Your public jobs page: candidates apply and track their application without an account.", href: "/recruitment/careers", icon: Globe, permission: "job_posting.view" },
   { title: "Candidates", description: "Maintain candidate records and recruitment sources.", href: "/recruitment/candidates", icon: UsersRound, permission: "candidate.view" },
   { title: "Recruitment Pipeline", description: "See application volume by the server-defined hiring stage.", href: "/recruitment/pipeline", icon: Workflow, permission: "candidate.view" },
   { title: "Recruitment Stages", description: "Review the ordered stages used by the recruitment pipeline.", href: "/recruitment/stages", icon: Workflow, permission: "recruitment_stage.view" },

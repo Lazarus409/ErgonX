@@ -19,6 +19,7 @@ import { employeesApi, getApiErrorMessage } from "@/lib/api";
 import { MY_DOCUMENT_CATEGORIES, type SelfServiceDocument } from "@/lib/api/employees";
 import { formatDate, humanizeEnum } from "@/lib/format";
 import DocumentChecklistPanel from "@/components/hr/DocumentChecklistPanel";
+import { MySignaturesPanel } from "@/components/hr/SignaturePanels";
 
 function fileSize(bytes: number) {
   if (!bytes) return "";
@@ -95,6 +96,7 @@ export default function MyDocumentsPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <PageHeader title="My documents" description="Upload your own documents, and find the ones HR has shared with you." icon={FileText} accent="brand" />
+      <MySignaturesPanel />
       <DocumentChecklistPanel mode="self" onChanged={load} />
 
       <section className="rounded-2xl border border-line bg-surface p-5 shadow-elevation-1" aria-labelledby="upload-heading">

@@ -7,6 +7,9 @@
  *   GET                 /employees/{id}/employment-history/
  *   GET/POST            /employments/
  *   GET/PATCH/PUT       /employments/{id}/
+ *   POST                /employees/{id}/lifecycle-tasks/
+ *   PATCH/DELETE        /employees/{id}/lifecycle-tasks/{task_id}/
+ *   GET/POST            /lifecycle-task-templates/  (+ install-standard/)
  *
  * `DELETE /employees/{id}/` is a soft delete: the backend sets the employee's
  * status to INACTIVE rather than removing the record.
@@ -38,6 +41,12 @@ import type {
   EmploymentPayload,
   EmergencyContact,
   EmergencyContactPayload,
+  LifecycleProcess,
+  LifecycleTask,
+  LifecycleTaskCategory,
+  LifecycleTaskOwner,
+  LifecycleTaskStatus,
+  LifecycleTaskTemplate,
   OffboardingStartPayload,
 } from "@/types/hr";
 
@@ -215,6 +224,72 @@ export async function startEmployeeOffboarding(
 
 export async function completeEmployeeOffboarding(id: string): Promise<EmployeeOffboarding> {
   return apiAction<EmployeeOffboarding>(`/employees/${id}/offboarding/complete/`);
+}
+
+export interface LifecycleTaskUpdatePayload {
+  status?: LifecycleTaskStatus;
+  note?: string;
+  due_date?: string | null;
+  owner?: LifecycleTaskOwner;
+}
+
+export interface LifecycleTaskCreatePayload {
+  process: LifecycleProcess;
+  title: string;
+  description?: string;
+  category?: LifecycleTaskCategory;
+  owner?: LifecycleTaskOwner;
+  due_date?: string | null;
+  is_required?: boolean;
+}
+
+export async function updateLifecycleTask(employeeId: string, taskId: string, payload: LifecycleTaskUpdatePayload): Promise<LifecycleTask> {
+  return apiPatch<LifecycleTask, LifecycleTaskUpdatePayload>(`/employees/${employeeId}/lifecycle-tasks/${taskId}/`, payload);
+}
+
+export async function addLifecycleTask(employeeId: string, payload: LifecycleTaskCreatePayload): Promise<LifecycleTask> {
+  return apiPost<LifecycleTask, LifecycleTaskCreatePayload>(`/employees/${employeeId}/lifecycle-tasks/`, payload);
+}
+
+export async function deleteLifecycleTask(employeeId: string, taskId: string): Promise<void> {
+  return apiDelete(`/employees/${employeeId}/lifecycle-tasks/${taskId}/`);
+}
+
+/** The signed-in employee's own open checklists; ``can_complete`` marks the items they tick off themselves. */
+export type MyLifecycleRecord<T> = Omit<T, "tasks"> & { tasks: (LifecycleTask & { can_complete: boolean })[] };
+export interface MyLifecycle {
+  onboarding: MyLifecycleRecord<EmployeeOnboarding> | null;
+  offboarding: MyLifecycleRecord<EmployeeOffboarding> | null;
+}
+
+export async function getMyLifecycle(): Promise<MyLifecycle> {
+  return apiGet<MyLifecycle>("/employees/me/lifecycle/");
+}
+
+export async function updateMyLifecycleTask(taskId: string, status: "OPEN" | "DONE"): Promise<MyLifecycle> {
+  return apiPatch<MyLifecycle, { status: string }>(`/employees/me/lifecycle-tasks/${taskId}/`, { status });
+}
+
+export type LifecycleTaskTemplatePayload = Pick<LifecycleTaskTemplate, "process" | "title" | "description" | "category" | "owner" | "due_offset_days" | "is_required" | "is_active" | "sort_order">;
+
+export async function listLifecycleTemplates(params: ListParams = {}): Promise<PaginatedData<LifecycleTaskTemplate>> {
+  return apiGetList<LifecycleTaskTemplate>("/lifecycle-task-templates/", { page_size: MAX_PAGE_SIZE, ...params });
+}
+
+export async function createLifecycleTemplate(payload: LifecycleTaskTemplatePayload): Promise<LifecycleTaskTemplate> {
+  return apiPost<LifecycleTaskTemplate, LifecycleTaskTemplatePayload>("/lifecycle-task-templates/", payload);
+}
+
+export async function updateLifecycleTemplate(id: string, payload: Partial<LifecycleTaskTemplatePayload>): Promise<LifecycleTaskTemplate> {
+  return apiPatch<LifecycleTaskTemplate, Partial<LifecycleTaskTemplatePayload>>(`/lifecycle-task-templates/${id}/`, payload);
+}
+
+export async function deleteLifecycleTemplate(id: string): Promise<void> {
+  return apiDelete(`/lifecycle-task-templates/${id}/`);
+}
+
+export async function installStandardLifecycleChecklists(): Promise<{ created: Record<LifecycleProcess, number> }> {
+  return apiPost<{ created: Record<LifecycleProcess, number> }>("/lifecycle-task-templates/install-standard/");
 }
 
 export interface RehireEmployeePayload {

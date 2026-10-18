@@ -36,6 +36,8 @@ export interface JobPosting {
   approved_at?: string | null;
   approval_note?: string;
   application_counts?: Record<string, number>;
+  /** Listed on the public careers site while open. */
+  is_public?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -172,7 +174,7 @@ export interface InterviewFeedback {
 }
 
 export interface ApplicationOverview {
-  application: { id: string; status: string; applied_at: string | null; created_at: string; notes: string; rejection_reason: string; current_stage: string | null; current_stage_name: string | null };
+  application: { id: string; status: string; applied_at: string | null; created_at: string; notes: string; rejection_reason: string; current_stage: string | null; current_stage_name: string | null; source?: "INTERNAL" | "CAREERS_SITE"; cover_letter?: string; consent_at?: string | null };
   candidate: Candidate;
   job: { id: string; code: string; title: string; status: string; department_name: string; location_name: string; employment_type: string };
   stages: Array<{ id: string; name: string; sequence: number }>;

@@ -41,10 +41,15 @@ import StatusBadge from "@/components/ui/StatusBadge";
 import ErrorState from "@/components/ui/ErrorState";
 import LoadingState from "@/components/ui/LoadingState";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import { Dialog } from "@/components/ui/Overlay";
+import { Field as FormField, Input as FormInput, Textarea as FormTextarea } from "@/components/ui/Field";
 import { Menu, MenuItem } from "@/components/ui/Overlay";
 import { EmployeeAttendanceTab, EmployeeLeaveTab, EmployeePayrollTab } from "@/components/hr/EmployeeRecordTabs";
 import DocumentChecklistPanel from "@/components/hr/DocumentChecklistPanel";
 import EmployeeTrainingList from "@/components/hr/EmployeeTrainingList";
+import LifecycleChecklist from "@/components/hr/LifecycleChecklist";
+import { EmployeeSignaturesPanel } from "@/components/hr/SignaturePanels";
+import { useAccess } from "@/lib/access";
 import { EM_DASH, formatDate, humanizeEnum } from "@/lib/format";
 import { Avatar } from "@/components/ui/Card";
 import { Button, buttonClasses } from "@/components/ui/Button";
@@ -57,6 +62,7 @@ import type {
   EmployeeLifecycle,
   Employee as ApiEmployee,
   Employment,
+  OffboardingStartPayload,
 } from "@/types/hr";
 import { WEEKDAY_CODES } from "@/types/hr";
 import { PrintFooter, PrintMasthead } from "@/components/brand/PrintDocument";
@@ -458,6 +464,8 @@ export default function EmployeeDetailPage() {
   });
   const [lifecycle, setLifecycle] = useState<EmployeeLifecycle | null>(null);
   const [lifecycleSaving, setLifecycleSaving] = useState(false);
+  const canManageLifecycle = useAccess().can("employee.update");
+  const [offboardForm, setOffboardForm] = useState<{ last_working_day: string; reason: string } | null>(null);
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [documentsError, setDocumentsError] = useState<string | null>(null);
   const [documentUploading, setDocumentUploading] = useState(false);
@@ -884,6 +892,7 @@ export default function EmployeeDetailPage() {
 
   const runLifecycleAction = async (
     action: "onboarding-start" | "onboarding-complete" | "offboarding-start" | "offboarding-complete",
+    offboardingPayload?: OffboardingStartPayload,
   ) => {
     if (!employee || lifecycleSaving) return;
 
@@ -895,10 +904,11 @@ export default function EmployeeDetailPage() {
     setLifecycleSaving(true);
     setSaveError(null);
     try {
-      if (action === "onboarding-start") await employeesApi.startEmployeeOnboarding(employee.id);
-      if (action === "onboarding-complete") await employeesApi.completeEmployeeOnboarding(employee.id);
-      if (action === "offboarding-start") await employeesApi.startEmployeeOffboarding(employee.id);
-      if (action === "offboarding-complete") await employeesApi.completeEmployeeOffboarding(employee.id);
+      let result: { status: string; blocked_reason: string } | null = null;
+      if (action === "onboarding-start") result = await employeesApi.startEmployeeOnboarding(employee.id);
+      if (action === "onboarding-complete") result = await employeesApi.completeEmployeeOnboarding(employee.id);
+      if (action === "offboarding-start") result = await employeesApi.startEmployeeOffboarding(employee.id, offboardingPayload);
+      if (action === "offboarding-complete") result = await employeesApi.completeEmployeeOffboarding(employee.id);
 
       const [nextLifecycle, nextEmployee, history] = await Promise.all([
         employeesApi.getEmployeeLifecycle(employee.id),
@@ -911,12 +921,23 @@ export default function EmployeeDetailPage() {
       setEmploymentHistory(history.results);
       setEmployee(view);
       setFormData(view);
-      setSavedMessage("Employee lifecycle updated.");
+      if (result?.status === "BLOCKED") setSaveError(result.blocked_reason || "This step cannot complete yet.");
+      else setSavedMessage("Employee lifecycle updated.");
+      if (action === "offboarding-start") setOffboardForm(null);
     } catch (caught) {
       setSaveError(getApiErrorMessage(caught));
     } finally {
       setLifecycleSaving(false);
     }
+  };
+
+  const openOffboarding = () => setOffboardForm({
+    last_working_day: lifecycle?.offboarding?.last_working_day ?? "",
+    reason: lifecycle?.offboarding?.reason ?? "",
+  });
+
+  const refreshLifecycle = async () => {
+    if (employee) setLifecycle(await employeesApi.getEmployeeLifecycle(employee.id));
   };
 
   if (loading) {
@@ -953,6 +974,21 @@ export default function EmployeeDetailPage() {
         onConfirm={() => void confirmStatusChange()}
         onCancel={() => setPendingStatus(null)}
       />
+      <Dialog
+        open={offboardForm !== null}
+        onClose={() => setOffboardForm(null)}
+        dismissible={!lifecycleSaving}
+        title={lifecycle?.offboarding && lifecycle.offboarding.status !== "NOT_STARTED" ? "Update offboarding" : `Offboard ${fullName}`}
+        description="Checklist due dates count from the last working day. Employment ends only when offboarding is completed."
+        footer={<><Button variant="secondary" onClick={() => setOffboardForm(null)} disabled={lifecycleSaving}>Cancel</Button><Button onClick={() => offboardForm && void runLifecycleAction("offboarding-start", { last_working_day: offboardForm.last_working_day || undefined, reason: offboardForm.reason.trim() || undefined })} loading={lifecycleSaving} disabled={!offboardForm?.last_working_day}>Save</Button></>}
+      >
+        {offboardForm && (
+          <div className="space-y-4">
+            <FormField label="Last working day" required><FormInput type="date" value={offboardForm.last_working_day} onChange={(event) => setOffboardForm({ ...offboardForm, last_working_day: event.target.value })} data-autofocus /></FormField>
+            <FormField label="Reason for leaving" optional><FormTextarea rows={3} value={offboardForm.reason} onChange={(event) => setOffboardForm({ ...offboardForm, reason: event.target.value })} placeholder="e.g. Resignation – relocating abroad" /></FormField>
+          </div>
+        )}
+      </Dialog>
       <PrintMasthead documentTitle="Employee record" reference={employee.employeeNumber} />
 
       {savedMessage && (
@@ -1124,7 +1160,7 @@ export default function EmployeeDetailPage() {
                       <MenuItem icon={<Pencil />} disabled={terminated} description={terminated ? "Terminated records are read-only" : undefined} onSelect={() => { close(); startEditing(); }}>Edit</MenuItem>
                       {employee.status !== "ACTIVE" && !terminated && <MenuItem icon={<PlayCircle />} onSelect={() => { close(); setPendingStatus("ACTIVE"); }}>Activate</MenuItem>}
                       {employee.status === "ACTIVE" && <MenuItem icon={<PauseCircle />} onSelect={() => { close(); setPendingStatus("INACTIVE"); }}>Deactivate</MenuItem>}
-                      <MenuItem icon={<LogOut />} disabled={terminated || offboarding} description={offboarding ? "Offboarding already in progress" : undefined} onSelect={() => { close(); void runLifecycleAction("offboarding-start"); }}>Offboard</MenuItem>
+                      <MenuItem icon={<LogOut />} disabled={terminated || offboarding} description={offboarding ? "Offboarding already in progress" : undefined} onSelect={() => { close(); openOffboarding(); }}>Offboard</MenuItem>
                       <div className="my-1 border-t border-line-soft" />
                       <MenuItem icon={<BriefcaseBusiness />} disabled={terminated} onSelect={() => { close(); openEmploymentChange(); }}>Change assignment</MenuItem>
                       <MenuItem icon={<UserCog />} onSelect={() => { close(); setTab("overview"); window.setTimeout(() => document.getElementById("onboarding-offboarding")?.scrollIntoView({ behavior: "smooth" }), 0); }}>Onboarding &amp; offboarding</MenuItem>
@@ -1590,7 +1626,7 @@ export default function EmployeeDetailPage() {
           <SectionCard
             id="onboarding-offboarding"
             title="Onboarding / Offboarding"
-            description="Lifecycle transitions are completed by the backend and cannot be edited directly."
+            description="Work through each checklist; required items must be done or skipped with a reason before the step can complete."
           >
             <div className="grid gap-4 md:grid-cols-2">
               <div className="rounded-xl border border-line bg-surface p-5">
@@ -1614,11 +1650,13 @@ export default function EmployeeDetailPage() {
                   <p className="mt-1 text-sm font-medium text-ink-strong">
                     {(lifecycle?.onboarding?.status ?? "NOT_STARTED").replaceAll("_", " ")}
                   </p>
-                  {lifecycle?.onboarding?.notes && <p className="mt-2 text-sm text-warning-ink">{lifecycle.onboarding.notes}</p>}
+                  {lifecycle?.onboarding?.blocked_reason && <p className="mt-2 text-sm text-warning-ink">{lifecycle.onboarding.blocked_reason}</p>}
+                  {lifecycle?.onboarding?.notes && <p className="mt-2 text-sm text-ink-muted">{lifecycle.onboarding.notes}</p>}
                   <div className="mt-4 flex gap-2">
                     {lifecycle?.onboarding?.status !== "COMPLETED" && <button type="button" onClick={() => void runLifecycleAction("onboarding-start")} disabled={lifecycleSaving} className={buttonClasses({ variant: "secondary" })}>Start</button>}
                     {lifecycle?.onboarding?.status !== "COMPLETED" && <button type="button" onClick={() => void runLifecycleAction("onboarding-complete")} disabled={lifecycleSaving} className={buttonClasses({ variant: "primary" })}>Complete</button>}
                   </div>
+                  <LifecycleChecklist employeeId={employee.id} process="ONBOARDING" record={lifecycle?.onboarding} canManage={canManageLifecycle} onChanged={refreshLifecycle} />
                 </div>
               </div>
 
@@ -1643,12 +1681,15 @@ export default function EmployeeDetailPage() {
                   <p className="mt-1 text-sm font-medium text-ink-strong">
                     {(lifecycle?.offboarding?.status ?? "NOT_STARTED").replaceAll("_", " ")}
                   </p>
-                  {lifecycle?.offboarding?.notes && <p className="mt-2 text-sm text-warning-ink">{lifecycle.offboarding.notes}</p>}
+                  {lifecycle?.offboarding?.last_working_day && <p className="mt-2 text-sm text-ink">Last working day: {formatDate(lifecycle.offboarding.last_working_day)}</p>}
+                  {lifecycle?.offboarding?.blocked_reason && <p className="mt-2 text-sm text-warning-ink">{lifecycle.offboarding.blocked_reason}</p>}
+                  {lifecycle?.offboarding?.notes && <p className="mt-2 text-sm text-ink-muted">{lifecycle.offboarding.notes}</p>}
                   <div className="mt-4 flex gap-2">
                     {(employee.status === "TERMINATED" || employee.status === "INACTIVE") && <button type="button" onClick={openEmploymentChange} disabled={lifecycleSaving} className="rounded-lg bg-success px-3 py-2 text-sm font-medium text-white hover:bg-success/90 disabled:opacity-50">Rehire</button>}
-                    {lifecycle?.offboarding?.status !== "COMPLETED" && <button type="button" onClick={() => void runLifecycleAction("offboarding-start")} disabled={lifecycleSaving} className={buttonClasses({ variant: "secondary" })}>Start</button>}
+                    {lifecycle?.offboarding?.status !== "COMPLETED" && <button type="button" onClick={openOffboarding} disabled={lifecycleSaving} className={buttonClasses({ variant: "secondary" })}>{lifecycle?.offboarding && lifecycle.offboarding.status !== "NOT_STARTED" ? "Edit" : "Start"}</button>}
                     {lifecycle?.offboarding?.status !== "COMPLETED" && <button type="button" onClick={() => void runLifecycleAction("offboarding-complete")} disabled={lifecycleSaving} className={buttonClasses({ variant: "danger" })}>Complete</button>}
                   </div>
+                  <LifecycleChecklist employeeId={employee.id} process="OFFBOARDING" record={lifecycle?.offboarding} canManage={canManageLifecycle} onChanged={refreshLifecycle} />
                 </div>
               </div>
             </div>
@@ -1662,6 +1703,7 @@ export default function EmployeeDetailPage() {
           {tab === "training" && <EmployeeTrainingList employeeId={employee.id} />}
           {tab === "payroll" && <EmployeePayrollTab employeeId={employee.id} />}
           {tab === "documents" && <div className="mb-6"><DocumentChecklistPanel mode="hr" employeeId={employee.id} onChanged={() => void refreshDocuments()} /></div>}
+          {tab === "documents" && <div className="mb-6"><EmployeeSignaturesPanel employeeId={employee.id} documents={documents.filter((document) => document.is_active !== false)} canSend={canManageLifecycle} /></div>}
           {tab === "documents" && (
           <SectionCard
             id="documents"

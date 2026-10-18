@@ -22,6 +22,11 @@ export function closeJobPosting(id: string, cancelled = false): Promise<JobPosti
   return apiAction<JobPosting>(`/recruitment/job-postings/${id}/${cancelled ? "cancel" : "close"}/`);
 }
 
+/** Shows or hides an open posting on the public careers site. */
+export function setJobPostingPublic(id: string, isPublic: boolean): Promise<JobPosting> {
+  return apiPatch<JobPosting, { is_public: boolean }>(`/recruitment/job-postings/${id}/`, { is_public: isPublic });
+}
+
 export function updateJobPosting(id: string, payload: Partial<JobPostingPayload>): Promise<JobPosting> {
   return apiPatch<JobPosting, Partial<JobPostingPayload>>(`/recruitment/job-postings/${id}/`, payload);
 }

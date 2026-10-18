@@ -14,6 +14,7 @@ import { DataTable, DataToolbar } from "@/components/ui/DataTable";
 import { Checkbox, Field, Select } from "@/components/ui/Field";
 import { Dialog } from "@/components/ui/Overlay";
 import PageHeader from "@/components/ui/PageHeader";
+import CalibrationBoardCard from "@/components/performance/CalibrationBoardCard";
 import { getApiErrorMessage, organizationApi, performanceApi } from "@/lib/api";
 import { CYCLE_STATUS_LABELS, CYCLE_STATUS_TONES, RATING_LABELS, REVIEW_STATUS_LABELS, REVIEW_STATUS_TONES, type ReviewListItem, type ReviewStatus } from "@/lib/api/performance";
 import { useAccess } from "@/lib/access";
@@ -120,6 +121,7 @@ export default function ReviewCyclePage() {
               </Card>
             </div>
           )}
+          {cycle && <CalibrationBoardCard cycleId={cycle.id} />}
           <DataTable<ReviewListItem>
             caption="Reviews in this cycle"
             rows={rows}

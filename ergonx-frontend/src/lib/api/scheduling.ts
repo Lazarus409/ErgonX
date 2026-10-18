@@ -284,3 +284,56 @@ export async function createScheduleAssignment(
     payload,
   );
 }
+
+/* Shift swaps -------------------------------------------------------------- */
+
+export type ShiftSwapStatus = "AWAITING_COLLEAGUE" | "AWAITING_APPROVAL" | "APPROVED" | "DECLINED" | "REJECTED" | "CANCELLED";
+
+export interface SwapPerson {
+  id: string;
+  name: string;
+  employee_number: string;
+}
+
+export interface ShiftSwap {
+  id: string;
+  requester: SwapPerson;
+  counterpart: SwapPerson;
+  swap_date: string;
+  reason: string;
+  status: ShiftSwapStatus;
+  status_label: string;
+  requester_shift_label: string;
+  counterpart_shift_label: string;
+  colleague_responded_at: string | null;
+  decided_by_name: string;
+  decided_at: string | null;
+  decision_note: string;
+  viewer: { is_requester: boolean; is_counterpart: boolean; can_answer: boolean; can_cancel: boolean; can_decide: boolean };
+  created_at: string;
+}
+
+export const SWAP_STATUS_TONES: Record<ShiftSwapStatus, "warning" | "info" | "success" | "neutral" | "danger"> = {
+  AWAITING_COLLEAGUE: "warning",
+  AWAITING_APPROVAL: "info",
+  APPROVED: "success",
+  DECLINED: "neutral",
+  REJECTED: "danger",
+  CANCELLED: "neutral",
+};
+
+export function listShiftSwaps(params: ListParams = {}): Promise<PaginatedData<ShiftSwap>> {
+  return apiGetList<ShiftSwap>("/shift-swaps/", { page_size: 100, ...params });
+}
+
+export function requestShiftSwap(payload: { counterpart: string; swap_date: string; reason?: string }): Promise<ShiftSwap> {
+  return apiPost<ShiftSwap>("/shift-swaps/", payload);
+}
+
+export function swapAction(id: string, action: "accept" | "decline" | "cancel" | "approve" | "reject", note?: string): Promise<ShiftSwap> {
+  return apiPost<ShiftSwap>(`/shift-swaps/${id}/${action}/`, note ? { note } : {});
+}
+
+export function swapColleagues(date: string): Promise<{ my_shift: string | null; colleagues: (SwapPerson & { shift: string })[] }> {
+  return apiGet(`/shift-swaps/colleagues/?date=${date}`);
+}

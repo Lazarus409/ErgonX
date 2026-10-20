@@ -13,7 +13,7 @@ import LoadingState from "@/components/ui/LoadingState";
 import PageHeader from "@/components/ui/PageHeader";
 import { getApiErrorMessage, payrollApi } from "@/lib/api";
 import { useAccess } from "@/lib/access";
-import type { CustomPayrollRules, PayDayRule, PayrollConfiguration, PayrollRuleBasis, PayrollSetupChoices } from "@/types/payroll";
+import type { CustomPayrollRules, PayDayRule, PayrollConfiguration, PayrollRuleBasis, PayrollSetupChoices, ProrationMethod } from "@/types/payroll";
 
 type TaxMethod = "NONE" | "FLAT" | "PROGRESSIVE";
 interface Band { upper_bound: string; rate: string }
@@ -61,6 +61,7 @@ export default function PayrollConfigurationPage() {
   const [choices, setChoices] = useState<PayrollSetupChoices | null>(null);
   const [choice, setChoice] = useState("");
   const [frequency, setFrequency] = useState("MONTHLY");
+  const [proration, setProration] = useState<ProrationMethod>("CALENDAR_DAYS");
   const [payDay, setPayDay] = useState("LAST_DAY");
   const [payDayOfMonth, setPayDayOfMonth] = useState("25");
   const [taxMethod, setTaxMethod] = useState<TaxMethod>("NONE");
@@ -82,6 +83,7 @@ export default function PayrollConfigurationPage() {
     const first = setup.choices.find((item) => item.recommended) ?? setup.choices[0];
     setChoice(current ? choiceKey(current.payroll_setup_mode, current.selected_payroll_preset_version) : first ? choiceKey(first.mode, first.preset_version_id) : "");
     setFrequency(current?.payroll_frequency ?? "MONTHLY");
+    setProration(current?.proration_method ?? "CALENDAR_DAYS");
     const rule: PayDayRule = current?.pay_day_rule ?? {};
     setPayDay(rule.type === "DAY_OF_MONTH" ? "DAY_OF_MONTH" : "LAST_DAY");
     if (rule.type === "DAY_OF_MONTH") setPayDayOfMonth(String(rule.day));
@@ -133,6 +135,7 @@ export default function PayrollConfigurationPage() {
         pay_day_rule: (payDay === "DAY_OF_MONTH" ? { type: "DAY_OF_MONTH", day: Number(payDayOfMonth) } : { type: "LAST_DAY" }) as PayDayRule,
         rounding_rule: configuration?.rounding_rule ?? { method: "HALF_UP", decimal_places: 2 },
         custom_rules: selected.mode === "CUSTOM" ? customRules() : {},
+        proration_method: proration,
         is_configured: true,
       };
       const next = configuration ? await payrollApi.updatePayrollConfiguration(configuration.id, payload) : await payrollApi.createPayrollConfiguration(payload);
@@ -182,6 +185,13 @@ export default function PayrollConfigurationPage() {
               <Input type="number" min={1} max={31} value={payDayOfMonth} disabled={disabled} onChange={(event) => touch(setPayDayOfMonth)(event.target.value)} />
             </Field>
           ) : <div className="hidden md:block" />}
+          <Field label="Partial-period pay" helper="Applies to mid-period hires and to salary changes that start inside a period.">
+            <Select value={proration} disabled={disabled} onChange={(event) => touch(setProration)(event.target.value as ProrationMethod)}>
+              <option value="CALENDAR_DAYS">By calendar days (e.g. 15 of 30 days)</option>
+              <option value="WORKING_DAYS">By working days, Monday to Friday (e.g. 8 of 22 days)</option>
+            </Select>
+          </Field>
+          <div className="hidden md:block" />
           <Field label="Country"><Input value={choices?.country_code ?? ""} readOnly disabled /></Field>
           <Field label="Currency"><Input value={choices?.currency ?? ""} readOnly disabled /></Field>
         </div>

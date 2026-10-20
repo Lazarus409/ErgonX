@@ -20,7 +20,10 @@ export interface PayrollPeriod {
   updated_at: string;
 }
 
-export interface PayrollConfiguration { id: string; country_code: string; currency: string; payroll_frequency: string; payroll_setup_mode: string; selected_payroll_preset_version: string | null; pay_day_rule: PayDayRule; rounding_rule: Record<string, unknown>; custom_rules?: CustomPayrollRules; is_configured: boolean; configured_at: string | null; }
+/** How a partial period is paid (a mid-period hire, or a salary change inside the period). */
+export type ProrationMethod = "CALENDAR_DAYS" | "WORKING_DAYS";
+
+export interface PayrollConfiguration { id: string; country_code: string; currency: string; payroll_frequency: string; payroll_setup_mode: string; selected_payroll_preset_version: string | null; pay_day_rule: PayDayRule; rounding_rule: Record<string, unknown>; custom_rules?: CustomPayrollRules; proration_method?: ProrationMethod; is_configured: boolean; configured_at: string | null; }
 /** When staff are paid; `{}` means not set. */
 export type PayDayRule = { type?: "LAST_DAY" } | { type: "DAY_OF_MONTH"; day: number };
 export type PayrollRuleBasis = "TAXABLE_INCOME" | "GROSS_PAY" | "BASE_SALARY";

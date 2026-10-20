@@ -16,6 +16,7 @@ import {
   Mail,
   Pencil,
   Plus,
+  Upload,
   Search,
   Settings2,
   Users,
@@ -25,6 +26,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { useAuth } from "@/components/guards/AuthProvider";
 import Alert from "@/components/ui/Alert";
 import { Button, ButtonLink, IconButton } from "@/components/ui/Button";
 import { Avatar, MetricCard } from "@/components/ui/Card";
@@ -59,6 +61,8 @@ const emptyLookups: OrganizationLookups = {
 };
 
 export default function EmployeesPage() {
+  const { user } = useAuth();
+  const canImport = Boolean(user?.permissions.includes("*") || (user?.permissions.includes("import_job.create") && user?.permissions.includes("employee.create")));
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus] = useState(ALL);
@@ -319,6 +323,7 @@ export default function EmployeesPage() {
         actions={
           <>
             <Button variant="secondary" leadingIcon={<Mail className="h-4 w-4" />} onClick={() => { setInviteOpen(true); setInviteError(null); setInvitationLink(null); }}>Invite employee</Button>
+            {canImport && <ButtonLink href="/hr/employees/import" variant="secondary" leadingIcon={<Upload className="h-4 w-4" />}>Import</ButtonLink>}
             <ButtonLink href="/hr/employees/new" leadingIcon={<Plus className="h-4 w-4" />}>Add employee</ButtonLink>
           </>
         }

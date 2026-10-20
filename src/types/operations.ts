@@ -13,6 +13,8 @@ export interface DocumentRecord {
   updated_at: string;
 }
 
-export interface ImportJob { id: string; import_type: string; file_reference: string; status: string; total_rows: number; valid_rows: number; invalid_rows: number; error_summary: string; created_at: string; completed_at: string | null; }
+export interface ImportJob { id: string; import_type: string; file_reference: string; status: string; total_rows: number; valid_rows: number; invalid_rows: number; error_summary: string; created_at: string; completed_at: string | null; metadata?: { format?: string; filename?: string; ignored_columns?: string[]; salary_warning?: string }; }
+export interface ImportRowResult { id: string; import_job: string; row_number: number; status: "VALID" | "INVALID" | "IMPORTED" | "SKIPPED"; raw_data: Record<string, string>; normalized_data: Record<string, string | null>; errors: string[]; warnings: string[]; }
+export interface EmployeeImportColumn { name: string; required: boolean; help: string; }
 export interface ExportJob { id: string; export_type: string; status: string; result_reference: string; error_summary: string; created_at: string; completed_at: string | null; }
 export interface BackgroundJob { id: string; job_type: string; status: string; progress: number; result_reference: string; error_summary: string; created_at: string; completed_at: string | null; }

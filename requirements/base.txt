@@ -10,3 +10,4 @@ pycountry>=24.6,<25.0
 Babel>=2.16,<3.0
 requests>=2.32,<3.0
 reportlab>=4.2,<6.0
+openpyxl>=3.1,<4.0

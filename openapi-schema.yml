@@ -27293,6 +27293,181 @@ paths:
       - permission_denied
       - not_found
       - validation_error
+  /api/v1/import-jobs/employee-columns/:
+    get:
+      operationId: import_jobs_employee_columns_list
+      description: |-
+        The columns an employee import file may contain, for the upload guide.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `import_job.create` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: Employee import columns
+      tags:
+      - import-jobs
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EmployeeImportColumn'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+  /api/v1/import-jobs/employee-template/:
+    get:
+      operationId: import_jobs_employee_template_retrieve
+      description: |-
+        A CSV with the import columns and one example row to replace.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `import_job.create` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: Employee import template
+      tags:
+      - import-jobs
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+  /api/v1/import-jobs/employee-upload/:
+    post:
+      operationId: import_jobs_employee_upload_create
+      description: |-
+        Validate a CSV or XLSX of employees row by row. Nothing is created until the job is confirmed.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `import_job.create` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `validation_error`.
+      summary: Upload an employee import file
+      tags:
+      - import-jobs
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/EmployeeImportUpload'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/ImportJob'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - validation_error
   /api/v1/import-row-results/:
     get:
       operationId: import_row_results_list
@@ -27306,6 +27481,11 @@ paths:
         Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
       summary: List import row results
       parameters:
+      - in: query
+        name: import_job
+        schema:
+          type: string
+          format: uuid
       - name: ordering
         required: false
         in: query
@@ -27330,6 +27510,21 @@ paths:
         description: A search term.
         schema:
           type: string
+      - in: query
+        name: status
+        schema:
+          type: string
+          x-spec-enum-id: 8522b6de420903db
+          enum:
+          - IMPORTED
+          - INVALID
+          - SKIPPED
+          - VALID
+        description: |-
+          * `VALID` - Valid
+          * `INVALID` - Invalid
+          * `IMPORTED` - Imported
+          * `SKIPPED` - Skipped
       tags:
       - import-row-results
       security:
@@ -72751,6 +72946,27 @@ components:
       - is_current
       - salary_structure
       - updated_at
+    EmployeeImportColumn:
+      type: object
+      properties:
+        name:
+          type: string
+        required:
+          type: boolean
+        help:
+          type: string
+      required:
+      - help
+      - name
+      - required
+    EmployeeImportUpload:
+      type: object
+      properties:
+        file:
+          type: string
+          format: uri
+      required:
+      - file
     EmployeePayComponent:
       type: object
       description: Runs model validation so domain invariants also protect non-form
@@ -75300,6 +75516,15 @@ components:
         pay_day_rule: {}
         rounding_rule: {}
         custom_rules: {}
+        proration_method:
+          enum:
+          - CALENDAR_DAYS
+          - WORKING_DAYS
+          type: string
+          description: |-
+            * `CALENDAR_DAYS` - Calendar days
+            * `WORKING_DAYS` - Working days (Monday to Friday)
+          x-spec-enum-id: d70868d5233746c8
         is_configured:
           type: boolean
         configured_by:
@@ -82326,6 +82551,15 @@ components:
         pay_day_rule: {}
         rounding_rule: {}
         custom_rules: {}
+        proration_method:
+          enum:
+          - CALENDAR_DAYS
+          - WORKING_DAYS
+          type: string
+          description: |-
+            * `CALENDAR_DAYS` - Calendar days
+            * `WORKING_DAYS` - Working days (Monday to Friday)
+          x-spec-enum-id: d70868d5233746c8
         is_configured:
           type: boolean
         configured_by:

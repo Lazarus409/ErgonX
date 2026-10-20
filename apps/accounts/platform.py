@@ -8,7 +8,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Count, IntegerField, Max, OuterRef, Q, Subquery, Value
+from django.db.models import Count, IntegerField, Max, OuterRef, Q, Subquery, Sum, Value
 from django.db.models.functions import Coalesce, TruncMonth
 from django.utils import timezone
 from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
@@ -271,6 +271,24 @@ class PlatformInstitutionStatusView(APIView):
         return Response(PlatformInstitutionDetailView.detail_payload(refreshed))
 
 
+# Uploads kept in the database count against its plan; past this, move them (manage.py move_media).
+FILE_STORAGE_WARNING_BYTES = 1024 ** 3
+
+
+def file_storage_usage():
+    """Where uploads live and, when that is the database, how much room they take."""
+    from apps.filestore.models import StoredFile
+
+    usage = StoredFile.objects.aggregate(files=Count("pk"), bytes=Sum("size"))
+    used = usage["bytes"] or 0
+    return {
+        "backend": settings.MEDIA_STORAGE_KIND,
+        "database_files": usage["files"],
+        "database_bytes": used,
+        "warning": used >= FILE_STORAGE_WARNING_BYTES,
+    }
+
+
 def _monthly_counts(queryset, months):
     start = months[0]
     counts = {
@@ -310,6 +328,7 @@ class PlatformOverviewView(APIView):
         return Response({
             # Whether approving an access request emails the invitation link.
             "email_delivery_enabled": settings.EMAIL_DELIVERY_ENABLED,
+            "file_storage": file_storage_usage(),
             "institutions": {
                 "total": institutions.count(),
                 "active": institutions.filter(is_active=True).count(),

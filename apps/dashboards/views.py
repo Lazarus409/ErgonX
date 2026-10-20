@@ -1006,6 +1006,20 @@ class HomeViewSet(ViewSet):
     @extend_schema(
         responses={200: OpenApiTypes.OBJECT},
         description=(
+            "Go-live readiness for administrators and HR: counted items (employees, employment, leave "
+            "policies, holidays, pay, payment details, first payroll, self-service invitations), each "
+            "with the route where it is completed. Others get applicable=false."
+        ),
+    )
+    @action(detail=False, methods=("get",), url_path="go-live")
+    def go_live(self, request):
+        from apps.dashboards.go_live import go_live_checklist
+
+        return Response(go_live_checklist(institution=request.institution, permission_codes=effective_permission_codes(request.membership)))
+
+    @extend_schema(
+        responses={200: OpenApiTypes.OBJECT},
+        description=(
             "My Work: approvals, own tasks, team onboarding/offboarding items and own requests "
             "waiting on others, each with the route where it is handled."
         ),

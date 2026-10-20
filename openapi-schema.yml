@@ -26490,6 +26490,62 @@ paths:
       - tenant_mismatch
       - module_disabled
       - permission_denied
+  /api/v1/home/go-live/:
+    get:
+      operationId: home_go_live_retrieve
+      description: 'Go-live readiness for administrators and HR: counted items (employees,
+        employment, leave policies, holidays, pay, payment details, first payroll,
+        self-service invitations), each with the route where it is completed. Others
+        get applicable=false.'
+      summary: Go live home
+      tags:
+      - home
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
   /api/v1/home/insights/:
     get:
       operationId: home_insights_retrieve

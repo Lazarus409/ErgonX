@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
-import { BarChart3, CheckCircle2, ChevronDown, ChevronRight, FileText, Filter, Folder, Layers, Lock, Network, Plus, Search, Settings, Upload, UserCheck } from "lucide-react";
+import { BarChart3, CheckCircle2, ChevronDown, ChevronRight, FileText, Filter, Folder, Layers, Network, Plus, Search, Settings, Upload, UserCheck } from "lucide-react";
 
 import { ButtonLink } from "@/components/ui/Button";
 import ErrorState from "@/components/ui/ErrorState";
@@ -140,7 +140,7 @@ export default function BudgetsPage() {
               {canManage ? <>
                 <ButtonLink href="/accounting/budgets/new" block leadingIcon={<Plus className="h-4 w-4" />}>Create budget</ButtonLink>
                 <ButtonLink href="/accounting/budgets/new" block variant="secondary" leadingIcon={<Upload className="h-4 w-4" />}>Import budget template</ButtonLink>
-              </> : <div className="flex gap-2.5 rounded-xl bg-primary-soft/60 p-3 text-sm"><Lock className="mt-0.5 h-5 w-5 shrink-0 text-primary-ink" aria-hidden="true" /><div><p className="font-semibold text-headline">Restricted information</p><p className="text-ink">Budget editing is restricted to your role&apos;s permissions.</p></div></div>}
+              </> : null}
             </div>
           </section>
         </aside>

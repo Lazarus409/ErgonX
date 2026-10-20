@@ -161,7 +161,7 @@ export default function CustomerInvoiceDetailPage() {
           )}
 
           {tab === "details" && (
-            <Panel icon={FileText} title="Invoice details" description="Amounts and collection position.">
+            <Panel icon={FileText} title="Invoice details">
               <dl className="grid gap-3 text-sm sm:grid-cols-3">
                 {([["Subtotal", invoice.subtotal], ["Tax", invoice.tax_total], ["Total", invoice.total_amount], ["Received", invoice.amount_received ?? "0"], ["Amount due", invoice.amount_due ?? "0"]] as const).map(([label, value]) => <div key={label} className="rounded-xl bg-surface-muted p-3"><dt className="text-caption text-ink-muted">{label}</dt><dd className="font-bold tabular-nums">{formatAmount(value, invoice.currency)}</dd></div>)}
                 <div className="rounded-xl bg-surface-muted p-3"><dt className="text-caption text-ink-muted">Days outstanding</dt><dd className="font-bold">{context.collection.days_outstanding ?? EM_DASH}</dd></div>
@@ -172,7 +172,7 @@ export default function CustomerInvoiceDetailPage() {
           {tab === "payments" && <PaymentHistory receipts={context.receipts} />}
           {tab === "reminders" && <Reminders invoiceId={invoice.id} reminders={context.reminders} canManage={can("invoice.issue") && open} onAdd={() => setDialog("reminder")} onChanged={reload} onError={setProblem} />}
           {tab === "related" && (
-            <Panel icon={FileSearch} title="Related records" description="Journal and receipts linked to this invoice.">
+            <Panel icon={FileSearch} title="Related records">
               {context.related.length ? <ul className="divide-y divide-line-soft">{context.related.map((row, index) => <li key={`${row.type}-${index}`} className="flex items-center gap-3 py-2.5 text-sm"><span className="w-40 shrink-0 text-ink-muted">{row.type}</span><span className="flex-1 font-semibold">{row.href ? <Link href={row.href} className="text-primary-ink hover:underline">{row.reference}</Link> : row.reference}</span>{row.status && <StatusBadge status={row.status} size="sm" />}</li>)}</ul> : <Empty icon={FileSearch} title="No related records yet" text="The AR journal and receipts appear here once the invoice is issued and paid." />}
             </Panel>
           )}
@@ -246,7 +246,7 @@ function Reminders({ invoiceId, reminders, canManage, onAdd, onChanged, onError 
     try { await accountingApi.updateInvoiceReminder(invoiceId, reminderId, status); onChanged(); } catch (caught) { onError(getApiErrorMessage(caught)); }
   };
   return (
-    <Panel icon={Bell} title="Reminders" description="Collection follow-ups planned or completed for this invoice." action={canManage ? <Button variant="secondary" leadingIcon={<Plus className="h-4 w-4" />} onClick={onAdd}>Add reminder</Button> : undefined}>
+    <Panel icon={Bell} title="Reminders" action={canManage ? <Button variant="secondary" leadingIcon={<Plus className="h-4 w-4" />} onClick={onAdd}>Add reminder</Button> : undefined}>
       {reminders.length ? (
         <ul className="divide-y divide-line-soft text-sm">
           {reminders.map((row) => (

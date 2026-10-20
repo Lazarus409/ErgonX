@@ -191,7 +191,7 @@ export default function OfferDetailPage() {
       {tab === "overview" && (
         <div className="grid items-start gap-5 xl:grid-cols-2">
           <div className="space-y-5">
-            <Panel icon={FileText} title="Compensation and terms" description="Employment details for this offer." action={canEdit ? <Button variant="secondary" leadingIcon={<Pencil className="h-4 w-4" />} onClick={() => setDialog("terms")}>Edit</Button> : undefined}>
+            <Panel icon={FileText} title="Compensation and terms" action={canEdit ? <Button variant="secondary" leadingIcon={<Pencil className="h-4 w-4" />} onClick={() => setDialog("terms")}>Edit</Button> : undefined}>
               {!hasPay && (
                 <div className="mb-4 rounded-xl bg-primary-soft/60 p-4 text-sm">
                   <p className="flex gap-2 font-semibold text-headline"><Info className="h-5 w-5 shrink-0" aria-hidden="true" />No compensation details added yet</p>
@@ -208,7 +208,7 @@ export default function OfferDetailPage() {
               onApprove={() => void run(() => recruitmentApi.approveOffer(id, comment.trim()))} onReturn={() => void run(() => recruitmentApi.returnOffer(id, comment.trim()))} onOpen={() => setTab("approvals")} />
           </div>
           <div className="space-y-5">
-            <Panel icon={FileSignature} title="Offer letter" description="Preview and manage the offer letter for this candidate." action={canEdit ? <Button variant="secondary" leadingIcon={<FileText className="h-4 w-4" />} loading={busy && dialog === null && tab === "overview"} onClick={() => void run(() => recruitmentApi.generateOfferLetter(id), () => setLetter(null))}>{offer.letter_body ? "Regenerate" : "Generate offer letter"}</Button> : undefined}>
+            <Panel icon={FileSignature} title="Offer letter" action={canEdit ? <Button variant="secondary" leadingIcon={<FileText className="h-4 w-4" />} loading={busy && dialog === null && tab === "overview"} onClick={() => void run(() => recruitmentApi.generateOfferLetter(id), () => setLetter(null))}>{offer.letter_body ? "Regenerate" : "Generate offer letter"}</Button> : undefined}>
               {offer.letter_body ? (
                 <>
                   <pre className="max-h-64 overflow-hidden whitespace-pre-wrap rounded-xl bg-surface-muted p-4 font-sans text-sm text-ink [mask-image:linear-gradient(to_bottom,black_70%,transparent)]">{offer.letter_body}</pre>
@@ -218,7 +218,7 @@ export default function OfferDetailPage() {
                 <Empty icon={FileText} title="No offer letter generated yet" text="Generate the letter from the compensation and terms. You can review and edit it before sending." />
               )}
             </Panel>
-            <Panel icon={UserRound} title="Candidate response" description="Track the candidate's response to the offer." action={offer.status === "EXTENDED" && can("offer.manage") ? <Button variant="secondary" leadingIcon={<Pencil className="h-4 w-4" />} onClick={() => setDialog("response")}>Record response</Button> : undefined}>
+            <Panel icon={UserRound} title="Candidate response" action={offer.status === "EXTENDED" && can("offer.manage") ? <Button variant="secondary" leadingIcon={<Pencil className="h-4 w-4" />} onClick={() => setDialog("response")}>Record response</Button> : undefined}>
               {offer.status === "ACCEPTED" || offer.status === "HIRED" || offer.status === "DECLINED" ? (
                 <div className={cx("rounded-xl p-4 text-sm", offer.status === "DECLINED" ? "bg-danger-soft" : "bg-success-soft")}>
                   <p className={cx("font-semibold", offer.status === "DECLINED" ? "text-danger-ink" : "text-success-ink")}>{offer.status === "DECLINED" ? "Declined" : "Accepted"} {formatDate(offer.accepted_at ?? offer.declined_at)}</p>
@@ -229,7 +229,7 @@ export default function OfferDetailPage() {
                 <div className="flex items-center gap-3 rounded-xl bg-surface-muted p-4 text-sm"><Hourglass className="h-6 w-6 text-headline" aria-hidden="true" /><div><p className="font-semibold text-headline">Response pending</p><p className="text-ink">{offer.status === "EXTENDED" ? `Sent ${formatDate(offer.extended_at)}${offer.expires_on ? `; expires ${formatDate(offer.expires_on)}` : ""}.` : offer.status === "WITHDRAWN" ? "The offer was withdrawn." : "The offer has not been sent to the candidate yet."}</p></div></div>
               )}
             </Panel>
-            <Panel icon={Clock3} title="Activity timeline" description="Key events in the offer process."><Timeline offer={offer} entries={activity.slice(0, 5)} /></Panel>
+            <Panel icon={Clock3} title="Activity timeline"><Timeline offer={offer} entries={activity.slice(0, 5)} /></Panel>
           </div>
         </div>
       )}
@@ -251,7 +251,7 @@ export default function OfferDetailPage() {
           onApprove={() => void run(() => recruitmentApi.approveOffer(id, comment.trim()))} onReturn={() => void run(() => recruitmentApi.returnOffer(id, comment.trim()))} onOpen={() => undefined} />
       )}
 
-      {tab === "activity" && <Panel icon={Clock3} title="Activity timeline" description="Every recorded event for this offer."><Timeline offer={offer} entries={activity} /></Panel>}
+      {tab === "activity" && <Panel icon={Clock3} title="Activity timeline"><Timeline offer={offer} entries={activity} /></Panel>}
 
       {dialog === "terms" && <TermsDialog offer={offer} onClose={() => setDialog(null)} onSaved={() => { setDialog(null); reload(); }} />}
       <ConfirmDialog open={dialog === "submit"} title="Submit offer for approval?" description="Approvers are notified. The offer can't be edited while it is pending." confirmLabel="Submit" loading={busy} onCancel={() => setDialog(null)} onConfirm={() => void run(() => recruitmentApi.submitOfferForApproval(id))} />
@@ -284,7 +284,7 @@ function printLetter(offer: RecruitmentOffer) {
 function ApprovalsPanel({ offer, canApprove, isSubmitter, busy, comment, setComment, onApprove, onReturn, onOpen, expanded }: { offer: RecruitmentOffer; canApprove: boolean; isSubmitter: boolean; busy: boolean; comment: string; setComment: (value: string) => void; onApprove: () => void; onReturn: () => void; onOpen: () => void; expanded?: boolean }) {
   const pending = offer.status === "PENDING_APPROVAL";
   return (
-    <Panel icon={UsersRound} title="Approvals" description="Approval status for this offer." action={!expanded ? <Button variant="secondary" onClick={onOpen}>View approval workflow</Button> : undefined}>
+    <Panel icon={UsersRound} title="Approvals" action={!expanded ? <Button variant="secondary" onClick={onOpen}>View approval workflow</Button> : undefined}>
       {offer.status === "DRAFT" && !offer.submitted_at ? (
         <div className="flex gap-3 rounded-xl bg-primary-soft/60 p-4 text-sm"><Info className="h-6 w-6 shrink-0 text-headline" aria-hidden="true" /><div><p className="font-semibold text-headline">Approval not started</p><p className="text-ink">Submit the offer for approval to route it to an HR Admin, Director or Institution Admin other than you.</p></div></div>
       ) : (
@@ -387,11 +387,11 @@ function TermsDialog({ offer, onClose, onSaved }: { offer: RecruitmentOffer; onC
   );
 }
 
-function Panel({ icon: Icon, title, description, action, children }: { icon: typeof FileText; title: string; description: string; action?: React.ReactNode; children: React.ReactNode }) {
+function Panel({ icon: Icon, title, description, action, children }: { icon: typeof FileText; title: string; description?: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
     <section className="rounded-2xl border border-line bg-surface p-5 shadow-elevation-1">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-start gap-3"><Icon className="mt-0.5 h-7 w-7 shrink-0 text-section-icon" aria-hidden="true" /><div><h2 className="text-heading font-bold text-headline">{title}</h2><p className="text-support text-heading-support">{description}</p></div></div>
+        <div className="flex items-start gap-3"><Icon className="mt-0.5 h-7 w-7 shrink-0 text-section-icon" aria-hidden="true" /><div><h2 className="text-heading font-bold text-headline">{title}</h2>{description && <p className="text-support text-heading-support">{description}</p>}</div></div>
         {action}
       </div>
       {children}

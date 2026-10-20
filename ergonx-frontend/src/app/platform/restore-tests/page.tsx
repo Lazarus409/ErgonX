@@ -37,7 +37,7 @@ export default function RestoreTestsPage() {
 
   return (
     <div className="space-y-6">
-      <SectionTitle eyebrow={<span className="inline-flex items-center gap-1"><DatabaseBackup className="h-3.5 w-3.5" aria-hidden="true" />Operations</span>} title="Backup restore tests" description="Restore a recent backup into a scratch database at least every 90 days and record what you checked. Organisations see when the last test passed." />
+      <SectionTitle eyebrow={<span className="inline-flex items-center gap-1"><DatabaseBackup className="h-3.5 w-3.5" aria-hidden="true" />Operations</span>} title="Backup restore tests" />
       {error && <Alert tone="danger">{error}</Alert>}
       <section className="space-y-4 rounded-2xl border border-line bg-surface p-5">
         {formError && <Alert tone="danger">{formError}</Alert>}

@@ -108,7 +108,7 @@ function ReviewBody({ review, reload }: { review: PerformanceReview; reload: () 
       {viewer.can_self_assess && review.self_assessment_due && <Alert tone="info">Please complete your self-assessment by {formatDate(review.self_assessment_due)}.</Alert>}
       {viewer.is_employee && !viewer.can_self_assess && review.status !== "COMPLETED" && <Alert tone="info">{"Your manager's assessment will be shared with you once HR has signed the review off."}</Alert>}
 
-      <Card title="Competencies" description="Rated from 1 (unsatisfactory) to 5 (outstanding)." icon={ClipboardCheck} accent="hr">
+      <Card title="Competencies" icon={ClipboardCheck} accent="hr">
         <ul className="divide-y divide-line-soft">
           {review.ratings.map((row) => (
             <li key={row.competency_id} className="grid gap-4 py-4 lg:grid-cols-[minmax(0,14rem)_1fr_1fr]">
@@ -174,7 +174,7 @@ function ReviewBody({ review, reload }: { review: PerformanceReview; reload: () 
       <ReviewFeedbackCard reviewId={id} employeeId={review.employee} canRequest={viewer.can_request_feedback} />
 
       {viewer.can_calibrate && (
-        <Card title="Calibration" description="Adjust the final rating to keep ratings consistent across teams. It replaces the manager's rating when you sign off; your reason stays with HR." icon={Star} accent="hr">
+        <Card title="Calibration" icon={Star} accent="hr">
           <div className="grid gap-4 sm:grid-cols-[12rem_minmax(0,1fr)]">
             <Field label="Final rating">
               <Select value={calibratedRating} onChange={(event) => setCalibratedRating(event.target.value)}>

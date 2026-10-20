@@ -22,7 +22,7 @@ export default function CalibrationBoardCard({ cycleId }: { cycleId: string }) {
   const awaiting = data.reviews.filter((row) => row.status === "HR_REVIEW").length;
 
   return (
-    <Card title="Calibration" description="Compare manager ratings with final ratings before signing off. Open a review to calibrate it." icon={Scale} accent="hr" actions={awaiting ? <Badge tone="warning">{awaiting} awaiting sign-off</Badge> : undefined}>
+    <Card title="Calibration" icon={Scale} accent="hr" actions={awaiting ? <Badge tone="warning">{awaiting} awaiting sign-off</Badge> : undefined}>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
         <ul className="space-y-2" aria-label="Rating distribution, manager compared with final">
           {[...data.distribution].reverse().map((row) => (

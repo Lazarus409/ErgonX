@@ -240,7 +240,7 @@ export default function AdjustmentReview({ id, backHref, backLabel, linkBase }: 
 
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
         <div className="space-y-5">
-          <Section number={1} title="Exception summary" description="Compare scheduled, recorded and requested hours for this date.">
+          <Section number={1} title="Exception summary">
             <div className="grid gap-4 sm:grid-cols-[repeat(3,minmax(0,1fr))_auto] sm:items-center">
               <HoursCell icon={CalendarDays} label="Scheduled" minutes={review?.scheduled?.minutes} window={review?.scheduled?.off_day ? "Off day" : windowLabel(review?.scheduled)} arrow />
               <HoursCell icon={Clock3} label="Recorded" minutes={review?.recorded?.minutes} window={windowLabel(review?.recorded)} arrow />
@@ -252,7 +252,7 @@ export default function AdjustmentReview({ id, backHref, backLabel, linkBase }: 
             </div>
           </Section>
 
-          <Section number={2} title="Policy and compliance" description="System check against attendance and leave policies.">
+          <Section number={2} title="Policy and compliance">
             {review ? (
               <>
                 <div className={cx("flex items-center gap-4 rounded-xl border px-4 py-3.5", review.compliant ? "border-success/30 bg-success-soft" : "border-warning/30 bg-warning-soft")}>
@@ -313,7 +313,7 @@ export default function AdjustmentReview({ id, backHref, backLabel, linkBase }: 
           </Section>
 
           {(canDecide || canDelegate) && (
-            <Section number={7} title="Your decision" icon={UserRound} description="Review the information and select an action.">
+            <Section number={7} title="Your decision" icon={UserRound}>
               <textarea rows={2} maxLength={2000} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Add a note (required to decline or request changes)" aria-label="Decision note" className="mb-3 w-full rounded-lg border border-line-strong px-3 py-2 text-sm" />
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 <DecisionButton tone="primary" icon={Check} label="Approve" onClick={() => { setActionError(""); setDecision("approve"); }} disabled={!canDecide} />
@@ -333,7 +333,7 @@ export default function AdjustmentReview({ id, backHref, backLabel, linkBase }: 
           )}
 
           {isReturned && review?.is_requester && (
-            <Section number={7} title="Update and resubmit" icon={Pencil} description="Make the requested changes, then send the adjustment back for review.">
+            <Section number={7} title="Update and resubmit" icon={Pencil}>
               {editing ? (
                 <div className="space-y-3">
                   <div className="grid grid-cols-2 gap-3">

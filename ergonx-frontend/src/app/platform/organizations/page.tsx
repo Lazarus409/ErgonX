@@ -65,7 +65,7 @@ export default function PlatformOrganizationsPage() {
         <ChartCard
           className="rounded-3xl"
           title="Growth"
-          description="New organizations and Get Started requests in each of the last 12 months."
+         
           icon={TrendingUp}
           accent="brand"
           loading={!overview}
@@ -77,7 +77,7 @@ export default function PlatformOrganizationsPage() {
           <BarsChart data={growth} xKey="month" xFormat="month" height={230} series={[{ key: "institutions", label: "Organizations created", color: "var(--chart-1)" }, { key: "access_requests", label: "Access requests", color: "var(--chart-3)" }]} />
         </ChartCard>
         <section className={`${platformCard} p-5 sm:p-6`}>
-          <SectionTitle eyebrow="Onboarding" title="Setup progress" description="Where organizations are in their setup checklist." />
+          <SectionTitle eyebrow="Onboarding" title="Setup progress" />
           {overview && <SummaryList className="mt-4" items={(["READY", "IN_PROGRESS", "NOT_STARTED", "BLOCKED"] as const).map((key) => ({ label: onboardingLabel[key], value: overview.onboarding[key] }))} />}
           <p className="mt-4 flex items-center gap-2 text-caption text-ink-muted"><LayoutGrid className="h-3.5 w-3.5" aria-hidden="true" />Blocked organizations report a problem in their own setup checklist.</p>
         </section>
@@ -95,7 +95,7 @@ export default function PlatformOrganizationsPage() {
         minWidth={1100}
         toolbar={
           <div className="space-y-4">
-          <SectionTitle eyebrow="Directory" title="Organizations" description="Every organization on ErgonX, who administers it, and how far it has got with setup." meta={data ? `${data.count} organization${data.count === 1 ? "" : "s"}` : undefined} />
+          <SectionTitle eyebrow="Directory" title="Organizations" meta={data ? `${data.count} organization${data.count === 1 ? "" : "s"}` : undefined} />
           <DataToolbar
             search={search}
             onSearchChange={setSearch}

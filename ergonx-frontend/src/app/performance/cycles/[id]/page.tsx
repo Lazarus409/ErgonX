@@ -98,7 +98,7 @@ export default function ReviewCyclePage() {
           </section>
           {summary && summary.by_status.COMPLETED > 0 && (
             <div className="grid gap-6 lg:grid-cols-2">
-              <Card title="Rating distribution" description="Overall ratings of signed-off reviews." icon={BarChart3} accent="hr">
+              <Card title="Rating distribution" icon={BarChart3} accent="hr">
                 <ul className="space-y-2">
                   {[...summary.rating_distribution].reverse().map((row) => (
                     <li key={row.rating} className="grid grid-cols-[minmax(0,11rem)_1fr_2.5rem] items-center gap-3 text-caption">

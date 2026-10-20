@@ -149,14 +149,14 @@ export default function AttendanceDashboardPage() {
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Attendance indicators">
         <MetricCard label="Attendance rate" value={rate === null || rate === undefined ? EM_DASH : `${Number(rate).toFixed(1)}%`} description={rate === null || rate === undefined ? "No data available" : `Last ${range} months`} icon={Users} accent="brand" loading={initial} />
         <MetricCard label="Late arrivals" value={value(data?.today.late_arrivals)} description={data?.today.late_arrivals ? `Last ${range} months` : "No data available"} icon={Clock3} accent="leave" loading={initial} />
-        <MetricCard label="Missing punches" value={value(data?.today.missing_punches)} description={data?.today.missing_punches ? "Clock-ins without a clock-out" : "No data available"} icon={AlertTriangle} accent="recruitment" loading={initial} href="/attendance/live" />
-        <MetricCard label="Pending adjustments" value={value(data?.today.pending_adjustments)} description={data?.today.pending_adjustments ? "Awaiting review" : "No data available"} icon={FileText} accent="payroll" loading={initial} href="/attendance/adjustments" />
+        <MetricCard label="Missing punches" value={value(data?.today.missing_punches)} icon={AlertTriangle} accent="recruitment" loading={initial} href="/attendance/live" />
+        <MetricCard label="Pending adjustments" value={value(data?.today.pending_adjustments)} icon={FileText} accent="payroll" loading={initial} href="/attendance/adjustments" />
       </section>
 
       <div className="grid gap-5 xl:grid-cols-2">
         <ChartCard
           title="Attendance trend"
-          description="Monthly attendance rate over time."
+         
           icon={BarChart3}
           loading={initial}
           error={!data && error ? "This data is unavailable right now." : null}
@@ -170,7 +170,7 @@ export default function AttendanceDashboardPage() {
         </ChartCard>
         <ChartCard
           title="Attendance by department / functional area"
-          description="Attendance rate by department / functional area."
+         
           icon={PieChartIcon}
           loading={initial}
           error={!data && error ? "This data is unavailable right now." : null}
@@ -186,7 +186,7 @@ export default function AttendanceDashboardPage() {
       <div className="grid gap-5 xl:grid-cols-2">
         <Card
           title="Priority exceptions"
-          description="Employees with attendance issues requiring attention."
+         
           icon={AlertTriangle}
           padding="none"
           className="[&>div:first-child]:px-5 [&>div:first-child]:pt-5"
@@ -204,7 +204,7 @@ export default function AttendanceDashboardPage() {
         </Card>
         <Card
           title="Recent adjustments"
-          description="Latest attendance adjustments and activity."
+         
           icon={History}
           padding="none"
           className="[&>div:first-child]:px-5 [&>div:first-child]:pt-5"
@@ -228,7 +228,7 @@ export default function AttendanceDashboardPage() {
         <MetricCard size="sm" label="Absent today" value={value(data?.today.absent)} icon={UserX} accent="audit" loading={initial} />
         <MetricCard size="sm" label="Currently on leave" value={value(data?.onLeave)} icon={CalendarDays} accent="leave" loading={initial} />
         <MetricCard size="sm" label="Overtime pending" value={value(data?.overtimePending)} icon={Timer} accent="attendance" loading={initial} href="/attendance/overtime" />
-        <MetricCard size="sm" label="Scheduled today" value={value(data?.scheduledToday)} description="Current schedule assignments" icon={Users} accent="attendance" loading={initial} />
+        <MetricCard size="sm" label="Scheduled today" value={value(data?.scheduledToday)} icon={Users} accent="attendance" loading={initial} />
         <MetricCard size="sm" label="Active shifts" value={value(data?.activeShifts)} icon={Activity} accent="attendance" loading={initial} href="/attendance/shifts" />
       </section>
 
@@ -236,7 +236,7 @@ export default function AttendanceDashboardPage() {
         <ChartCard
           className="xl:col-span-3"
           title="Seven-day attendance"
-          description="Daily attendance outcomes across the last week."
+         
           accent="attendance"
           loading={initial}
           error={!data && error ? "This data is unavailable right now." : null}
@@ -256,7 +256,7 @@ export default function AttendanceDashboardPage() {
         <ChartCard
           className="xl:col-span-2"
           title="Overtime this week"
-          description="Recorded overtime minutes per day. Only approved overtime is consumed by Payroll."
+         
           accent="attendance"
           icon={Timer}
           loading={initial}
@@ -272,7 +272,7 @@ export default function AttendanceDashboardPage() {
       </div>
 
       <div className="grid gap-5 xl:grid-cols-5">
-        <Card className="xl:col-span-3" title="Department / Functional Area attendance heatmap" description="Today's outcomes by department / functional area. Darker cells mean more employees." icon={Grid3X3} accent="attendance">
+        <Card className="xl:col-span-3" title="Department / Functional Area attendance heatmap" icon={Grid3X3} accent="attendance">
           {initial ? <div className="skeleton h-48 rounded-xl" /> : departments.length ? (
             <HeatmapGrid
               rows={departments.map((item) => item.employee__employments__department__name || "Unassigned")}
@@ -281,7 +281,7 @@ export default function AttendanceDashboardPage() {
             />
           ) : <p className="text-support text-ink-muted">No department-linked attendance has been recorded today.</p>}
         </Card>
-        <Card className="xl:col-span-2" title="Action required" description="Attendance items awaiting operational attention." icon={AlertTriangle} accent="attendance">
+        <Card className="xl:col-span-2" title="Action required" icon={AlertTriangle} accent="attendance">
           {data && data.scheduledToday ? (
             <div className="mb-4 border-b border-line-soft pb-4">
               <ProgressMeter
@@ -345,7 +345,7 @@ export default function AttendanceDashboardPage() {
         <ChartCard
           className="xl:col-span-2"
           title="Lateness trend"
-          description="Late arrivals per month."
+         
           accent="attendance"
           loading={initial}
           error={!data && error ? "This data is unavailable right now." : null}

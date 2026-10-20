@@ -137,13 +137,13 @@ export default function BudgetDetailPage() {
             </>
           )}
           {tab === "initiatives" && (
-            <Panel icon={ListTree} title="Initiatives" description="Allocations grouped by initiative.">
+            <Panel icon={ListTree} title="Initiatives">
               {data.initiatives.length ? <table className="w-full text-sm"><thead className="bg-surface-muted text-left text-caption font-semibold"><tr><th className="px-3 py-2">Initiative</th><th className="px-3 py-2 text-right">Allocated</th><th className="px-3 py-2 text-right">Committed</th><th className="px-3 py-2 text-right">Actual</th></tr></thead><tbody className="divide-y divide-line-soft">{data.initiatives.map((row) => <tr key={row.initiative}><td className="px-3 py-2 font-medium">{row.initiative}</td><td className="px-3 py-2 text-right tabular-nums">{formatAmount(row.allocated)}</td><td className="px-3 py-2 text-right tabular-nums">{formatAmount(row.committed)}</td><td className="px-3 py-2 text-right tabular-nums">{formatAmount(row.actual)}</td></tr>)}</tbody></table> : <Empty icon={ListTree} title="No initiatives" text="Tag budget lines with an initiative to group them here." />}
             </Panel>
           )}
           {tab === "documents" && <AttachmentsPanel resource="budgets" recordId={budget.id} attachments={data.attachments} canUpload={can("budget.manage")} onChanged={reload} />}
           {tab === "notes" && (
-            <Panel icon={Info} title="Notes" description="Assumptions and discussion. Notes are added to the audit trail.">
+            <Panel icon={Info} title="Notes">
               <div className="mb-4 space-y-2"><textarea rows={3} value={newNote} maxLength={4000} onChange={(event) => setNewNote(event.target.value)} placeholder="Add a note…" aria-label="New note" className="w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm" /><div className="flex justify-end"><Button disabled={!newNote.trim()} onClick={() => void run(() => accountingApi.addBudgetNote(budget.id, newNote.trim()).then(() => setNewNote("")))}>Add note</Button></div></div>
               {data.notes.length ? <ul className="space-y-3">{data.notes.map((row) => <li key={row.id} className="rounded-xl bg-surface-muted p-3 text-sm"><p className="whitespace-pre-wrap">{row.body}</p><p className="mt-1 text-caption text-ink-muted">{row.author} · {formatDateTime(row.created_at)}</p></li>)}</ul> : <Empty icon={Info} title="No notes yet" text="Record assumptions behind the allocations." />}
             </Panel>

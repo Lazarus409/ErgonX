@@ -159,7 +159,7 @@ export default function OnboardingPage() {
       <section aria-labelledby="checklist-heading" className="space-y-4">
         <SectionHeading
           title={<span id="checklist-heading">{isInstitutionSetupOwner ? "Prepare your organization" : "Complete your setup"}</span>}
-          description={isInstitutionSetupOwner ? "Role owners complete their own authorized configuration after you invite them." : "Complete the setup items assigned to your permissions."}
+         
           actions={<span className="text-support text-ink-muted">{visibleSteps.length} setup steps</span>}
         />
         <ol className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

@@ -106,14 +106,14 @@ export default function LeaveDashboardPage() {
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Leave indicators">
         <MetricCard label="Total leave requests" value={count(rollup?.total_requests)} description={rollup?.total_requests ? `Submitted in the last ${range} months` : "No data available"} icon={Users} accent="brand" loading={initial} href="/leave/requests" />
         <MetricCard label="Approved requests" value={count(rollup?.approved_requests)} description={rollup?.total_requests ? `${Math.round(((rollup.approved_requests ?? 0) / rollup.total_requests) * 100)}% of submitted` : "No data available"} icon={CheckCircle2} accent="leave" loading={initial} />
-        <MetricCard label="Pending approvals" value={count(rollup?.pending)} description="Awaiting a decision" icon={Hourglass} accent="recruitment" loading={initial} href="/leave/requests?status=PENDING" />
-        <MetricCard label="Average absence rate" value={absence === null || absence === undefined ? EM_DASH : `${Number(absence).toFixed(1)}%`} description={absence === null || absence === undefined ? "No data available" : "Approved leave vs. working days"} icon={CalendarRange} accent="payroll" loading={initial} />
+        <MetricCard label="Pending approvals" value={count(rollup?.pending)} icon={Hourglass} accent="recruitment" loading={initial} href="/leave/requests?status=PENDING" />
+        <MetricCard label="Average absence rate" value={absence === null || absence === undefined ? EM_DASH : `${Number(absence).toFixed(1)}%`} icon={CalendarRange} accent="payroll" loading={initial} />
       </section>
 
       <div className="grid gap-5 xl:grid-cols-2">
         <ChartCard
           title="Leave trend"
-          description="Number of approved leave days taken over time."
+         
           icon={BarChart3}
           loading={initial}
           error={!data && error ? "This data is unavailable right now." : null}
@@ -132,7 +132,7 @@ export default function LeaveDashboardPage() {
       <div className="grid gap-5 xl:grid-cols-2">
         <Card
           title="Pending leave approvals"
-          description="Leave requests awaiting approval."
+         
           icon={Hourglass}
           padding="none"
           className="[&>div:first-child]:px-5 [&>div:first-child]:pt-5"
@@ -160,12 +160,12 @@ export default function LeaveDashboardPage() {
           )}
         </Card>
 
-        <Card title="Policy compliance & alerts" description="Monitor leave policy compliance and flagged issues." icon={ShieldCheck}>
+        <Card title="Policy compliance & alerts" icon={ShieldCheck}>
           {initial ? <div className="skeleton h-40 rounded-xl" /> : (
             <div className="space-y-3">
-              <ComplianceRow icon={AlertCircle} tone="danger" title="Policy breaches" description="Leave records that require review for policy compliance." alert={rollup?.compliance?.policy_breaches} hrefFor={(id) => `/leave/requests/${id}`} />
-              <ComplianceRow icon={FileText} tone="violet" title="Incomplete leave records" description="Employees with missing or incomplete leave information." alert={rollup?.compliance?.incomplete_leave_records} hrefFor={(id) => `/hr/employees/${id}`} />
-              <ComplianceRow icon={CalendarDays} tone="brand" title="Upcoming long absences" description="Employees with upcoming extended leave (5+ days, next 30 days)." alert={rollup?.compliance?.upcoming_long_absences} hrefFor={(id) => `/leave/requests/${id}`} />
+              <ComplianceRow icon={AlertCircle} tone="danger" title="Policy breaches" alert={rollup?.compliance?.policy_breaches} hrefFor={(id) => `/leave/requests/${id}`} />
+              <ComplianceRow icon={FileText} tone="violet" title="Incomplete leave records" alert={rollup?.compliance?.incomplete_leave_records} hrefFor={(id) => `/hr/employees/${id}`} />
+              <ComplianceRow icon={CalendarDays} tone="brand" title="Upcoming long absences" alert={rollup?.compliance?.upcoming_long_absences} hrefFor={(id) => `/leave/requests/${id}`} />
             </div>
           )}
         </Card>
@@ -187,7 +187,7 @@ export default function LeaveDashboardPage() {
         <ChartCard
           className="xl:col-span-2"
           title="Approved leave by type"
-          description="Share of approved leave days by leave type."
+         
           icon={PieChartIcon}
           loading={initial}
           error={!data && error ? "This data is unavailable right now." : null}
@@ -213,7 +213,7 @@ function ComplianceRow({ icon: Icon, tone, title, description, alert, hrefFor }:
   icon: typeof AlertCircle;
   tone: keyof typeof TONES;
   title: string;
-  description: string;
+  description?: string;
   alert?: { count: number; items: Array<{ id: string; employee: string; issue: string }> };
   hrefFor: (id: string) => string;
 }) {
@@ -223,7 +223,7 @@ function ComplianceRow({ icon: Icon, tone, title, description, alert, hrefFor }:
     <div className="rounded-xl border border-line">
       <button type="button" onClick={() => setOpen((value) => !value)} disabled={!total} aria-expanded={open} className="flex w-full items-center gap-4 px-4 py-3.5 text-left disabled:cursor-default">
         <span className={cx("flex h-12 w-12 shrink-0 items-center justify-center rounded-full", TONES[tone])} aria-hidden="true"><Icon className="h-6 w-6" /></span>
-        <span className="min-w-0 flex-1"><span className="block font-bold text-headline">{title}</span><span className="block text-support text-heading-support">{description}</span></span>
+        <span className="min-w-0 flex-1"><span className="block font-bold text-headline">{title}</span>{description && <span className="block text-support text-heading-support">{description}</span>}</span>
         <span className="text-heading font-bold tabular-nums text-ink-strong">{total === undefined ? EM_DASH : formatNumber(total)}</span>
         <ChevronRight className={cx("h-5 w-5 shrink-0 text-primary-ink transition-transform", open && "rotate-90", !total && "opacity-30")} aria-hidden="true" />
       </button>
@@ -262,7 +262,7 @@ function LeaveCalendarCard({ leaveTypes, employees }: { leaveTypes: Map<string, 
   return (
     <Card
       title="Leave calendar"
-      description="View employee leave at a glance."
+     
       icon={CalendarDays}
       actions={
         <div className="flex items-center gap-1.5">

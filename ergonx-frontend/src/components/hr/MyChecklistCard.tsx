@@ -44,7 +44,7 @@ export default function MyChecklistCard() {
   return (
     <Card
       title={isOnboarding ? "Your onboarding checklist" : "Your offboarding checklist"}
-      description={isOnboarding ? "What happens in your first weeks. Tick off the items marked for you." : "What needs to happen before you leave. Tick off the items marked for you."}
+     
       icon={ListChecks}
       accent="hr"
       actions={<Badge tone={mine ? "warning" : "success"}>{mine ? `${mine} for you` : `${record.checklist.closed} of ${record.checklist.total} done`}</Badge>}

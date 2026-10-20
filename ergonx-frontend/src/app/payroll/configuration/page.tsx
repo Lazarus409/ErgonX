@@ -160,7 +160,7 @@ export default function PayrollConfigurationPage() {
       {error && <Alert tone="danger" title="The configuration was not saved">{error}</Alert>}
       {saved && <Alert tone="success" title="Payroll configuration saved"><span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4" aria-hidden="true" />New payroll runs use these settings. Runs already started keep the settings they began with.</span></Alert>}
 
-      <Card title="General settings" description="Available presets depend on the institution's country." icon={Settings2} accent="payroll">
+      <Card title="General settings" icon={Settings2} accent="payroll">
         <div className="grid gap-5 md:grid-cols-2">
           <Field label="Payroll setup">
             <Select value={choice} disabled={disabled} onChange={(event) => { setChoice(event.target.value); setSaved(false); }}>
@@ -201,7 +201,7 @@ export default function PayrollConfigurationPage() {
 
       {isCustom && (
         <>
-          <Card title="Income tax" description="How tax is worked out for each employee every pay period." icon={Landmark} accent="payroll">
+          <Card title="Income tax" icon={Landmark} accent="payroll">
             <div className="grid gap-5 md:grid-cols-2">
               <Field label="Tax method">
                 <Select value={taxMethod} disabled={disabled} onChange={(event) => touch(setTaxMethod)(event.target.value as TaxMethod)}>
@@ -249,7 +249,7 @@ export default function PayrollConfigurationPage() {
             )}
           </Card>
 
-          <Card title="Contributions" description="Pension, social security, health insurance or similar, as a percentage of pay." icon={Percent} accent="payroll">
+          <Card title="Contributions" icon={Percent} accent="payroll">
             {contributions.length === 0 && <p className="text-support text-ink-muted">No contributions. Add one for each scheme you pay into.</p>}
             <div className="space-y-4">
               {contributions.map((item, index) => (
@@ -270,7 +270,7 @@ export default function PayrollConfigurationPage() {
             <Button variant="secondary" size="sm" className="mt-4" disabled={disabled || contributions.length >= 10} leadingIcon={<Plus className="h-4 w-4" />} onClick={() => { setContributions((current) => [...current, { name: "", basis: "BASE_SALARY", employee_rate: "", employer_rate: "", maximum_basis: "" }]); setSaved(false); }}>Add contribution</Button>
           </Card>
 
-          <Card title="Preview" description="What one employee on a basic salary alone would receive under these rules." icon={Calculator} accent="payroll">
+          <Card title="Preview" icon={Calculator} accent="payroll">
             <div className="grid gap-5 md:grid-cols-[minmax(0,16rem)_1fr]">
               <Field label={`Salary per period (${choices?.currency ?? ""})`}><Input type="number" min={0} step="0.01" value={sampleSalary} onChange={(event) => setSampleSalary(event.target.value)} /></Field>
               <dl className="grid gap-2 text-sm">

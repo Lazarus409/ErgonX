@@ -25,10 +25,10 @@ function pinnedCodes(preferences: PreferenceData): string[] {
 
 const SAMPLE = new Date(2026, 0, 12, 14, 30);
 
-function Section({ icon: Icon, title, description, children }: { icon: typeof Globe; title: string; description: string; children: ReactNode }) {
+function Section({ icon: Icon, title, description, children }: { icon: typeof Globe; title: string; description?: string; children: ReactNode }) {
   return (
     <section className="rounded-xl border border-line bg-surface p-5 shadow-elevation-1 sm:p-6">
-      <div className="flex gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-ink" aria-hidden="true"><Icon className="h-5 w-5" /></span><div><h2 className="text-card-title font-semibold text-ink-strong">{title}</h2><p className="mt-0.5 text-support text-ink-muted">{description}</p></div></div>
+      <div className="flex gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-ink" aria-hidden="true"><Icon className="h-5 w-5" /></span><div><h2 className="text-card-title font-semibold text-ink-strong">{title}</h2>{description && <p className="mt-0.5 text-support text-ink-muted">{description}</p>}</div></div>
       <div className="mt-5">{children}</div>
     </section>
   );
@@ -95,7 +95,7 @@ export default function ProfileSettingsPage() {
       {saveError && <ErrorState variant="inline" title="Preferences not saved" message={saveError} />}
       {saved && <p className="rounded-lg border border-success/25 bg-success-soft p-3 text-sm text-success-ink">Your preferences were saved.</p>}
 
-      <Section icon={Globe} title="Language and region" description="Language and time zone used across the workspace.">
+      <Section icon={Globe} title="Language and region">
         <dl className="grid gap-3 sm:grid-cols-2 text-support">
           <div className="rounded-lg bg-surface-muted/70 p-3"><dt className="text-ink-muted">Language</dt><dd className="font-semibold text-ink-strong">English</dd><dd className="text-caption text-ink-muted">The only language available today.</dd></div>
           <div className="rounded-lg bg-surface-muted/70 p-3"><dt className="text-ink-muted">Time zone</dt><dd className="font-semibold text-ink-strong">{institution?.timezone ?? "Institution default"}</dd><dd className="text-caption text-ink-muted">Set by your institution.</dd></div>
@@ -114,14 +114,14 @@ export default function ProfileSettingsPage() {
         </div>
       </Section>
 
-      <Section icon={Hash} title="Numbers and formats" description="Digit grouping for amounts and counts. Currency codes are unchanged.">
+      <Section icon={Hash} title="Numbers and formats">
         <div className="grid gap-3 sm:grid-cols-2">
           <Choice value="comma" current={current.numberStyle} onChange={(numberStyle) => update({ numberStyle })} label="1,234,567.89" hint="Comma groups, point decimals" />
           <Choice value="space" current={current.numberStyle} onChange={(numberStyle) => update({ numberStyle })} label="1 234 567,89" hint="Space groups, comma decimals" />
         </div>
       </Section>
 
-      <Section icon={Palette} title="Appearance" description="Applies immediately on this browser.">
+      <Section icon={Palette} title="Appearance">
         <div className="grid gap-3 sm:grid-cols-3">
           {([["light", "Light", Sun], ["dark", "Dark", Moon], ["system", "Match my device", Monitor]] as Array<[ThemePreference, string, typeof Sun]>).map(([value, label, Icon]) => (
             <button key={value} type="button" aria-pressed={themePreference === value} onClick={() => setTheme(value)} className={cx("flex items-center gap-3 rounded-lg border p-3 text-sm font-semibold", themePreference === value ? "border-primary bg-primary-soft text-ink-strong ring-1 ring-primary/20" : "border-line text-ink hover:bg-surface-hover")}><Icon className="h-4 w-4" aria-hidden="true" />{label}</button>
@@ -129,15 +129,15 @@ export default function ProfileSettingsPage() {
         </div>
       </Section>
 
-      <Section icon={Accessibility} title="Motion and accessibility" description="Your device's reduced-motion setting is always respected; this adds it for ErgonX.">
+      <Section icon={Accessibility} title="Motion and accessibility">
         <label className="flex items-center gap-3 text-sm text-ink-strong"><input type="checkbox" className="h-4 w-4" checked={current.reduceMotion} onChange={(event) => update({ reduceMotion: event.target.checked })} />Reduce motion and animations</label>
       </Section>
 
-      <Section icon={Bell} title="Notifications" description="Every notification appears in ErgonX; choose which modules also email you.">
+      <Section icon={Bell} title="Notifications">
         <Link href="/notifications" className="text-sm font-semibold text-primary-ink hover:underline">Open notification preferences</Link>
       </Section>
 
-      <Section icon={Pin} title="Home quick actions" description="Pin the actions you want first on Home. They stay permission- and module-aware.">
+      <Section icon={Pin} title="Home quick actions">
         <div className="grid gap-3 sm:grid-cols-2">
           {data.actions.map((action) => {
             const checked = pinned.includes(action.code);

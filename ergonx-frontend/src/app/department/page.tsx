@@ -86,15 +86,15 @@ export default function DepartmentOverviewPage() {
         <MetricCard label="Team size" value={data ? formatNumber(data.headcount) : EM_DASH} description={data && data.departments.length > 1 ? `Across ${data.departments.length} departments` : "Current employees, excluding you"} icon={Users} accent="hr" loading={initial} />
         {attendanceEnabled && <MetricCard label="In today" value={data ? formatNumber((today.present ?? 0) + (today.remote ?? 0) + (today.late ?? 0)) : EM_DASH} description={data ? `${formatNumber(today.late ?? 0)} late · ${formatNumber(today.absent ?? 0)} absent · ${formatNumber(today.not_recorded ?? 0)} not recorded` : "Attendance today"} icon={UserCheck} accent="attendance" loading={initial} />}
         {leaveEnabled && <MetricCard label="On leave today" value={data ? formatNumber(data.on_leave_today.length) : EM_DASH} description={data?.upcoming_leave.length ? `${data.upcoming_leave.length} more starting in the next 30 days` : "No leave starting soon"} icon={CalendarOff} accent="leave" loading={initial} />}
-        {leaveEnabled && <MetricCard label="Awaiting your approval" value={data ? formatNumber(data.pending_approvals) : EM_DASH} description="Leave requests at your step" icon={ClipboardCheck} accent="brand" loading={initial} href="/department/approvals" />}
+        {leaveEnabled && <MetricCard label="Awaiting your approval" value={data ? formatNumber(data.pending_approvals) : EM_DASH} icon={ClipboardCheck} accent="brand" loading={initial} href="/department/approvals" />}
       </section>
 
       {leaveEnabled && (
         <div className="grid gap-5 xl:grid-cols-2">
-          <Card title="Off today" description="Approved leave covering today." icon={CalendarOff} accent="leave">
+          <Card title="Off today" icon={CalendarOff} accent="leave">
             {initial ? <div className="skeleton h-32 rounded-xl" /> : data?.on_leave_today.length ? <LeaveList items={data.on_leave_today} /> : <p className="text-support text-ink-muted">Nobody on your team is on leave today.</p>}
           </Card>
-          <Card title="Coming up" description="Approved and pending leave starting in the next 30 days." icon={CalendarDays} accent="leave">
+          <Card title="Coming up" icon={CalendarDays} accent="leave">
             {initial ? <div className="skeleton h-32 rounded-xl" /> : data?.upcoming_leave.length ? <LeaveList items={data.upcoming_leave} showStatus /> : <p className="text-support text-ink-muted">No leave is planned in the next 30 days.</p>}
           </Card>
         </div>
@@ -105,7 +105,7 @@ export default function DepartmentOverviewPage() {
           <ChartCard
             className="xl:col-span-3"
             title="Attendance, last 14 days"
-            description="Daily attendance records for your team."
+           
             accent="attendance"
             loading={initial}
             empty={!trend.some((row) => row.present || row.late || row.absent)}
@@ -115,7 +115,7 @@ export default function DepartmentOverviewPage() {
             <BarsChart data={trend} xKey="day" xFormat="day" mode="stacked" height={240} series={[{ key: "present", label: "Present", color: "var(--success)" }, { key: "late", label: "Late", color: "var(--warning)" }, { key: "absent", label: "Absent", color: "var(--danger)" }]} />
           </ChartCard>
         )}
-        <Card className={attendanceEnabled ? "xl:col-span-2" : "xl:col-span-5"} title={leaveEnabled ? "Leave taken this year" : "Team by position"} description={leaveEnabled ? "Approved days by leave type." : "Current positions on your team."} icon={leaveEnabled ? CalendarOff : Users} accent={leaveEnabled ? "leave" : "hr"}>
+        <Card className={attendanceEnabled ? "xl:col-span-2" : "xl:col-span-5"} title={leaveEnabled ? "Leave taken this year" : "Team by position"} icon={leaveEnabled ? CalendarOff : Users} accent={leaveEnabled ? "leave" : "hr"}>
           {initial ? <div className="skeleton h-48 rounded-xl" /> : leaveEnabled
             ? data?.leave_by_type.length ? <RankingBars items={data.leave_by_type.map((row) => ({ label: row.leave_type__name, value: Number(row.days), hint: `${row.requests} request${row.requests === 1 ? "" : "s"}` }))} color="var(--mod-leave)" /> : <p className="text-support text-ink-muted">No approved leave yet this year.</p>
             : data?.by_position.length ? <RankingBars items={data.by_position.map((row) => ({ label: row.position, value: row.count }))} color="var(--mod-hr)" /> : <p className="text-support text-ink-muted">No positions to show.</p>}

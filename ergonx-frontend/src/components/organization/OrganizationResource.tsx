@@ -200,7 +200,7 @@ function DepartmentHeadCard({ department, onSaved }: { department: Department; o
   };
 
   return (
-    <Card title="Department / Functional Area head" description="Approves the team's leave before HR and sees this department / functional area's people, attendance and leave. Sub-departments / functional areas are included." icon={UserRoundCheck} accent="hr">
+    <Card title="Department / Functional Area head" icon={UserRoundCheck} accent="hr">
       {!canEdit ? (
         <p className="text-sm font-semibold text-ink-strong">{department.head_name ?? "Not assigned"}</p>
       ) : (

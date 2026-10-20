@@ -132,10 +132,10 @@ export default function AuditSettingsPage() {
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Summary for these filters">
-        <MetricCard label="Total events" value={summary ? formatNumber(summary.total) : "—"} icon={FileText} accent="brand" description="Matching the filters" />
+        <MetricCard label="Total events" value={summary ? formatNumber(summary.total) : "—"} icon={FileText} accent="brand" />
         <MetricCard label="Successful" value={summary ? formatNumber(summary.successful) : "—"} icon={CheckCircle2} accent="leave" description={summary?.total ? `${Math.round((summary.successful / summary.total) * 1000) / 10}% of events` : "No events"} />
-        <MetricCard label="Failed attempts" value={summary ? formatNumber(summary.failed) : "—"} icon={XCircle} accent="payroll" description="Refused sign-ins, codes and step-ups" />
-        <MetricCard label="Security events" value={summary ? formatNumber(summary.security) : "—"} icon={ShieldAlert} accent="audit" description="Sign-in, access and configuration" />
+        <MetricCard label="Failed attempts" value={summary ? formatNumber(summary.failed) : "—"} icon={XCircle} accent="payroll" />
+        <MetricCard label="Security events" value={summary ? formatNumber(summary.security) : "—"} icon={ShieldAlert} accent="audit" />
       </section>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">

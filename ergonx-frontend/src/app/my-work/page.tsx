@@ -129,10 +129,10 @@ export default function MyWorkPage() {
       {error && <ErrorState variant="inline" title="Unable to load your work" message={error} onRetry={reload} />}
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="My work summary">
-        <MetricCard label="To do" value={summary ? String(summary.total) : "—"} description="Approvals and tasks for you" icon={ListTodo} accent="brand" loading={initial} />
-        <MetricCard label="Overdue" value={summary ? String(summary.overdue) : "—"} description="Past due, or approvals waiting over 3 days" icon={AlarmClock} accent="audit" loading={initial} />
-        <MetricCard label="Due this week" value={summary ? String(summary.due_soon) : "—"} description="Due in the next 7 days" icon={CheckCircle2} accent="attendance" loading={initial} />
-        <MetricCard label="Waiting on others" value={summary ? String(summary.waiting_on_others) : "—"} description="Your requests in someone else's queue" icon={Hourglass} accent="leave" loading={initial} />
+        <MetricCard label="To do" value={summary ? String(summary.total) : "—"} icon={ListTodo} accent="brand" loading={initial} />
+        <MetricCard label="Overdue" value={summary ? String(summary.overdue) : "—"} icon={AlarmClock} accent="audit" loading={initial} />
+        <MetricCard label="Due this week" value={summary ? String(summary.due_soon) : "—"} icon={CheckCircle2} accent="attendance" loading={initial} />
+        <MetricCard label="Waiting on others" value={summary ? String(summary.waiting_on_others) : "—"} icon={Hourglass} accent="leave" loading={initial} />
       </section>
 
       {initial ? (

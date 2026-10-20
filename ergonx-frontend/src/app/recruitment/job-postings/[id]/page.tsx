@@ -197,7 +197,7 @@ export default function RequisitionDetailPage() {
 
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
         <div className="space-y-5">
-          <Panel icon={FileText} title="Job brief" description="An overview of the role, its purpose and key details." action={editable ? <ButtonLink href={`/recruitment/job-postings/${id}/edit`} variant="secondary" leadingIcon={<Pencil className="h-4 w-4" />}>Edit</ButtonLink> : undefined}>
+          <Panel icon={FileText} title="Job brief" action={editable ? <ButtonLink href={`/recruitment/job-postings/${id}/edit`} variant="secondary" leadingIcon={<Pencil className="h-4 w-4" />}>Edit</ButtonLink> : undefined}>
             <dl className="divide-y divide-line-soft rounded-xl border border-line-soft">
               {brief.map(([Icon, label, text]) => (
                 <div key={label} className="grid grid-cols-[minmax(0,13rem)_minmax(0,1fr)] gap-3 px-3 py-2 text-sm">
@@ -232,7 +232,7 @@ export default function RequisitionDetailPage() {
             </div>
           </Panel>
 
-          <Panel icon={UsersRound} title="Candidate activity" description="Applications and candidate progress for this requisition." action={can("candidate.view") ? <ButtonLink href="/recruitment/applications" variant="secondary">View all candidates</ButtonLink> : undefined}>
+          <Panel icon={UsersRound} title="Candidate activity" action={can("candidate.view") ? <ButtonLink href="/recruitment/applications" variant="secondary">View all candidates</ButtonLink> : undefined}>
             {activity && activity.total > 0 ? (
               <>
                 <div className="flex flex-wrap gap-2">
@@ -258,7 +258,7 @@ export default function RequisitionDetailPage() {
         </div>
 
         <div className="space-y-5">
-          <Panel icon={CircleCheck} title="Approvals" description="This requisition requires approval before it can be published.">
+          <Panel icon={CircleCheck} title="Approvals">
             {posting.status === "DRAFT" && !posting.approved_by_name ? (
               <div className="text-center">
                 {posting.approval_note ? (
@@ -293,7 +293,7 @@ export default function RequisitionDetailPage() {
             )}
           </Panel>
 
-          <Panel icon={UsersRound} title="Hiring team" description="People involved in hiring for this requisition." action={canUpdate && !["CLOSED", "CANCELLED"].includes(posting.status) ? <Button variant="secondary" onClick={() => setTeamOpen(true)}>Manage team</Button> : undefined}>
+          <Panel icon={UsersRound} title="Hiring team" action={canUpdate && !["CLOSED", "CANCELLED"].includes(posting.status) ? <Button variant="secondary" onClick={() => setTeamOpen(true)}>Manage team</Button> : undefined}>
             <ul className="divide-y divide-line-soft">
               {posting.hiring_manager_name && (
                 <li className="flex items-center gap-3 py-2.5"><Avatar name={posting.hiring_manager_name} /><span className="min-w-0 flex-1"><span className="block font-semibold text-ink-strong">{posting.hiring_manager_name}</span><span className="text-caption text-ink-muted">Hiring manager</span></span><span className="rounded-full bg-success-soft px-2.5 py-0.5 text-caption font-semibold text-success-ink">Owner</span></li>
@@ -308,7 +308,7 @@ export default function RequisitionDetailPage() {
             )}
           </Panel>
 
-          <Panel icon={History} title="Audit history" description="A record of key changes and actions on this requisition." action={history.length > 4 ? <Button variant="secondary" onClick={() => setAllHistory((current) => !current)}>{allHistory ? "Show recent" : "View full history"}</Button> : undefined}>
+          <Panel icon={History} title="Audit history" action={history.length > 4 ? <Button variant="secondary" onClick={() => setAllHistory((current) => !current)}>{allHistory ? "Show recent" : "View full history"}</Button> : undefined}>
             {history.length ? (
               <ol className="space-y-3">
                 {shownHistory.map((entry) => (
@@ -341,13 +341,13 @@ export default function RequisitionDetailPage() {
   );
 }
 
-function Panel({ icon: Icon, title, description, action, children }: { icon: typeof FileText; title: string; description: string; action?: React.ReactNode; children: React.ReactNode }) {
+function Panel({ icon: Icon, title, description, action, children }: { icon: typeof FileText; title: string; description?: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
     <section className="rounded-2xl border border-line bg-surface p-5 shadow-elevation-1">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <Icon className="mt-0.5 h-7 w-7 shrink-0 text-section-icon" aria-hidden="true" />
-          <div><h2 className="text-heading font-bold text-headline">{title}</h2><p className="text-support text-heading-support">{description}</p></div>
+          <div><h2 className="text-heading font-bold text-headline">{title}</h2>{description && <p className="text-support text-heading-support">{description}</p>}</div>
         </div>
         {action}
       </div>

@@ -1323,7 +1323,7 @@ export default function EmployeeDetailPage() {
           <SectionCard
             id="employment-history"
             title="Employment History"
-            description="Historical employment assignments are preserved and are not overwritten."
+           
           >
             <div className="overflow-x-auto">
               <table className="w-full min-w-[700px] text-left text-sm">
@@ -1381,7 +1381,7 @@ export default function EmployeeDetailPage() {
           <SectionCard
             id="emergency-contacts"
             title="Emergency Contacts"
-            description="Emergency contact records for this employee."
+           
             action={
               <button
                 type="button"
@@ -1626,7 +1626,7 @@ export default function EmployeeDetailPage() {
           <SectionCard
             id="onboarding-offboarding"
             title="Onboarding / Offboarding"
-            description="Work through each checklist; required items must be done or skipped with a reason before the step can complete."
+           
           >
             <div className="grid gap-4 md:grid-cols-2">
               <div className="rounded-xl border border-line bg-surface p-5">
@@ -1708,7 +1708,7 @@ export default function EmployeeDetailPage() {
           <SectionCard
             id="documents"
             title="Documents"
-            description="Upload and review protected documents associated with this employee."
+           
             action={
               <label className={buttonClasses({ variant: "primary" })}>
                 <Upload className="h-4 w-4" />
@@ -1763,7 +1763,7 @@ export default function EmployeeDetailPage() {
         <form onSubmit={requestSave} className="space-y-6">
           <SectionCard
             title="Edit Personal Details"
-            description="Update the employee's basic profile information."
+           
           >
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
               <Field
@@ -1798,7 +1798,7 @@ export default function EmployeeDetailPage() {
 
           <SectionCard
             title="Edit Contact Details"
-            description="Update the employee's contact information."
+           
           >
             <div className="grid gap-5 sm:grid-cols-2">
               <Field
@@ -1846,7 +1846,7 @@ export default function EmployeeDetailPage() {
           {currentEmployment && (
             <SectionCard
               title="Employment Terms"
-              description="Working pattern, location and probation details for the current employment."
+             
             >
               <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 <LookupSelect label="Working pattern" value={termsForm.workingPattern} required options={[{ value: "FULL_TIME", label: "Full-time" }, { value: "PART_TIME", label: "Part-time" }, { value: "SHIFT", label: "Shift-based" }]} onChange={(value) => setTermsForm((current) => ({ ...current, workingPattern: value }))} />
@@ -1877,7 +1877,7 @@ export default function EmployeeDetailPage() {
 
           <SectionCard
             title="Edit Employee Details"
-            description="Update the employee's core employment information."
+           
           >
             <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               <InfoItem label="Employee Number" value={formData.employeeNumber} />
@@ -1902,7 +1902,7 @@ export default function EmployeeDetailPage() {
 
           <SectionCard
             title="Current Employment Assignment"
-            description="Employment assignments are effective-dated and cannot be overwritten from this profile form."
+           
           >
             <div className="rounded-xl border border-dashed border-line-strong bg-surface-muted p-4 text-sm text-ink-muted">
               Save profile changes first, then use Change Assignment on the

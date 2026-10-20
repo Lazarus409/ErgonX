@@ -60,7 +60,7 @@ export default function ReviewFeedbackCard({ reviewId, employeeId, canRequest }:
   return (
     <Card
       title="360 feedback"
-      description="Ratings and comments from colleagues. Shown without names once at least three have answered."
+     
       icon={MessagesSquare}
       accent="hr"
       actions={<span className="flex items-center gap-2"><Badge tone={summary.visible ? "success" : "neutral"}>{summary.submitted} of {summary.requested} answered</Badge>{canRequest && <Button size="sm" variant="secondary" leadingIcon={<UserPlus className="h-4 w-4" />} onClick={() => void openAsk()}>Ask colleagues</Button>}</span>}

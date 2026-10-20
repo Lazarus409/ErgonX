@@ -137,7 +137,7 @@ export default function PlatformOrganizationDetailPage() {
         rows={data.administrators}
         rowKey={(admin) => admin.email}
         minWidth={640}
-        toolbar={<SectionTitle eyebrow="Access" title="Institution Admins" description="People who can manage this organization's settings, roles and users." />}
+        toolbar={<SectionTitle eyebrow="Access" title="Institution Admins" />}
         empty={{ title: "No administrators", description: "This organization has no active Institution Admin. Its users cannot change settings or invite anyone.", icon: ShieldCheck }}
         columns={[
           { key: "name", header: "Name", cell: (admin) => <span><span className="block font-semibold text-ink-strong">{admin.name}</span><span className="block text-caption text-ink-muted">{admin.email}</span></span> },
@@ -147,7 +147,7 @@ export default function PlatformOrganizationDetailPage() {
         ]}
       />
 
-      <PlatformCard eyebrow="Activity" title="Platform activity" description="Actions Super Admins have taken on this organization." icon={History} actions={<Link className="text-support font-semibold text-primary-ink hover:underline" href={`/platform/audit?institution=${data.id}`}>View all</Link>}>
+      <PlatformCard eyebrow="Activity" title="Platform activity" icon={History} actions={<Link className="text-support font-semibold text-primary-ink hover:underline" href={`/platform/audit?institution=${data.id}`}>View all</Link>}>
         {data.recent_events.length === 0 ? (
           <p className="text-support text-ink-muted">No platform actions recorded yet.</p>
         ) : (

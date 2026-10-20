@@ -112,10 +112,10 @@ export default function DocumentChecklistPage() {
       />
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Document compliance summary">
-        <MetricCard label="Compliance rate" value={overview ? `${overview.compliance_rate.toFixed(1)}%` : "—"} description="Required documents on file or waived" icon={ShieldCheck} accent="hr" loading={initial} />
+        <MetricCard label="Compliance rate" value={overview ? `${overview.compliance_rate.toFixed(1)}%` : "—"} icon={ShieldCheck} accent="hr" loading={initial} />
         <MetricCard label="Fully compliant" value={overview ? formatNumber(overview.complete_employees) : "—"} description={overview ? `of ${formatNumber(overview.employees)} employees` : undefined} icon={CheckCircle2} accent="attendance" loading={initial} />
-        <MetricCard label="With documents outstanding" value={overview ? formatNumber(overview.employees - overview.complete_employees) : "—"} description="Missing or expired" icon={AlertTriangle} accent="audit" loading={initial} />
-        <MetricCard label="Expiring within 30 days" value={formatNumber(expiring)} description="Renewable documents to follow up" icon={Users} accent="leave" loading={initial} />
+        <MetricCard label="With documents outstanding" value={overview ? formatNumber(overview.employees - overview.complete_employees) : "—"} icon={AlertTriangle} accent="audit" loading={initial} />
+        <MetricCard label="Expiring within 30 days" value={formatNumber(expiring)} icon={Users} accent="leave" loading={initial} />
       </section>
 
       {formError && !modalOpen && <Alert tone="danger" onDismiss={() => setFormError("")}>{formError}</Alert>}

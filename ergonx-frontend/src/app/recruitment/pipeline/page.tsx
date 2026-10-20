@@ -34,7 +34,7 @@ export default function RecruitmentPipelinePage() {
               </article>
             ))}
           </section>
-          <Card title="Stage conversion" description="Share of applications that reach each stage, relative to the one before." icon={Layers} accent="recruitment">
+          <Card title="Stage conversion" icon={Layers} accent="recruitment">
             <FunnelChart stages={stages.map((stage) => ({ label: stage.stage_name, value: stage.application_count }))} />
           </Card>
         </>

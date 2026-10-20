@@ -137,7 +137,7 @@ export default function WorkspaceHome({ areaLabel, continueHref, continueTitle, 
 
       {/* Quick actions */}
       <section aria-labelledby="quick-actions-heading" className="space-y-4">
-        <SectionHeading title={<span id="quick-actions-heading">Quick actions</span>} description="Your permitted actions, ordered by what you pin and use most." />
+        <SectionHeading title={<span id="quick-actions-heading">Quick actions</span>} />
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {loading && !data && Array.from({ length: 3 }, (_, index) => <Skeleton key={index} className="h-[76px] rounded-2xl" />)}
           {data?.quick_actions.map((action) => {
@@ -161,7 +161,7 @@ export default function WorkspaceHome({ areaLabel, continueHref, continueTitle, 
 
       {/* Attention + updates */}
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
-        <Card title="Needs your attention" description="Approvals and time-sensitive work in your queue." icon={CheckCircle2} accent="brand" padding="md">
+        <Card title="Needs your attention" icon={CheckCircle2} accent="brand" padding="md">
           {loading && !data ? (
             <div className="space-y-3">{[0, 1, 2].map((index) => <Skeleton key={index} className="h-14 rounded-xl" />)}</div>
           ) : !data ? (
@@ -180,7 +180,7 @@ export default function WorkspaceHome({ areaLabel, continueHref, continueTitle, 
           )}
         </Card>
 
-        <Card title="Latest updates" description="Unread notifications for this institution." icon={Bell} accent="brand" actions={<Link href="/notifications" className="text-support font-semibold text-primary-ink hover:underline">View all</Link>}>
+        <Card title="Latest updates" icon={Bell} accent="brand" actions={<Link href="/notifications" className="text-support font-semibold text-primary-ink hover:underline">View all</Link>}>
           {loading && !data ? (
             <div className="space-y-3">{[0, 1, 2].map((index) => <Skeleton key={index} className="h-12 rounded-xl" />)}</div>
           ) : !data ? (
@@ -207,7 +207,7 @@ export default function WorkspaceHome({ areaLabel, continueHref, continueTitle, 
       <OperationalSnapshot />
 
       <div className="grid gap-5 lg:grid-cols-2">
-        <Card title="Continue your work" description="Records you recently worked on." icon={History} accent="brand">
+        <Card title="Continue your work" icon={History} accent="brand">
           {loading && !data ? (
             <div className="space-y-3">{[0, 1].map((index) => <Skeleton key={index} className="h-12 rounded-xl" />)}</div>
           ) : !data ? (
@@ -355,7 +355,7 @@ function OperationalSnapshot() {
 
   return (
     <section aria-labelledby="snapshot-heading" className="space-y-4">
-      <SectionHeading title={<span id="snapshot-heading">Operational snapshot</span>} description="A quick pulse from the areas you oversee." />
+      <SectionHeading title={<span id="snapshot-heading">Operational snapshot</span>} />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {tiles === null
           ? Array.from({ length: Math.min(planKey.split(",").length, 4) }, (_, index) => <Skeleton key={index} className="h-36 rounded-2xl" />)

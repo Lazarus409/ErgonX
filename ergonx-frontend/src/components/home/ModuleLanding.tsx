@@ -49,7 +49,7 @@ export default function ModuleLanding({ title, module, accent, icon, eyebrow, ar
       {children}
       {visibleAreas.length ? (
         <section aria-label={`${title} areas`} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {visibleAreas.map((area) => <ActionCard key={area.href} href={area.href} title={area.title} description={area.description} icon={area.icon} accent={accent} />)}
+          {visibleAreas.map((area) => <ActionCard key={area.href} href={area.href} title={area.title} icon={area.icon} accent={accent} />)}
         </section>
       ) : (
         <EmptyState icon={LockKeyhole} accent={accent} title={`No ${title.toLowerCase()} areas are available`} description="An administrator can enable the module or assign the required permissions to your membership." />

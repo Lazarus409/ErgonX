@@ -118,7 +118,7 @@ export default function PublicHolidaysPage() {
       />
 
       {canManage && (
-        <Card title="Add a holiday" description="For Eid dates when announced, a one-off holiday the government declares, or your own company day off." icon={Plus} accent="settings">
+        <Card title="Add a holiday" icon={Plus} accent="settings">
           <form onSubmit={addOne} className="grid gap-4 px-5 pb-5 sm:grid-cols-[12rem_minmax(0,1fr)_auto] sm:items-end">
             <Field label="Date" required><Input type="date" value={form.date} onChange={(event) => setForm((current) => ({ ...current, date: event.target.value }))} required /></Field>
             <Field label="Name" required><Input value={form.name} maxLength={150} placeholder="e.g. Eid-ul-Fitr" onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} required /></Field>

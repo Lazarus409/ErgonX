@@ -264,7 +264,7 @@ export default function PayrollRunDetailPage() {
                 <MetricCard size="sm" label="Deductions" value={reconciliation ? formatAmount(reconciliation.totals.total_deductions, currency) : EM_DASH} icon={AlertCircle} accent="audit" />
                 <MetricCard size="sm" label="Net pay" value={reconciliation ? formatAmount(reconciliation.totals.net_pay, currency) : EM_DASH} icon={CheckCircle2} accent="accounting" />
               </div>
-              <Panel title="Reconciliation" description="Stored totals are checked against the calculated payroll items before approval and finalization.">
+              <Panel title="Reconciliation">
                 {reconciliation ? (
                   <div className="flex flex-wrap items-center gap-4">
                     <StatusBadge status={isReconciled ? "RECONCILED" : "DISCREPANCY"} />
@@ -273,7 +273,7 @@ export default function PayrollRunDetailPage() {
                   </div>
                 ) : <p className="text-support text-ink-muted">Reconciliation is available once the run is calculated.</p>}
               </Panel>
-              <Panel title="Payroll to Accounting" description="Finalized runs generate a draft journal that follows the Accounting approval and posting workflow.">
+              <Panel title="Payroll to Accounting">
                 {run.accounting_journal_entry ? <Link href={`/accounting/journals/${run.accounting_journal_entry}`} className="text-sm font-semibold text-primary-ink hover:underline">Open accounting journal</Link>
                   : <p className="text-support text-ink-muted">{run.status === "FINALIZED" ? (canGenerateJournal ? "Use the primary action above to generate the draft journal." : "A user with Accounting journal-create access can generate the journal.") : "Available after the run is finalized."}</p>}
               </Panel>
@@ -281,7 +281,7 @@ export default function PayrollRunDetailPage() {
           )}
 
           {tab === "employees" && (
-            <Panel title="Employee payroll results" description="Calculated records for this run." toolbar={<SearchBox value={search} onChange={setSearch} placeholder="Search employees" />}>
+            <Panel title="Employee payroll results" toolbar={<SearchBox value={search} onChange={setSearch} placeholder="Search employees" />}>
               {filteredRecords.length === 0 ? <EmptyState size="compact" icon={Users} title="No payroll records" description={records.length ? "No employees match your search." : "Records appear once the run is calculated."} /> : (
                 <div className="-mx-5 overflow-x-auto">
                   <table className="w-full min-w-[640px] text-sm">
@@ -364,7 +364,7 @@ export default function PayrollRunDetailPage() {
           {tab === "payments" && <PaymentsPanel runId={run.id} canDownload={can("payroll.finalize")} canEditProfiles={can("payroll.configure")} />}
 
           {tab === "approvals" && (
-            <Panel icon={ShieldCheck} title="Approval trail" description="Who prepared, approved and finalized this run.">
+            <Panel icon={ShieldCheck} title="Approval trail">
               <ol className="relative space-y-4 border-l border-line pl-5">
                 <Stage done title="Prepared" detail={`${run.started_by_name ?? EM_DASH} · ${formatDateTime(run.started_at)}`} />
                 <Stage done={step >= 1} active={step === 1} title="Submitted for validation" detail={step >= 1 ? "Awaiting approver decision" : "Not yet submitted"} />
@@ -375,7 +375,7 @@ export default function PayrollRunDetailPage() {
           )}
 
           {tab === "activity" && (
-            <Panel icon={Clock3} title="Activity" description="Audit trail for this payroll run.">
+            <Panel icon={Clock3} title="Activity">
               {activity.length === 0 ? <EmptyState size="compact" icon={Clock3} title="No activity recorded" description="Workflow actions on this run will appear here." /> : (
                 <ul className="divide-y divide-line-soft">
                   {activity.map((entry) => (
@@ -391,7 +391,7 @@ export default function PayrollRunDetailPage() {
         </div>
 
         <aside className="space-y-4">
-          <RailCard icon={ShieldCheck} title="Compliance checks" description="Ensure payroll meets policy and regulatory requirements.">
+          <RailCard icon={ShieldCheck} title="Compliance checks">
             {["DRAFT", "CALCULATING"].includes(run.status) && deadlines.length === 0 ? (
               <EmptyRail icon={FileText} title="No compliance checks to review" text="Compliance issues and alerts will appear here after validation." />
             ) : (
@@ -411,14 +411,14 @@ export default function PayrollRunDetailPage() {
               </ul>
             )}
           </RailCard>
-          <RailCard icon={Users} title="Approval state" description="Review and manage payroll approvals.">
+          <RailCard icon={Users} title="Approval state">
             {run.status === "UNDER_REVIEW" ? (
               <div className="rounded-xl bg-warning-soft px-3 py-3 text-support text-warning-ink">Awaiting approval{can("payroll.approve") ? " — you can approve this run." : " from a payroll approver."}</div>
             ) : run.approved_at ? (
               <div className="rounded-xl bg-success-soft px-3 py-3 text-support text-success-ink">Approved by {run.approved_by_name ?? EM_DASH} on {formatDate(run.approved_at)}.</div>
             ) : <EmptyRail icon={Users} title="No pending approvals" text="There are no payroll approvals required at this time." />}
           </RailCard>
-          <RailCard icon={Lock} title="Restricted information" description="Payroll information is only visible to authorized HR and Finance users.">
+          <RailCard icon={Lock} title="Restricted information">
             <div className="flex items-start gap-3 rounded-xl bg-surface-muted/60 px-3 py-3"><EyeOff className="mt-0.5 h-5 w-5 shrink-0 text-ink-muted" aria-hidden="true" /><div className="text-support"><p className="font-semibold text-ink-strong">Access is permission-controlled</p><p className="text-ink-muted">Employees see only their own payslips. Every change here is recorded in the audit trail.</p></div></div>
           </RailCard>
         </aside>
@@ -474,10 +474,10 @@ function SearchBox({ value, onChange, placeholder }: { value: string; onChange: 
   );
 }
 
-function RailCard({ icon: Icon, title, description, children }: { icon: typeof FileText; title: string; description: string; children: React.ReactNode }) {
+function RailCard({ icon: Icon, title, description, children }: { icon: typeof FileText; title: string; description?: string; children: React.ReactNode }) {
   return (
     <section className="rounded-2xl border border-line bg-surface p-5 shadow-elevation-1">
-      <div className="mb-3 flex items-start gap-3"><Icon className="mt-0.5 h-7 w-7 shrink-0 text-section-icon" aria-hidden="true" /><div><h2 className="text-card-title font-bold text-headline">{title}</h2><p className="text-support text-heading-support">{description}</p></div></div>
+      <div className="mb-3 flex items-start gap-3"><Icon className="mt-0.5 h-7 w-7 shrink-0 text-section-icon" aria-hidden="true" /><div><h2 className="text-card-title font-bold text-headline">{title}</h2>{description && <p className="text-support text-heading-support">{description}</p>}</div></div>
       {children}
     </section>
   );

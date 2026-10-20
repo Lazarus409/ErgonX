@@ -31,7 +31,7 @@ export default function EmployeeTrainingList({ employeeId, mine = false }: { emp
   return (
     <div className="space-y-6">
       {certificates.length > 0 && (
-        <Card title="Certificates" description="Certifications from completed training, with their renewal dates." icon={Award} accent="hr">
+        <Card title="Certificates" icon={Award} accent="hr">
           <ul className="divide-y divide-line-soft">
             {certificates.map((item) => (
               <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
@@ -42,7 +42,7 @@ export default function EmployeeTrainingList({ employeeId, mine = false }: { emp
           </ul>
         </Card>
       )}
-      <Card title="Training history" description={mine ? "Courses you are enrolled on or have completed." : "Courses this employee is enrolled on or has completed."} icon={GraduationCap} accent="hr">
+      <Card title="Training history" icon={GraduationCap} accent="hr">
         {error ? <ErrorState variant="inline" title="Unable to load training" message={error} onRetry={reload} /> : loading && !data ? <p className="text-support text-ink-muted">Loading training…</p> : items.length === 0 ? (
           <EmptyState size="compact" icon={GraduationCap} title="No training yet" description={mine ? "Training HR enrols you on will appear here." : "Enrol this employee from the Training page."} />
         ) : (

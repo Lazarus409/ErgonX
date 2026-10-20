@@ -69,6 +69,15 @@ test("employee uses self-service", async ({ page }) => {
   await expect(page).toHaveURL(/\/me\/leave$/);
 });
 
+test("help and unknown pages are friendly", async ({ page }) => {
+  await signIn(page, EMPLOYEE);
+  await opens(page, "/help", /^Help$/);
+  await page.getByRole("link", { name: /Running monthly payroll/ }).click();
+  await expect(page.getByRole("heading", { name: /Running monthly payroll/ })).toBeVisible();
+  await page.goto("/no-such-page");
+  await expect(page.getByRole("heading", { name: /couldn.t find that page/i })).toBeVisible();
+});
+
 test("health endpoint is ready", async ({ request }) => {
   const api = process.env.E2E_API_URL ?? "http://127.0.0.1:8000";
   const response = await request.get(`${api}/api/v1/health/ready/`);

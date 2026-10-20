@@ -44,10 +44,19 @@ def _cache():
         raise RuntimeError("cache read-back failed")
 
 
+_migrations_applied = False
+
+
 def _migrations():
+    # Loading the migration graph costs about a second; once applied, migrations stay
+    # applied for the life of this process (a deploy starts a new one).
+    global _migrations_applied
+    if _migrations_applied:
+        return
     executor = MigrationExecutor(connections[DEFAULT_DB_ALIAS])
     if executor.migration_plan(executor.loader.graph.leaf_nodes()):
         raise RuntimeError("unapplied migrations")
+    _migrations_applied = True
 
 
 @never_cache

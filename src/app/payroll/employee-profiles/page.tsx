@@ -22,6 +22,7 @@ const NETWORK_LABELS: Record<Exclude<MobileMoneyNetwork, "">, string> = { MTN: "
 const emptyForm = (): EmployeePayrollProfilePayload => ({
   employee: "", tax_residency: "RESIDENT", tax_identification_number: "", social_security_number: "", payment_method: "",
   bank_name: "", bank_branch: "", bank_sort_code: "", account_name: "", account_number: "", mobile_money_network: "", mobile_money_number: "",
+  pension_exempt: false, pension_exemption_reason: "",
 });
 
 function payTo(profile: EmployeePayrollProfile) {
@@ -115,6 +116,14 @@ export default function EmployeePayrollProfilesPage() {
               {(Object.keys(METHOD_LABELS) as PaymentMethod[]).map((method) => <option key={method} value={method}>{METHOD_LABELS[method]}</option>)}
             </Select>
           </Field>
+          <div className="sm:col-span-2 rounded-xl border border-line-soft p-3">
+            <label className="flex items-start gap-2 text-sm font-semibold text-ink-strong">
+              <input type="checkbox" className="mt-0.5 h-4 w-4" checked={form.pension_exempt} onChange={(event) => set("pension_exempt", event.target.checked)} />
+              Exempt from mandatory pension (SSNIT / Tier 2)
+            </label>
+            <p className="mt-1 text-caption text-ink-muted">Only when the law says pension does not apply, e.g. a retiree already drawing an SSNIT pension. Every payroll run will flag it for review.</p>
+            {form.pension_exempt && <Field label="Reason" required className="mt-3"><Input value={form.pension_exemption_reason} maxLength={300} onChange={(event) => set("pension_exemption_reason", event.target.value)} /></Field>}
+          </div>
           {form.payment_method === "BANK" && (
             <>
               <Field label="Bank" required><Input value={form.bank_name} onChange={(event) => set("bank_name", event.target.value)} placeholder="e.g. GCB Bank" /></Field>

@@ -39,6 +39,7 @@ export interface EmployeePayrollProfile {
   id: string; employee: string; tax_residency: "RESIDENT" | "NON_RESIDENT" | string; tax_identification_number: string;
   social_security_number: string; payment_method: PaymentMethod; bank_name: string; bank_branch: string; bank_sort_code: string;
   account_name: string; account_number: string; mobile_money_network: MobileMoneyNetwork; mobile_money_number: string;
+  pension_exempt: boolean; pension_exemption_reason: string;
   created_at: string; updated_at: string;
 }
 export interface PaymentSummary {

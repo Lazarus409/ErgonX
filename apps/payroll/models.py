@@ -574,18 +574,56 @@ class EmployeePayrollProfile(TenantOwnedModel):
     employee = models.OneToOneField(
         Employee, on_delete=models.PROTECT, related_name="payroll_profile"
     )
+    class PaymentMethod(models.TextChoices):
+        BANK = "BANK", "Bank transfer"
+        MOBILE_MONEY = "MOBILE_MONEY", "Mobile money"
+        CASH = "CASH", "Cash"
+        CHEQUE = "CHEQUE", "Cheque"
+
+    class MobileMoneyNetwork(models.TextChoices):
+        MTN = "MTN", "MTN MoMo"
+        TELECEL = "TELECEL", "Telecel Cash"
+        AIRTELTIGO = "AIRTELTIGO", "AT Money"
+
     tax_residency = models.CharField(max_length=16, choices=TaxResidency.choices)
     tax_identification_number = models.CharField(max_length=80, blank=True)
+    social_security_number = models.CharField(max_length=40, blank=True)
+    # How net pay reaches the employee; blank until payroll records it.
+    payment_method = models.CharField(max_length=16, choices=PaymentMethod.choices, blank=True)
+    bank_name = models.CharField(max_length=120, blank=True)
+    bank_branch = models.CharField(max_length=120, blank=True)
+    bank_sort_code = models.CharField(max_length=20, blank=True)
+    account_name = models.CharField(max_length=150, blank=True)
+    account_number = models.CharField(max_length=34, blank=True)
+    mobile_money_network = models.CharField(max_length=12, choices=MobileMoneyNetwork.choices, blank=True)
+    mobile_money_number = models.CharField(max_length=20, blank=True)
 
     class Meta:
         ordering = ("employee__employee_number",)
         indexes = [models.Index(fields=("institution", "tax_residency"))]
 
     def clean(self):
+        errors = {}
         if self.employee_id and self.employee.institution_id != self.institution_id:
-            raise ValidationError(
-                {"employee": "Employee must belong to the same institution."}
-            )
+            errors["employee"] = "Employee must belong to the same institution."
+        for field in ("social_security_number", "bank_name", "bank_branch", "bank_sort_code", "account_name", "account_number", "mobile_money_number"):
+            setattr(self, field, getattr(self, field).strip())
+        self.account_number = self.account_number.replace(" ", "")
+        self.mobile_money_number = self.mobile_money_number.replace(" ", "")
+        if self.payment_method == self.PaymentMethod.BANK:
+            for field, label in (("bank_name", "bank"), ("account_name", "account name"), ("account_number", "account number")):
+                if not getattr(self, field):
+                    errors[field] = f"Enter the {label} for bank transfers."
+            if self.account_number and not self.account_number.isalnum():
+                errors["account_number"] = "Use only letters and digits in the account number."
+        if self.payment_method == self.PaymentMethod.MOBILE_MONEY:
+            if not self.mobile_money_network:
+                errors["mobile_money_network"] = "Choose the mobile money network."
+            number = self.mobile_money_number.removeprefix("+")
+            if not (number.isdigit() and len(number) in (10, 12)):
+                errors["mobile_money_number"] = "Enter the wallet number, e.g. 0241234567 or +233241234567."
+        if errors:
+            raise ValidationError(errors)
 
 
 class EmployeeTaxReliefClaim(TenantOwnedModel):

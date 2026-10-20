@@ -43406,6 +43406,148 @@ paths:
       - invalid_state_transition
       - policy_not_applicable
       - period_closed
+  /api/v1/payroll-runs/{id}/payment-file/:
+    get:
+      operationId: payroll_runs_payment_file_retrieve
+      description: |-
+        Bank transfers, mobile-money payments, pension schedule or PAYE schedule (CSV) for a finalized run.
+
+        Requires an authenticated user, an active institution context, the `PAYROLL` module enabled, the `payroll.finalize` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
+      summary: Download a payment or statutory file
+      parameters:
+      - in: query
+        name: file
+        schema:
+          type: string
+          enum:
+          - bank
+          - mobile-money
+          - paye
+          - pension
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this payroll run.
+        required: true
+      tags:
+      - payroll-runs
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+  /api/v1/payroll-runs/{id}/payment-summary/:
+    get:
+      operationId: payroll_runs_payment_summary_retrieve
+      description: |-
+        Net pay by payment method, employees whose payment details are missing, and the files available.
+
+        Requires an authenticated user, an active institution context, the `PAYROLL` module enabled, the `payroll.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
+      summary: Payment summary
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this payroll run.
+        required: true
+      tags:
+      - payroll-runs
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
   /api/v1/payroll-runs/{id}/reconcile/:
     get:
       operationId: payroll_runs_reconcile_retrieve
@@ -73593,6 +73735,53 @@ components:
         tax_identification_number:
           type: string
           maxLength: 80
+        social_security_number:
+          type: string
+          maxLength: 40
+        payment_method:
+          enum:
+          - BANK
+          - MOBILE_MONEY
+          - CASH
+          - CHEQUE
+          - ''
+          type: string
+          description: |-
+            * `BANK` - Bank transfer
+            * `MOBILE_MONEY` - Mobile money
+            * `CASH` - Cash
+            * `CHEQUE` - Cheque
+          x-spec-enum-id: a41088f5aad98188
+        bank_name:
+          type: string
+          maxLength: 120
+        bank_branch:
+          type: string
+          maxLength: 120
+        bank_sort_code:
+          type: string
+          maxLength: 20
+        account_name:
+          type: string
+          maxLength: 150
+        account_number:
+          type: string
+          maxLength: 34
+        mobile_money_network:
+          enum:
+          - MTN
+          - TELECEL
+          - AIRTELTIGO
+          - ''
+          type: string
+          description: |-
+            * `MTN` - MTN MoMo
+            * `TELECEL` - Telecel Cash
+            * `AIRTELTIGO` - AT Money
+          x-spec-enum-id: 4bee07b378010570
+        mobile_money_number:
+          type: string
+          maxLength: 20
         created_at:
           type: string
           format: date-time
@@ -82299,6 +82488,53 @@ components:
         tax_identification_number:
           type: string
           maxLength: 80
+        social_security_number:
+          type: string
+          maxLength: 40
+        payment_method:
+          enum:
+          - BANK
+          - MOBILE_MONEY
+          - CASH
+          - CHEQUE
+          - ''
+          type: string
+          description: |-
+            * `BANK` - Bank transfer
+            * `MOBILE_MONEY` - Mobile money
+            * `CASH` - Cash
+            * `CHEQUE` - Cheque
+          x-spec-enum-id: a41088f5aad98188
+        bank_name:
+          type: string
+          maxLength: 120
+        bank_branch:
+          type: string
+          maxLength: 120
+        bank_sort_code:
+          type: string
+          maxLength: 20
+        account_name:
+          type: string
+          maxLength: 150
+        account_number:
+          type: string
+          maxLength: 34
+        mobile_money_network:
+          enum:
+          - MTN
+          - TELECEL
+          - AIRTELTIGO
+          - ''
+          type: string
+          description: |-
+            * `MTN` - MTN MoMo
+            * `TELECEL` - Telecel Cash
+            * `AIRTELTIGO` - AT Money
+          x-spec-enum-id: 4bee07b378010570
+        mobile_money_number:
+          type: string
+          maxLength: 20
         created_at:
           type: string
           format: date-time

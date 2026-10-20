@@ -232,30 +232,51 @@ def payroll_setup_choices(institution):
     }
 
 
+PAYMENT_PROFILE_FIELDS = (
+    "social_security_number",
+    "payment_method",
+    "bank_name",
+    "bank_branch",
+    "bank_sort_code",
+    "account_name",
+    "account_number",
+    "mobile_money_network",
+    "mobile_money_number",
+)
+
+
 @transaction.atomic
 def configure_employee_payroll_profile(
-    *, institution, employee, actor, tax_residency, tax_identification_number=""
+    *, institution, employee, actor, tax_residency, tax_identification_number="", **payment
 ):
+    """Tax and payment details. Pay-routing changes are audited by field name only."""
     _membership_with_permission(actor, institution, "payroll.configure")
+    assert_not_own_pay(actor, employee)
     if employee.institution_id != institution.id:
         raise CodedValidationError(
             {"employee": "Employee belongs to another institution."},
             api_code="tenant_mismatch",
         )
-    profile, _ = EmployeePayrollProfile.objects.select_for_update().update_or_create(
-        employee=employee,
-        defaults={
-            "institution": institution,
-            "tax_residency": tax_residency,
-            "tax_identification_number": tax_identification_number,
-        },
-    )
+    unknown = set(payment) - set(PAYMENT_PROFILE_FIELDS)
+    if unknown:
+        raise ValidationError({field: "Unknown field." for field in unknown})
+    profile = EmployeePayrollProfile.objects.select_for_update().filter(employee=employee).first()
+    if profile is None:
+        profile = EmployeePayrollProfile(institution=institution, employee=employee)
+    before = {field: getattr(profile, field) for field in ("tax_residency", "tax_identification_number", *PAYMENT_PROFILE_FIELDS)}
+    profile.tax_residency = tax_residency
+    profile.tax_identification_number = tax_identification_number
+    for field, value in payment.items():
+        setattr(profile, field, value or "")
+    profile.full_clean()
+    profile.save()
+    changed = [field for field, value in before.items() if getattr(profile, field) != value]
     record_audit_event(
         actor=actor,
         institution=institution,
         entity=profile,
         action="payroll.employee_profile.changed",
-        metadata={"tax_residency": profile.tax_residency},
+        metadata={"tax_residency": profile.tax_residency, "changed_fields": changed},
     )
     return profile
 

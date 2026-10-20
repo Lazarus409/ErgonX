@@ -7,6 +7,7 @@ from django.utils import timezone
 
 from apps.compensation.models import EmployeeCompensation, SalaryStructure
 from apps.documents.models import Document
+from apps.employees.models import Employment
 from apps.payroll.models import (
     EmployeeTaxReliefClaim,
     PayrollItem,
@@ -37,12 +38,26 @@ pytestmark = pytest.mark.django_db
 def _employee_with_compensation(
     institution,
     employee_factory,
+    organization_factory,
+    assignment_dimensions_factory,
     *,
     employee_number,
 ):
     employee = employee_factory(
         institution,
         employee_number=employee_number,
+    )
+    department, position = organization_factory(institution)
+    grade, location = assignment_dimensions_factory(institution)
+    Employment.objects.create(
+        institution=institution,
+        employee=employee,
+        department=department,
+        position=position,
+        grade=grade,
+        location=location,
+        employment_type=Employment.EmploymentType.PERMANENT,
+        start_date=date(2026, 1, 1),
     )
     structure = SalaryStructure.objects.create(
         institution=institution,
@@ -97,6 +112,8 @@ def test_payroll_selectors_apply_effective_dates_and_tenant_scope(
     user_factory,
     membership_factory,
     employee_factory,
+    organization_factory,
+    assignment_dimensions_factory,
 ):
     institution = institution_factory(code="HOME")
     other = institution_factory(code="OTHER")
@@ -119,11 +136,15 @@ def test_payroll_selectors_apply_effective_dates_and_tenant_scope(
     employee = _employee_with_compensation(
         institution,
         employee_factory,
+        organization_factory,
+        assignment_dimensions_factory,
         employee_number="HOME001",
     )
     other_employee = _employee_with_compensation(
         other,
         employee_factory,
+        organization_factory,
+        assignment_dimensions_factory,
         employee_number="OTHER001",
     )
     _, payroll_run = _period_and_run(
@@ -205,6 +226,8 @@ def test_payroll_selectors_return_only_approved_reliefs_and_prior_finalized_ytd(
     user_factory,
     membership_factory,
     employee_factory,
+    organization_factory,
+    assignment_dimensions_factory,
 ):
     institution = institution_factory(code="YTD")
     actor = user_factory()
@@ -221,6 +244,8 @@ def test_payroll_selectors_return_only_approved_reliefs_and_prior_finalized_ytd(
     employee = _employee_with_compensation(
         institution,
         employee_factory,
+        organization_factory,
+        assignment_dimensions_factory,
         employee_number="YTD001",
     )
     _, prior_run = _period_and_run(

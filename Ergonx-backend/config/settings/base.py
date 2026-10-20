@@ -172,7 +172,21 @@ REST_FRAMEWORK = {
         "rest_framework.filters.SearchFilter",
         "rest_framework.filters.OrderingFilter",
     ),
+    "DEFAULT_THROTTLE_CLASSES": (
+        "common.throttling.ApiUserThrottle",
+        "common.throttling.ApiAnonThrottle",
+    ),
 }
+
+CACHES = {
+    "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
+    # Per-worker API rate-limit counters (common.throttling); never the database.
+    "throttle": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "ergonx-throttle"},
+}
+
+# Default API limits (common.throttling); views with their own throttles keep them.
+API_USER_RATE = os.environ.get("API_USER_RATE", "600/min")
+API_ANON_RATE = os.environ.get("API_ANON_RATE", "120/min")
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(
@@ -210,6 +224,11 @@ CORS_ALLOW_HEADERS = (*default_headers, "x-institution-id")
 # Shared with the Next.js BFF, which forwards the browser's IP in
 # X-ErgonX-Client-IP together with this secret. Empty disables per-IP sign-in limits.
 BFF_PROXY_SECRET = os.environ.get("BFF_PROXY_SECRET", "")
+
+# Web push (apps.notifications.push); generate the pair with manage.py generate_vapid_keys.
+WEB_PUSH_PUBLIC_KEY = os.environ.get("WEB_PUSH_PUBLIC_KEY", "")
+WEB_PUSH_PRIVATE_KEY = os.environ.get("WEB_PUSH_PRIVATE_KEY", "")
+WEB_PUSH_SUBJECT = os.environ.get("WEB_PUSH_SUBJECT", "mailto:support@ergonx.app")
 
 EMAIL_DELIVERY_ENABLED = os.environ.get("EMAIL_DELIVERY_ENABLED", "false").lower() == "true"
 EMAIL_BACKEND = os.environ.get(

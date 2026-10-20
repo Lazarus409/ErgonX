@@ -38,6 +38,7 @@ from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError as ApiValidationError
 
+from apps.institutions.demo_payroll_details import ensure_demo_holidays, ensure_demo_payment_details
 from apps.accounting.expenses import create_expense, decide_expense_step, submit_expense
 from apps.accounting.models import Account, Customer, Expense, ExpenseCategory, Invoice, Vendor, VendorBill
 from apps.accounting.services import approve_vendor_bill, create_customer, create_invoice, create_vendor, create_vendor_bill, issue_invoice, post_vendor_bill, submit_vendor_bill
@@ -189,6 +190,8 @@ class Command(BaseCommand):
             ("expense claims", self._expense_claims),
             ("suppliers and customers", self._suppliers_and_customers),
             ("depot vacancies", self._vacancies),
+            ("payment details", self._payment_details),
+            ("public holidays", self._holidays),
         )
         failures = []
         for label, step in steps:
@@ -202,6 +205,12 @@ class Command(BaseCommand):
         if failures:
             raise CommandError(f"Seeding failed for: {', '.join(failures)}")
         self.stdout.write(self.style.SUCCESS("APEX-DEMO people and HR records are in place."))
+
+    def _payment_details(self):
+        self._count("payment details", ensure_demo_payment_details(self.institution, self.hr))
+
+    def _holidays(self):
+        self._count("public holidays", ensure_demo_holidays(self.institution, self.hr))
 
     # ------------------------------------------------------------------ helpers
 

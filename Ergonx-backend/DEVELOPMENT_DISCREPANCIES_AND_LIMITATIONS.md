@@ -438,12 +438,13 @@ Under the Module Delivery and Frontend Integration Contract v1.0, the current de
 
 - Area: Compensation / Ghana payroll
 - Type: Data-model limitation
-- Status: `OPEN`
+- Status: `SAFEGUARDED`
 - Priority: `P1`
 - Governing reference: Context §45.10 requires the GHS 21.77 daily minimum wage to support compliance checks and daily/casual scenarios.
-- Limitation: `EmployeeCompensation` stores `base_salary` but has no pay basis, salary frequency, paid-days quantity, or daily-rate field. A monthly amount therefore cannot be safely compared with a daily minimum.
-- Current safeguard: The threshold is versioned and exposed, but the engine does not claim to enforce it.
-- Decision needed: Define compensation pay basis/frequency and the authoritative paid-days source before enabling minimum-wage checks.
+- Current safeguard (2026-10-20): monthly payroll raises a `BELOW_MINIMUM_WAGE` run exception (MEDIUM, must be acknowledged before review) when an employee's contractual monthly rate is below the preset's `NATIONAL_DAILY_MINIMUM_WAGE` x 27 days (GHS 587.79 for 2026, consistent with SSNIT minimum insurable earnings of GHS 587.80). Prorated pay for partial periods is not compared.
+- Remaining limitation: daily and casual workers paid by the day cannot be checked, because compensation has no daily pay basis or paid-days source.
+- Decision needed: Define compensation pay basis/frequency and the authoritative paid-days source before enabling daily/casual checks.
+- Evidence: `apps/payroll/services.py` (`_below_minimum_wage`), `tests/test_payroll_compliance.py`.
 
 ### GHA-002 — Public overtime eligibility threshold appears stale
 
@@ -460,11 +461,13 @@ Under the Module Delivery and Frontend Integration Contract v1.0, the current de
 
 - Area: Ghana payroll / pensions
 - Type: ERD eligibility gap
-- Status: `OPEN`
+- Status: `SAFEGUARDED`
 - Priority: `P1`
 - Governing reference: ERD §12.5 defines contribution rates and bases but no employee eligibility, exemption, scheme-membership, or coverage fields.
-- Limitation: The current Ghana evaluator applies mandatory pension to every compensated employee, including employees explicitly classified as `CASUAL`.
-- Decision needed: Confirm the required legal treatment and add an explicit, auditable pension coverage/exemption model before using exceptional worker scenarios in production.
+- Current safeguard (2026-10-20): `EmployeePayrollProfile.pension_exempt` with a required `pension_exemption_reason` records HR's decision that mandatory pension does not apply; the Ghana evaluator then applies no employee or employer pension, and every run raises a `PENSION_EXEMPT` exception (LOW) naming the reason. Changes are audited by field name and cannot be made to one's own profile.
+- Remaining limitation: ErgonX does not decide eligibility (age, existing pensioners, casual workers); the legal judgement stays with HR.
+- Decision needed: Confirm the statutory treatment for retirees, casual workers and foreign nationals if automatic eligibility rules are wanted.
+- Evidence: `apps/payroll/models.py`, `apps/payroll/localizations/ghana.py`, `tests/test_payroll_compliance.py`.
 
 ### PAY-001 — Base salary has no explicit pay-period basis
 
@@ -476,26 +479,6 @@ Under the Module Delivery and Frontend Integration Contract v1.0, the current de
 - Current safeguard: Payroll calculation fails closed for any unsupported future basis instead of treating annual, daily, or hourly amounts as a configured-period amount.
 - Decision needed: Add conversion rules and additional approved basis values before enabling annual, weekly, daily, or hourly compensation in localized production payroll.
 - Evidence: `apps/compensation/models.py`, `apps/compensation/serializers.py`, `apps/compensation/migrations/0002_employeecompensation_pay_basis.py`, and `apps/payroll/calculation.py`.
-
-### PAY-002 — Mid-period compensation changes have no proration rule
-
-- Area: Compensation / Payroll
-- Type: Calculation limitation
-- Status: `SAFEGUARDED`
-- Priority: `P1`
-- Limitation: The ERD supports effective-dated compensation but does not specify how a salary change inside an active payroll period is prorated.
-- Current safeguard: Payroll calculation fails closed when the effective compensation begins after the payroll period start.
-- Decision needed: Specify calendar-day, working-day, scheduled-minute, or jurisdiction-specific proration behavior and its rounding rules.
-
-### PAY-003 — Annual relief application timing needs policy confirmation
-
-- Area: Ghana payroll / PAYE reliefs
-- Type: Operational tax-policy assumption
-- Status: `REVIEW`
-- Priority: `P1`
-- Limitation: An approved annual relief amount is treated as a year-to-date pool and applied against available chargeable income until exhausted. It is not automatically divided across twelve months or remaining payroll periods.
-- Current safeguard: Only eligible, approved, evidence-backed claims are applied, and prior finalized applications are tracked by claim ID.
-- Decision needed: Confirm whether Ghana payroll withholding should apply approved relief immediately, prorate it, or follow certificate-effective dates.
 
 ### PAY-004 — Percentage and actual-amount reliefs depend on the approved amount
 
@@ -535,12 +518,6 @@ Under the Module Delivery and Frontend Integration Contract v1.0, the current de
 - Priority: `P2`
 - Limitation: A leave request spanning calendar years must be submitted as separate annual requests.
 
-### ATT-001 — Holiday-calendar configuration is not implemented
-
-- Status: `ACCEPTED_MVP`
-- Priority: `P2`
-- Impact: Scheduling and attendance do not yet have an institution-specific public-holiday calendar.
-
 ## Superseded historical entries
 
 The entries below are retained for traceability only. They no longer carry current `Status:` lines; each points to the active limitation or resolved-history item that superseded it.
@@ -566,6 +543,32 @@ The entries below are retained for traceability only. They no longer carry curre
 - Note: Pending roadmap work is recorded here for review context, not classified as an implementation defect.
 
 ## Resolved items
+
+### RES-037 - Institution public-holiday calendar (was ATT-001)
+
+- Resolved: 2026-10-20
+- Original issue: Scheduling and attendance had no institution-specific public-holiday calendar.
+- Resolution: `PublicHoliday` (institution, observed date, name, optional statutory date) at `/api/v1/public-holidays/`; anyone with `schedule.view` lists them and organization editors maintain them (audited). Leave working days skip holidays, attendance classification records a holiday as `OFF_DAY` rather than `ABSENT`, and `WORKING_DAYS` payroll proration leaves holidays out. `/public-holidays/suggestions/?year=` proposes Ghana's statutory holidays whose dates can be worked out (Public Holidays and Commemorative Days (Amendment) Act, 2025: 4 August removed, 21 September Founders' Day, weekend holidays observed Monday, Tuesday-Thursday holidays observed Friday, religious holidays not moved); HR reviews before adding, and adds the lunar Eid/Shaqq dates when announced.
+- Remaining: holiday-specific overtime premiums are not modelled; holidays are institution-wide (not per location).
+- Validation: `tests/test_public_holidays.py`.
+- Evidence: `apps/organization/holidays.py`, `apps/organization/models.py`, migration `organization/0006_public_holidays.py`, `apps/leave/services.py`, `apps/attendance/services.py`, `apps/payroll/calculation.py`.
+
+### RES-035 - Mid-period hires and salary changes could not be paid (was PAY-002)
+
+- Resolved: 2026-10-20
+- Original issue: Payroll calculation failed closed whenever the effective compensation began after the payroll period start, so a mid-period hire or a salary change inside a period blocked the whole run.
+- Resolution: `InstitutionPayrollConfiguration.proration_method` (`CALENDAR_DAYS` default, or `WORKING_DAYS` counting Monday to Friday) governs partial periods. The period is split into stretches paid at one compensation; days outside any employment are unpaid, and employed days with no compensation still fail closed. Base salary and fixed earning components are prorated by each stretch's share of counted days; fixed deductions and employer components are not. Statutory rules use the prorated basic. Prorated items carry `metadata.proration` (method, paid and period days, date range). A non-default method is part of the run configuration snapshot.
+- Leavers: a run includes only employees employed and compensated at some point in the period. Offboarding ends the employment but not the compensation, so previously a leaver was still selected and failed the "employment at period end" check, which blocked that run and every later one. A leaver is now paid up to their last working day and drops out of later runs.
+- Remaining: final-pay items such as leave encashment are not calculated.
+- Validation: `tests/test_pay_proration.py`, `tests/test_payroll_selectors.py`.
+- Evidence: `apps/payroll/calculation.py` (`_pay_segments`), `apps/payroll/selectors.py` (`eligible_employees_for_payroll_run`), `apps/payroll/models.py`, migration `payroll/0007_proration_method.py`.
+
+### RES-036 - Annual relief timing confirmed as a cumulative monthly twelfth (was PAY-003)
+
+- Resolved: 2026-10-13 (register updated 2026-10-20)
+- Original issue: An approved annual relief was applied as a year-to-date pool until exhausted rather than spread across the year.
+- Resolution: The Ghana evaluator grants a twelfth of the approved amount per month, cumulatively, so a mid-year approval catches up and the year never exceeds the approved amount.
+- Evidence: `apps/payroll/localizations/ghana.py`.
 
 ### RES-029 - Integrated demo seeding applied recruitment stages only on rerun
 

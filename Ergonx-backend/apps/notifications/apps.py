@@ -10,10 +10,12 @@ class NotificationsConfig(AppConfig):
         from django.db.models.signals import post_save
 
         from apps.notifications.models import Notification
+        from apps.notifications.push import queue_notification_push
         from apps.notifications.services import queue_notification_email
 
         def email_copy(sender, instance, created, raw=False, **kwargs):
             if created and not raw:
                 queue_notification_email(instance)
+                queue_notification_push(instance)
 
         post_save.connect(email_copy, sender=Notification, dispatch_uid="notifications.email_copy", weak=False)

@@ -10,6 +10,7 @@ from apps.audit.services import record_audit_event
 from apps.institutions.services import record_user_activity
 from apps.attendance.models import AttendanceAdjustment, AttendanceRecord, OvertimeRecord
 from apps.employees.models import Employment
+from apps.organization.holidays import holiday_dates
 from apps.institutions.models import InstitutionMembership
 from apps.scheduling.services import schedule_assignment_for, schedule_expectation
 from common.exceptions import CodedValidationError
@@ -258,7 +259,7 @@ def classify_attendance_date(*, employee, attendance_date, actor):
     expectation = schedule_expectation(assignment, attendance_date)
     if _approved_leave_exists(employee, attendance_date):
         status = AttendanceRecord.Status.ON_LEAVE
-    elif expectation["off_day"]:
+    elif expectation["off_day"] or holiday_dates(employee.institution, attendance_date, attendance_date):
         status = AttendanceRecord.Status.OFF_DAY
     else:
         status = AttendanceRecord.Status.ABSENT

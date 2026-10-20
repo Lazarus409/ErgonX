@@ -1,7 +1,9 @@
+from django.http import HttpResponse
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import OpenApiExample, extend_schema, extend_schema_view
+from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema, extend_schema_view
 from rest_framework import viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.response import Response
 
 from apps.payroll.models import (
@@ -70,6 +72,9 @@ from apps.payroll.services import (
 )
 from apps.accounting.serializers import JournalEntrySerializer
 from apps.accounting.services import generate_payroll_journal
+from apps.audit.services import record_audit_event
+from apps.payroll.payment_files import FILES as PAYMENT_FILES, build_payment_file, payment_summary
+from apps.payroll.payslip_pdf import payslip_filename, render_payslip_pdf
 from common.scoping import PAYSLIP_BROAD, scope_to_employees
 from common.permissions import TenantContextPermission, TenantRBACPermission
 from common.serializers import call_validated_service
@@ -378,6 +383,8 @@ class PayrollRunViewSet(TenantModelViewSet):
             "generate_accounting_journal": "journal.create",
             "validate": "payroll.prepare",
             "update_exception": "payroll.prepare",
+            # Bank and wallet numbers: only the people who release pay.
+            "payment_file": "payroll.finalize",
         }.get(self.action, "payroll.view")
 
     def get_queryset(self):
@@ -433,6 +440,38 @@ class PayrollRunViewSet(TenantModelViewSet):
     def validate(self, request, pk=None):
         """Re-run exception detection on a calculated or in-review run."""
         return self._transition(request, revalidate_payroll_run)
+
+    @extend_schema(summary="Payment summary", request=None, responses=OpenApiTypes.OBJECT, filters=False)
+    @action(detail=True, methods=("get",), filter_backends=(), pagination_class=None, url_path="payment-summary")
+    def payment_summary(self, request, pk=None):
+        """Net pay by payment method, employees whose payment details are missing, and the files available."""
+        return Response(payment_summary(self.get_object()))
+
+    @extend_schema(
+        summary="Download a payment or statutory file",
+        request=None,
+        parameters=[OpenApiParameter("file", str, enum=list(PAYMENT_FILES), required=True)],
+        responses={(200, "text/csv"): OpenApiTypes.BINARY},
+        filters=False,
+    )
+    @action(detail=True, methods=("get",), filter_backends=(), pagination_class=None, url_path="payment-file")
+    def payment_file(self, request, pk=None):
+        """Bank transfers, mobile-money payments, pension schedule or PAYE schedule (CSV) for a finalized run."""
+        run = self.get_object()
+        key = request.query_params.get("file", "")
+        if key not in PAYMENT_FILES:
+            raise DRFValidationError({"file": f"Choose one of: {', '.join(PAYMENT_FILES)}."})
+        if run.status != PayrollRun.Status.FINALIZED:
+            raise DRFValidationError({"status": "Payment files are available once the run is finalized."})
+        filename, content, rows = build_payment_file(run, key)
+        record_audit_event(
+            actor=request.user, institution=run.institution, entity=run, action="payroll.payment_file.downloaded",
+            metadata={"file": key, "rows": rows},
+        )
+        response = HttpResponse(content, content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        response["Cache-Control"] = "private, no-store"
+        return response
 
     @extend_schema(request=None, responses=PayrollRunExceptionSerializer(many=True), filters=False)
     @action(detail=True, methods=("get",), filter_backends=(), pagination_class=None)
@@ -728,3 +767,25 @@ class PayslipViewSet(TenantModelViewSet):
         return scope_to_employees(
             queryset, self.request, "payroll_record__employee", allow_team=False, broad=PAYSLIP_BROAD
         )
+
+    @extend_schema(
+        summary="Download payslip PDF",
+        responses={(200, "application/pdf"): OpenApiTypes.BINARY},
+        filters=False,
+    )
+    @action(detail=True, methods=("get",), filter_backends=())
+    def pdf(self, request, pk=None):
+        """Render the finalized payslip as a PDF, with the same access as viewing it."""
+        payslip = self.get_object()
+        content = render_payslip_pdf(payslip)
+        record_audit_event(
+            actor=request.user,
+            institution=payslip.institution,
+            entity=payslip,
+            action="payroll.payslip.downloaded",
+            metadata={"employee_id": str(payslip.payroll_record.employee_id)},
+        )
+        response = HttpResponse(content, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="{payslip_filename(payslip)}"'
+        response["Cache-Control"] = "private, no-store"
+        return response

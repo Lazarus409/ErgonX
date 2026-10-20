@@ -14,6 +14,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import models, transaction
 from django.utils import timezone
 
+from apps.institutions.demo_payroll_details import ensure_demo_holidays, ensure_demo_payment_details
 from apps.accounts.models import User
 from apps.employees.models import Employee, Employment
 from apps.employees.services import create_employment
@@ -458,6 +459,8 @@ class Command(BaseCommand):
             institution, password, reset_passwords=reset_passwords
         )
         self._ensure_compensation_and_payroll_profiles(institution, admin)
+        ensure_demo_payment_details(institution, admin)
+        ensure_demo_holidays(institution, admin)
         self._ensure_recruitment(institution, admin)
         self._ensure_leave(institution, admin)
         self._ensure_attendance(institution, admin)
@@ -595,12 +598,13 @@ class Command(BaseCommand):
             employee = institution.employees.get(employee_number=number)
             compensation = EmployeeCompensation.objects.filter(employee=employee, is_current=True).first()
             salary = Decimal(amount)
+            # Nobody sets their own pay or payroll profile: the admin's are set by a second manager.
+            actor = admin
+            if employee.user_id == admin.id:
+                if second_payroll_manager is None:
+                    raise CommandError("A second compensation manager is needed to set the demo admin's pay.")
+                actor = second_payroll_manager.user
             if compensation is None:
-                actor = admin
-                if employee.user_id == admin.id:
-                    if second_payroll_manager is None:
-                        raise CommandError("A second compensation manager is needed to set the demo admin's pay.")
-                    actor = second_payroll_manager.user
                 change_current_compensation(
                     institution=institution,
                     employee=employee,
@@ -629,7 +633,7 @@ class Command(BaseCommand):
                 configure_employee_payroll_profile(
                     institution=institution,
                     employee=employee,
-                    actor=admin,
+                    actor=actor,
                     tax_residency=residency,
                     tax_identification_number=expected_tin,
                 )

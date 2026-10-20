@@ -196,3 +196,35 @@ class Location(AutoCodeMixin, TenantOwnedModel):
 
     def __str__(self):
         return f"{self.institution.code}: {self.name}"
+
+
+class PublicHoliday(TenantOwnedModel):
+    """A non-working day for the whole institution (see apps.organization.holidays)."""
+
+    institution = models.ForeignKey(
+        Institution, on_delete=models.CASCADE, related_name="public_holidays"
+    )
+    date = models.DateField()
+    name = models.CharField(max_length=150)
+    # The statutory date when the observed day was moved (e.g. a Sunday holiday kept on Monday).
+    statutory_date = models.DateField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ("date",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=("institution", "date"),
+                condition=models.Q(is_active=True),
+                name="uniq_active_holiday_per_institution_date",
+            )
+        ]
+        indexes = [models.Index(fields=("institution", "date"))]
+
+    def clean(self):
+        self.name = self.name.strip()
+        if not self.name:
+            raise ValidationError({"name": "Name the holiday."})
+
+    def __str__(self):
+        return f"{self.date}: {self.name}"

@@ -25,6 +25,7 @@ from apps.payroll.models import (
     TaxRule,
 )
 from apps.payroll.services import (
+    PAYMENT_PROFILE_FIELDS,
     configure_payroll,
     configure_employee_payroll_profile,
     create_payroll_adjustment,
@@ -238,6 +239,7 @@ class InstitutionPayrollConfigurationSerializer(TenantRelationSerializer):
             "pay_day_rule",
             "rounding_rule",
             "custom_rules",
+            "proration_method",
             "is_configured",
             "configured_by",
             "configured_at",
@@ -273,6 +275,7 @@ class InstitutionPayrollConfigurationSerializer(TenantRelationSerializer):
                 "pay_day_rule",
                 "rounding_rule",
                 "custom_rules",
+                "proration_method",
                 "is_configured",
             )
         }
@@ -292,6 +295,17 @@ class EmployeePayrollProfileSerializer(TenantRelationSerializer):
             "employee",
             "tax_residency",
             "tax_identification_number",
+            "social_security_number",
+            "payment_method",
+            "bank_name",
+            "bank_branch",
+            "bank_sort_code",
+            "account_name",
+            "account_number",
+            "mobile_money_network",
+            "mobile_money_number",
+            "pension_exempt",
+            "pension_exemption_reason",
             "created_at",
             "updated_at",
         )
@@ -310,6 +324,10 @@ class EmployeePayrollProfileSerializer(TenantRelationSerializer):
             tax_identification_number=validated_data.get(
                 "tax_identification_number", instance.tax_identification_number
             ),
+            **{
+                field: validated_data.get(field, getattr(instance, field))
+                for field in PAYMENT_PROFILE_FIELDS
+            },
         )
 
 

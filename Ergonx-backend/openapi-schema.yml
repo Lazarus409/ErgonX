@@ -26490,6 +26490,62 @@ paths:
       - tenant_mismatch
       - module_disabled
       - permission_denied
+  /api/v1/home/go-live/:
+    get:
+      operationId: home_go_live_retrieve
+      description: 'Go-live readiness for administrators and HR: counted items (employees,
+        employment, leave policies, holidays, pay, payment details, first payroll,
+        self-service invitations), each with the route where it is completed. Others
+        get applicable=false.'
+      summary: Go live home
+      tags:
+      - home
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
   /api/v1/home/insights/:
     get:
       operationId: home_insights_retrieve
@@ -27293,6 +27349,181 @@ paths:
       - permission_denied
       - not_found
       - validation_error
+  /api/v1/import-jobs/employee-columns/:
+    get:
+      operationId: import_jobs_employee_columns_list
+      description: |-
+        The columns an employee import file may contain, for the upload guide.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `import_job.create` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: Employee import columns
+      tags:
+      - import-jobs
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EmployeeImportColumn'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+  /api/v1/import-jobs/employee-template/:
+    get:
+      operationId: import_jobs_employee_template_retrieve
+      description: |-
+        A CSV with the import columns and one example row to replace.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `import_job.create` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: Employee import template
+      tags:
+      - import-jobs
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+  /api/v1/import-jobs/employee-upload/:
+    post:
+      operationId: import_jobs_employee_upload_create
+      description: |-
+        Validate a CSV or XLSX of employees row by row. Nothing is created until the job is confirmed.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `import_job.create` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `validation_error`.
+      summary: Upload an employee import file
+      tags:
+      - import-jobs
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/EmployeeImportUpload'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/ImportJob'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - validation_error
   /api/v1/import-row-results/:
     get:
       operationId: import_row_results_list
@@ -27306,6 +27537,11 @@ paths:
         Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
       summary: List import row results
       parameters:
+      - in: query
+        name: import_job
+        schema:
+          type: string
+          format: uuid
       - name: ordering
         required: false
         in: query
@@ -27330,6 +27566,21 @@ paths:
         description: A search term.
         schema:
           type: string
+      - in: query
+        name: status
+        schema:
+          type: string
+          x-spec-enum-id: 8522b6de420903db
+          enum:
+          - IMPORTED
+          - INVALID
+          - SKIPPED
+          - VALID
+        description: |-
+          * `VALID` - Valid
+          * `INVALID` - Invalid
+          * `IMPORTED` - Imported
+          * `SKIPPED` - Skipped
       tags:
       - import-row-results
       security:
@@ -38407,6 +38658,181 @@ paths:
       - module_disabled
       - permission_denied
       - validation_error
+  /api/v1/notifications/push/config/:
+    get:
+      operationId: notifications_push_config_retrieve
+      description: |-
+        Whether web push is available, and the public key a browser subscribes with.
+
+        Requires an authenticated user, an active institution context, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: Get push config view
+      tags:
+      - notifications
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+  /api/v1/notifications/push/subscription/:
+    post:
+      operationId: notifications_push_subscription_create
+      description: |-
+        Turn push on (POST) or off (DELETE) for this browser or phone.
+
+        Requires an authenticated user, an active institution context, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `validation_error`.
+      summary: Post push subscription view
+      tags:
+      - notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PushSubscribe'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PushSubscribe'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PushSubscribe'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - validation_error
+    delete:
+      operationId: notifications_push_subscription_destroy
+      description: |-
+        Turn push on (POST) or off (DELETE) for this browser or phone.
+
+        Requires an authenticated user, an active institution context, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: Delete push subscription view
+      tags:
+      - notifications
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
   /api/v1/overtime-records/:
     get:
       operationId: overtime_records_list
@@ -43211,6 +43637,148 @@ paths:
       - invalid_state_transition
       - policy_not_applicable
       - period_closed
+  /api/v1/payroll-runs/{id}/payment-file/:
+    get:
+      operationId: payroll_runs_payment_file_retrieve
+      description: |-
+        Bank transfers, mobile-money payments, pension schedule or PAYE schedule (CSV) for a finalized run.
+
+        Requires an authenticated user, an active institution context, the `PAYROLL` module enabled, the `payroll.finalize` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
+      summary: Download a payment or statutory file
+      parameters:
+      - in: query
+        name: file
+        schema:
+          type: string
+          enum:
+          - bank
+          - mobile-money
+          - paye
+          - pension
+        required: true
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this payroll run.
+        required: true
+      tags:
+      - payroll-runs
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+  /api/v1/payroll-runs/{id}/payment-summary/:
+    get:
+      operationId: payroll_runs_payment_summary_retrieve
+      description: |-
+        Net pay by payment method, employees whose payment details are missing, and the files available.
+
+        Requires an authenticated user, an active institution context, the `PAYROLL` module enabled, the `payroll.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
+      summary: Payment summary
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this payroll run.
+        required: true
+      tags:
+      - payroll-runs
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
   /api/v1/payroll-runs/{id}/reconcile/:
     get:
       operationId: payroll_runs_reconcile_retrieve
@@ -43599,6 +44167,61 @@ paths:
                     type: object
                     nullable: true
                     additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+  /api/v1/payslips/{id}/pdf/:
+    get:
+      operationId: payslips_pdf_retrieve
+      description: |-
+        Render the finalized payslip as a PDF, with the same access as viewing it.
+
+        Requires an authenticated user, an active institution context, the `PAYROLL` module enabled, the `payslip.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
+      summary: Download payslip PDF
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+        required: true
+      tags:
+      - payslips
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
           description: ''
         '401':
           description: Authentication is missing or invalid.
@@ -48471,6 +49094,555 @@ paths:
                   data:
                     type: object
                     additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+  /api/v1/public-holidays/:
+    get:
+      operationId: public_holidays_list
+      description: |-
+        Institution holidays: leave, attendance and working-day payroll skip these dates.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `schedule.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: List public holidays
+      parameters:
+      - in: query
+        name: date
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: date__gte
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: date__lte
+        schema:
+          type: string
+          format: date
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - public-holidays
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/PaginatedPublicHolidayList'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+    post:
+      operationId: public_holidays_create
+      description: |-
+        Institution holidays: leave, attendance and working-day payroll skip these dates.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `organization.create` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `validation_error`.
+      summary: Create public holiday
+      tags:
+      - public-holidays
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublicHoliday'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PublicHoliday'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PublicHoliday'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/PublicHoliday'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - validation_error
+  /api/v1/public-holidays/{id}/:
+    get:
+      operationId: public_holidays_retrieve
+      description: |-
+        Institution holidays: leave, attendance and working-day payroll skip these dates.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `schedule.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
+      summary: Retrieve public holiday
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this public holiday.
+        required: true
+      tags:
+      - public-holidays
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/PublicHoliday'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+    put:
+      operationId: public_holidays_update
+      description: |-
+        Institution holidays: leave, attendance and working-day payroll skip these dates.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `organization.update` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Update public holiday
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this public holiday.
+        required: true
+      tags:
+      - public-holidays
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublicHoliday'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PublicHoliday'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PublicHoliday'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/PublicHoliday'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+    patch:
+      operationId: public_holidays_partial_update
+      description: |-
+        Institution holidays: leave, attendance and working-day payroll skip these dates.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `organization.update` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Update public holiday
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this public holiday.
+        required: true
+      tags:
+      - public-holidays
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedPublicHoliday'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedPublicHoliday'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedPublicHoliday'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/PublicHoliday'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+    delete:
+      operationId: public_holidays_destroy
+      description: |-
+        Institution holidays: leave, attendance and working-day payroll skip these dates.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `organization.delete` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
+      summary: Delete public holiday
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this public holiday.
+        required: true
+      tags:
+      - public-holidays
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+  /api/v1/public-holidays/suggestions/:
+    get:
+      operationId: public_holidays_suggestions_retrieve
+      description: |-
+        Statutory holidays for the institution's country whose dates can be worked out; review before adding.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `organization.create` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: Suggested public holidays for a year
+      parameters:
+      - in: query
+        name: year
+        schema:
+          type: integer
+        required: true
+      tags:
+      - public-holidays
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/HolidaySuggestions'
                   message:
                     type: string
                   errors:
@@ -72696,6 +73868,27 @@ components:
       - is_current
       - salary_structure
       - updated_at
+    EmployeeImportColumn:
+      type: object
+      properties:
+        name:
+          type: string
+        required:
+          type: boolean
+        help:
+          type: string
+      required:
+      - help
+      - name
+      - required
+    EmployeeImportUpload:
+      type: object
+      properties:
+        file:
+          type: string
+          format: uri
+      required:
+      - file
     EmployeePayComponent:
       type: object
       description: Runs model validation so domain invariants also protect non-form
@@ -72773,6 +73966,58 @@ components:
         tax_identification_number:
           type: string
           maxLength: 80
+        social_security_number:
+          type: string
+          maxLength: 40
+        payment_method:
+          enum:
+          - BANK
+          - MOBILE_MONEY
+          - CASH
+          - CHEQUE
+          - ''
+          type: string
+          description: |-
+            * `BANK` - Bank transfer
+            * `MOBILE_MONEY` - Mobile money
+            * `CASH` - Cash
+            * `CHEQUE` - Cheque
+          x-spec-enum-id: a41088f5aad98188
+        bank_name:
+          type: string
+          maxLength: 120
+        bank_branch:
+          type: string
+          maxLength: 120
+        bank_sort_code:
+          type: string
+          maxLength: 20
+        account_name:
+          type: string
+          maxLength: 150
+        account_number:
+          type: string
+          maxLength: 34
+        mobile_money_network:
+          enum:
+          - MTN
+          - TELECEL
+          - AIRTELTIGO
+          - ''
+          type: string
+          description: |-
+            * `MTN` - MTN MoMo
+            * `TELECEL` - Telecel Cash
+            * `AIRTELTIGO` - AT Money
+          x-spec-enum-id: 4bee07b378010570
+        mobile_money_number:
+          type: string
+          maxLength: 20
+        pension_exempt:
+          type: boolean
+        pension_exemption_reason:
+          type: string
+          maxLength: 300
         created_at:
           type: string
           format: date-time
@@ -74206,6 +75451,40 @@ components:
       - id
       - name
       - updated_at
+    HolidaySuggestion:
+      type: object
+      properties:
+        name:
+          type: string
+        date:
+          type: string
+          format: date
+        statutory_date:
+          type: string
+          format: date
+          nullable: true
+        already_added:
+          type: boolean
+      required:
+      - already_added
+      - date
+      - name
+      - statutory_date
+    HolidaySuggestions:
+      type: object
+      properties:
+        country_code:
+          type: string
+        note:
+          type: string
+        holidays:
+          type: array
+          items:
+            $ref: '#/components/schemas/HolidaySuggestion'
+      required:
+      - country_code
+      - holidays
+      - note
     Home:
       type: object
       properties:
@@ -75245,6 +76524,15 @@ components:
         pay_day_rule: {}
         rounding_rule: {}
         custom_rules: {}
+        proration_method:
+          enum:
+          - CALENDAR_DAYS
+          - WORKING_DAYS
+          type: string
+          description: |-
+            * `CALENDAR_DAYS` - Calendar days
+            * `WORKING_DAYS` - Working days (Monday to Friday)
+          x-spec-enum-id: d70868d5233746c8
         is_configured:
           type: boolean
         configured_by:
@@ -79486,6 +80774,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Position'
+    PaginatedPublicHolidayList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicHoliday'
     PaginatedReceiptList:
       type: object
       required:
@@ -81413,6 +82724,58 @@ components:
         tax_identification_number:
           type: string
           maxLength: 80
+        social_security_number:
+          type: string
+          maxLength: 40
+        payment_method:
+          enum:
+          - BANK
+          - MOBILE_MONEY
+          - CASH
+          - CHEQUE
+          - ''
+          type: string
+          description: |-
+            * `BANK` - Bank transfer
+            * `MOBILE_MONEY` - Mobile money
+            * `CASH` - Cash
+            * `CHEQUE` - Cheque
+          x-spec-enum-id: a41088f5aad98188
+        bank_name:
+          type: string
+          maxLength: 120
+        bank_branch:
+          type: string
+          maxLength: 120
+        bank_sort_code:
+          type: string
+          maxLength: 20
+        account_name:
+          type: string
+          maxLength: 150
+        account_number:
+          type: string
+          maxLength: 34
+        mobile_money_network:
+          enum:
+          - MTN
+          - TELECEL
+          - AIRTELTIGO
+          - ''
+          type: string
+          description: |-
+            * `MTN` - MTN MoMo
+            * `TELECEL` - Telecel Cash
+            * `AIRTELTIGO` - AT Money
+          x-spec-enum-id: 4bee07b378010570
+        mobile_money_number:
+          type: string
+          maxLength: 20
+        pension_exempt:
+          type: boolean
+        pension_exemption_reason:
+          type: string
+          maxLength: 300
         created_at:
           type: string
           format: date-time
@@ -82271,6 +83634,15 @@ components:
         pay_day_rule: {}
         rounding_rule: {}
         custom_rules: {}
+        proration_method:
+          enum:
+          - CALENDAR_DAYS
+          - WORKING_DAYS
+          type: string
+          description: |-
+            * `CALENDAR_DAYS` - Calendar days
+            * `WORKING_DAYS` - Working days (Monday to Friday)
+          x-spec-enum-id: d70868d5233746c8
         is_configured:
           type: boolean
         configured_by:
@@ -83872,6 +85244,36 @@ components:
           type: string
         is_active:
           type: boolean
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedPublicHoliday:
+      type: object
+      description: Runs model validation so domain invariants also protect non-form
+        API writes.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        date:
+          type: string
+          format: date
+        name:
+          type: string
+          maxLength: 150
+        statutory_date:
+          type: string
+          format: date
+          nullable: true
+        is_active:
+          type: boolean
+          readOnly: true
         created_at:
           type: string
           format: date-time
@@ -85734,6 +87136,8 @@ components:
           - LARGE_NET_PAY_CHANGE
           - NOT_IN_RUN
           - MISSING_PAYROLL_PROFILE
+          - BELOW_MINIMUM_WAGE
+          - PENSION_EXEMPT
           type: string
           description: |-
             * `CALCULATION_ERROR` - Calculation error
@@ -85742,7 +87146,9 @@ components:
             * `LARGE_NET_PAY_CHANGE` - Large net pay change
             * `NOT_IN_RUN` - Active employee not in run
             * `MISSING_PAYROLL_PROFILE` - Payroll profile not configured
-          x-spec-enum-id: 271aa580d5bae8f5
+            * `BELOW_MINIMUM_WAGE` - Pay below the national minimum wage
+            * `PENSION_EXEMPT` - Mandatory pension not applied (exemption)
+          x-spec-enum-id: da249738c49cb9be
           readOnly: true
         severity:
           enum:
@@ -86616,6 +88022,58 @@ components:
       - email
       - first_name
       - last_name
+    PublicHoliday:
+      type: object
+      description: Runs model validation so domain invariants also protect non-form
+        API writes.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        date:
+          type: string
+          format: date
+        name:
+          type: string
+          maxLength: 150
+        statutory_date:
+          type: string
+          format: date
+          nullable: true
+        is_active:
+          type: boolean
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - date
+      - id
+      - is_active
+      - name
+      - updated_at
+    PushSubscribe:
+      type: object
+      properties:
+        endpoint:
+          type: string
+          format: uri
+          maxLength: 1000
+        keys:
+          type: object
+          additionalProperties:
+            type: string
+            maxLength: 200
+      required:
+      - endpoint
+      - keys
     RatingInput:
       type: object
       properties:

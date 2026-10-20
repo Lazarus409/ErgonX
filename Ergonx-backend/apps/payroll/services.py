@@ -6,7 +6,7 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Max, Sum
+from django.db.models import Max, Q, Sum
 from django.utils import timezone
 
 from apps.audit.services import record_audit_event
@@ -26,6 +26,7 @@ from apps.payroll.models import (
     PayrollPresetVersion,
     PayrollRun,
     Payslip,
+    StatutoryThreshold,
 )
 from apps.payroll.selectors import (
     active_payroll_preset_versions_for_institution,
@@ -117,6 +118,7 @@ def configure_payroll(
     pay_day_rule=None,
     rounding_rule=None,
     custom_rules=None,
+    proration_method=InstitutionPayrollConfiguration.ProrationMethod.CALENDAR_DAYS,
     is_configured=True,
 ):
     _membership_with_permission(actor, institution, "payroll.configure")
@@ -176,6 +178,7 @@ def configure_payroll(
         if payroll_setup_mode == InstitutionPayrollConfiguration.SetupMode.CUSTOM
         else {}
     )
+    configuration.proration_method = proration_method
     configuration.is_configured = is_configured
     configuration.configured_by = actor
     configuration.configured_at = timezone.now()
@@ -230,30 +233,53 @@ def payroll_setup_choices(institution):
     }
 
 
+PAYMENT_PROFILE_FIELDS = (
+    "social_security_number",
+    "payment_method",
+    "bank_name",
+    "bank_branch",
+    "bank_sort_code",
+    "account_name",
+    "account_number",
+    "mobile_money_network",
+    "mobile_money_number",
+    "pension_exempt",
+    "pension_exemption_reason",
+)
+
+
 @transaction.atomic
 def configure_employee_payroll_profile(
-    *, institution, employee, actor, tax_residency, tax_identification_number=""
+    *, institution, employee, actor, tax_residency, tax_identification_number="", **payment
 ):
+    """Tax and payment details. Pay-routing changes are audited by field name only."""
     _membership_with_permission(actor, institution, "payroll.configure")
+    assert_not_own_pay(actor, employee)
     if employee.institution_id != institution.id:
         raise CodedValidationError(
             {"employee": "Employee belongs to another institution."},
             api_code="tenant_mismatch",
         )
-    profile, _ = EmployeePayrollProfile.objects.select_for_update().update_or_create(
-        employee=employee,
-        defaults={
-            "institution": institution,
-            "tax_residency": tax_residency,
-            "tax_identification_number": tax_identification_number,
-        },
-    )
+    unknown = set(payment) - set(PAYMENT_PROFILE_FIELDS)
+    if unknown:
+        raise ValidationError({field: "Unknown field." for field in unknown})
+    profile = EmployeePayrollProfile.objects.select_for_update().filter(employee=employee).first()
+    if profile is None:
+        profile = EmployeePayrollProfile(institution=institution, employee=employee)
+    before = {field: getattr(profile, field) for field in ("tax_residency", "tax_identification_number", *PAYMENT_PROFILE_FIELDS)}
+    profile.tax_residency = tax_residency
+    profile.tax_identification_number = tax_identification_number
+    for field, value in payment.items():
+        setattr(profile, field, value if isinstance(value, bool) else (value or ""))
+    profile.full_clean()
+    profile.save()
+    changed = [field for field, value in before.items() if getattr(profile, field) != value]
     record_audit_event(
         actor=actor,
         institution=institution,
         entity=profile,
         action="payroll.employee_profile.changed",
-        metadata={"tax_residency": profile.tax_residency},
+        metadata={"tax_residency": profile.tax_residency, "changed_fields": changed},
     )
     return profile
 
@@ -372,6 +398,8 @@ def _configuration_snapshot(configuration):
     # Only present when set, so runs snapshotted before custom rules existed still match.
     if configuration.custom_rules:
         snapshot["custom_rules"] = configuration.custom_rules
+    if configuration.proration_method != InstitutionPayrollConfiguration.ProrationMethod.CALENDAR_DAYS:
+        snapshot["proration_method"] = configuration.proration_method
     return snapshot
 
 
@@ -1295,6 +1323,41 @@ def decide_tax_relief_claim(*, claim, actor, approve, approved_amount=None):
 LARGE_NET_CHANGE_RATIO = Decimal("0.25")
 
 
+# Ghana's monthly minimum is quoted as the daily minimum wage times 27 working days.
+MINIMUM_WAGE_DAYS_PER_MONTH = 27
+
+
+def _below_minimum_wage(run, records):
+    """(record, monthly rate, monthly minimum) for records paid below the preset's daily minimum wage.
+
+    Compares the contractual monthly rate (not prorated pay), so a mid-month hire on a
+    legal salary is not flagged. Only monthly payroll with a NATIONAL_DAILY_MINIMUM_WAGE
+    threshold in the run's preset is checked.
+    """
+    from apps.compensation.models import EmployeeCompensation
+
+    configuration = getattr(run.institution, "payroll_configuration", None)
+    if run.preset_version_id is None or configuration is None or configuration.payroll_frequency != "MONTHLY":
+        return []
+    threshold = (
+        StatutoryThreshold.objects.filter(preset_version_id=run.preset_version_id, code="NATIONAL_DAILY_MINIMUM_WAGE", effective_from__lte=run.payroll_period.end_date)
+        .filter(Q(effective_to__isnull=True) | Q(effective_to__gte=run.payroll_period.end_date))
+        .order_by("-effective_from")
+        .first()
+    )
+    if threshold is None:
+        return []
+    minimum = money(threshold.amount * MINIMUM_WAGE_DAYS_PER_MONTH)
+    found = []
+    for record in records:
+        base_items = [item for item in record.items.all() if item.component_code_snapshot == "BASE_SALARY"]
+        compensation_id = base_items[-1].metadata.get("employee_compensation_id") if base_items else None
+        compensation = EmployeeCompensation.objects.filter(pk=compensation_id).only("base_salary").first() if compensation_id else None
+        if compensation and compensation.base_salary < minimum:
+            found.append((record, money(compensation.base_salary), minimum))
+    return found
+
+
 def detect_payroll_exceptions(run):
     """(Re)compute a calculated run's exceptions.
 
@@ -1308,7 +1371,7 @@ def detect_payroll_exceptions(run):
     def add(code, severity, message, employee=None, **details):
         detected[(code, employee.id if employee else None)] = (code, severity, message, employee, details)
 
-    records = list(run.records.select_related("employee"))
+    records = list(run.records.select_related("employee").prefetch_related("items"))
     for record in records:
         if record.status == PayrollRecord.Status.ERROR:
             add(PayrollRunException.Code.CALCULATION_ERROR, PayrollRunException.Severity.HIGH, "Payroll record could not be calculated.", record.employee)
@@ -1355,6 +1418,16 @@ def detect_payroll_exceptions(run):
     for record in records:
         if record.employee_id not in with_profile:
             add(PayrollRunException.Code.MISSING_PAYROLL_PROFILE, PayrollRunException.Severity.LOW, "Employee payroll profile (tax residency and identifiers) is not configured.", record.employee)
+
+    for profile in EmployeePayrollProfile.objects.filter(institution=run.institution, employee_id__in=included, pension_exempt=True).select_related("employee"):
+        add(PayrollRunException.Code.PENSION_EXEMPT, PayrollRunException.Severity.LOW, f"Mandatory pension not applied: {profile.pension_exemption_reason}", profile.employee, reason=profile.pension_exemption_reason)
+
+    for record, rate, minimum in _below_minimum_wage(run, records):
+        add(
+            PayrollRunException.Code.BELOW_MINIMUM_WAGE, PayrollRunException.Severity.MEDIUM,
+            f"Monthly rate {rate} is below the national minimum of {minimum} ({MINIMUM_WAGE_DAYS_PER_MONTH} days at the daily minimum wage).",
+            record.employee, rate=str(rate), minimum=str(minimum),
+        )
 
     existing = {(item.code, item.employee_id): item for item in run.exceptions.all()}
     now = timezone.now()

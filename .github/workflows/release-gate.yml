@@ -64,15 +64,15 @@ jobs:
         env:
           DJANGO_SETTINGS_MODULE: config.settings.test
           E2E_BASE_URL: http://127.0.0.1:3000
-          E2E_INSTITUTION_ADMIN_EMAIL: kwame.mensah@apexdemo.example
+          E2E_INSTITUTION_ADMIN_EMAIL: kwame.mensah@apexenergy.com
           E2E_INSTITUTION_ADMIN_PASSWORD: ErgonxDemo!2026
-          E2E_DIRECTOR_EMAIL: evelyn.darko@apexdemo.example
+          E2E_DIRECTOR_EMAIL: evelyn.darko@apexenergy.com
           E2E_DIRECTOR_PASSWORD: ErgonxDemo!2026
-          E2E_FINANCE_MANAGER_EMAIL: yaw.osei@apexdemo.example
+          E2E_FINANCE_MANAGER_EMAIL: yaw.osei@apexenergy.com
           E2E_FINANCE_MANAGER_PASSWORD: ErgonxDemo!2026
-          E2E_AUDITOR_EMAIL: sandra.appiah@apexdemo.example
+          E2E_AUDITOR_EMAIL: sandra.appiah@apexenergy.com
           E2E_AUDITOR_PASSWORD: ErgonxDemo!2026
-          E2E_EMPLOYEE_EMAIL: nana.nyarko@apexdemo.example
+          E2E_EMPLOYEE_EMAIL: nana.nyarko@apexenergy.com
           E2E_EMPLOYEE_PASSWORD: ErgonxDemo!2026
         run: |
           cd Ergonx-backend

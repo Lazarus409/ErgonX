@@ -57,6 +57,8 @@ export interface PlatformOverview {
   institutions: { total: number; active: number; suspended: number; new_last_30_days: number };
   users: { total: number; signed_in_last_30_days: number };
   employees: { total: number };
+  /** Where uploads live; database usage counts against the database plan. */
+  file_storage?: { backend: "database" | "s3" | "filesystem"; database_files: number; database_bytes: number; warning: boolean };
   onboarding: Record<OnboardingStatus, number>;
   pipeline: { pending_requests: number; pending_invitations: number; invitations_expiring_48h: number };
   growth: { months: string[]; institutions: number[]; access_requests: number[] };

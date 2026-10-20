@@ -36,7 +36,7 @@ export default function ApplicationsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Recruitment" title="Applications" description="Draft and submit applications through the institution recruitment pipeline." icon={ClipboardCheck} accent="recruitment" actions={<ButtonLink href="/recruitment/applications/new" leadingIcon={<Plus className="h-4 w-4" />}>New application</ButtonLink>} />
+      <PageHeader eyebrow="Recruitment" title="Applications" icon={ClipboardCheck} accent="recruitment" actions={<ButtonLink href="/recruitment/applications/new" leadingIcon={<Plus className="h-4 w-4" />}>New application</ButtonLink>} />
       <DataTable<RecruitmentApplication>
         caption="Applications"
         rows={rows}

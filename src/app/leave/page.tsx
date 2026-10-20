@@ -12,5 +12,5 @@ const areas = [
 ];
 
 export default function LeaveHomePage() {
-  return <ModuleLanding title="Leave" eyebrow="Leave management" description="Manage leave requests, balances and policies for the institution." module="LEAVE" accent="leave" icon={CalendarDays} areas={areas} />;
+  return <ModuleLanding title="Leave" eyebrow="Leave management" module="LEAVE" accent="leave" icon={CalendarDays} areas={areas} />;
 }

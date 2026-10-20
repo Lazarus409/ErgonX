@@ -95,7 +95,7 @@ export default function MyDocumentsPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <PageHeader title="My documents" description="Upload your own documents, and find the ones HR has shared with you." icon={FileText} accent="brand" />
+      <PageHeader title="My documents" icon={FileText} accent="brand" />
       <MySignaturesPanel />
       <DocumentChecklistPanel mode="self" onChanged={load} />
 

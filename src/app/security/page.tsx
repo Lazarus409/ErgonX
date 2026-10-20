@@ -38,7 +38,7 @@ export default function SecurityPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <PageHeader eyebrow="Compliance" title="Security" description="Checks on how your organisation uses ErgonX, recent security events, and an evidence pack for auditors." icon={ShieldAlert} accent="audit" actions={<Button variant="secondary" onClick={reload} loading={loading}>Refresh</Button>} />
+      <PageHeader eyebrow="Compliance" title="Security" icon={ShieldAlert} accent="audit" actions={<Button variant="secondary" onClick={reload} loading={loading}>Refresh</Button>} />
       {error && <ErrorState variant="inline" title="Unable to load security checks" message={error} onRetry={reload} />}
       {data && (
         <section className="grid gap-4 sm:grid-cols-3" aria-label="Security summary">

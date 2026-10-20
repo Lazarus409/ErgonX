@@ -55,7 +55,7 @@ export default function MyLeavePage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <PageHeader title="My leave" description="Plan, request and follow your leave." icon={CalendarDays} accent="leave" meta={<Badge tone="neutral">Leave year {new Date().getFullYear()}</Badge>} />
+      <PageHeader title="My leave" icon={CalendarDays} accent="leave" meta={<Badge tone="neutral">Leave year {new Date().getFullYear()}</Badge>} />
       {error && <ErrorState variant="inline" message={error} onRetry={reload} />}
       {!loading && !error && data && !data.employee && (
         <EmptyState icon={CalendarDays} accent="leave" title="No employee record linked" description="Your account is not linked to an employee record in this institution, so personal leave balances and requests are unavailable." />

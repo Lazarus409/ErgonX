@@ -84,7 +84,7 @@ export default function OnboardingUsersPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <Link href="/onboarding" className="inline-flex items-center gap-2 text-sm font-semibold text-ink-muted transition hover:text-ink-strong"><ArrowLeft className="h-4 w-4" />Back to setup</Link>
-      <PageHeader eyebrow="Setup owners" title="Invite your implementation team" description="During onboarding, active members remain read-only. Full access management moves to Settings after setup." icon={UserRoundCheck} accent="brand" />
+      <PageHeader eyebrow="Setup owners" title="Invite your implementation team" icon={UserRoundCheck} accent="brand" />
 
       <section className="rounded-2xl border border-line bg-surface p-5"><div className="flex items-start gap-3"><div className="rounded-xl bg-primary-soft p-3 text-primary-ink"><UserRoundCheck className="h-5 w-5" /></div><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-primary-ink">Current institution admin</p><h2 className="mt-1 font-bold text-headline">{[owner?.first_name, owner?.last_name].filter(Boolean).join(" ") || owner?.email || "Setup owner"}</h2><p className="mt-1 text-sm text-ink-muted">{owner?.email ?? "Your active institution membership"} · {data.context.membership.role?.name ?? "Institution Admin"}</p></div></div></section>
 

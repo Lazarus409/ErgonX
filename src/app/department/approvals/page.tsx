@@ -29,7 +29,7 @@ export default function DepartmentApprovalsPage() {
       <PageHeader
         eyebrow="My department / functional area"
         title="Leave approvals"
-        description="Requests waiting on your decision. After you approve, HR gives the final approval where your institution requires it."
+       
         icon={ClipboardCheck}
         accent="leave"
         actions={<ButtonLink href="/leave/calendar" variant="secondary" leadingIcon={<CalendarDays className="h-4 w-4" />}>Team calendar</ButtonLink>}

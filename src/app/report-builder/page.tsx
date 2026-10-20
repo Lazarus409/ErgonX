@@ -78,7 +78,7 @@ export default function ReportBuilderPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
-      <PageHeader eyebrow="Reports" title="Report builder" description="Pick a dataset, drag columns into order, add filters, and group if you need totals. Reports only ever show the data your role can see, even when shared." icon={Table2} accent="brand" />
+      <PageHeader eyebrow="Reports" title="Report builder" icon={Table2} accent="brand" />
       {(error || runError) && <Alert tone="danger" onDismiss={runError ? () => setRunError("") : undefined}>{error || runError}</Alert>}
       <div className="grid gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
         <div className="space-y-4">

@@ -319,7 +319,7 @@ export default function LiveAttendancePage() {
     <div className="space-y-6">
       <PageHeader
         title="Live Attendance"
-        description="Monitor today's employee attendance and attendance exceptions."
+       
         actions={
           <button
             onClick={refresh}

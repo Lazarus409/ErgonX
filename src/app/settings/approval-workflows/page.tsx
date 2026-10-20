@@ -87,7 +87,7 @@ export default function ApprovalWorkflowSettingsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Approval workflows"
-        description="Who approves each kind of request, in what order, and who hears about overdue steps."
+       
         icon={GitPullRequest}
         accent="settings"
         actions={canCreate ? <Button leadingIcon={<Plus className="h-4 w-4" />} onClick={() => setEditing("new")}>Create workflow</Button> : undefined}

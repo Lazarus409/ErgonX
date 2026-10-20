@@ -19,7 +19,7 @@ export default function JobPostingsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Recruitment" title="Requisitions" description="Plan, approve and publish the roles you are hiring for." icon={BriefcaseBusiness} accent="recruitment" actions={<ButtonLink href="/recruitment/job-postings/new" size="lg" leadingIcon={<Plus className="h-5 w-5" />}>Create requisition</ButtonLink>} />
+      <PageHeader eyebrow="Recruitment" title="Requisitions" icon={BriefcaseBusiness} accent="recruitment" actions={<ButtonLink href="/recruitment/job-postings/new" size="lg" leadingIcon={<Plus className="h-5 w-5" />}>Create requisition</ButtonLink>} />
       <DataTable
         caption="Requisitions"
         rows={data?.results}

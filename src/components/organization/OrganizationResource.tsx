@@ -24,11 +24,11 @@ import { CLOCK_LOCATION_RULE_LABELS, type Department, type Grade, type Location,
 export type OrganizationResourceKind = "departments" | "positions" | "grades" | "locations";
 type Resource = Department | Position | Grade | Location;
 
-const metadata: Record<OrganizationResourceKind, { singular: string; title: string; description: string; icon: typeof Building2 }> = {
-  departments: { singular: "Department / Functional Area", title: "Departments / Functional Areas", description: "The departments / functional areas your people, positions and approvals are organized by.", icon: Building2 },
-  positions: { singular: "Position", title: "Positions", description: "Job positions and the department / functional area each one sits in.", icon: BriefcaseBusiness },
-  grades: { singular: "Grade", title: "Grades", description: "Grade levels used for employees and pay structures.", icon: GraduationCap },
-  locations: { singular: "Location", title: "Locations", description: "Offices, sites and remote arrangements people work from.", icon: MapPin },
+const metadata: Record<OrganizationResourceKind, { singular: string; title: string; icon: typeof Building2 }> = {
+  departments: { singular: "Department / Functional Area", title: "Departments / Functional Areas", icon: Building2 },
+  positions: { singular: "Position", title: "Positions", icon: BriefcaseBusiness },
+  grades: { singular: "Grade", title: "Grades", icon: GraduationCap },
+  locations: { singular: "Location", title: "Locations", icon: MapPin },
 };
 
 function list(kind: OrganizationResourceKind): Promise<PaginatedData<Resource>> { switch (kind) { case "departments": return organizationApi.listDepartments({ page_size: 100 }) as Promise<PaginatedData<Resource>>; case "positions": return organizationApi.listPositions({ page_size: 100 }) as Promise<PaginatedData<Resource>>; case "grades": return organizationApi.listGrades({ page_size: 100 }) as Promise<PaginatedData<Resource>>; case "locations": return organizationApi.listLocations({ page_size: 100 }) as Promise<PaginatedData<Resource>>; } }
@@ -52,7 +52,7 @@ export function OrganizationResourceList({ kind }: { kind: OrganizationResourceK
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Organization" title={meta.title} description={meta.description} icon={Icon} accent="hr" actions={canCreate ? <Button leadingIcon={<Plus className="h-4 w-4" />} onClick={() => setCreating(true)}>New {meta.singular.toLowerCase()}</Button> : undefined} />
+      <PageHeader eyebrow="Organization" title={meta.title} icon={Icon} accent="hr" actions={canCreate ? <Button leadingIcon={<Plus className="h-4 w-4" />} onClick={() => setCreating(true)}>New {meta.singular.toLowerCase()}</Button> : undefined} />
       {creating && (
         <OrganizationForm
           kind={kind}

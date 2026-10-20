@@ -65,7 +65,7 @@ export default function ExpensesPage() {
     <div className="space-y-6">
       <PageHeader
         title="Expenses"
-        description="Review staff claims, post them to the ledger, and record settlements. Claimants submit from My expenses."
+       
         icon={Receipt}
         accent="accounting"
         actions={can("expense.create") ? <Button variant="secondary" leadingIcon={<Plus className="h-4 w-4" />} onClick={() => setCreating(true)}>Petty-cash expense</Button> : undefined}

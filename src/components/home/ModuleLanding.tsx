@@ -21,7 +21,6 @@ export interface ModuleLandingArea {
 
 interface ModuleLandingProps {
   title: string;
-  description: string;
   /** Backend module code; omit for non-module areas such as Settings. */
   module?: string;
   accent: ModuleAccent;
@@ -37,7 +36,7 @@ interface ModuleLandingProps {
  * membership may open. Visibility mirrors permissions and module enablement;
  * each destination still enforces its own gate.
  */
-export default function ModuleLanding({ title, description, module, accent, icon, eyebrow, areas, actions, children }: ModuleLandingProps) {
+export default function ModuleLanding({ title, module, accent, icon, eyebrow, areas, actions, children }: ModuleLandingProps) {
   const { user, institution } = useAuth();
   const permissions = user?.permissions ?? [];
   const can = (permission?: string) => !permission || permissions.includes("*") || permissions.includes(permission);
@@ -46,7 +45,7 @@ export default function ModuleLanding({ title, description, module, accent, icon
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
-      <PageHeader eyebrow={eyebrow ?? `${title} workspace`} title={title} description={description} icon={icon} accent={accent} actions={actions} />
+      <PageHeader eyebrow={eyebrow ?? `${title} workspace`} title={title} icon={icon} accent={accent} actions={actions} />
       {children}
       {visibleAreas.length ? (
         <section aria-label={`${title} areas`} className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

@@ -16,7 +16,7 @@ export default function EvaluationsPage() {
   const { data, loading, error, reload } = useApiResource(load);
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Recruitment" title="Candidate evaluations" description="Structured interviewer scores and recommendations for recruitment applications." icon={ClipboardList} accent="recruitment" actions={<ButtonLink href="/recruitment/evaluations/new" leadingIcon={<Plus className="h-4 w-4" />}>Add evaluation</ButtonLink>} />
+      <PageHeader eyebrow="Recruitment" title="Candidate evaluations" icon={ClipboardList} accent="recruitment" actions={<ButtonLink href="/recruitment/evaluations/new" leadingIcon={<Plus className="h-4 w-4" />}>Add evaluation</ButtonLink>} />
       <DataTable
         caption="Candidate evaluations"
         rows={data?.results}

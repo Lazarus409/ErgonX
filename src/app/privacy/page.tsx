@@ -46,7 +46,7 @@ export default function PrivacyPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <PageHeader eyebrow="Compliance" title="Privacy & data protection" description="Handle people's data protection requests within 30 days, keep personal data only as long as needed, and pause clean-up with legal holds. Payroll, tax and pension records are never removed here." icon={ShieldCheck} accent="audit" />
+      <PageHeader eyebrow="Compliance" title="Privacy & data protection" icon={ShieldCheck} accent="audit" />
       {(error || actionError) && <Alert tone="danger" onDismiss={actionError ? () => setActionError("") : undefined}>{error || actionError}</Alert>}
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Privacy summary">
         <MetricCard label="Open requests" value={String(open.length)} description={`${open.filter((row) => row.overdue).length} overdue`} icon={FileDown} accent="audit" />

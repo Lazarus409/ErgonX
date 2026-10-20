@@ -59,7 +59,7 @@ function ComplaintsWorkspace() {
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Human Resources" title="Complaints" description="Confidential employee complaints: review, investigate and record the outcome." icon={MessageSquareWarning} accent="hr" />
+      <PageHeader eyebrow="Human Resources" title="Complaints" icon={MessageSquareWarning} accent="hr" />
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Complaints summary">
         <MetricCard label="Open complaints" value={overview ? formatNumber(overview.open) : "—"} description={overview ? `${formatNumber(overview.by_status.SUBMITTED)} waiting for HR` : undefined} icon={Inbox} accent="hr" loading={initial} />

@@ -80,7 +80,7 @@ export default function InstitutionSettingsPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       {/* Institution profile (Stitch S045): organization details, then contact details. */}
-      <PageHeader title="Institution profile" description="Legal identity, locale and contact details for the active institution."
+      <PageHeader title="Institution profile"
         meta={<span className="rounded-full bg-primary-soft px-3 py-1 text-caption font-semibold text-primary-ink">Code: {institution.code}</span>}
         actions={canManage && !editing ? <button type="button" onClick={startEditing} className={buttonClasses({ variant: "primary" })}><Pencil size={16} />Edit institution</button> : undefined} />
       {actionError && <ErrorState variant="inline" title="Unable to save institution settings" message={actionError} />}

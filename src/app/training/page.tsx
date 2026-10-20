@@ -165,7 +165,7 @@ export default function TrainingPage() {
       <PageHeader
         eyebrow="Human Resources"
         title="Training"
-        description="Plan training, record completions and keep certifications current."
+       
         icon={GraduationCap}
         accent="hr"
         actions={canManage ? <div className="flex flex-wrap gap-2"><Button variant="secondary" leadingIcon={<Plus className="h-4 w-4" />} onClick={() => openCourse(null)}>Add course</Button><Button leadingIcon={<UserPlus className="h-4 w-4" />} onClick={() => openEnrol()}>Enrol employees</Button></div> : null}

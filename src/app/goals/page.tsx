@@ -152,7 +152,7 @@ export default function GoalsPage() {
       <PageHeader
         eyebrow="Performance"
         title="Goals"
-        description="Objectives with measurable key results. Your goals align to your department's, and theirs to the company's; check in regularly so everyone can see progress."
+       
         icon={Target}
         accent="hr"
         actions={<Button leadingIcon={<Plus className="h-4 w-4" />} onClick={startCreate} disabled={!data}>New goal</Button>}

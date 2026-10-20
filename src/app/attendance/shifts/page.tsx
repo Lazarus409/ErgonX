@@ -209,7 +209,7 @@ export default function AttendanceShiftsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Shifts"
-        description="Manage the shift definitions used by work schedules."
+       
         actions={
           <button
             onClick={openCreate}

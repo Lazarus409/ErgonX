@@ -319,7 +319,7 @@ export default function EmployeesPage() {
     <div className="space-y-6">
       <PageHeader
         title="Employees"
-        description="Manage your team, their roles and employment records across ErgonX."
+       
         actions={
           <>
             <Button variant="secondary" leadingIcon={<Mail className="h-4 w-4" />} onClick={() => { setInviteOpen(true); setInviteError(null); setInvitationLink(null); }}>Invite employee</Button>

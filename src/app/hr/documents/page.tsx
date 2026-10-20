@@ -105,7 +105,7 @@ export default function DocumentChecklistPage() {
       <PageHeader
         eyebrow="Human Resources"
         title="Document checklist"
-        description="The documents every employee must have on file, and who is still missing them."
+       
         icon={FileCheck2}
         accent="hr"
         actions={canManage ? <Button leadingIcon={<Plus className="h-4 w-4" />} onClick={openCreate}>Add requirement</Button> : null}

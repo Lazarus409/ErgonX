@@ -128,7 +128,7 @@ export default function AttendanceDashboardPage() {
     <div className="space-y-6">
       <PageHeader
         title="Attendance"
-        description="Monitor attendance, find exceptions and keep records accurate."
+       
         actions={
           <>
             <label className="relative">

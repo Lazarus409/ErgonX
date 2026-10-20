@@ -284,7 +284,7 @@ export default function CreateEmployeePage() {
         back={<BackNavigation fallback="/hr/employees" label="Back to employees" />}
         breadcrumbs={[{ label: "Employees", href: "/hr/employees" }, { label: "Add employee" }]}
         title="Add Employee"
-        description="Create the employee record. Documents and emergency contacts can be added from the profile afterwards."
+       
       />
 
       {saved && (

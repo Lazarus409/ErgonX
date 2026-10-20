@@ -39,7 +39,7 @@ export default function CalendarSubscriptionPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <PageHeader eyebrow="Settings" title="Calendar subscription" description="See your shifts, approved leave and the interviews you take part in, in the calendar app you already use. It refreshes on its own." icon={CalendarPlus} accent="settings" />
+      <PageHeader eyebrow="Settings" title="Calendar subscription" icon={CalendarPlus} accent="settings" />
       {error && <Alert tone="danger">{error}</Alert>}
       <Card title="Your calendar link" icon={CalendarPlus} accent="settings">
         <div className="space-y-4 text-support text-ink">

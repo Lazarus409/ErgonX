@@ -305,7 +305,7 @@ export default function RotationsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Rotation Patterns"
-        description="Define rotating sequences of shift patterns or shifts."
+       
         actions={
           <button
             onClick={() => {

@@ -42,7 +42,7 @@ export default function MyPrivacyPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <PageHeader eyebrow="Settings" title="My data & privacy" description="Under Ghana's Data Protection Act, 2012 you can ask for a copy of your personal data, have it corrected, or object to how it is used. HR responds within 30 days." icon={ShieldCheck} accent="settings" />
+      <PageHeader eyebrow="Settings" title="My data & privacy" icon={ShieldCheck} accent="settings" />
       {error && <Alert tone="warning">{error}</Alert>}
       <Card title="Make a request" icon={ShieldCheck} accent="settings">
         <div className="space-y-4">

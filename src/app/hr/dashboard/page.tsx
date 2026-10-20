@@ -79,7 +79,7 @@ export default function HRDashboardPage() {
       <PageHeader
         eyebrow="Human Resources"
         title="HR Dashboard"
-        description="Live workforce composition, staffing activity and employee records for this institution."
+       
         icon={Users}
         accent="hr"
         actions={

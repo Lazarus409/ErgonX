@@ -73,7 +73,7 @@ export default function TalentPage() {
       <PageHeader
         eyebrow="Human Resources · Confidential"
         title="Talent & succession"
-        description="Who could step into critical roles, and where your people sit on performance and potential. Visible to HR and leadership only."
+       
         icon={Crown}
         accent="hr"
         actions={canManage && view === "succession" ? <Button leadingIcon={<Plus className="h-4 w-4" />} onClick={() => setNewPlan({ position: "", risk_of_loss: "MEDIUM", impact_of_loss: "HIGH", notes: "" })}>Add position</Button> : null}

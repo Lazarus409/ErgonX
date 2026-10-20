@@ -9,7 +9,7 @@ import PageHeader from "@/components/ui/PageHeader";
 export default function MyTrainingPage() {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <PageHeader title="My training" description="Your courses, completions and certificates." icon={GraduationCap} accent="hr" />
+      <PageHeader title="My training" icon={GraduationCap} accent="hr" />
       <EmployeeTrainingList mine />
     </div>
   );

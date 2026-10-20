@@ -48,7 +48,7 @@ export default function PayComponentsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Payroll" title="Pay components" description="Configure earnings, deductions and employer contributions used by payroll." icon={Banknote} accent="payroll" actions={can("compensation.configure") ? <Button leadingIcon={<Plus className="h-4 w-4" />} onClick={openCreate}>Add component</Button> : null} />
+      <PageHeader eyebrow="Payroll" title="Pay components" icon={Banknote} accent="payroll" actions={can("compensation.configure") ? <Button leadingIcon={<Plus className="h-4 w-4" />} onClick={openCreate}>Add component</Button> : null} />
       <section className="grid gap-4 sm:grid-cols-3" aria-label="Component summary">
         <MetricCard size="sm" label="Total components" value={formatNumber(data?.count ?? 0)} accent="payroll" loading={loading && !data} />
         <MetricCard size="sm" label="Active" value={formatNumber(components.filter((item) => item.is_active).length)} accent="accounting" loading={loading && !data} />

@@ -130,7 +130,7 @@ export default function PoliciesPage() {
       <PageHeader
         eyebrow="Human Resources"
         title="Policies"
-        description="Publish workplace policies and see who has read and signed them. A new version asks everyone to sign again."
+       
         icon={ScrollText}
         accent="hr"
         actions={canManage ? <Button leadingIcon={<Plus className="h-4 w-4" />} onClick={() => openEditor("create")}>New policy</Button> : null}

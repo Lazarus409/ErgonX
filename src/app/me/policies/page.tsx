@@ -80,7 +80,7 @@ export default function MyPoliciesPage() {
       <PageHeader
         eyebrow="Self service"
         title="My policies"
-        description="Workplace policies that apply to you. Read each one and sign to confirm you understand it."
+       
         icon={ScrollText}
         accent="hr"
       />

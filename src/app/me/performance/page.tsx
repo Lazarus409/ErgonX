@@ -23,7 +23,7 @@ export default function MyPerformancePage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <PageHeader title="My performance" description="Your performance reviews, and reviews you complete for your team." icon={Target} accent="hr" />
+      <PageHeader title="My performance" icon={Target} accent="hr" />
       <DataTable<ReviewListItem>
         caption="My reviews"
         rows={mine}

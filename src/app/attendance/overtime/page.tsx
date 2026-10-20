@@ -313,7 +313,7 @@ export default function OvertimePage() {
     <div className="space-y-6">
       <PageHeader
         title="Overtime"
-        description="Review overtime generated from attendance. Only approved overtime is consumed by Payroll."
+       
       />
 
       {error && <ErrorState message={error} onRetry={reload} />}

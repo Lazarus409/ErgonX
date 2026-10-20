@@ -208,7 +208,7 @@ export default function LeaveRequestsPage() {
     <>
       <PageHeader
         title="Leave Requests"
-        description="Review and manage employee leave requests."
+       
       />
 
       <div className="mt-6 space-y-6">

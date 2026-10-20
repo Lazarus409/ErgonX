@@ -17,7 +17,7 @@ export default function OffersPage() {
   const { data, loading, error, reload } = useApiResource(load);
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Recruitment" title="Offers" description="Track offer decisions and use the controlled hire workflow for accepted offers." icon={FileSignature} accent="recruitment" actions={<ButtonLink href="/recruitment/offers/new" leadingIcon={<Plus className="h-4 w-4" />}>New offer</ButtonLink>} />
+      <PageHeader eyebrow="Recruitment" title="Offers" icon={FileSignature} accent="recruitment" actions={<ButtonLink href="/recruitment/offers/new" leadingIcon={<Plus className="h-4 w-4" />}>New offer</ButtonLink>} />
       <DataTable
         caption="Offers"
         rows={data?.results}

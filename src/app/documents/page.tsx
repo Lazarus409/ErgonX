@@ -75,7 +75,7 @@ export default function DocumentsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Documents" description="Upload and keep protected documents for the active institution. Any file type, up to 25 MB." actions={<button type="button" onClick={() => setOpen(true)} className={buttonClasses({ variant: "primary" })}>Upload document</button>} />
+      <PageHeader title="Documents" actions={<button type="button" onClick={() => setOpen(true)} className={buttonClasses({ variant: "primary" })}>Upload document</button>} />
       {downloadError && <p className="rounded-lg bg-danger-soft p-3 text-sm text-danger-ink">{downloadError}</p>}
       <div className="rounded-2xl border border-line bg-surface">
         {data.results.length === 0 ? <EmptyState title="No documents yet" description="Uploaded documents and files attached through ERP workflows will appear here." /> : (

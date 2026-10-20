@@ -381,7 +381,7 @@ export default function SchedulesPage() {
     <div className="space-y-6">
       <PageHeader
         title="Work Schedules"
-        description="Define fixed, pattern-based, rotating and flexible work schedules, and assign them to employees."
+       
         actions={
           <button
             onClick={openCreate}

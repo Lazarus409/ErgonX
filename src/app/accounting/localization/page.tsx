@@ -43,7 +43,7 @@ export default function AccountingLocalizationPage() {
   const configured = Boolean(data?.configuration?.selected_accounting_preset_version);
 
   return <div className="mx-auto max-w-7xl space-y-6 pb-12">
-    <PageHeader title="Tax & Ghana Localisation" description="Read the server-controlled tax and withholding rules attached to the active accounting preset." />
+    <PageHeader title="Tax & Ghana Localisation" />
     {error && <ErrorState message={error} onRetry={reload} />}
     {!configured ? <section className="rounded-2xl border border-warning/30 bg-warning-soft p-5 text-sm text-warning-ink"><div className="flex gap-3"><ShieldCheck className="h-5 w-5 shrink-0" /><div><h2 className="font-semibold">No accounting preset is applied</h2><p className="mt-1">Tax and withholding catalogues are available only after an authorized preset is deliberately applied. This screen does not invent tax rates or localisation rules.</p><Link href="/accounting/ghana-setup" className="mt-3 inline-flex font-semibold underline">Open accounting setup</Link></div></div></section> : <>
       <section className="grid gap-4 sm:grid-cols-3"><Metric label="Active tax codes" value={String(data?.taxCodes.filter((item) => item.is_active).length ?? 0)} icon={BookOpenCheck} /><Metric label="Tax components" value={String(data?.components.length ?? 0)} icon={Landmark} /><Metric label="Withholding rules" value={String(data?.withholdingRules.length ?? 0)} icon={ShieldCheck} /></section>

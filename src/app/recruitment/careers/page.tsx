@@ -26,7 +26,7 @@ export default function CareersSettingsPage() {
       <PageHeader
         eyebrow="Recruitment"
         title="Careers site"
-        description="A public page where anyone can see your open jobs and apply without an account. Only postings you mark “Show on careers site” appear."
+       
         icon={Globe}
         accent="recruitment"
       />

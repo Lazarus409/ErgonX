@@ -58,7 +58,7 @@ export default function ModuleSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Modules" description="Choose the modules your institution uses. Turning a module off hides it and blocks its API; its records are kept." icon={Layers3} accent="settings" />
+      <PageHeader title="Modules" icon={Layers3} accent="settings" />
       {actionError && <ErrorState variant="inline" title="Module could not be updated" message={actionError} />}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <section className="space-y-3" aria-label="Institution modules">

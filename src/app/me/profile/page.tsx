@@ -70,7 +70,7 @@ export default function MyProfilePage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <PageHeader title="My profile" description="Keep your personal contact details current. Employment details are managed by HR." icon={UserRound} accent="brand" />
+      <PageHeader title="My profile" icon={UserRound} accent="brand" />
       {error && <Alert tone="danger" onDismiss={() => setError(null)}>{error}</Alert>}
       {message && <Alert tone="success" onDismiss={() => setMessage(null)}>{message}</Alert>}
 

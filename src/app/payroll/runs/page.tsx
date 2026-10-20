@@ -57,7 +57,7 @@ export default function PayrollRunsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Payroll" title="Payroll runs" description="Review payroll calculations, approvals and finalised runs." icon={ListChecks} accent="payroll" actions={can("payroll.prepare") ? <ButtonLink href="/payroll/periods" leadingIcon={<PlayCircle className="h-4 w-4" />}>Start from period</ButtonLink> : null} />
+      <PageHeader eyebrow="Payroll" title="Payroll runs" icon={ListChecks} accent="payroll" actions={can("payroll.prepare") ? <ButtonLink href="/payroll/periods" leadingIcon={<PlayCircle className="h-4 w-4" />}>Start from period</ButtonLink> : null} />
       <DataTable
         caption="Payroll runs"
         rows={runs}

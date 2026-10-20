@@ -90,7 +90,7 @@ export default function ProfileSettingsPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <PageHeader title="Personal preferences" description="How ErgonX looks and behaves for you. Other members are not affected."
+      <PageHeader title="Personal preferences"
         actions={<Button leadingIcon={<Save className="h-4 w-4" />} disabled={!dirty} loading={saving} loadingLabel="Saving…" onClick={() => void save()}>Save preferences</Button>} />
       {saveError && <ErrorState variant="inline" title="Preferences not saved" message={saveError} />}
       {saved && <p className="rounded-lg border border-success/25 bg-success-soft p-3 text-sm text-success-ink">Your preferences were saved.</p>}

@@ -92,7 +92,7 @@ export default function RoleSettingsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Roles & Permissions"
-        description="Create and maintain custom roles. Reserved system roles remain protected by the backend."
+       
         actions={<button onClick={openCreate} className={buttonClasses({ variant: "primary", size: "lg" })}><Plus className="h-5 w-5" aria-hidden="true" />Create custom role</button>}
       />
 

@@ -44,7 +44,7 @@ export default function SettingsPage() {
   const visibleAreas = settingsAreas.filter((area) => canUseSettingsArea(area, user?.permissions ?? [], institution?.enabledModules, user?.dataScope));
   return (
     <div className="mx-auto max-w-7xl space-y-6">
-      <PageHeader eyebrow="Administration" title="Settings" description="Only settings authorized by your active institution membership are shown." icon={SlidersHorizontal} accent="settings" />
+      <PageHeader eyebrow="Administration" title="Settings" icon={SlidersHorizontal} accent="settings" />
       {visibleAreas.length ? (
         <section aria-label="Settings areas" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {visibleAreas.map((area) => <ActionCard key={area.href} href={area.href} title={area.title} description={area.description} icon={area.icon} accent="settings" />)}

@@ -18,5 +18,5 @@ const areas = [
 ];
 
 export default function AttendanceHomePage() {
-  return <ModuleLanding title="Attendance" eyebrow="Time & attendance" description="Track attendance, approve corrections and manage schedules." module="ATTENDANCE" accent="attendance" icon={Clock3} areas={areas} />;
+  return <ModuleLanding title="Attendance" eyebrow="Time & attendance" module="ATTENDANCE" accent="attendance" icon={Clock3} areas={areas} />;
 }

@@ -54,7 +54,7 @@ export default function DepartmentOverviewPage() {
   if (data && data.departments.length === 0) {
     return (
       <div className="space-y-6">
-        <PageHeader eyebrow="My department / functional area" title="Department / Functional Area overview" description="Your team's attendance, leave and approvals." icon={Network} accent="hr" />
+        <PageHeader eyebrow="My department / functional area" title="Department / Functional Area overview" icon={Network} accent="hr" />
         <EmptyState icon={Network} accent="hr" title="You are not set as head of a department / functional area" description="HR assigns department / functional area heads on the Departments / Functional Areas page. Once you are assigned, your team appears here." />
       </div>
     );

@@ -238,7 +238,7 @@ export default function AttendanceRecordDetailPage() {
 
         <PageHeader
           title="Attendance Record"
-          description="Attendance detail and correction requests."
+         
         />
 
         <ErrorState

@@ -18,5 +18,5 @@ const areas = [
 ];
 
 export default function RecruitmentHomePage() {
-  return <ModuleLanding title="Recruitment" eyebrow="Talent acquisition" description="Manage job postings, candidates, and the hiring pipeline." module="RECRUITMENT" accent="recruitment" icon={UsersRound} areas={areas} />;
+  return <ModuleLanding title="Recruitment" eyebrow="Talent acquisition" module="RECRUITMENT" accent="recruitment" icon={UsersRound} areas={areas} />;
 }

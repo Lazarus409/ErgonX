@@ -51,7 +51,7 @@ export default function SalaryStructuresPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Payroll" title="Salary structures" description="Define reusable salary structures and associate approved pay components." icon={WalletCards} accent="payroll" actions={can("compensation.configure") ? <Button leadingIcon={<Plus className="h-4 w-4" />} onClick={openCreate}>Add structure</Button> : null} />
+      <PageHeader eyebrow="Payroll" title="Salary structures" icon={WalletCards} accent="payroll" actions={can("compensation.configure") ? <Button leadingIcon={<Plus className="h-4 w-4" />} onClick={openCreate}>Add structure</Button> : null} />
       <section className="grid gap-4 sm:grid-cols-3" aria-label="Structure summary">
         <MetricCard size="sm" label="Total structures" value={formatNumber(data?.[0].count ?? 0)} accent="payroll" loading={loading && !data} />
         <MetricCard size="sm" label="Active" value={formatNumber(structures.filter((item) => item.is_active).length)} accent="accounting" loading={loading && !data} />

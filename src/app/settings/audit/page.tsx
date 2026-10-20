@@ -110,7 +110,7 @@ export default function AuditSettingsPage() {
     <div className="mx-auto max-w-7xl space-y-6">
       <PageHeader
         title="Audit trail"
-        description="Immutable record of sign-ins, access changes and record changes in this institution. Sensitive values are redacted."
+       
         icon={ShieldCheck}
         accent="audit"
         meta={<Badge tone="neutral" icon={Lock}>Read-only</Badge>}

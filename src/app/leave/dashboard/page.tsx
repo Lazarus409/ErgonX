@@ -83,7 +83,7 @@ export default function LeaveDashboardPage() {
     <div className="space-y-6">
       <PageHeader
         title="Leave"
-        description="Manage leave, monitor absence and ensure policy compliance."
+       
         actions={
           <>
             <label className="relative">

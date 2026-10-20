@@ -85,7 +85,7 @@ export default function EmployeeImportPage() {
       <PageHeader
         back={<BackNavigation fallback="/hr/employees" label="Back to employees" />}
         title="Import employees"
-        description="Add many employees at once from a spreadsheet. Every row is checked before anything is created."
+       
         icon={Users}
         accent="hr"
       />

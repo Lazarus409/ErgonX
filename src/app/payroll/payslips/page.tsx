@@ -38,7 +38,7 @@ export default function PayrollPayslipsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Payroll" title="Payslips" description="View employee payslips generated from completed payroll runs." icon={FileText} accent="payroll" />
+      <PageHeader eyebrow="Payroll" title="Payslips" icon={FileText} accent="payroll" />
       <DataTable<Row>
         caption="Payslips"
         rows={filtered}

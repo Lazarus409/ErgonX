@@ -176,7 +176,7 @@ function ReportsDashboard() {
       <PageHeader
         eyebrow="Reports & Analytics"
         title="Report viewer"
-        description="Summaries of the areas your role can see. Download any report as CSV."
+       
         icon={BarChart3}
         accent="reports"
         actions={<Button disabled={!visibleReports.length} loading={downloading} loadingLabel="Preparing CSV…" onClick={() => void download()} leadingIcon={<Download className="h-4 w-4" />}>Download CSV</Button>}

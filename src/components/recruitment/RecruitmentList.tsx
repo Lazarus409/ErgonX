@@ -12,7 +12,6 @@ import type { PaginatedData } from "@/types/api";
 
 interface RecruitmentListProps<T extends { id: string; status: string }> {
   title: string;
-  description: string;
   createHref?: string;
   createLabel?: string;
   load: (search?: string) => Promise<PaginatedData<T>>;
@@ -21,7 +20,6 @@ interface RecruitmentListProps<T extends { id: string; status: string }> {
 
 export default function RecruitmentList<T extends { id: string; status: string }>({
   title,
-  description,
   createHref,
   createLabel,
   load,
@@ -51,7 +49,6 @@ export default function RecruitmentList<T extends { id: string; status: string }
       <PageHeader
         eyebrow="Recruitment"
         title={title}
-        description={description}
         icon={UsersRound}
         accent="recruitment"
         actions={createHref && createLabel ? <ButtonLink href={createHref} leadingIcon={<Plus className="h-4 w-4" />}>{createLabel}</ButtonLink> : undefined}

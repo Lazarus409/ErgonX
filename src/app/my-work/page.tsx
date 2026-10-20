@@ -120,7 +120,7 @@ export default function MyWorkPage() {
       <PageHeader
         eyebrow="Workspace"
         title="My work"
-        description="Everything waiting on you, in one place. Overdue items come first; open any item to deal with it."
+       
         icon={ListTodo}
         accent="brand"
         actions={<Button variant="ghost" leadingIcon={<HelpCircle className="h-4 w-4" />} onClick={() => setShowHelp(!showHelp)} aria-pressed={showHelp}>{showHelp ? "Hide tips" : "Show tips"}</Button>}

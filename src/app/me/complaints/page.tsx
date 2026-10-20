@@ -79,7 +79,7 @@ export default function MyComplaintsPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <PageHeader title="My complaints" description="Raise a concern about something at work and follow it with HR." icon={MessageSquareWarning} accent="hr" actions={<Button leadingIcon={<Plus className="h-4 w-4" />} onClick={start}>File a complaint</Button>} />
+      <PageHeader title="My complaints" icon={MessageSquareWarning} accent="hr" actions={<Button leadingIcon={<Plus className="h-4 w-4" />} onClick={start}>File a complaint</Button>} />
       <Alert tone="info" title="Confidential">Only HR staff who handle complaints see what you file. The person it is about and your manager do not.</Alert>
 
       <DataTable<ComplaintSummary>

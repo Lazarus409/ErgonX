@@ -52,7 +52,7 @@ export default function IntegrationsPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <PageHeader eyebrow="Settings" title="Integrations" description="Connect payroll banks, attendance devices, BI tools and other systems. Keys and webhook secrets are shown once; every change is audited." icon={Plug} accent="settings" />
+      <PageHeader eyebrow="Settings" title="Integrations" icon={Plug} accent="settings" />
       {(error || actionError) && <Alert tone="danger" onDismiss={actionError ? () => setActionError("") : undefined}>{error || actionError}</Alert>}
       <Tabs label="Integrations" value={view} onChange={(value) => setView(value as View)} items={[{ value: "keys", label: "API keys" }, { value: "webhooks", label: "Webhooks" }, { value: "guide", label: "Developer guide" }]} />
 

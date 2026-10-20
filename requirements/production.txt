@@ -1,3 +1,4 @@
 -r base.txt
 gunicorn>=23.0,<24.0
 django-storages[s3]>=1.14,<2.0
+sentry-sdk[django]>=2.0,<3.0

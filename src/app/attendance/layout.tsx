@@ -3,5 +3,5 @@ import AppShell from "@/components/layout/AppShell";
 import { INSTITUTION_WIDE, moduleWorkspacePermissions } from "@/components/navigation/navigation";
 
 export default function AttendanceLayout({ children }: { children: React.ReactNode }) {
-  return <AppShell><ModuleAccessGate module="ATTENDANCE" anyPermissions={moduleWorkspacePermissions.ATTENDANCE} scopes={INSTITUTION_WIDE}>{children}</ModuleAccessGate></AppShell>;
+  return <AppShell><ModuleAccessGate selfService={{ href: "/me/attendance", permission: "attendance.clock" }} module="ATTENDANCE" anyPermissions={moduleWorkspacePermissions.ATTENDANCE} scopes={INSTITUTION_WIDE}>{children}</ModuleAccessGate></AppShell>;
 }

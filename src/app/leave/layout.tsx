@@ -10,5 +10,5 @@ export default function LeaveLayout({
 }: {
   children: ReactNode;
 }) {
-  return <AppShell><ModuleAccessGate module="LEAVE" anyPermissions={moduleWorkspacePermissions.LEAVE} scopes={INSTITUTION_WIDE}>{children}</ModuleAccessGate></AppShell>;
+  return <AppShell><ModuleAccessGate selfService={{ href: "/me/leave", permission: "leave.request" }} module="LEAVE" anyPermissions={moduleWorkspacePermissions.LEAVE} scopes={INSTITUTION_WIDE}>{children}</ModuleAccessGate></AppShell>;
 }

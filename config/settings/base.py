@@ -172,7 +172,21 @@ REST_FRAMEWORK = {
         "rest_framework.filters.SearchFilter",
         "rest_framework.filters.OrderingFilter",
     ),
+    "DEFAULT_THROTTLE_CLASSES": (
+        "common.throttling.ApiUserThrottle",
+        "common.throttling.ApiAnonThrottle",
+    ),
 }
+
+CACHES = {
+    "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
+    # Per-worker API rate-limit counters (common.throttling); never the database.
+    "throttle": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "ergonx-throttle"},
+}
+
+# Default API limits (common.throttling); views with their own throttles keep them.
+API_USER_RATE = os.environ.get("API_USER_RATE", "600/min")
+API_ANON_RATE = os.environ.get("API_ANON_RATE", "120/min")
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(

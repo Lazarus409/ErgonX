@@ -46,7 +46,8 @@ CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.db.DatabaseCache",
         "LOCATION": "ergonx_cache",
-    }
+    },
+    "throttle": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "ergonx-throttle"},
 }
 
 # Logs go to stdout for the platform log stream; failed requests keep their traceback.

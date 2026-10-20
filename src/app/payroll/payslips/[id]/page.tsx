@@ -5,6 +5,7 @@ import { useCallback, useState } from "react";
 import { Download, FileText, Lock, Printer } from "lucide-react";
 
 import DocumentFrame from "@/components/brand/DocumentFrame";
+import HelpTip from "@/components/help/HelpTip";
 import { useAuth } from "@/components/guards/AuthProvider";
 import BackNavigation from "@/components/ui/BackNavigation";
 import { Button } from "@/components/ui/Button";
@@ -68,11 +69,11 @@ export default function PayslipDetailPage() {
           <Detail label="Payroll period" value={`${formatDate(period.start_date)} – ${formatDate(period.end_date)}`} />
         </div>
         <div className="grid gap-8 px-6 py-6 md:grid-cols-2 sm:px-8">
-          <ItemGroup title="Earnings" items={earnings} currency={currency} totalLabel="Gross pay" total={payslip.payload.gross_pay} />
-          <ItemGroup title="Deductions" items={deductions} currency={currency} totalLabel="Total deductions" total={payrollApi.payslipWithheld(payslip.payload)} />
+          <ItemGroup title="Earnings" items={earnings} currency={currency} totalLabel={<>Gross pay<HelpTip term="gross_pay" /></>} total={payslip.payload.gross_pay} />
+          <ItemGroup title="Deductions" items={deductions} currency={currency} totalLabel={<>Total deductions<HelpTip term="deductions" /></>} total={payrollApi.payslipWithheld(payslip.payload)} />
         </div>
         <div className="mx-6 mb-6 flex items-center justify-between rounded-xl bg-brand-navy px-5 py-4 text-white sm:mx-8 print:border print:border-black print:bg-transparent print:text-black">
-          <span className="font-semibold">Net pay</span>
+          <span className="font-semibold">Net pay<span className="print:hidden"><HelpTip term="net_pay" /></span></span>
           <span className="text-kpi-sm font-bold tabular-nums">{formatAmount(payslip.payload.net_pay, currency)}</span>
         </div>
       </DocumentFrame>
@@ -84,7 +85,7 @@ function Detail({ label, value, subvalue }: { label: string; value: string; subv
   return <div><p className="text-caption font-medium text-ink-muted">{label}</p><p className="mt-1 font-semibold text-ink-strong">{value}</p>{subvalue && <p className="text-support text-ink-muted">{subvalue}</p>}</div>;
 }
 
-function ItemGroup({ title, items, currency, totalLabel, total }: { title: string; items: PayslipItem[]; currency: string; totalLabel: string; total: string }) {
+function ItemGroup({ title, items, currency, totalLabel, total }: { title: string; items: PayslipItem[]; currency: string; totalLabel: React.ReactNode; total: string }) {
   return (
     <div>
       <h3 className="mb-3 text-card-title font-bold text-ink-strong">{title}</h3>

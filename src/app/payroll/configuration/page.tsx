@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Calculator, CheckCircle2, Landmark, Percent, Plus, Save, Settings2, Trash2 } from "lucide-react";
 
+import HelpTip from "@/components/help/HelpTip";
 import Alert from "@/components/ui/Alert";
 import BackNavigation from "@/components/ui/BackNavigation";
 import { Button } from "@/components/ui/Button";
@@ -185,7 +186,7 @@ export default function PayrollConfigurationPage() {
               <Input type="number" min={1} max={31} value={payDayOfMonth} disabled={disabled} onChange={(event) => touch(setPayDayOfMonth)(event.target.value)} />
             </Field>
           ) : <div className="hidden md:block" />}
-          <Field label="Partial-period pay" helper="Applies to mid-period hires and to salary changes that start inside a period.">
+          <Field label={<>Partial-period pay<HelpTip term="proration" /></>} helper="Applies to mid-period hires and to salary changes that start inside a period.">
             <Select value={proration} disabled={disabled} onChange={(event) => touch(setProration)(event.target.value as ProrationMethod)}>
               <option value="CALENDAR_DAYS">By calendar days (e.g. 15 of 30 days)</option>
               <option value="WORKING_DAYS">By working days, Monday to Friday (e.g. 8 of 22 days)</option>

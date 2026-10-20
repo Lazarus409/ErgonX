@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import { Edit3, Landmark, Plus, Smartphone } from "lucide-react";
 
+import HelpTip from "@/components/help/HelpTip";
 import Alert from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
 import { Button, IconButton } from "@/components/ui/Button";
@@ -110,7 +111,7 @@ export default function EmployeePayrollProfilesPage() {
             <Select value={form.tax_residency} onChange={(event) => set("tax_residency", event.target.value)}><option value="RESIDENT">Resident</option><option value="NON_RESIDENT">Non-resident</option></Select>
           </Field>
           <Field label="Tax identification number (TIN)"><Input value={form.tax_identification_number} onChange={(event) => set("tax_identification_number", event.target.value)} /></Field>
-          <Field label="SSNIT number"><Input value={form.social_security_number} onChange={(event) => set("social_security_number", event.target.value)} /></Field>
+          <Field label={<>SSNIT number<HelpTip term="ssnit" /></>}><Input value={form.social_security_number} onChange={(event) => set("social_security_number", event.target.value)} /></Field>
           <Field label="Pay by">
             <Select value={form.payment_method} onChange={(event) => set("payment_method", event.target.value as PaymentMethod)}>
               {(Object.keys(METHOD_LABELS) as PaymentMethod[]).map((method) => <option key={method} value={method}>{METHOD_LABELS[method]}</option>)}

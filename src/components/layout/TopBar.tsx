@@ -14,6 +14,7 @@ import {
   Moon,
   Search,
   ShieldCheck,
+  LifeBuoy,
   SlidersHorizontal,
   Sun,
   UserRound,
@@ -47,6 +48,7 @@ const settingsPageLabels: Array<[string, string]> = [
   ["/settings/audit", "Audit Log"],
   ["/settings/security", "Security"],
   ["/settings/profile", "Personal Preferences"],
+  ["/help", "Help"],
 ];
 
 /** Resolves the most specific navigation label for the current route. */
@@ -420,6 +422,7 @@ export default function TopBar({ onOpenSidebar }: TopBarProps) {
                 <ProfileItem icon={UserRound} label="My Profile" onClick={() => navigateFromProfile("/me/profile")} />
                 <ProfileItem icon={SlidersHorizontal} label="Personal Preferences" onClick={() => navigateFromProfile("/settings/profile")} />
                 <ProfileItem icon={ShieldCheck} label="Security" onClick={() => navigateFromProfile("/settings/security")} />
+                <ProfileItem icon={LifeBuoy} label="Help" onClick={() => navigateFromProfile("/help")} />
               </div>
 
               <div className="border-t border-line-soft px-4 py-3">

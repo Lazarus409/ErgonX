@@ -88,7 +88,7 @@ export default function CustomerInvoiceDetailPage() {
     <div className="space-y-5">
       <nav aria-label="Breadcrumb" className="text-sm text-ink-muted print:hidden"><Link href="/accounting/dashboard" className="hover:underline">Accounting</Link><ChevronRight className="mx-1 inline h-4 w-4" aria-hidden="true" /><Link href="/accounting/receivables" className="hover:underline">Accounts Receivable</Link><ChevronRight className="mx-1 inline h-4 w-4" aria-hidden="true" /><span className="font-medium text-ink-strong">Invoice {invoice.invoice_number}</span></nav>
       <header className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between print:hidden">
-        <div><h1 className="text-[1.75rem] font-bold leading-9 tracking-tight text-headline sm:text-title">Customer Invoice Detail</h1><p className="mt-1.5 text-[1.0625rem] text-heading-support">View customer invoice, payment status, and related activities.</p></div>
+        <div><h1 className="text-[1.75rem] font-bold leading-9 tracking-tight text-headline sm:text-title">Customer Invoice Detail</h1></div>
         <div className="flex flex-wrap gap-2">
           <Link href="/accounting/receivables" className="inline-flex h-12 items-center gap-2 rounded-lg border border-primary px-4 font-semibold text-primary-ink hover:bg-primary-soft/50"><ChevronLeft className="h-5 w-5" aria-hidden="true" />Back to Customer Invoices</Link>
           <Menu label="Actions" trigger={(props) => <Button {...props} variant="secondary" size="lg" trailingIcon={<ChevronDown className="h-4 w-4" />}>Actions</Button>}>

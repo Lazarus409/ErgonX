@@ -384,9 +384,6 @@ export default function LeaveRequestsPage() {
               Employee Leave Requests
             </h2>
 
-            <p className="mt-1 text-xs text-ink-muted">
-              Review submitted requests and take authorised workflow actions.
-            </p>
           </div>
 
           {error ? (

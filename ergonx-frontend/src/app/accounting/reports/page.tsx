@@ -66,7 +66,7 @@ export default function FinancialReportsPage() {
   return (
     <div className="space-y-5">
       <header className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div><h1 className="text-[1.75rem] font-bold leading-9 tracking-tight text-headline sm:text-title">Financial Reports</h1><p className="mt-1.5 text-[1.0625rem] text-heading-support">Create, run and manage financial reports for informed decision making.</p></div>
+        <div><h1 className="text-[1.75rem] font-bold leading-9 tracking-tight text-headline sm:text-title">Financial Reports</h1></div>
         {canManage && <Button size="lg" leadingIcon={<Plus className="h-5 w-5" />} onClick={() => setDialog("create")}>Create report</Button>}
       </header>
       {(problem || error) && <ErrorState variant="inline" title="Something went wrong" message={problem ?? error ?? ""} onRetry={error ? reload : undefined} />}

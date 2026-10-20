@@ -187,9 +187,6 @@ export default function ShiftDetailPage() {
             <h2 className="text-base font-bold text-headline">
               Work Schedules
             </h2>
-            <p className="mt-1 text-xs text-ink-muted">
-              Schedules that use this shift as their fixed shift.
-            </p>
           </div>
 
           {schedules.length === 0 ? (
@@ -232,9 +229,6 @@ export default function ShiftDetailPage() {
           <h2 className="text-base font-bold text-headline">
             Assigned Employees
           </h2>
-          <p className="mt-1 text-xs text-ink-muted">
-            Employees whose current schedule assignment resolves to this shift.
-          </p>
         </div>
 
         {assignments.length === 0 ? (
@@ -320,12 +314,6 @@ export default function ShiftDetailPage() {
               Schedule-aware attendance
             </p>
 
-            <p className="mt-1 text-sm leading-6 text-ink-muted">
-              Clock events resolve the employee&apos;s effective schedule and
-              are classified against this shift&apos;s start time and grace
-              period. Lateness, early departure and overtime are all derived by
-              the backend.
-            </p>
           </div>
         </div>
       </section>

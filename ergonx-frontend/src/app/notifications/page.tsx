@@ -274,7 +274,6 @@ function NotificationDetail({ item, busy, onClose, onOpen, onMarkRead, onArchive
         {item.read_at && <div className="flex justify-between gap-3"><dt className="text-ink-muted">Read</dt><dd className="text-ink-strong">{formatDateTime(item.read_at)}</dd></div>}
       </dl>
       {item.route_hint && <QuickDecision route={item.route_hint} />}
-      <p className="mt-3 text-caption text-ink-muted">Opening the related record checks your access again; you see only what your role allows.</p>
       <div className="mt-4 grid gap-2">
         {item.route_hint && <Button onClick={onOpen} leadingIcon={<ArrowRight className="h-4 w-4" />}>Open related record</Button>}
         {!item.is_read && <Button variant="secondary" disabled={busy} onClick={onMarkRead} leadingIcon={<CheckCheck className="h-4 w-4" />}>Mark as read</Button>}

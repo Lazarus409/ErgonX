@@ -106,7 +106,6 @@ export default function JournalDetailPage() {
       <header className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
           <h1 className="text-[1.75rem] font-bold leading-9 tracking-tight text-headline sm:text-title">Journal Entry Detail</h1>
-          <p className="mt-1.5 text-[1.0625rem] text-heading-support">View journal entry details, related information and approval status.</p>
         </div>
         <div className="flex flex-wrap gap-2 print:hidden">
           <Link href="/accounting/journals" className="inline-flex h-12 items-center gap-2 rounded-lg border border-primary px-4 font-semibold text-primary-ink hover:bg-primary-soft/50"><ChevronLeft className="h-5 w-5" aria-hidden="true" />Back to General Ledger</Link>

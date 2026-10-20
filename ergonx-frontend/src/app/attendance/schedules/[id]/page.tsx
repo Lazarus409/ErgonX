@@ -224,10 +224,6 @@ export default function ScheduleDetailPage() {
           <h2 className="text-base font-bold text-headline">
             Assignment History
           </h2>
-          <p className="mt-1 text-xs text-ink-muted">
-            Effective-dated assignments for this schedule. Replacing a current
-            assignment preserves the previous record.
-          </p>
         </div>
 
         {assignments.length === 0 ? (

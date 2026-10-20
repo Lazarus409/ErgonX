@@ -143,7 +143,6 @@ export default function ApplicationWizard({ initialJob }: { initialJob?: string 
         <Link href="/recruitment/candidates" className="inline-flex items-center gap-2 text-sm font-semibold text-primary-ink hover:underline"><ArrowLeft className="h-4 w-4" aria-hidden="true" />Back to candidates</Link>
         <div>
           <h1 className="text-[1.75rem] font-bold leading-9 tracking-tight text-headline sm:text-title">{job ? "Apply for this role" : "Add candidate"}</h1>
-          <p className="mt-1.5 max-w-3xl text-[1.0625rem] text-heading-support">Complete the sections below to submit the application. Progress is saved after each step, so you can come back at any time.</p>
         </div>
 
         <ol className="grid grid-cols-4" aria-label="Application progress">

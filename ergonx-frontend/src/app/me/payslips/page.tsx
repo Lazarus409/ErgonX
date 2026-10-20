@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, CircleDollarSign, Download, FileText, Search, ShieldCheck } from "lucide-react";
+import { ArrowRight, CircleDollarSign, Download, FileText, Search } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/Badge";
@@ -111,10 +111,6 @@ export default function MyPayslipsPage() {
                 {downloadError && <p role="alert" className="mt-2 text-caption text-danger-ink">Could not download the PDF: {downloadError}</p>}
               </>
             ) : <p className="mt-2 text-support text-ink-muted">Select a payslip to see its breakdown.</p>}
-          </section>
-          <section className="flex gap-3 rounded-xl border border-line bg-surface p-5 shadow-elevation-1">
-            <ShieldCheck className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
-            <div><h2 className="text-sm font-semibold text-ink-strong">Your information is private</h2><p className="mt-1 text-caption text-ink-muted">Only you, and payroll staff with access to your record, can see your payslips.</p></div>
           </section>
         </aside>
       </div>

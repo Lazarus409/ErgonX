@@ -13,9 +13,7 @@ import {
   ChevronDown,
   ClipboardList,
   Clock3,
-  EyeOff,
   FileText,
-  Lock,
   Play,
   Printer,
   RefreshCw,
@@ -417,9 +415,6 @@ export default function PayrollRunDetailPage() {
             ) : run.approved_at ? (
               <div className="rounded-xl bg-success-soft px-3 py-3 text-support text-success-ink">Approved by {run.approved_by_name ?? EM_DASH} on {formatDate(run.approved_at)}.</div>
             ) : <EmptyRail icon={Users} title="No pending approvals" text="There are no payroll approvals required at this time." />}
-          </RailCard>
-          <RailCard icon={Lock} title="Restricted information">
-            <div className="flex items-start gap-3 rounded-xl bg-surface-muted/60 px-3 py-3"><EyeOff className="mt-0.5 h-5 w-5 shrink-0 text-ink-muted" aria-hidden="true" /><div className="text-support"><p className="font-semibold text-ink-strong">Access is permission-controlled</p><p className="text-ink-muted">Employees see only their own payslips. Every change here is recorded in the audit trail.</p></div></div>
           </RailCard>
         </aside>
       </div>

@@ -113,7 +113,6 @@ export default function GeneralLedgerPage() {
       <header className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
           <h1 className="text-[1.75rem] font-bold leading-9 tracking-tight text-headline sm:text-title">General Ledger</h1>
-          <p className="mt-1.5 text-[1.0625rem] text-heading-support">View and manage journal entries across your chart of accounts.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <label className="relative">
@@ -257,7 +256,6 @@ function AccountDetails({ account, activity, parentName }: { account: Account | 
         <div className="flex flex-col items-center py-12 text-center">
           <span className="flex h-24 w-24 items-center justify-center rounded-full bg-surface-muted text-ink-subtle"><BarChart3 className="h-10 w-10" aria-hidden="true" /></span>
           <p className="mt-3 text-heading font-bold text-headline">No account selected</p>
-          <p className="mt-1 text-support text-ink-muted">Choose an account from the chart of accounts to view the account summary, recent activity and related insights.</p>
         </div>
       ) : (
         <div className="mt-4 space-y-4">

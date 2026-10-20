@@ -438,7 +438,6 @@ export default function EmployeesPage() {
           <div className="space-y-2">
             <p className="text-support text-ink-muted">Showing <span className="font-semibold text-ink-strong tabular-nums">{employees.length}</span> of <span className="font-semibold text-ink-strong tabular-nums">{data.count}</span> employees</p>
             <Pagination page={page} pageSize={pageSize} total={data.count} onPageChange={(next) => setPage(Math.min(Math.max(1, next), totalPages))} />
-            {employments?.truncated && <p className="text-caption text-ink-muted">Assignment columns are resolved for the most recent employment records only.</p>}
           </div>
         }
         columns={[

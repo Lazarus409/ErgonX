@@ -475,9 +475,6 @@ export default function AttendanceShiftsPage() {
                 <h2 className="text-lg font-bold text-headline">
                   {editingShift ? "Edit Shift" : "Add Shift"}
                 </h2>
-                <p className="mt-1 text-sm text-ink-muted">
-                  Scheduled hours are derived by the backend from these values.
-                </p>
               </div>
 
               <button

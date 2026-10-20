@@ -57,9 +57,6 @@ export default function PayrollAccountingPosting() {
           <h2 className="text-card-title font-bold text-headline">
             Payroll → Accounting
           </h2>
-          <p className="mt-1 text-sm text-ink-muted">
-            Review the accounting journal generated from this payroll run.
-          </p>
         </div>
 
         <span className="rounded-full bg-surface-sunken px-3 py-1.5 text-xs font-semibold">

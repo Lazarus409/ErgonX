@@ -313,7 +313,6 @@ export default function AttendanceDashboardPage() {
           toolbar={
             <div>
               <h2 className="text-card-title font-bold text-headline">Repeated lateness</h2>
-              <p className="text-support text-ink-muted">Employees with repeated late arrivals in the last 90 days.</p>
             </div>
           }
           empty={{ title: "No repeated lateness", description: "No repeated late arrivals have been recorded in the selected period.", icon: Clock3 }}

@@ -209,7 +209,7 @@ export default function RequisitionDetailPage() {
 
             <div className="mt-6 flex items-start gap-3">
               <FileText className="mt-0.5 h-6 w-6 text-section-icon" aria-hidden="true" />
-              <div><h3 className="text-heading font-bold text-headline">Role description</h3><p className="text-support text-heading-support">A summary of the role, its purpose and what the successful candidate will be expected to do.</p></div>
+              <div><h3 className="text-heading font-bold text-headline">Role description</h3></div>
             </div>
             <div className="mt-3 space-y-3 rounded-xl bg-surface-muted p-4 text-sm text-ink">
               {posting.description ? <p className="whitespace-pre-wrap">{posting.description}</p> : !responsibilities.length && <p className="text-ink-muted">No role description has been written yet.</p>}
@@ -220,7 +220,7 @@ export default function RequisitionDetailPage() {
 
             <div className="mt-6 flex items-start gap-3">
               <ListChecks className="mt-0.5 h-6 w-6 text-section-icon" aria-hidden="true" />
-              <div><h3 className="text-heading font-bold text-headline">Key requirements</h3><p className="text-support text-heading-support">Essential and desirable criteria for this role.</p></div>
+              <div><h3 className="text-heading font-bold text-headline">Key requirements</h3></div>
             </div>
             <div className="mt-3 grid rounded-xl border border-line-soft sm:grid-cols-2 sm:divide-x sm:divide-line-soft">
               {([["Essential", essential], ["Desirable", desirable]] as const).map(([heading, items]) => (

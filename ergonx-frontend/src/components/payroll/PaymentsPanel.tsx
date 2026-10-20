@@ -44,7 +44,6 @@ export default function PaymentsPanel({ runId, canDownload, canEditProfiles }: {
     <section className="space-y-4 rounded-2xl border border-line bg-surface p-5 shadow-elevation-1" aria-labelledby="payments-heading">
       <div>
         <h2 id="payments-heading" className="flex items-center gap-2 text-card-title font-semibold text-ink-strong"><Banknote className="h-5 w-5 text-mod-payroll" aria-hidden="true" />Payments</h2>
-        <p className="mt-1 text-support text-ink-muted">Net pay by payment method. Files come from the finalized figures, never from current salaries.</p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">

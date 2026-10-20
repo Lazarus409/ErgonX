@@ -14,7 +14,6 @@ import {
   Download,
   FileText,
   Info,
-  Lock,
   Play,
   Search,
   Settings,
@@ -150,7 +149,6 @@ export default function PayrollWorkspace() {
       <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-[1.75rem] font-bold leading-9 tracking-tight text-headline sm:text-title">Payroll workspace</h1>
-          <p className="mt-1.5 text-[1.0625rem] text-heading-support">Run, review and manage payroll with confidence.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
           <label className="relative flex h-14 min-w-[18rem] items-center gap-3 rounded-lg border border-line-strong bg-surface pl-4 pr-10">
@@ -176,7 +174,7 @@ export default function PayrollWorkspace() {
             <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
               <div className="flex items-start gap-3">
                 <FileText className="mt-0.5 h-7 w-7 text-section-icon" aria-hidden="true" />
-                <div><h2 className="text-heading font-bold text-headline">Current payroll run</h2><p className="text-support text-heading-support">Track the progress and status of the active payroll run.</p></div>
+                <div><h2 className="text-heading font-bold text-headline">Current payroll run</h2></div>
               </div>
               <div className="flex items-center gap-2">
                 {run && <Link href={`/payroll/runs/${run.id}`} className="text-support font-semibold text-primary-ink hover:underline">{run.reference ?? `Run #${run.run_number}`}</Link>}
@@ -208,7 +206,7 @@ export default function PayrollWorkspace() {
             <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div className="flex items-start gap-3">
                 <Users className="mt-0.5 h-7 w-7 text-section-icon" aria-hidden="true" />
-                <div><h2 className="text-heading font-bold text-headline">Payroll employee breakdown</h2><p className="text-support text-heading-support">Review employee payroll details for the selected period.</p></div>
+                <div><h2 className="text-heading font-bold text-headline">Payroll employee breakdown</h2></div>
               </div>
               <div className="flex flex-wrap gap-2">
                 <label className="relative block">
@@ -242,10 +240,6 @@ export default function PayrollWorkspace() {
                 </table>
               </div>
             )}
-            <div className="mx-auto mt-5 flex max-w-xl items-start gap-3 rounded-xl border border-primary/15 bg-primary-soft/50 px-4 py-3">
-              <Lock className="mt-0.5 h-6 w-6 shrink-0 text-section-icon" aria-hidden="true" />
-              <div><p className="font-bold text-headline">Restricted information</p><p className="text-support text-heading-support">Payroll information is only visible to authorized HR and Finance users.</p></div>
-            </div>
           </section>
         </div>
 

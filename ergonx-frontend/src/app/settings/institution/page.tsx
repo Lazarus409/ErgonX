@@ -104,7 +104,6 @@ export default function InstitutionSettingsPage() {
           <Field label="Time zone" editing={editing} wide><input disabled={!editing} list="timezones" value={values.timezone} onChange={(event) => update("timezone", event.target.value)} /><datalist id="timezones">{data.catalogues.timezones.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</datalist></Field>
           <Field label="Executive title" editing={editing}><input disabled={!editing} value={values.executive_title} onChange={(event) => update("executive_title", event.target.value)} placeholder="Executive" /></Field>
         </div>
-        <p className="mt-3 text-caption text-ink-muted">The time zone is used for dates, times and reports across the institution. Country, currency and time zone are independent choices.</p>
         {suggestion && suggestion !== values.default_currency && <p className="mt-3 rounded-lg border border-primary/25 bg-primary-soft px-3 py-2 text-sm text-primary-ink">Suggested currency for {values.country_code}: <strong>{suggestion}</strong>. <button type="button" onClick={() => update("default_currency", suggestion)} className="font-semibold underline">Use suggestion</button></p>}
       </section>
 

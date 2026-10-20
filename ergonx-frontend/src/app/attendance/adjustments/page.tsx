@@ -499,11 +499,6 @@ export default function AttendanceAdjustmentsPage() {
               Historical attendance integrity
             </p>
 
-            <p className="mt-1 text-sm leading-6 text-ink-muted">
-              An approved adjustment represents a controlled correction to an
-              attendance record. The original values are retained on the
-              adjustment so the change stays auditable.
-            </p>
           </div>
         </div>
       </section>

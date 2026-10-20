@@ -326,9 +326,6 @@ export default function CreateEmployeePage() {
             <h2 className="text-base font-bold text-headline">
               Personal Details
             </h2>
-            <p className="mt-1 text-sm text-ink-muted">
-              Enter the employee&apos;s basic personal information.
-            </p>
           </div>
 
           <div className="grid grid-cols-1 gap-5 p-6 md:grid-cols-2 lg:grid-cols-3">
@@ -370,9 +367,6 @@ export default function CreateEmployeePage() {
             <h2 className="text-base font-bold text-headline">
               Contact Details
             </h2>
-            <p className="mt-1 text-sm text-ink-muted">
-              Provide the employee&apos;s primary contact information.
-            </p>
           </div>
 
           <div className="grid grid-cols-1 gap-5 p-6 md:grid-cols-2">
@@ -400,10 +394,6 @@ export default function CreateEmployeePage() {
             <h2 className="text-base font-bold text-headline">
               Employee Details
             </h2>
-            <p className="mt-1 text-sm text-ink-muted">
-              Assign the employee to the organisation and record their
-              employment details.
-            </p>
           </div>
 
           <div className="grid grid-cols-1 gap-5 p-6 md:grid-cols-2 lg:grid-cols-3">
@@ -480,10 +470,6 @@ export default function CreateEmployeePage() {
             <h2 className="text-base font-bold text-headline">
               Account Invitation
             </h2>
-            <p className="mt-1 text-sm text-ink-muted">
-              An employee does not need a user account to exist in ErgonX.
-              You can optionally invite them to use employee self-service.
-            </p>
           </div>
 
           <div className="p-6">

@@ -117,6 +117,7 @@ def configure_payroll(
     pay_day_rule=None,
     rounding_rule=None,
     custom_rules=None,
+    proration_method=InstitutionPayrollConfiguration.ProrationMethod.CALENDAR_DAYS,
     is_configured=True,
 ):
     _membership_with_permission(actor, institution, "payroll.configure")
@@ -176,6 +177,7 @@ def configure_payroll(
         if payroll_setup_mode == InstitutionPayrollConfiguration.SetupMode.CUSTOM
         else {}
     )
+    configuration.proration_method = proration_method
     configuration.is_configured = is_configured
     configuration.configured_by = actor
     configuration.configured_at = timezone.now()
@@ -372,6 +374,8 @@ def _configuration_snapshot(configuration):
     # Only present when set, so runs snapshotted before custom rules existed still match.
     if configuration.custom_rules:
         snapshot["custom_rules"] = configuration.custom_rules
+    if configuration.proration_method != InstitutionPayrollConfiguration.ProrationMethod.CALENDAR_DAYS:
+        snapshot["proration_method"] = configuration.proration_method
     return snapshot
 
 

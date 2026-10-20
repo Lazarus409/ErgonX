@@ -6,13 +6,14 @@ from django.db.models import Q
 
 from apps.attendance.models import OvertimeRecord
 from apps.compensation.models import EmployeeCompensation, PayComponent
-from apps.compensation.services import compensation_for, resolve_compensation
+from apps.compensation.services import resolve_compensation
 from apps.employees.models import Employment
 from apps.leave.models import LeaveRequest
 from apps.payroll.custom_rules import progressive_tax
 from apps.payroll.localizations import calculate_localized_statutory
 from apps.payroll.models import (
     ContributionRule,
+    InstitutionPayrollConfiguration,
     PayrollAdjustment,
     PayrollItem,
     PayrollRecord,
@@ -38,15 +39,6 @@ def _dates(start_date, end_date):
         current += timedelta(days=1)
 
 
-def _employment_on(employee, on_date):
-    return (
-        Employment.objects.filter(employee=employee, start_date__lte=on_date)
-        .filter(Q(end_date__isnull=True) | Q(end_date__gte=on_date))
-        .order_by("-is_current", "-start_date")
-        .first()
-    )
-
-
 def _schedule_totals(employee, period):
     working_dates = []
     required_minutes = 0
@@ -60,6 +52,71 @@ def _schedule_totals(employee, period):
         working_dates.append(work_date)
         required_minutes += expectation["required_minutes"]
     return working_dates, required_minutes
+
+
+def _pay_segments(employee, period, configuration):
+    """Split the period into stretches paid at one compensation, with each stretch's share of full pay.
+
+    Days outside any employment are unpaid (a mid-period hire); days inside employment
+    with no compensation fail closed. A stretch's share is its counted days over the
+    period's counted days: every day for CALENDAR_DAYS, Monday to Friday for WORKING_DAYS.
+    """
+    working_days_only = (
+        configuration.proration_method
+        == InstitutionPayrollConfiguration.ProrationMethod.WORKING_DAYS
+    )
+
+    def counted(day):
+        return not working_days_only or day.weekday() < 5
+
+    period_days = sum(1 for day in _dates(period.start_date, period.end_date) if counted(day))
+    if not period_days:
+        raise ValidationError({"payroll_period": "The payroll period has no working days to pay."})
+    employments = list(
+        Employment.objects.filter(employee=employee, start_date__lte=period.end_date).filter(
+            Q(end_date__isnull=True) | Q(end_date__gte=period.start_date)
+        )
+    )
+    compensations = list(
+        EmployeeCompensation.objects.filter(employee=employee, effective_from__lte=period.end_date)
+        .filter(Q(effective_to__isnull=True) | Q(effective_to__gte=period.start_date))
+        .select_related("employee", "salary_structure")
+        .order_by("-effective_from")
+    )
+    segments = []
+    for day in _dates(period.start_date, period.end_date):
+        if not any(
+            row.start_date <= day and (row.end_date is None or row.end_date >= day)
+            for row in employments
+        ):
+            continue
+        compensation = next(
+            (
+                row
+                for row in compensations
+                if row.effective_from <= day and (row.effective_to is None or row.effective_to >= day)
+            ),
+            None,
+        )
+        if compensation is None:
+            raise ValidationError(
+                {
+                    "employee": (
+                        f"{employee.employee_number} is employed on {day.isoformat()} "
+                        "but has no compensation for that day."
+                    )
+                }
+            )
+        if segments and segments[-1]["compensation"].id == compensation.id:
+            segments[-1]["end"] = day
+            segments[-1]["days"] += int(counted(day))
+        else:
+            segments.append(
+                {"compensation": compensation, "start": day, "end": day, "days": int(counted(day))}
+            )
+    for segment in segments:
+        segment["factor"] = Decimal(segment["days"]) / Decimal(period_days)
+    return [segment for segment in segments if segment["days"]], period_days
 
 
 def _basis_value(basis, *, basic_pay, gross_pay, taxable_income):
@@ -333,40 +390,31 @@ def _apply_statutory_rules(
 
 def calculate_employee_record(payroll_run, employee, configuration):
     period = payroll_run.payroll_period
-    compensation = compensation_for(employee, period.end_date)
-    if compensation is None:
+    segments, period_days = _pay_segments(employee, period, configuration)
+    if not segments:
         raise ValidationError(
-            {"employee": f"{employee.employee_number} has no compensation for the period end."}
+            {"employee": f"{employee.employee_number} has no paid days in this period."}
         )
-    if compensation.effective_from > period.start_date:
-        raise ValidationError(
-            {
-                "employee": (
-                    f"{employee.employee_number} requires an explicit mid-period salary proration rule."
-                )
-            }
-        )
-    if _employment_on(employee, period.end_date) is None:
-        raise ValidationError(
-            {"employee": f"{employee.employee_number} has no employment at period end."}
-        )
-    if compensation.currency != configuration.currency:
-        raise ValidationError(
-            {
-                "currency": (
-                    f"{employee.employee_number} compensation currency does not match payroll."
-                )
-            }
-        )
-    if compensation.pay_basis != EmployeeCompensation.PayBasis.PAYROLL_PERIOD:
-        raise ValidationError(
-            {
-                "pay_basis": (
-                    "This payroll engine supports compensation expressed per configured "
-                    "payroll period only; convert the amount before processing."
-                )
-            }
-        )
+    # Rates for unpaid leave, overtime and statutory thresholds use the latest pay.
+    compensation = segments[-1]["compensation"]
+    for segment in segments:
+        if segment["compensation"].currency != configuration.currency:
+            raise ValidationError(
+                {
+                    "currency": (
+                        f"{employee.employee_number} compensation currency does not match payroll."
+                    )
+                }
+            )
+        if segment["compensation"].pay_basis != EmployeeCompensation.PayBasis.PAYROLL_PERIOD:
+            raise ValidationError(
+                {
+                    "pay_basis": (
+                        "This payroll engine supports compensation expressed per configured "
+                        "payroll period only; convert the amount before processing."
+                    )
+                }
+            )
 
     record = PayrollRecord.objects.create(
         institution=payroll_run.institution,
@@ -380,69 +428,104 @@ def calculate_employee_record(payroll_run, employee, configuration):
         net_pay=Decimal("0"),
         currency=configuration.currency,
     )
-    gross_pay = money(compensation.base_salary)
-    taxable_income = money(compensation.base_salary)
+    gross_pay = Decimal("0")
+    taxable_income = Decimal("0")
     total_deductions = Decimal("0")
     employer_contributions = Decimal("0")
-    _create_item(
-        record,
-        code="BASE_SALARY",
-        name="Base salary",
-        source=PayrollItem.Source.COMPENSATION,
-        amount=compensation.base_salary,
-        effect="EARNING",
-        metadata={
-            "employee_compensation_id": str(compensation.id),
-            "taxable": True,
-        },
-    )
-
-    resolved = resolve_compensation(compensation, period.end_date)
-    pay_components = PayComponent.objects.in_bulk(
-        component["pay_component_id"] for component in resolved["components"]
-    )
-    for component in resolved["components"]:
-        if component["resolved_amount"] is None:
-            if component["is_required"]:
-                raise ValidationError(
-                    {
-                        "salary_structure": (
-                            f"Required component {component['code']} has no configured value."
-                        )
-                    }
-                )
-            continue
-        pay_component = pay_components[component["pay_component_id"]]
-        amount = money(component["resolved_amount"])
-        effect = pay_component.component_type
+    basic_pay = Decimal("0")
+    for segment in segments:
+        segment_compensation = segment["compensation"]
+        factor = segment["factor"]
+        prorated = factor != 1
+        label = (
+            f" ({segment['start']:%d %b} - {segment['end']:%d %b})" if len(segments) > 1 else ""
+        )
+        proration = (
+            {
+                "proration": {
+                    "method": configuration.proration_method,
+                    "paid_days": segment["days"],
+                    "period_days": period_days,
+                    "from": segment["start"].isoformat(),
+                    "to": segment["end"].isoformat(),
+                }
+            }
+            if prorated
+            else {}
+        )
+        base_amount = money(segment_compensation.base_salary * factor)
+        gross_pay += base_amount
+        taxable_income += base_amount
+        basic_pay += base_amount
         _create_item(
             record,
-            code=pay_component.code,
-            name=pay_component.name,
+            code="BASE_SALARY",
+            name=f"Base salary{label}",
             source=PayrollItem.Source.COMPENSATION,
-            amount=amount,
-            effect=effect,
-            pay_component=pay_component,
-            rate=component["percentage"],
+            amount=base_amount,
+            effect="EARNING",
+            quantity=Decimal(segment["days"]) if prorated else None,
+            rate=segment_compensation.base_salary / period_days if prorated else None,
             metadata={
-                "calculation_type": pay_component.calculation_type,
-                "resolution_source": component["source"],
-                "taxable": pay_component.taxable,
-                "percentage_base_component_id": (
-                    str(component["percentage_base_component_id"])
-                    if component["percentage_base_component_id"]
-                    else None
-                ),
+                "employee_compensation_id": str(segment_compensation.id),
+                "taxable": True,
+                **proration,
             },
         )
-        if effect == PayComponent.ComponentType.EARNING:
-            gross_pay += amount
-            if pay_component.taxable:
-                taxable_income += amount
-        elif effect == PayComponent.ComponentType.DEDUCTION:
-            total_deductions += amount
-        else:
-            employer_contributions += amount
+
+        resolved = resolve_compensation(segment_compensation, segment["end"])
+        pay_components = PayComponent.objects.in_bulk(
+            component["pay_component_id"] for component in resolved["components"]
+        )
+        for component in resolved["components"]:
+            if component["resolved_amount"] is None:
+                if component["is_required"]:
+                    raise ValidationError(
+                        {
+                            "salary_structure": (
+                                f"Required component {component['code']} has no configured value."
+                            )
+                        }
+                    )
+                continue
+            pay_component = pay_components[component["pay_component_id"]]
+            effect = pay_component.component_type
+            # Earnings accrue per day employed; fixed deductions and employer amounts do not.
+            component_prorated = prorated and effect == PayComponent.ComponentType.EARNING
+            amount = money(
+                component["resolved_amount"] * factor
+                if component_prorated
+                else component["resolved_amount"]
+            )
+            _create_item(
+                record,
+                code=pay_component.code,
+                name=f"{pay_component.name}{label}",
+                source=PayrollItem.Source.COMPENSATION,
+                amount=amount,
+                effect=effect,
+                pay_component=pay_component,
+                rate=component["percentage"],
+                metadata={
+                    "calculation_type": pay_component.calculation_type,
+                    "resolution_source": component["source"],
+                    "taxable": pay_component.taxable,
+                    "percentage_base_component_id": (
+                        str(component["percentage_base_component_id"])
+                        if component["percentage_base_component_id"]
+                        else None
+                    ),
+                    **(proration if component_prorated else {}),
+                },
+            )
+            if effect == PayComponent.ComponentType.EARNING:
+                gross_pay += amount
+                if pay_component.taxable:
+                    taxable_income += amount
+            elif effect == PayComponent.ComponentType.DEDUCTION:
+                total_deductions += amount
+            else:
+                employer_contributions += amount
 
     working_dates, scheduled_minutes = _schedule_totals(employee, period)
     working_date_set = set(working_dates)
@@ -574,7 +657,7 @@ def calculate_employee_record(payroll_run, employee, configuration):
         record,
         payroll_run=payroll_run,
         compensation=compensation,
-        basic_pay=money(max(Decimal("0"), compensation.base_salary - unpaid_amount)),
+        basic_pay=money(max(Decimal("0"), basic_pay - unpaid_amount)),
         gross_pay=max(Decimal("0"), gross_pay - unpaid_amount),
         taxable_income=max(Decimal("0"), taxable_income),
     )

@@ -477,26 +477,6 @@ Under the Module Delivery and Frontend Integration Contract v1.0, the current de
 - Decision needed: Add conversion rules and additional approved basis values before enabling annual, weekly, daily, or hourly compensation in localized production payroll.
 - Evidence: `apps/compensation/models.py`, `apps/compensation/serializers.py`, `apps/compensation/migrations/0002_employeecompensation_pay_basis.py`, and `apps/payroll/calculation.py`.
 
-### PAY-002 — Mid-period compensation changes have no proration rule
-
-- Area: Compensation / Payroll
-- Type: Calculation limitation
-- Status: `SAFEGUARDED`
-- Priority: `P1`
-- Limitation: The ERD supports effective-dated compensation but does not specify how a salary change inside an active payroll period is prorated.
-- Current safeguard: Payroll calculation fails closed when the effective compensation begins after the payroll period start.
-- Decision needed: Specify calendar-day, working-day, scheduled-minute, or jurisdiction-specific proration behavior and its rounding rules.
-
-### PAY-003 — Annual relief application timing needs policy confirmation
-
-- Area: Ghana payroll / PAYE reliefs
-- Type: Operational tax-policy assumption
-- Status: `REVIEW`
-- Priority: `P1`
-- Limitation: An approved annual relief amount is treated as a year-to-date pool and applied against available chargeable income until exhausted. It is not automatically divided across twelve months or remaining payroll periods.
-- Current safeguard: Only eligible, approved, evidence-backed claims are applied, and prior finalized applications are tracked by claim ID.
-- Decision needed: Confirm whether Ghana payroll withholding should apply approved relief immediately, prorate it, or follow certificate-effective dates.
-
 ### PAY-004 — Percentage and actual-amount reliefs depend on the approved amount
 
 - Area: Ghana payroll / PAYE reliefs
@@ -566,6 +546,23 @@ The entries below are retained for traceability only. They no longer carry curre
 - Note: Pending roadmap work is recorded here for review context, not classified as an implementation defect.
 
 ## Resolved items
+
+### RES-035 - Mid-period hires and salary changes could not be paid (was PAY-002)
+
+- Resolved: 2026-10-20
+- Original issue: Payroll calculation failed closed whenever the effective compensation began after the payroll period start, so a mid-period hire or a salary change inside a period blocked the whole run.
+- Resolution: `InstitutionPayrollConfiguration.proration_method` (`CALENDAR_DAYS` default, or `WORKING_DAYS` counting Monday to Friday) governs partial periods. The period is split into stretches paid at one compensation; days outside any employment are unpaid, and employed days with no compensation still fail closed. Base salary and fixed earning components are prorated by each stretch's share of counted days; fixed deductions and employer components are not. Statutory rules use the prorated basic. Prorated items carry `metadata.proration` (method, paid and period days, date range). A non-default method is part of the run configuration snapshot.
+- Leavers: a run includes only employees employed and compensated at some point in the period. Offboarding ends the employment but not the compensation, so previously a leaver was still selected and failed the "employment at period end" check, which blocked that run and every later one. A leaver is now paid up to their last working day and drops out of later runs.
+- Remaining: working days do not yet exclude public holidays (see ATT-001). Final-pay items such as leave encashment are not calculated.
+- Validation: `tests/test_pay_proration.py`, `tests/test_payroll_selectors.py`.
+- Evidence: `apps/payroll/calculation.py` (`_pay_segments`), `apps/payroll/selectors.py` (`eligible_employees_for_payroll_run`), `apps/payroll/models.py`, migration `payroll/0007_proration_method.py`.
+
+### RES-036 - Annual relief timing confirmed as a cumulative monthly twelfth (was PAY-003)
+
+- Resolved: 2026-10-13 (register updated 2026-10-20)
+- Original issue: An approved annual relief was applied as a year-to-date pool until exhausted rather than spread across the year.
+- Resolution: The Ghana evaluator grants a twelfth of the approved amount per month, cumulatively, so a mid-year approval catches up and the year never exceeds the approved amount.
+- Evidence: `apps/payroll/localizations/ghana.py`.
 
 ### RES-029 - Integrated demo seeding applied recruitment stages only on rerun
 

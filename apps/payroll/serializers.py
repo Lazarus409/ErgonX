@@ -238,6 +238,7 @@ class InstitutionPayrollConfigurationSerializer(TenantRelationSerializer):
             "pay_day_rule",
             "rounding_rule",
             "custom_rules",
+            "proration_method",
             "is_configured",
             "configured_by",
             "configured_at",
@@ -273,6 +274,7 @@ class InstitutionPayrollConfigurationSerializer(TenantRelationSerializer):
                 "pay_day_rule",
                 "rounding_rule",
                 "custom_rules",
+                "proration_method",
                 "is_configured",
             )
         }

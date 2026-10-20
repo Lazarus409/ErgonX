@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError
 from django.db.models import Q
 
 from apps.compensation.models import EmployeeCompensation
+from apps.employees.models import Employment
 from apps.payroll.models import (
     ComplianceDeadline,
     ContributionRule,
@@ -41,12 +42,19 @@ def active_payroll_preset_versions_for_institution(*, institution, as_of=None):
 def eligible_employees_for_payroll_run(*, institution, payroll_run):
     _require_tenant(payroll_run, institution, "payroll_run")
     period = payroll_run.payroll_period
+    # Paid for any part of the period: employed and compensated at some point in it.
+    # A leaver is paid up to their last day and drops out of later runs.
     compensation_rows = EmployeeCompensation.objects.filter(
         institution=institution,
         effective_from__lte=period.end_date,
-    ).filter(Q(effective_to__isnull=True) | Q(effective_to__gte=period.end_date))
+    ).filter(Q(effective_to__isnull=True) | Q(effective_to__gte=period.start_date))
+    employment_rows = Employment.objects.filter(
+        institution=institution,
+        start_date__lte=period.end_date,
+    ).filter(Q(end_date__isnull=True) | Q(end_date__gte=period.start_date))
     return (
         institution.employees.filter(id__in=compensation_rows.values("employee_id"))
+        .filter(id__in=employment_rows.values("employee_id"))
         .order_by("employee_number")
         .distinct()
     )

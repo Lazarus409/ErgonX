@@ -488,6 +488,10 @@ class InstitutionPayrollConfiguration(TenantOwnedModel):
         PRESET = "PRESET", "Preset"
         CUSTOM = "CUSTOM", "Custom"
 
+    class ProrationMethod(models.TextChoices):
+        CALENDAR_DAYS = "CALENDAR_DAYS", "Calendar days"
+        WORKING_DAYS = "WORKING_DAYS", "Working days (Monday to Friday)"
+
     institution = models.OneToOneField(
         Institution, on_delete=models.CASCADE, related_name="payroll_configuration"
     )
@@ -507,6 +511,10 @@ class InstitutionPayrollConfiguration(TenantOwnedModel):
     # Income tax and contribution rules the institution defines itself in CUSTOM
     # mode; see apps.payroll.custom_rules. Always empty in PRESET mode.
     custom_rules = models.JSONField(default=dict, blank=True)
+    # How a partial period is paid: a mid-period hire, or a salary change inside the period.
+    proration_method = models.CharField(
+        max_length=16, choices=ProrationMethod.choices, default=ProrationMethod.CALENDAR_DAYS
+    )
     is_configured = models.BooleanField(default=False)
     configured_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,

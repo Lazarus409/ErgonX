@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
-import { BookOpen, CalendarClock, Eye, FileText, Filter, Folder, Layers, Lock, Play, Plus, Search, Upload, UsersRound } from "lucide-react";
+import { BookOpen, CalendarClock, Eye, FileText, Filter, Folder, Layers, Play, Plus, Search, Upload, UsersRound } from "lucide-react";
 
 import ReportFormDialog, { type ReportDialogMode } from "@/components/accounting/ReportFormDialog";
 import { Button } from "@/components/ui/Button";
@@ -126,7 +126,6 @@ export default function FinancialReportsPage() {
               <Button className="mt-2" block variant="secondary" size="sm" disabled={!chosen || !allowed} onClick={onClick}>{label}</Button>
             </section>
           ))}
-          {!canManage && <div className="flex gap-2.5 rounded-xl bg-primary-soft/60 p-3 text-sm xl:col-span-2"><Lock className="mt-0.5 h-5 w-5 shrink-0 text-primary-ink" aria-hidden="true" /><div><p className="font-semibold text-headline">Restricted information</p><p className="text-ink">Creating and scheduling reports depends on your access permissions.</p></div></div>}
           <Link href="/accounting/journals" className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary-ink hover:underline xl:col-span-2"><BookOpen className="h-4 w-4" aria-hidden="true" />Account-level ledger detail lives in the General Ledger</Link>
         </aside>
       </div>

@@ -25,6 +25,7 @@ export const settingsAreas: Array<{ title: string; description: string; href: st
   { title: "Calendar Subscription", description: "Add your shifts, leave and interviews to Google, Outlook or Apple Calendar.", href: "/settings/calendar", icon: CalendarPlus, permission: "home.view" },
   { title: "Approval Workflows", description: "Review approval definitions used by operational processes.", href: "/settings/approval-workflows", icon: GitPullRequest, permission: "approval_workflow.view" },
   { title: "Notifications", description: "Review in-app notification history for your active institution.", href: "/notifications", icon: Bell, permission: "home.view" },
+  { title: "Public Holidays", description: "The institution's holiday calendar, used by leave, attendance and payroll.", href: "/settings/holidays", icon: CalendarDays, permission: "organization.view", module: "HR" },
   { title: "Organization", description: "Review the institution's department / functional area, position, grade, and location catalogues.", href: "/hr/departments", icon: BriefcaseBusiness, permission: "organization.view", module: "HR", scopes: INSTITUTION_WIDE },
   { title: "Recruitment", description: "Manage the ordered recruitment stages used by the institution pipeline.", href: "/recruitment/stages", icon: BriefcaseBusiness, permission: "recruitment_stage.view", module: "RECRUITMENT" },
   { title: "Leave", description: "Manage the institution's leave types and effective leave policies.", href: "/leave/policies", icon: CalendarDays, permission: "leave.configure", module: "LEAVE" },

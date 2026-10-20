@@ -54,6 +54,13 @@ export default function PlatformOrganizationsPage() {
         <StatTile label="Employees managed" value={overview ? overview.employees.total.toLocaleString("en-GB") : "—"} icon={UsersRound} tone="amber" />
       </section>
 
+      {overview?.file_storage?.backend === "database" && (
+        <p className={overview.file_storage.warning ? "rounded-xl border border-warning/30 bg-warning-soft p-3 text-sm text-warning-ink" : "text-sm text-ink-muted"}>
+          Uploaded files are stored in the database: {overview.file_storage.database_files.toLocaleString("en-GB")} files, {(overview.file_storage.database_bytes / 1_048_576).toFixed(1)} MB.
+          {overview.file_storage.warning && " That is getting large for the database plan; move them to a bucket or disk with manage.py move_media."}
+        </p>
+      )}
+
       <div className="grid gap-5 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <ChartCard
           className="rounded-3xl"

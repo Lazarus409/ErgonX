@@ -158,3 +158,27 @@ export async function loadOrganizationLookups(): Promise<OrganizationLookups> {
     locations: locations.results,
   };
 }
+
+/* Public holidays ---------------------------------------------------------- */
+
+export interface PublicHoliday { id: string; date: string; name: string; statutory_date: string | null; is_active: boolean; }
+export interface HolidaySuggestion { name: string; date: string; statutory_date: string | null; already_added: boolean; }
+export interface HolidaySuggestions { country_code: string; note: string; holidays: HolidaySuggestion[]; }
+
+/** Holidays in one calendar year; leave, attendance and working-day payroll skip them. */
+export async function listPublicHolidays(year: number): Promise<PublicHoliday[]> {
+  const page = await apiGetList<PublicHoliday>("/public-holidays/", { date__gte: `${year}-01-01`, date__lte: `${year}-12-31`, ordering: "date", page_size: MAX_PAGE_SIZE });
+  return page.results;
+}
+
+export function createPublicHoliday(payload: { date: string; name: string; statutory_date?: string | null }): Promise<PublicHoliday> {
+  return apiPost<PublicHoliday, typeof payload>("/public-holidays/", payload);
+}
+
+export function deletePublicHoliday(id: string): Promise<void> {
+  return apiDelete(`/public-holidays/${id}/`);
+}
+
+export function getHolidaySuggestions(year: number): Promise<HolidaySuggestions> {
+  return apiGet<HolidaySuggestions>("/public-holidays/suggestions/", { params: { year } });
+}

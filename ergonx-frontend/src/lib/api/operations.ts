@@ -1,6 +1,6 @@
-import { apiAction, apiDelete, apiDownload, apiGet, apiGetList, apiPost, apiPostMultipart } from "./client";
+import { apiAction, apiDelete, apiDownload, apiGet, apiGetList, apiPost, apiPostMultipart, fetchAllPages } from "./client";
 import type { PaginatedData } from "@/types/api";
-import type { BackgroundJob, DocumentRecord, ExportJob, ImportJob } from "@/types/operations";
+import type { BackgroundJob, DocumentRecord, EmployeeImportColumn, ExportJob, ImportJob, ImportRowResult } from "@/types/operations";
 import type { ListParams } from "@/types/api";
 
 export function listDocuments(params?: ListParams): Promise<PaginatedData<DocumentRecord>> { return apiGetList<DocumentRecord>("/documents/", { ordering: "-created_at", ...params }); }
@@ -12,6 +12,15 @@ export function listImportJobs(): Promise<PaginatedData<ImportJob>> { return api
 export function listExportJobs(): Promise<PaginatedData<ExportJob>> { return apiGetList<ExportJob>("/export-jobs/", { ordering: "-created_at" }); }
 export function listBackgroundJobs(): Promise<PaginatedData<BackgroundJob>> { return apiGetList<BackgroundJob>("/background-jobs/", { ordering: "-created_at" }); }
 export function confirmImportJob(id: string): Promise<ImportJob> { return apiAction<ImportJob>(`/import-jobs/${id}/confirm/`); }
+export function downloadEmployeeImportTemplate(): Promise<Blob> { return apiDownload("/import-jobs/employee-template/"); }
+export function getEmployeeImportColumns(): Promise<EmployeeImportColumn[]> { return apiGet<EmployeeImportColumn[]>("/import-jobs/employee-columns/"); }
+/** Validates the file row by row; nothing is created until the job is confirmed. */
+export function uploadEmployeeImport(file: File): Promise<ImportJob> { const body = new FormData(); body.append("file", file); return apiPostMultipart<ImportJob>("/import-jobs/employee-upload/", body); }
+/** Every row of an import (at most 1,000, so ten pages). */
+export async function listImportRows(importJob: string): Promise<ImportRowResult[]> {
+  const { items } = await fetchAllPages((page) => apiGetList<ImportRowResult>("/import-row-results/", { import_job: importJob, ordering: "row_number", page, page_size: 100 }), 10);
+  return items;
+}
 /** Upload cap enforced by the API (DOCUMENT_UPLOAD_MAX_MB, default 25). Any file type is accepted. */
 export const MAX_DOCUMENT_BYTES = 25 * 1024 * 1024;
 export interface DocumentCreatePayload { file_reference: string; original_filename: string; content_type: string; size_bytes: number; category?: string; classification?: string; entity_type?: string; entity_id?: string | null; }

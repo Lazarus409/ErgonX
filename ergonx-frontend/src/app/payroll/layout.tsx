@@ -9,5 +9,5 @@ export default function PayrollLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <AppShell><ModuleAccessGate module="PAYROLL" anyPermissions={moduleWorkspacePermissions.PAYROLL} scopes={INSTITUTION_WIDE}>{children}</ModuleAccessGate></AppShell>;
+  return <AppShell><ModuleAccessGate selfService={{ href: "/me/payslips", permission: "payslip.view" }} module="PAYROLL" anyPermissions={moduleWorkspacePermissions.PAYROLL} scopes={INSTITUTION_WIDE}>{children}</ModuleAccessGate></AppShell>;
 }

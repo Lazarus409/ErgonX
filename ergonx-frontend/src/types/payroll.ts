@@ -20,7 +20,10 @@ export interface PayrollPeriod {
   updated_at: string;
 }
 
-export interface PayrollConfiguration { id: string; country_code: string; currency: string; payroll_frequency: string; payroll_setup_mode: string; selected_payroll_preset_version: string | null; pay_day_rule: PayDayRule; rounding_rule: Record<string, unknown>; custom_rules?: CustomPayrollRules; is_configured: boolean; configured_at: string | null; }
+/** How a partial period is paid (a mid-period hire, or a salary change inside the period). */
+export type ProrationMethod = "CALENDAR_DAYS" | "WORKING_DAYS";
+
+export interface PayrollConfiguration { id: string; country_code: string; currency: string; payroll_frequency: string; payroll_setup_mode: string; selected_payroll_preset_version: string | null; pay_day_rule: PayDayRule; rounding_rule: Record<string, unknown>; custom_rules?: CustomPayrollRules; proration_method?: ProrationMethod; is_configured: boolean; configured_at: string | null; }
 /** When staff are paid; `{}` means not set. */
 export type PayDayRule = { type?: "LAST_DAY" } | { type: "DAY_OF_MONTH"; day: number };
 export type PayrollRuleBasis = "TAXABLE_INCOME" | "GROSS_PAY" | "BASE_SALARY";
@@ -29,7 +32,23 @@ export interface CustomPayrollRules {
   income_tax?: { method: "NONE" | "FLAT" | "PROGRESSIVE"; name?: string; basis?: PayrollRuleBasis; rate?: string; threshold?: string; bands?: Array<{ upper_bound: string | null; rate: string }> };
   contributions?: Array<{ code?: string; name: string; basis: PayrollRuleBasis; employee_rate: string; employer_rate: string; maximum_basis: string | null }>;
 }
-export interface EmployeePayrollProfile { id: string; employee: string; tax_residency: "RESIDENT" | "NON_RESIDENT" | string; tax_identification_number: string; created_at: string; updated_at: string; }
+export type PaymentMethod = "" | "BANK" | "MOBILE_MONEY" | "CASH" | "CHEQUE";
+export type MobileMoneyNetwork = "" | "MTN" | "TELECEL" | "AIRTELTIGO";
+/** Tax identity and how net pay reaches the employee. */
+export interface EmployeePayrollProfile {
+  id: string; employee: string; tax_residency: "RESIDENT" | "NON_RESIDENT" | string; tax_identification_number: string;
+  social_security_number: string; payment_method: PaymentMethod; bank_name: string; bank_branch: string; bank_sort_code: string;
+  account_name: string; account_number: string; mobile_money_network: MobileMoneyNetwork; mobile_money_number: string;
+  pension_exempt: boolean; pension_exemption_reason: string;
+  created_at: string; updated_at: string;
+}
+export interface PaymentSummary {
+  payroll_run_id: string; status: string; ready: boolean; currency: string;
+  methods: Array<{ method: PaymentMethod | "UNASSIGNED"; employees: number; net_pay: string }>;
+  needs_attention: Array<{ employee_id: string; employee_number: string; employee_name: string; net_pay: string; problem: string }>;
+  files: Array<{ key: PaymentFileKey; label: string }>;
+}
+export type PaymentFileKey = "bank" | "mobile-money" | "pension" | "paye";
 export interface PayrollSetupChoice { mode: string; preset_version_id: string | null; preset_code: string | null; version_code: string | null; name: string; recommended: boolean; compliance_warning: string | null; }
 export interface PayrollSetupChoices { country_code: string; currency: string; choices: PayrollSetupChoice[]; }
 export interface ContributionRule { id: string; preset_version: string; code: string; name: string; basis: string; employee_rate: string; employer_rate: string; minimum_basis: string | null; maximum_basis: string | null; effective_from: string; effective_to: string | null; }

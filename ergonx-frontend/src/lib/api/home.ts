@@ -44,3 +44,11 @@ export interface MyWorkPayload {
 export async function getMyWork(): Promise<MyWorkPayload> {
   return apiGet<MyWorkPayload>("/home/my-work/");
 }
+
+export interface GoLiveItem { code: string; title: string; done: number; total: number; complete: boolean; href: string; action: string; detail: string; }
+export interface GoLivePayload { applicable: boolean; complete: boolean; items: GoLiveItem[]; }
+
+/** What an administrator still needs before the organisation runs on ErgonX (counted, with where to fix each). */
+export async function getGoLive(): Promise<GoLivePayload> {
+  return apiGet<GoLivePayload>("/home/go-live/");
+}

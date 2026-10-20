@@ -28,6 +28,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import GoLiveCard from "@/components/home/GoLiveCard";
 import HomeHero, { HeroStat } from "@/components/home/HomeHero";
 import { AttentionItem, Card, IconTile, SectionHeading } from "@/components/ui/Card";
 import ErrorState from "@/components/ui/ErrorState";
@@ -129,6 +130,8 @@ export default function WorkspaceHome({ areaLabel, continueHref, continueTitle, 
       </HomeHero>
 
       {error && <ErrorState variant="inline" title="Unable to load your workspace" message={error} onRetry={reload} />}
+
+      <GoLiveCard />
 
       {data?.team_snapshot && <TeamToday snapshot={data.team_snapshot} />}
 

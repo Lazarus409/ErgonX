@@ -38,6 +38,7 @@ import { formatDateTime, humanizeEnum } from "@/lib/format";
 import { moduleAccents, type ModuleAccent } from "@/lib/moduleTheme";
 import { useApiResource } from "@/lib/useApiResource";
 import PushToggle from "@/components/notifications/PushToggle";
+import QuickDecision from "@/components/notifications/QuickDecision";
 import { NOTIFICATION_MODULE_LABELS, type AppNotification, type NotificationModule, type NotificationPreferences } from "@/types/notifications";
 
 type View = "inbox" | "unread" | "archived";
@@ -272,6 +273,7 @@ function NotificationDetail({ item, busy, onClose, onOpen, onMarkRead, onArchive
         <div className="flex justify-between gap-3"><dt className="text-ink-muted">Module</dt><dd className="text-ink-strong">{NOTIFICATION_MODULE_LABELS[code]}</dd></div>
         {item.read_at && <div className="flex justify-between gap-3"><dt className="text-ink-muted">Read</dt><dd className="text-ink-strong">{formatDateTime(item.read_at)}</dd></div>}
       </dl>
+      {item.route_hint && <QuickDecision route={item.route_hint} />}
       <p className="mt-3 text-caption text-ink-muted">Opening the related record checks your access again; you see only what your role allows.</p>
       <div className="mt-4 grid gap-2">
         {item.route_hint && <Button onClick={onOpen} leadingIcon={<ArrowRight className="h-4 w-4" />}>Open related record</Button>}

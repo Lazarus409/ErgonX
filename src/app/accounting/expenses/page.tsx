@@ -247,7 +247,6 @@ function CategoryManager({ categories, accounts, onChanged }: { categories: Expe
   };
   return (
     <div className="space-y-5 p-4">
-      <p className="text-support text-ink-muted">Claimants choose a category; its expense account is used at posting (finance may recode during review). Limits and receipt thresholds drive the policy checks.</p>
       {error && <ErrorState variant="inline" title="Category not saved" message={error} />}
       <div className="grid gap-3 rounded-xl border border-line p-4 sm:grid-cols-2 lg:grid-cols-6">
         <input value={draft.code} onChange={(event) => setDraft({ ...draft, code: event.target.value })} placeholder="Code" className={fieldClass} />

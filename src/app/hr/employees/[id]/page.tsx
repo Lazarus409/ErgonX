@@ -12,7 +12,6 @@ import {
   Contact,
   FileText,
   History,
-  Lock,
   LogOut,
   PauseCircle,
   PlayCircle,
@@ -1188,7 +1187,6 @@ export default function EmployeeDetailPage() {
               </Menu>
             </div>
             <blockquote className="hidden max-w-xs text-right xl:block">
-              <p className="text-[1.0625rem] italic leading-7 text-ink-muted">&ldquo;Great people make brighter workplaces.&rdquo;</p>
               <span aria-hidden="true" className="ml-auto mt-3 block h-1 w-14 rounded-full bg-accent-aqua" />
             </blockquote>
           </div>
@@ -1273,7 +1271,6 @@ export default function EmployeeDetailPage() {
 
                 <div className="space-y-5">
                   <ProfileCard title="Record Lifecycle" icon={History} badge={<StatusBadge status={employee.status} size="sm" />}>
-                    <p className="flex gap-2 rounded-lg bg-success-soft/60 px-3 py-2 text-caption text-ink">{employee.status === "TERMINATED" ? <Lock className="h-4 w-4 shrink-0 text-ink-muted" aria-hidden="true" /> : null}This employee record is retained for payroll, attendance, leave and audit history, even after deactivation or exit, in line with the data retention policy.</p>
                     <ol className="mt-3 space-y-3 border-l-2 border-line-soft pl-4 text-sm">
                       {lifecycle?.offboarding && lifecycle.offboarding.status !== "NOT_STARTED" && <li className="relative"><span aria-hidden="true" className="absolute -left-[1.4rem] top-1 h-3 w-3 rounded-full bg-warning" /><span className="font-semibold">Offboarding</span> <span className="text-ink-muted">{humanizeEnum(lifecycle.offboarding.status)}</span></li>}
                       <li className="relative"><span aria-hidden="true" className="absolute -left-[1.4rem] top-1 h-3 w-3 rounded-full bg-success" /><span className="font-semibold">{humanizeEnum(employee.status)}</span> <span className="text-ink-muted">{formatDate(serviceStart)} – Present</span><span className="block text-caption text-ink-muted">Employee is currently {humanizeEnum(employee.status).toLowerCase()}</span></li>
@@ -1402,9 +1399,6 @@ export default function EmployeeDetailPage() {
                       : "Add Emergency Contact"}
                   </h3>
 
-                  <p className="mt-1 text-xs text-ink-muted">
-                    Enter the contact details for this employee.
-                  </p>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -1547,9 +1541,6 @@ export default function EmployeeDetailPage() {
                   No emergency contacts
                 </p>
 
-                <p className="mt-1 text-sm text-ink-muted">
-                  Add an emergency contact for this employee.
-                </p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -1636,7 +1627,6 @@ export default function EmployeeDetailPage() {
                       Onboarding
                     </h3>
 
-                    <p className="mt-1 text-sm text-ink-muted">Activate the onboarding workflow once employment is ready.</p>
                   </div>
 
                   <StatusBadge status={lifecycle?.onboarding?.status ?? "NOT_STARTED"} />
@@ -1730,7 +1720,6 @@ export default function EmployeeDetailPage() {
               <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-line-strong py-10 text-center">
                 <FileText className="h-10 w-10 text-ink-subtle" />
                 <h3 className="mt-3 font-medium text-ink-strong">No documents available</h3>
-                <p className="mt-1 text-sm text-ink-muted">Add an employee document to make it available to authorized users.</p>
               </div>
             ) : (
               <div className="divide-y divide-line-soft rounded-xl border border-line">

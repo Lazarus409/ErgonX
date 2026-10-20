@@ -183,7 +183,6 @@ export default function RequestLeavePage() {
           </section>
           <section className="rounded-xl border border-line bg-surface p-5 shadow-elevation-1">
             <h2 className="flex items-center gap-2 text-card-title font-semibold text-ink-strong"><Route className="h-5 w-5 text-primary" aria-hidden="true" />Approval route</h2>
-            <p className="mt-2 text-support text-ink-muted">Approvers are assigned when you submit: your institution&apos;s leave workflow if one is configured, otherwise your department head or line manager, then HR. You are never your own approver.</p>
           </section>
         </aside>
       </div>

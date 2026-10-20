@@ -138,7 +138,6 @@ export default function MembershipSettingsPage() {
         <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary" aria-hidden="true"><UsersRound className="h-7 w-7" /></span>
         <div className="min-w-0">
           <h2 className="text-card-title font-bold text-headline">Manage your team&apos;s access</h2>
-          <p className="mt-0.5 text-support text-heading-support">Invite users, assign roles and manage access for your institution. Permissions come from the role assigned to each membership.</p>
         </div>
       </div>
 
@@ -153,7 +152,6 @@ export default function MembershipSettingsPage() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h2 className="text-card-title font-bold text-headline">Invite user</h2>
-                  <p className="mt-0.5 text-support text-heading-support">Choose a setup-owner role to preselect it, or pick any role below, then enter the recipient&apos;s email.</p>
                 </div>
                 <button type="button" onClick={() => setInviteOpen(false)} className="rounded-lg p-2 text-ink-muted hover:bg-surface-hover hover:text-ink-strong" aria-label="Close invite panel"><X className="h-4 w-4" /></button>
               </div>
@@ -168,7 +166,6 @@ export default function MembershipSettingsPage() {
                 <select value={inviteRoleId} onChange={(event) => setInviteRoleId(event.target.value)} aria-label="Role" className="h-10 rounded-lg border border-line-strong px-3 text-sm"><option value="">Select role</option>{data.roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select>
                 <div className="flex gap-2"><button disabled={inviting} className={buttonClasses({ variant: "primary" })}>{inviting ? "Inviting…" : "Invite member"}</button><button type="button" disabled={inviting} onClick={() => void createLink()} className={buttonClasses({ variant: "secondary" })}>Create link</button></div>
                 {actionError && !editing && <p className="text-sm text-danger-ink md:col-span-3">{actionError}</p>}
-                <p className="text-xs text-ink-muted md:col-span-3">Invitations are created for existing ErgonX accounts. Email delivery will be added when the delivery contract is available.</p>
               </form>
             </section>
           )}
@@ -229,7 +226,7 @@ export default function MembershipSettingsPage() {
 
       {tab === "invitations" && (
         <section className="overflow-hidden rounded-2xl border border-line bg-surface shadow-elevation-1">
-          <div className="border-b border-line-soft px-5 py-4"><h2 className="text-card-title font-bold text-headline">Invitation status</h2><p className="mt-0.5 text-support text-ink-muted">Pending invitations show their expiry and can be reissued or revoked. Established member access is managed on the Members tab.</p></div>
+          <div className="border-b border-line-soft px-5 py-4"><h2 className="text-card-title font-bold text-headline">Invitation status</h2></div>
           {data.invitations.results.length === 0 ? <EmptyState size="compact" icon={Mail} title="No invitation records" description="Pending invitations will appear here after creation." /> : <div className="divide-y divide-line-soft">{data.invitations.results.map((invitation) => <div key={invitation.id} className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center"><span className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary sm:flex" aria-hidden="true"><Mail className="h-5 w-5" /></span><div className="min-w-0 flex-1"><p className="font-semibold text-headline">{invitation.email}</p><p className="mt-0.5 text-sm text-ink-muted">{invitation.role?.name ?? "No role"} · Expires {new Date(invitation.expires_at).toLocaleString()}</p></div><StatusBadge status={invitation.status} /><div className="flex gap-2">{invitation.status === "PENDING" && <><button type="button" onClick={() => { setPendingInvitationId(invitation.id); setInvitationAction("resend"); }} className={buttonClasses({ variant: "secondary", size: "sm" })}>Reissue</button><button type="button" onClick={() => { setPendingInvitationId(invitation.id); setInvitationAction("revoke"); }} className="h-8 rounded-lg border border-danger/30 px-3 text-support font-semibold text-danger-ink hover:bg-danger-soft">Revoke</button></>}</div></div>)}</div>}
         </section>
       )}
@@ -238,7 +235,6 @@ export default function MembershipSettingsPage() {
         <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary" aria-hidden="true"><ShieldCheck className="h-6 w-6" /></span>
         <div className="min-w-0">
           <h2 className="text-card-title font-bold text-headline">Security and access notes</h2>
-          <p className="mt-0.5 text-support text-heading-support">Invitation links are single-use and expire. Access changes are confirmed before they apply, and the final active Institution Admin cannot be removed.</p>
         </div>
       </div>
 

@@ -77,7 +77,7 @@ export default function NewOfferPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-5">
       <Link href="/recruitment/offers" className="inline-flex items-center gap-2 text-sm font-semibold text-primary-ink hover:underline"><ArrowLeft className="h-4 w-4" aria-hidden="true" />Back to offers</Link>
-      <div><h1 className="text-[1.75rem] font-bold leading-9 text-headline sm:text-title">Create offer</h1><p className="mt-1.5 text-heading-support">Start a draft offer. Placement comes from the requisition; add compensation and generate the letter next.</p></div>
+      <div><h1 className="text-[1.75rem] font-bold leading-9 text-headline sm:text-title">Create offer</h1></div>
       {problem && <ErrorState variant="inline" title="Offer not created" message={problem} />}
       <section className="grid gap-4 rounded-2xl border border-line bg-surface p-5 shadow-elevation-1 sm:grid-cols-2 sm:p-6">
         <label className="sm:col-span-2"><span className="mb-1.5 block text-sm font-semibold text-ink-strong">Candidate application <span className="text-danger-ink">*</span></span>

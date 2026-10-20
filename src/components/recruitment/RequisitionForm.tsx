@@ -125,7 +125,6 @@ export default function RequisitionForm({ posting }: { posting?: JobPosting | nu
       <header className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
         <div>
           <h1 className="text-[1.75rem] font-bold leading-9 tracking-tight text-headline sm:text-title">{posting ? "Edit requisition" : "Create requisition"}</h1>
-          <p className="mt-1.5 text-[1.0625rem] text-heading-support">Define the role, set the hiring plan and submit for approval.</p>
         </div>
         <ol className="flex flex-wrap items-center gap-3" aria-label="Requisition progress">
           {["Requisition details", "Hiring plan", "Review & submit"].map((name, index) => {
@@ -164,7 +163,6 @@ export default function RequisitionForm({ posting }: { posting?: JobPosting | nu
           </div>
           <div className="border-t border-line-soft pt-6">
             <h2 className="text-heading font-bold text-headline">2. Role brief</h2>
-            <p className="text-support text-ink-muted">Provide a clear and compelling role brief to attract the right candidates.</p>
             <div className="mt-5 space-y-4">
               <LongText label="Role summary" value={form.description} onChange={(value) => update("description", value)} placeholder="A short summary of the role, its purpose and what the successful candidate will do…" />
               <LongText label="Key responsibilities" required value={form.responsibilities} onChange={(value) => update("responsibilities", value)} placeholder="Enter the main responsibilities for this role… (one per line)" />

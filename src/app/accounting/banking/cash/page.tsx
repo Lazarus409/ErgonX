@@ -238,11 +238,6 @@ export default function BankingPage() {
         }}
       />
       <Reconciliation />
-      <p className="text-xs text-ink-muted">
-        Balances and allocations are not shown because the available backend
-        resources do not expose them. Payment and receipt state is derived by
-        the backend.
-      </p>
       {creating && (
         <CashModal
           kind={creating}
@@ -340,9 +335,6 @@ function CashModal({
           <h2 className="text-lg font-bold">
             Record {kind === "payment" ? "Payment" : "Receipt"}
           </h2>
-          <p className="text-sm text-ink-muted">
-            The backend immediately posts the controlled cash journal.
-          </p>
         </div>
         {error && (
           <p className="mx-5 mt-4 rounded border border-danger/25 bg-danger-soft p-3 text-sm text-danger-ink">
@@ -609,10 +601,6 @@ function Reconciliation() {
       <div className="flex items-start justify-between gap-4">
         <div>
         <h2 className="font-semibold">Bank Reconciliation</h2>
-        <p className="mt-1 text-sm text-ink-muted">
-          Match each imported statement movement to one posted journal with the
-          same bank-ledger amount.
-        </p>
         </div>
         <button type="button" onClick={() => setImporting(true)} className={buttonClasses({ variant: "secondary", size: "sm" })}>Import statement line</button>
       </div>

@@ -55,7 +55,7 @@ export default function CustomersPage() {
     <div className="space-y-5">
       <Link href="/accounting/receivables" className="inline-flex items-center gap-2 text-sm font-semibold text-primary-ink hover:underline"><ChevronLeft className="h-4 w-4" aria-hidden="true" />Back to Accounts Receivable</Link>
       <header className="flex flex-wrap items-start justify-between gap-4">
-        <div><h1 className="text-[1.75rem] font-bold leading-9 text-headline sm:text-title">Customers</h1><p className="mt-1.5 text-heading-support">Add and manage the customer accounts you invoice.</p></div>
+        <div><h1 className="text-[1.75rem] font-bold leading-9 text-headline sm:text-title">Customers</h1></div>
         {can("customer.create") && <Button size="lg" leadingIcon={<Plus className="h-5 w-5" />} onClick={() => open("new")}>Add customer</Button>}
       </header>
       <section className="rounded-2xl border border-line bg-surface p-4 shadow-elevation-1">

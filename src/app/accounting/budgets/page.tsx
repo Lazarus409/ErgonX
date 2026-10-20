@@ -38,7 +38,7 @@ export default function BudgetsPage() {
   return (
     <div className="space-y-5">
       <header className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div><h1 className="text-[1.75rem] font-bold leading-9 tracking-tight text-headline sm:text-title">Budgets</h1><p className="mt-1.5 text-[1.0625rem] text-heading-support">Plan, monitor and manage budgets to drive financial discipline.</p></div>
+        <div><h1 className="text-[1.75rem] font-bold leading-9 tracking-tight text-headline sm:text-title">Budgets</h1></div>
         {canManage && <ButtonLink href="/accounting/budgets/new" size="lg" leadingIcon={<Plus className="h-5 w-5" />}>Create budget</ButtonLink>}
       </header>
 

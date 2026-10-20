@@ -394,10 +394,6 @@ export default function AttendanceRecordDetailPage() {
             />
           </div>
 
-          <p className="mt-4 text-xs leading-5 text-ink-muted">
-            All minute values are classified by the backend against the
-            employee&apos;s effective schedule.
-          </p>
         </section>
       </div>
 
@@ -406,9 +402,6 @@ export default function AttendanceRecordDetailPage() {
           <h2 className="text-base font-bold text-headline">
             Recent Attendance
           </h2>
-          <p className="mt-1 text-xs text-ink-muted">
-            The employee&apos;s most recent attendance records.
-          </p>
         </div>
 
         <div className="overflow-x-auto">

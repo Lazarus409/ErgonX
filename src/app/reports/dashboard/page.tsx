@@ -239,7 +239,6 @@ function ReportsDashboard() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h2 className="text-card-title font-bold text-headline">{report?.title}</h2>
-                    <p className="text-support text-ink-muted">Live summary. Select a row to see the records behind it. The CSV download uses the filters you set here.</p>
                   </div>
                   <span className="rounded-full bg-surface-muted px-2.5 py-1 text-caption font-semibold text-ink-muted tabular-nums">{data?.rows.length ?? 0} rows</span>
                 </div>

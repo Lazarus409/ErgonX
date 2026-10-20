@@ -82,7 +82,7 @@ export default function RecordHistoryPage() {
         <div className="min-w-0">
           {tab === "history" && (
             <section className="rounded-2xl border border-line bg-surface p-5 shadow-elevation-1">
-              <div className="flex items-start justify-between gap-3"><div><h2 className="text-heading font-bold text-headline">Record History</h2><p className="text-support text-heading-support">Events are grouped by stage in the record&apos;s lifecycle. Expand a section to see all events and details.</p></div><button type="button" onClick={() => setOpen(Object.fromEntries(data.stages.map((stage) => [stage.label, !allOpen])))} className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-primary-ink"><ChevronDown className={cx("h-4 w-4 transition", allOpen && "rotate-180")} aria-hidden="true" />{allOpen ? "Collapse all" : "Expand all"}</button></div>
+              <div className="flex items-start justify-between gap-3"><div><h2 className="text-heading font-bold text-headline">Record History</h2></div><button type="button" onClick={() => setOpen(Object.fromEntries(data.stages.map((stage) => [stage.label, !allOpen])))} className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-primary-ink"><ChevronDown className={cx("h-4 w-4 transition", allOpen && "rotate-180")} aria-hidden="true" />{allOpen ? "Collapse all" : "Expand all"}</button></div>
               <ul className="mt-4 space-y-3">
                 {data.stages.map((stage) => {
                   const Icon = ICONS[stage.icon] ?? FileText;
@@ -155,7 +155,6 @@ export default function RecordHistoryPage() {
 
       <section className="rounded-2xl border border-line bg-surface p-5 shadow-elevation-1">
         <h2 className="font-bold text-ink-strong">Event type patterns</h2>
-        <p className="text-support text-ink-muted">How record events are tagged in history across ErgonX.</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {Object.entries(KINDS).map(([key, kind]) => { const Icon = kind.icon; return <div key={key} className={cx("rounded-xl border p-3", kind.tone)}><p className="flex items-center gap-2 font-semibold"><Icon className="h-5 w-5" aria-hidden="true" />{kind.label}</p><p className="mt-1 text-caption text-ink">{kind.text}</p></div>; })}
         </div>

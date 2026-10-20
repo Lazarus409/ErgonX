@@ -66,7 +66,7 @@ export default function EmergencyContactsPage() {
       </Card>
       <section className="flex gap-3 rounded-xl border border-line bg-surface p-5 shadow-elevation-1">
         <ShieldCheck className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
-        <div><h2 className="text-sm font-semibold text-ink-strong">Your information is confidential</h2><p className="mt-1 text-caption text-ink-muted">Only you and HR staff with access to your record can see these contacts. They are used only in an emergency.</p></div>
+        <div><h2 className="text-sm font-semibold text-ink-strong">Your information is confidential</h2></div>
       </section>
     </div>
   );

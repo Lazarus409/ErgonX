@@ -2,7 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useCallback, useState } from "react";
-import { Download, FileText, Lock, Printer } from "lucide-react";
+import { Download, FileText, Printer } from "lucide-react";
 
 import DocumentFrame from "@/components/brand/DocumentFrame";
 import HelpTip from "@/components/help/HelpTip";
@@ -62,7 +62,6 @@ export default function PayslipDetailPage() {
         institutionLogoSrc={institution?.logoImageId ? imagesApi.imageContentUrl(institution.logoImageId) : null}
         documentTitle="Employee payslip"
         meta={<><p className="font-semibold text-ink-strong">{period.name}</p><p className="text-ink-muted">Pay date: {formatDate(period.pay_date)}</p></>}
-        footerNote={<span className="inline-flex items-center gap-2"><Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />Generated from a finalized payroll record. Historical payroll data is immutable.</span>}
       >
         <div className="grid gap-6 border-b border-line-soft px-6 py-6 sm:grid-cols-2 sm:px-8">
           <Detail label="Employee" value={employee ? employeesApi.employeeDisplayName(employee) : EM_DASH} subvalue={employee?.employee_number} />

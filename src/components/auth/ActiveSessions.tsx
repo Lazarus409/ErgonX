@@ -62,7 +62,6 @@ export default function ActiveSessions() {
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-ink"><Monitor size={19} aria-hidden="true" /></span>
           <div>
             <h2 id="sessions-heading" className="text-card-title font-semibold text-ink-strong">Active sessions</h2>
-            <p className="mt-1 text-sm text-ink-muted">Browsers and devices signed in to your account. Signing one out ends it immediately.</p>
           </div>
         </div>
         {others > 0 && <Button variant="secondary" size="sm" leadingIcon={<LogOut className="h-4 w-4" />} onClick={() => setPending("others")}>Sign out all other sessions</Button>}

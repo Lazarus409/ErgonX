@@ -616,9 +616,6 @@ export default function LeavePoliciesPage() {
                 <h2 className="text-lg font-bold text-headline">
                   {editingPolicy ? "Edit Leave Policy" : "Add Leave Policy"}
                 </h2>
-                <p className="mt-1 text-sm text-ink-muted">
-                  Configure the policy rules and eligibility.
-                </p>
               </div>
 
               <button

@@ -127,7 +127,7 @@ export default function FinancialReportDetailPage() {
               </div>
               <div className="overflow-auto p-4 print:p-0">
                 {!result ? (
-                  <div className="flex flex-col items-center rounded-xl bg-surface py-14 text-center"><FileText className="h-10 w-10 text-ink-subtle" aria-hidden="true" /><p className="mt-2 font-bold text-headline">Run the report to generate it</p><p className="text-support text-ink-muted">Each run is kept as a version you can return to.</p></div>
+                  <div className="flex flex-col items-center rounded-xl bg-surface py-14 text-center"><FileText className="h-10 w-10 text-ink-subtle" aria-hidden="true" /><p className="mt-2 font-bold text-headline">Run the report to generate it</p></div>
                 ) : (
                   <article className="mx-auto bg-surface p-7 text-ink shadow-elevation-1 print:shadow-none" style={{ width: `${zoom}%`, minWidth: zoom > 100 ? `${zoom}%` : undefined, fontSize: `${(zoom / 100) * 0.875}rem` }}>
                     <div className="flex flex-wrap justify-between gap-4 border-b border-line pb-4">
@@ -166,7 +166,6 @@ export default function FinancialReportDetailPage() {
           {tab === "notes" && (
             <section className="rounded-2xl border border-line bg-surface p-5 shadow-elevation-1">
               <h2 className="text-heading font-bold text-headline">Notes</h2>
-              <p className="text-support text-ink-muted">Commentary shown alongside this report (for example, for the board pack).</p>
               <textarea rows={8} value={notes ?? report.notes} disabled={!canManage} onChange={(event) => setNotes(event.target.value)} className="mt-3 w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm" aria-label="Report notes" />
               {canManage && <div className="mt-2 flex justify-end"><Button disabled={notes === null} onClick={() => void saveNotes()}>Save notes</Button></div>}
             </section>

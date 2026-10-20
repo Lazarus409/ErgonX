@@ -97,7 +97,7 @@ export default function AccountingDashboard() {
         </ChartCard>
         <section className="rounded-2xl border border-line bg-surface p-5 shadow-elevation-1">
           <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-3"><FileText className="mt-0.5 h-7 w-7 text-section-icon" aria-hidden="true" /><div><h2 className="text-heading font-bold text-headline">Needs attention</h2><p className="text-support text-heading-support">Accounting items that require your review or action.</p></div></div>
+            <div className="flex items-start gap-3"><FileText className="mt-0.5 h-7 w-7 text-section-icon" aria-hidden="true" /><div><h2 className="text-heading font-bold text-headline">Needs attention</h2></div></div>
             {(data?.needs_attention_total ?? 0) > (data?.needs_attention?.length ?? 0) && <span className="text-sm text-ink-muted">{data?.needs_attention?.length} of {data?.needs_attention_total}</span>}
           </div>
           <div className="mt-4 overflow-x-auto">
@@ -145,7 +145,7 @@ export default function AccountingDashboard() {
           </div>
         </section>
         <section className="rounded-2xl border border-line bg-surface p-5 shadow-elevation-1">
-          <div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 h-7 w-7 text-section-icon" aria-hidden="true" /><div><h2 className="text-heading font-bold text-headline">Accounting controls</h2><p className="text-support text-heading-support">Key controls to help maintain financial integrity.</p></div></div>
+          <div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 h-7 w-7 text-section-icon" aria-hidden="true" /><div><h2 className="text-heading font-bold text-headline">Accounting controls</h2></div></div>
           <ul className="mt-4 space-y-3">
             {([
               ["period_close", "Period close checklist", CheckCircle2, "bg-success-soft text-success-ink", "/accounting/periods"],

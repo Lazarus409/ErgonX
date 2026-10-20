@@ -87,7 +87,6 @@ export default function RecruitmentDashboardPage() {
             <BarChart3 className="mt-1 h-7 w-7 text-section-icon" aria-hidden="true" />
             <div>
               <h2 id="pipeline-title" className="text-[1.375rem] font-bold leading-8 text-headline">Recruitment pipeline</h2>
-              <p className="text-support text-heading-support">Move candidates through stages from requisition to hire.</p>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">

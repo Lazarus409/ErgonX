@@ -84,7 +84,7 @@ export default function MyLeavePage() {
       {data?.employee && (
         <section className="flex flex-wrap items-center gap-4 rounded-xl bg-ink-strong p-5 text-surface shadow-elevation-2">
           <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-surface/15" aria-hidden="true"><CalendarPlus className="h-5 w-5" /></span>
-          <div className="min-w-0 flex-1"><h2 className="text-card-title font-semibold">Request leave</h2><p className="text-support text-surface/75">Submit a new request; it goes to your approver automatically.</p></div>
+          <div className="min-w-0 flex-1"><h2 className="text-card-title font-semibold">Request leave</h2></div>
           <Link href="/me/leave/request" className="inline-flex items-center gap-2 rounded-lg bg-surface/10 px-4 py-2.5 text-sm font-semibold hover:bg-surface/20">Open form<ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
         </section>
       )}
@@ -93,7 +93,6 @@ export default function MyLeavePage() {
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
           <section className="rounded-xl border border-line bg-surface p-5 shadow-elevation-1" aria-labelledby="my-requests">
             <h2 id="my-requests" className="text-card-title font-semibold text-ink-strong">My requests</h2>
-            <p className="text-support text-ink-muted">Status and history of your submitted requests.</p>
             <Tabs className="mt-3" label="Filter requests" variant="pill" value={filter} onChange={(value) => setFilter(value as RequestFilter)} items={[
               { value: "ALL", label: "All", count: requests.length },
               { value: "PENDING", label: "Pending", count: requests.filter((request) => request.status === "PENDING").length },

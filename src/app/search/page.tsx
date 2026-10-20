@@ -73,7 +73,7 @@ export default function GlobalSearchPage() {
 
   return (
     <div className="space-y-5">
-      <div><h1 className="text-[1.75rem] font-bold leading-9 tracking-tight text-headline sm:text-title">Global Search</h1><p className="mt-1.5 text-[1.0625rem] text-heading-support">Search across people, payroll, finance, recruitment and more.</p></div>
+      <div><h1 className="text-[1.75rem] font-bold leading-9 tracking-tight text-headline sm:text-title">Global Search</h1></div>
 
       <div className="flex flex-wrap items-center gap-3">
         <form className="relative min-w-[18rem] flex-1" onSubmit={(event) => { event.preventDefault(); submit(); }}>

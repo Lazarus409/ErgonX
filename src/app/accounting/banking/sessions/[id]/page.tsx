@@ -76,7 +76,7 @@ export default function ReconciliationSessionPage() {
         <nav aria-label="Breadcrumb" className="text-sm text-ink-muted"><Link href="/accounting/banking" className="hover:underline">Bank Reconciliation</Link><ChevronRight className="mx-1 inline h-4 w-4" aria-hidden="true" /><span className="font-medium text-ink-strong">Session Detail</span></nav>
         <Link href={`/accounting/banking?account=${account.id}`} className="inline-flex h-10 items-center gap-2 rounded-lg border border-line bg-surface px-3 text-sm font-semibold text-ink-strong hover:bg-surface-hover"><ArrowLeft className="h-4 w-4" aria-hidden="true" />Back to bank reconciliation</Link>
       </div>
-      <div><h1 className="text-[1.75rem] font-bold leading-9 tracking-tight text-headline sm:text-title">Bank Reconciliation</h1><p className="mt-1.5 text-[1.0625rem] text-heading-support">Review and match bank transactions with your book entries.</p></div>
+      <div><h1 className="text-[1.75rem] font-bold leading-9 tracking-tight text-headline sm:text-title">Bank Reconciliation</h1></div>
 
       {problem && <ErrorState variant="inline" title="Action not completed" message={problem} />}
       {notice && <p className="rounded-xl border border-success/30 bg-success-soft px-4 py-3 text-sm font-medium text-success-ink">{notice}</p>}

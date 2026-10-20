@@ -98,7 +98,6 @@ export default function VendorBillDetailPage() {
       <header className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between print:hidden">
         <div>
           <h1 className="text-[1.75rem] font-bold leading-9 tracking-tight text-headline sm:text-title">Vendor Bill Detail</h1>
-          <p className="mt-1.5 text-[1.0625rem] text-heading-support">View vendor bill details, document, and approval status.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href="/accounting/payables" className="inline-flex h-12 items-center gap-2 rounded-lg border border-primary px-4 font-semibold text-primary-ink hover:bg-primary-soft/50"><ChevronLeft className="h-5 w-5" aria-hidden="true" />Back to Vendor Bills</Link>
@@ -168,7 +167,6 @@ export default function VendorBillDetailPage() {
                     {Number(bill.withholding_total) > 0 && <div className="flex justify-between text-ink-muted"><dt>Withholding</dt><dd className="tabular-nums">−{formatAmount(bill.withholding_total)}</dd></div>}
                     <div className="flex justify-between bg-surface-muted px-2 py-1.5 font-bold text-ink-strong"><dt>Total</dt><dd className="tabular-nums">{formatAmount(bill.total_amount, bill.currency)}</dd></div>
                   </dl>
-                  <p className="mt-6 text-caption text-ink-muted">Rendered from the bill recorded in ErgonX. The vendor&apos;s original document, if uploaded, is under Attachments.</p>
                 </article>
               </div>
             </section>

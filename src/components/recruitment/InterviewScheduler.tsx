@@ -193,7 +193,6 @@ function Scheduler({ existing, overview, people, team, onDone }: Loaded & { onDo
       </div>
       <div>
         <h1 className="text-[1.75rem] font-bold leading-9 tracking-tight text-headline sm:text-title">{existing && existing.status === "SCHEDULED" ? "Reschedule interview" : "Schedule interview"}</h1>
-        <p className="mt-1.5 text-[1.0625rem] text-heading-support">Find a time that works for your team and the candidate. All times shown are in the selected time zone.</p>
       </div>
       <ol className="grid grid-cols-4" aria-label="Scheduling progress">
         {STEPS.map((name, index) => {

@@ -24,7 +24,6 @@ import ChartCard from "@/components/charts/ChartCard";
 import { BarsChart, DonutChart, TrendChart } from "@/components/charts/Charts";
 import { seriesColors, toNumber } from "@/components/charts/format";
 import ErrorState from "@/components/ui/ErrorState";
-import { useAuth } from "@/components/guards/AuthProvider";
 import { Tooltip } from "@/components/ui/Overlay";
 import ScopeNote from "@/components/ui/ScopeNote";
 import Tabs from "@/components/ui/Tabs";
@@ -128,7 +127,6 @@ function NoAccessPanel({ icon: Icon = BarChart3, title, description }: { icon?: 
  */
 export default function InsightsBoard({ variant = "insights" }: { variant?: "insights" | "executive" }) {
   const executive = variant === "executive";
-  const { institution } = useAuth();
   const [range, setRange] = useState<Range>(12);
   const [demographic, setDemographic] = useState<DemographicTab>("gender");
   const load = useCallback(() => homeApi.getInsights(range), [range]);
@@ -148,9 +146,9 @@ export default function InsightsBoard({ variant = "insights" }: { variant?: "ins
           <h1 className="text-[1.75rem] font-bold leading-9 tracking-tight text-headline sm:text-title">{executive ? `${data?.executive_title ?? "Executive"} Dashboard` : "Insights"}</h1>
         </div>
         {executive ? (
-          <ScopeNote title="Organization-wide view" icon={Landmark} solidIcon>Showing data for all modules, departments and locations{institution?.name ? <> at {institution.name.replace(/\.$/, "")}</> : null}.</ScopeNote>
+          <ScopeNote title="Organization-wide view" icon={Landmark} solidIcon />
         ) : (
-          <ScopeNote title="Based on your access">Showing data for modules and records available to your role and permissions.</ScopeNote>
+          <ScopeNote title="Based on your access" />
         )}
         <div className="flex flex-col gap-1.5 sm:items-end">
           <RangeSelect value={range} onChange={setRange} />

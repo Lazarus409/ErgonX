@@ -178,7 +178,6 @@ export default function RoleSettingsPage() {
       <section className="overflow-hidden rounded-xl border border-line bg-surface shadow-elevation-1" aria-labelledby="matrix-overview">
         <div className="border-b border-line-soft p-5">
           <h2 id="matrix-overview" className="text-card-title font-semibold text-ink-strong">Matrix overview</h2>
-          <p className="mt-1 text-sm text-ink-muted">Permissions each role holds per module, out of what the module offers. Read-only; edit a custom role to change it.</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[40rem] text-left text-sm">

@@ -31,7 +31,6 @@ export default function SignInActivity() {
   return (
     <section className="rounded-xl border border-line bg-surface p-5 shadow-elevation-1" aria-labelledby="security-activity">
       <h2 id="security-activity" className="flex items-center gap-2 text-card-title font-semibold text-ink-strong"><CheckCircle2 className="h-5 w-5 text-primary" aria-hidden="true" />Recent security activity</h2>
-      <p className="mt-1 text-support text-ink-muted">Sign-ins and security changes on your account. If something looks unfamiliar, change your password and sign out other sessions.</p>
       {error && <div className="mt-3"><ErrorState variant="inline" title="Activity unavailable" message={error} onRetry={reload} /></div>}
       {loading && !data && <div className="mt-4 space-y-2">{[0, 1, 2].map((index) => <Skeleton key={index} className="h-12 rounded-lg" />)}</div>}
       {data && events.length === 0 && <p className="mt-4 text-support text-ink-muted">No recorded activity yet.</p>}

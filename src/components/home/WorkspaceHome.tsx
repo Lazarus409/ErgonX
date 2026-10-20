@@ -243,7 +243,6 @@ export default function WorkspaceHome({ areaLabel, continueHref, continueTitle, 
               <IconTile icon={UserRound} accent="brand" />
               <div>
                 <h2 className="text-card-title font-bold text-headline">Your personal workspace</h2>
-                <p className="mt-0.5 text-support text-ink-muted">Your attendance, leave balances, payslips and documents in one place.</p>
               </div>
             </div>
             <span className="relative mt-6 inline-flex items-center gap-1.5 text-support font-semibold text-primary-ink">Open Employee Home<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" aria-hidden="true" /></span>

@@ -258,7 +258,6 @@ export default function LeaveRequestReviewPage() {
 
       <header>
         <h1 className="text-[1.75rem] font-bold leading-9 tracking-tight text-headline sm:text-title">Leave Request Review</h1>
-        <p className="mt-1.5 text-[1.0625rem] text-ink-muted">Review the request details, check team availability and policy compliance before making a decision.</p>
       </header>
 
       {actionError && <div role="alert" className="rounded-xl border border-danger/25 bg-danger-soft px-4 py-3 text-sm text-danger-ink">{actionError}</div>}

@@ -90,7 +90,7 @@ export default function BankReconciliationPage() {
   return (
     <div className="space-y-5">
       <header className="flex flex-col gap-2 xl:flex-row xl:items-end xl:justify-between">
-        <div><h1 className="text-[1.75rem] font-bold leading-9 tracking-tight text-headline sm:text-title">Bank Reconciliation</h1><p className="mt-1.5 text-[1.0625rem] text-heading-support">Match bank transactions with your books to ensure accurate financial records.</p></div>
+        <div><h1 className="text-[1.75rem] font-bold leading-9 tracking-tight text-headline sm:text-title">Bank Reconciliation</h1></div>
         {can("payment.view") && <Link href="/accounting/banking/cash" className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary-ink hover:underline"><Wallet className="h-4 w-4" aria-hidden="true" />Payments &amp; receipts</Link>}
       </header>
 

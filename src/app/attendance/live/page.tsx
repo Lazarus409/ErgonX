@@ -345,9 +345,6 @@ export default function LiveAttendancePage() {
           <p className="text-sm font-semibold text-ink-strong">
             Today&apos;s Attendance
           </p>
-          <p className="mt-1 text-xs text-ink-muted">
-            Live attendance monitoring for the current institution.
-          </p>
         </div>
 
         <div className="flex items-center gap-2 text-xs text-ink-muted">

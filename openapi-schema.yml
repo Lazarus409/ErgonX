@@ -48746,6 +48746,555 @@ paths:
       - tenant_mismatch
       - module_disabled
       - permission_denied
+  /api/v1/public-holidays/:
+    get:
+      operationId: public_holidays_list
+      description: |-
+        Institution holidays: leave, attendance and working-day payroll skip these dates.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `schedule.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: List public holidays
+      parameters:
+      - in: query
+        name: date
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: date__gte
+        schema:
+          type: string
+          format: date
+      - in: query
+        name: date__lte
+        schema:
+          type: string
+          format: date
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - public-holidays
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/PaginatedPublicHolidayList'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+    post:
+      operationId: public_holidays_create
+      description: |-
+        Institution holidays: leave, attendance and working-day payroll skip these dates.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `organization.create` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `validation_error`.
+      summary: Create public holiday
+      tags:
+      - public-holidays
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublicHoliday'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PublicHoliday'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PublicHoliday'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/PublicHoliday'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - validation_error
+  /api/v1/public-holidays/{id}/:
+    get:
+      operationId: public_holidays_retrieve
+      description: |-
+        Institution holidays: leave, attendance and working-day payroll skip these dates.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `schedule.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
+      summary: Retrieve public holiday
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this public holiday.
+        required: true
+      tags:
+      - public-holidays
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/PublicHoliday'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+    put:
+      operationId: public_holidays_update
+      description: |-
+        Institution holidays: leave, attendance and working-day payroll skip these dates.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `organization.update` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Update public holiday
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this public holiday.
+        required: true
+      tags:
+      - public-holidays
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublicHoliday'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PublicHoliday'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PublicHoliday'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/PublicHoliday'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+    patch:
+      operationId: public_holidays_partial_update
+      description: |-
+        Institution holidays: leave, attendance and working-day payroll skip these dates.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `organization.update` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`, `validation_error`.
+      summary: Update public holiday
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this public holiday.
+        required: true
+      tags:
+      - public-holidays
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedPublicHoliday'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedPublicHoliday'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedPublicHoliday'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/PublicHoliday'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+      - validation_error
+    delete:
+      operationId: public_holidays_destroy
+      description: |-
+        Institution holidays: leave, attendance and working-day payroll skip these dates.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `organization.delete` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `not_found`.
+      summary: Delete public holiday
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: A UUID string identifying this public holiday.
+        required: true
+      tags:
+      - public-holidays
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: Resource not found in the caller's permitted scope.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - not_found
+  /api/v1/public-holidays/suggestions/:
+    get:
+      operationId: public_holidays_suggestions_retrieve
+      description: |-
+        Statutory holidays for the institution's country whose dates can be worked out; review before adding.
+
+        Requires an authenticated user, an active institution context, the `CORE_HR` module enabled, the `organization.create` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: Suggested public holidays for a year
+      parameters:
+      - in: query
+        name: year
+        schema:
+          type: integer
+        required: true
+      tags:
+      - public-holidays
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    $ref: '#/components/schemas/HolidaySuggestions'
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
   /api/v1/public/calendar/{token}.ics:
     get:
       operationId: public_calendar_.ics_retrieve
@@ -74477,6 +75026,40 @@ components:
       - id
       - name
       - updated_at
+    HolidaySuggestion:
+      type: object
+      properties:
+        name:
+          type: string
+        date:
+          type: string
+          format: date
+        statutory_date:
+          type: string
+          format: date
+          nullable: true
+        already_added:
+          type: boolean
+      required:
+      - already_added
+      - date
+      - name
+      - statutory_date
+    HolidaySuggestions:
+      type: object
+      properties:
+        country_code:
+          type: string
+        note:
+          type: string
+        holidays:
+          type: array
+          items:
+            $ref: '#/components/schemas/HolidaySuggestion'
+      required:
+      - country_code
+      - holidays
+      - note
     Home:
       type: object
       properties:
@@ -79766,6 +80349,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Position'
+    PaginatedPublicHolidayList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicHoliday'
     PaginatedReceiptList:
       type: object
       required:
@@ -84169,6 +84775,36 @@ components:
           type: string
           format: date-time
           readOnly: true
+    PatchedPublicHoliday:
+      type: object
+      description: Runs model validation so domain invariants also protect non-form
+        API writes.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        date:
+          type: string
+          format: date
+        name:
+          type: string
+          maxLength: 150
+        statutory_date:
+          type: string
+          format: date
+          nullable: true
+        is_active:
+          type: boolean
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
     PatchedRecruitmentStage:
       type: object
       description: Runs model validation so domain invariants also protect non-form
@@ -86905,6 +87541,43 @@ components:
       - email
       - first_name
       - last_name
+    PublicHoliday:
+      type: object
+      description: Runs model validation so domain invariants also protect non-form
+        API writes.
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        date:
+          type: string
+          format: date
+        name:
+          type: string
+          maxLength: 150
+        statutory_date:
+          type: string
+          format: date
+          nullable: true
+        is_active:
+          type: boolean
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - date
+      - id
+      - is_active
+      - name
+      - updated_at
     RatingInput:
       type: object
       properties:

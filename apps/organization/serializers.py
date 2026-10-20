@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 from apps.employees.models import Employee
-from apps.organization.models import Department, Grade, Location, Position
+from apps.organization.models import Department, Grade, Location, Position, PublicHoliday
 from apps.organization.services import create_position, update_position
 from common.serializers import ValidatedModelSerializer, call_validated_service
 
@@ -132,3 +132,10 @@ class LocationSerializer(ValidatedModelSerializer):
             "updated_at",
         )
         read_only_fields = ("id", "created_at", "updated_at")
+
+
+class PublicHolidaySerializer(ValidatedModelSerializer):
+    class Meta:
+        model = PublicHoliday
+        fields = ("id", "date", "name", "statutory_date", "is_active", "created_at", "updated_at")
+        read_only_fields = ("id", "is_active", "created_at", "updated_at")

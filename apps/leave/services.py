@@ -95,14 +95,21 @@ HALF_DAY = Decimal("0.5")
 
 
 def working_days(employee, start_date, end_date):
-    """Working days in a date range: the employee's schedule, or Monday-Friday without one."""
+    """Working days in a date range: the employee's schedule, or Monday-Friday without one.
+
+    Public holidays are never working days, so leave over a holiday doesn't use it up.
+    """
+    from apps.organization.holidays import holiday_dates
     from apps.scheduling.services import schedule_assignment_for, schedule_expectation
 
+    holidays = holiday_dates(employee.institution, start_date, end_date)
     count = 0
     day = start_date
     while day <= end_date:
         assignment = schedule_assignment_for(employee, day)
-        if assignment is not None:
+        if day in holidays:
+            pass
+        elif assignment is not None:
             if not schedule_expectation(assignment, day)["off_day"]:
                 count += 1
         elif day.weekday() < 5:

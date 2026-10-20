@@ -515,12 +515,6 @@ Under the Module Delivery and Frontend Integration Contract v1.0, the current de
 - Priority: `P2`
 - Limitation: A leave request spanning calendar years must be submitted as separate annual requests.
 
-### ATT-001 — Holiday-calendar configuration is not implemented
-
-- Status: `ACCEPTED_MVP`
-- Priority: `P2`
-- Impact: Scheduling and attendance do not yet have an institution-specific public-holiday calendar.
-
 ## Superseded historical entries
 
 The entries below are retained for traceability only. They no longer carry current `Status:` lines; each points to the active limitation or resolved-history item that superseded it.
@@ -547,13 +541,22 @@ The entries below are retained for traceability only. They no longer carry curre
 
 ## Resolved items
 
+### RES-037 - Institution public-holiday calendar (was ATT-001)
+
+- Resolved: 2026-10-20
+- Original issue: Scheduling and attendance had no institution-specific public-holiday calendar.
+- Resolution: `PublicHoliday` (institution, observed date, name, optional statutory date) at `/api/v1/public-holidays/`; anyone with `schedule.view` lists them and organization editors maintain them (audited). Leave working days skip holidays, attendance classification records a holiday as `OFF_DAY` rather than `ABSENT`, and `WORKING_DAYS` payroll proration leaves holidays out. `/public-holidays/suggestions/?year=` proposes Ghana's statutory holidays whose dates can be worked out (Public Holidays and Commemorative Days (Amendment) Act, 2025: 4 August removed, 21 September Founders' Day, weekend holidays observed Monday, Tuesday-Thursday holidays observed Friday, religious holidays not moved); HR reviews before adding, and adds the lunar Eid/Shaqq dates when announced.
+- Remaining: holiday-specific overtime premiums are not modelled; holidays are institution-wide (not per location).
+- Validation: `tests/test_public_holidays.py`.
+- Evidence: `apps/organization/holidays.py`, `apps/organization/models.py`, migration `organization/0006_public_holidays.py`, `apps/leave/services.py`, `apps/attendance/services.py`, `apps/payroll/calculation.py`.
+
 ### RES-035 - Mid-period hires and salary changes could not be paid (was PAY-002)
 
 - Resolved: 2026-10-20
 - Original issue: Payroll calculation failed closed whenever the effective compensation began after the payroll period start, so a mid-period hire or a salary change inside a period blocked the whole run.
 - Resolution: `InstitutionPayrollConfiguration.proration_method` (`CALENDAR_DAYS` default, or `WORKING_DAYS` counting Monday to Friday) governs partial periods. The period is split into stretches paid at one compensation; days outside any employment are unpaid, and employed days with no compensation still fail closed. Base salary and fixed earning components are prorated by each stretch's share of counted days; fixed deductions and employer components are not. Statutory rules use the prorated basic. Prorated items carry `metadata.proration` (method, paid and period days, date range). A non-default method is part of the run configuration snapshot.
 - Leavers: a run includes only employees employed and compensated at some point in the period. Offboarding ends the employment but not the compensation, so previously a leaver was still selected and failed the "employment at period end" check, which blocked that run and every later one. A leaver is now paid up to their last working day and drops out of later runs.
-- Remaining: working days do not yet exclude public holidays (see ATT-001). Final-pay items such as leave encashment are not calculated.
+- Remaining: final-pay items such as leave encashment are not calculated.
 - Validation: `tests/test_pay_proration.py`, `tests/test_payroll_selectors.py`.
 - Evidence: `apps/payroll/calculation.py` (`_pay_segments`), `apps/payroll/selectors.py` (`eligible_employees_for_payroll_run`), `apps/payroll/models.py`, migration `payroll/0007_proration_method.py`.
 

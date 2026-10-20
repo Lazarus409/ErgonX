@@ -9,6 +9,7 @@ from apps.compensation.models import EmployeeCompensation, PayComponent
 from apps.compensation.services import resolve_compensation
 from apps.employees.models import Employment
 from apps.leave.models import LeaveRequest
+from apps.organization.holidays import holiday_dates
 from apps.payroll.custom_rules import progressive_tax
 from apps.payroll.localizations import calculate_localized_statutory
 from apps.payroll.models import (
@@ -59,15 +60,21 @@ def _pay_segments(employee, period, configuration):
 
     Days outside any employment are unpaid (a mid-period hire); days inside employment
     with no compensation fail closed. A stretch's share is its counted days over the
-    period's counted days: every day for CALENDAR_DAYS, Monday to Friday for WORKING_DAYS.
+    period's counted days: every day for CALENDAR_DAYS; for WORKING_DAYS, Monday to
+    Friday except the institution's public holidays.
     """
     working_days_only = (
         configuration.proration_method
         == InstitutionPayrollConfiguration.ProrationMethod.WORKING_DAYS
     )
+    holidays = (
+        holiday_dates(employee.institution, period.start_date, period.end_date)
+        if working_days_only
+        else set()
+    )
 
     def counted(day):
-        return not working_days_only or day.weekday() < 5
+        return not working_days_only or (day.weekday() < 5 and day not in holidays)
 
     period_days = sum(1 for day in _dates(period.start_date, period.end_date) if counted(day))
     if not period_days:

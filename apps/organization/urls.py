@@ -5,11 +5,13 @@ from apps.organization.views import (
     GradeViewSet,
     LocationViewSet,
     PositionViewSet,
+    PublicHolidayViewSet,
 )
 
 router = DefaultRouter()
 router.register("departments", DepartmentViewSet, basename="department")
 router.register("positions", PositionViewSet, basename="position")
+router.register("public-holidays", PublicHolidayViewSet, basename="public-holiday")
 router.register("grades", GradeViewSet, basename="grade")
 router.register("locations", LocationViewSet, basename="location")
 

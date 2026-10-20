@@ -137,7 +137,7 @@ export default function PayrollPeriodsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Payroll" title="Payroll periods" description="Create a period for each pay cycle, then start its payroll run." icon={CalendarDays} accent="payroll" actions={canPrepare ? <Button leadingIcon={<Plus className="h-4 w-4" />} onClick={openForm} disabled={!data}>New period</Button> : null} />
+      <PageHeader eyebrow="Payroll" title="Payroll periods" icon={CalendarDays} accent="payroll" actions={canPrepare ? <Button leadingIcon={<Plus className="h-4 w-4" />} onClick={openForm} disabled={!data}>New period</Button> : null} />
       {data && !configured && canPrepare && (
         <Alert tone="warning" title="Payroll is not configured yet">
           Save the payroll configuration before starting a run. <Link href="/payroll/configuration" className="font-semibold underline">Open payroll configuration</Link>

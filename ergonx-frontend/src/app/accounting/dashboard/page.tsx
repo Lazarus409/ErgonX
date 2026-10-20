@@ -54,7 +54,7 @@ export default function AccountingDashboard() {
     <div className="space-y-6">
       <PageHeader
         title="Accounting"
-        description="Financial integrity for a stronger tomorrow."
+       
         actions={
           <>
             <label className="relative">

@@ -133,7 +133,7 @@ export default function ScheduleDetailPage() {
       <>
         <PageHeader
           title="Work Schedule"
-          description="Schedule configuration and assignment history."
+         
           actions={<BackLink />}
         />
 

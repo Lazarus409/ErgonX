@@ -281,7 +281,7 @@ export default function AttendanceAdjustmentsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Attendance Adjustments"
-        description="Review requested corrections to attendance records."
+       
       />
 
       {error && <ErrorState message={error} onRetry={reload} />}

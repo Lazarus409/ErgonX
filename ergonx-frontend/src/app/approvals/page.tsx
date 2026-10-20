@@ -72,7 +72,7 @@ export default function ApprovalsPage() {
       <PageHeader
         eyebrow="Workflow"
         title="Approvals"
-        description="Review and action requests as they move through your institution's approval workflows."
+       
         icon={GitPullRequest}
         accent="brand"
         meta={

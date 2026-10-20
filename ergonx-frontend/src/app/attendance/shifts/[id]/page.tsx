@@ -96,7 +96,7 @@ export default function ShiftDetailPage() {
       <>
         <PageHeader
           title="Shift"
-          description="Shift configuration and assigned employees."
+         
           actions={<BackLink />}
         />
 

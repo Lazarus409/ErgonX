@@ -106,7 +106,7 @@ export default function MyAttendancePage() {
     <div className="mx-auto max-w-6xl space-y-6">
       <PageHeader
         title="My attendance"
-        description="Your daily attendance, time logs and correction requests."
+       
         icon={Clock3}
         accent="attendance"
         actions={employee && (

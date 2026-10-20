@@ -96,7 +96,7 @@ export default function PayrollPage() {
     <ModuleLanding
       title="Payroll"
       eyebrow="Payroll"
-      description="Manage payroll configuration, salary structures, payroll periods, payroll runs, adjustments and payslips."
+     
       module="PAYROLL"
       accent="payroll"
       icon={WalletCards}

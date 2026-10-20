@@ -139,7 +139,7 @@ export default function NotificationsPage() {
         <div className="mx-auto max-w-6xl space-y-6">
           <PageHeader
             title="Notification center"
-            description="Workflow, approval and system updates addressed to you in this institution."
+           
             icon={Bell}
             accent="brand"
             actions={

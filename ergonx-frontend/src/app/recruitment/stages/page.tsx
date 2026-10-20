@@ -41,7 +41,7 @@ export default function RecruitmentStagesPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Recruitment" title="Recruitment stages" description="The ordered, institution-scoped stages used by the recruitment pipeline." icon={Workflow} accent="recruitment" />
+      <PageHeader eyebrow="Recruitment" title="Recruitment stages" icon={Workflow} accent="recruitment" />
       <Card title="Add a stage" description="Stages run in sequence order; a terminal stage ends the pipeline." accent="recruitment">
         <form onSubmit={create} className="grid items-end gap-4 md:grid-cols-[1fr_140px_auto_auto]">
           <Field label="Stage name" required><Input value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} placeholder="e.g. Technical interview" /></Field>

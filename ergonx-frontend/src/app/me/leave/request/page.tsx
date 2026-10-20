@@ -108,7 +108,7 @@ export default function RequestLeavePage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <PageHeader title="Request leave" description="Submit a leave request for approval." actions={<Link href="/me/leave" className={buttonClasses({ variant: "secondary" })}><ArrowLeft size={16} />Back to my leave</Link>} />
+      <PageHeader title="Request leave" actions={<Link href="/me/leave" className={buttonClasses({ variant: "secondary" })}><ArrowLeft size={16} />Back to my leave</Link>} />
       {!referenceLoading && !employee && <EmptyState title="No employee record linked" description="Your account is not linked to an employee record in this institution, so a leave request cannot be raised for you." />}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">

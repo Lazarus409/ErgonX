@@ -47,7 +47,7 @@ export default function InterviewsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Recruitment" title="Interviews" description="Schedule interviews and record controlled outcomes." icon={CalendarClock} accent="recruitment" actions={<ButtonLink href="/recruitment/interviews/new" leadingIcon={<Plus className="h-4 w-4" />}>Schedule interview</ButtonLink>} />
+      <PageHeader eyebrow="Recruitment" title="Interviews" icon={CalendarClock} accent="recruitment" actions={<ButtonLink href="/recruitment/interviews/new" leadingIcon={<Plus className="h-4 w-4" />}>Schedule interview</ButtonLink>} />
       {error && rows && <ErrorState variant="inline" title="Unable to update the interview" message={error} onRetry={() => void load()} />}
       <DataTable<RecruitmentInterview>
         caption="Interviews"

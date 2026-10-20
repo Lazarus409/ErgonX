@@ -71,7 +71,7 @@ export default function MySwapsPage() {
       <PageHeader
         eyebrow="Self service"
         title="Shift swaps"
-        description="Swap a day's shift with a colleague. They accept first, then your manager or HR approves; your hours that day follow the swap."
+       
         icon={ArrowLeftRight}
         accent="attendance"
         actions={<Button leadingIcon={<Plus className="h-4 w-4" />} onClick={() => { setAsking(true); setDate(""); setOptions(null); setCounterpart(""); setReason(""); setFormError(""); }}>Ask for a swap</Button>}

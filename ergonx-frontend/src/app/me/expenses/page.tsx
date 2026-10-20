@@ -59,7 +59,7 @@ export default function MyExpensesPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <PageHeader title="My expenses" description="Claim work expenses, follow their approval, and see when settlement is recorded." icon={Receipt} accent="accounting" actions={<Button leadingIcon={<Plus className="h-4 w-4" />} onClick={() => setEditing("new")}>New claim</Button>} />
+      <PageHeader title="My expenses" icon={Receipt} accent="accounting" actions={<Button leadingIcon={<Plus className="h-4 w-4" />} onClick={() => setEditing("new")}>New claim</Button>} />
       <section className="grid gap-4 sm:grid-cols-3" aria-label="Summary">
         <div className="rounded-xl border border-line bg-surface p-4 shadow-elevation-1"><p className="text-caption font-semibold uppercase tracking-[0.06em] text-ink-muted">In progress</p><p className="mt-1 text-heading font-bold text-ink-strong">{inProgress}</p></div>
         <div className="rounded-xl border border-line bg-surface p-4 shadow-elevation-1"><p className="text-caption font-semibold uppercase tracking-[0.06em] text-ink-muted">Awaiting settlement</p><p className="mt-1 text-heading font-bold tabular-nums text-ink-strong">{currency ? formatAmount(owed.toFixed(2), currency) : "—"}</p></div>

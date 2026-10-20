@@ -116,7 +116,7 @@ export default function LifecycleChecklistsPage() {
       <PageHeader
         eyebrow="Human Resources"
         title="Onboarding & offboarding checklists"
-        description="Items copied onto every employee's onboarding or offboarding. Required items must be done, or skipped with a reason, before the step can complete."
+       
         icon={ClipboardCheck}
         accent="hr"
         actions={canManage ? <Button leadingIcon={<Plus className="h-4 w-4" />} onClick={openCreate}>Add item</Button> : null}

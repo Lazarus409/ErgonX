@@ -156,7 +156,7 @@ export default function PayrollConfigurationPage() {
   return (
     <div className="space-y-6">
       <BackNavigation fallback="/payroll" label="Back to Payroll" />
-      <PageHeader title="Payroll configuration" description="Choose a country preset, or run a custom payroll with your own tax and contribution rules." icon={Settings2} accent="payroll" />
+      <PageHeader title="Payroll configuration" icon={Settings2} accent="payroll" />
       {error && <Alert tone="danger" title="The configuration was not saved">{error}</Alert>}
       {saved && <Alert tone="success" title="Payroll configuration saved"><span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4" aria-hidden="true" />New payroll runs use these settings. Runs already started keep the settings they began with.</span></Alert>}
 

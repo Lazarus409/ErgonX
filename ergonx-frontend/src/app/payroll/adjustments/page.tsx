@@ -44,7 +44,7 @@ export default function PayrollAdjustmentsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Payroll" title="Payroll adjustments" description="Create and approve adjustments before payroll calculation." icon={FileCog} accent="payroll" actions={can("payroll.prepare") ? <Button leadingIcon={<Plus className="h-4 w-4" />} onClick={() => { setFormError(""); setModal(true); }}>New adjustment</Button> : null} />
+      <PageHeader eyebrow="Payroll" title="Payroll adjustments" icon={FileCog} accent="payroll" actions={can("payroll.prepare") ? <Button leadingIcon={<Plus className="h-4 w-4" />} onClick={() => { setFormError(""); setModal(true); }}>New adjustment</Button> : null} />
       {formError && !modal && <Alert tone="danger" onDismiss={() => setFormError("")}>{formError}</Alert>}
       <DataTable<PayrollAdjustment>
         caption="Payroll adjustments"

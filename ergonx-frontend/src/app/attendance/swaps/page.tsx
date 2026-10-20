@@ -23,7 +23,7 @@ export default function ShiftSwapsPage() {
       <PageHeader
         eyebrow="Time & attendance"
         title="Shift swaps"
-        description="Swaps agreed between colleagues, waiting for your approval. Approved swaps change each person's expected hours for that day."
+       
         icon={ArrowLeftRight}
         accent="attendance"
       />

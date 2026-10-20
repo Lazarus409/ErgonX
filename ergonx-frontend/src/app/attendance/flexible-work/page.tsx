@@ -203,7 +203,7 @@ export default function FlexibleWorkPage() {
     <div className="space-y-6">
       <PageHeader
         title="Flexible Work"
-        description="Configure flexible working windows while defining required working time and optional core hours."
+       
         actions={<Button onClick={openNew} leadingIcon={<Plus className="h-4 w-4" />}>New Rule</Button>}
       />
 

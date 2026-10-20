@@ -129,7 +129,7 @@ export default function BankingPage() {
     <div className="space-y-6">
       <PageHeader
         title="Payments & Receipts"
-        description="Bank accounts, vendor payments and customer receipts."
+       
         actions={
           <div className="flex gap-2">
             <button type="button" onClick={() => setBankFormOpen(true)} className={buttonClasses({ variant: "secondary" })}>New Bank Account</button>

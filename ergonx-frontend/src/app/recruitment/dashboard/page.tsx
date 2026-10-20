@@ -55,7 +55,7 @@ export default function RecruitmentDashboardPage() {
     <div className="space-y-6">
       <PageHeader
         title="Recruitment"
-        description="Attract, assess and hire great talent."
+       
         actions={
           <>
             <label className="relative">

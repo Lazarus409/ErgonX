@@ -78,7 +78,7 @@ export default function OrganizationStarterPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <PageHeader title="Create starter organization structure" description="These four records are the minimum Core HR structure required before institution setup can be validated." actions={<Link href="/onboarding" className="rounded-lg border border-line-strong px-3 py-2 text-sm font-semibold">Back to setup</Link>} />
+      <PageHeader title="Create starter organization structure" actions={<Link href="/onboarding" className="rounded-lg border border-line-strong px-3 py-2 text-sm font-semibold">Back to setup</Link>} />
       {error && <ErrorState title="Could not create starter structure" message={error} />}
       <section className="rounded-2xl border border-line bg-surface p-6">
         <p className="text-sm text-ink-muted">Creating records for {institution?.name ?? "your institution"}. Reference codes are generated automatically.</p>

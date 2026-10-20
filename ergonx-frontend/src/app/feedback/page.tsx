@@ -57,7 +57,7 @@ export default function GiveFeedbackPage() {
       <PageHeader
         eyebrow="Performance"
         title="Give feedback"
-        description="Colleagues have asked for your view as part of their performance review. Your answers are combined with others' and shown without your name."
+       
         icon={MessagesSquare}
         accent="hr"
       />

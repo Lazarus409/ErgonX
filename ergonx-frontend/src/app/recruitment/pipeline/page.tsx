@@ -19,7 +19,7 @@ export default function RecruitmentPipelinePage() {
   const stages = [...(data ?? [])].sort((a, b) => a.sequence - b.sequence);
   return (
     <div className="space-y-6">
-      <PageHeader eyebrow="Recruitment" title="Recruitment pipeline" description="Application volume by the institution-defined recruitment stages." icon={Layers} accent="recruitment" />
+      <PageHeader eyebrow="Recruitment" title="Recruitment pipeline" icon={Layers} accent="recruitment" />
       {loading && !data && <LoadingState variant="dashboard" />}
       {error && <ErrorState message={error} onRetry={reload} />}
       {data && (stages.length ? (

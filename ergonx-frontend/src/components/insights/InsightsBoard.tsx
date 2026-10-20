@@ -146,8 +146,6 @@ export default function InsightsBoard({ variant = "insights" }: { variant?: "ins
       <header className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,30rem)_auto] lg:items-start">
         <div className="min-w-0">
           <h1 className="text-[1.75rem] font-bold leading-9 tracking-tight text-headline sm:text-title">{executive ? `${data?.executive_title ?? "Executive"} Dashboard` : "Insights"}</h1>
-          <p className="mt-1 text-[1.0625rem] leading-7 text-heading-support">{executive ? "A unified view of your institution's performance." : "Trusted data. Meaningful insights."}</p>
-          <p className="text-support text-ink-muted">{executive ? "Organization-wide analytics across all modules, departments and campuses." : "Based on your access. Showing data from modules you can view."}</p>
         </div>
         {executive ? (
           <ScopeNote title="Organization-wide view" icon={Landmark} solidIcon>Showing data for all modules, departments and locations{institution?.name ? <> at {institution.name.replace(/\.$/, "")}</> : null}.</ScopeNote>

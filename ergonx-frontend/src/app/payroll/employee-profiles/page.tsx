@@ -69,7 +69,7 @@ export default function EmployeePayrollProfilesPage() {
     <div className="space-y-6">
       <PageHeader
         title="Employee payroll profiles"
-        description="Tax identity and payment details for each employee. Payment details feed the bank and mobile-money files of each finalized run."
+       
         actions={canEdit ? <Button leadingIcon={<Plus className="h-4 w-4" />} onClick={openCreate}>Add profile</Button> : null}
       />
       {canEdit && withoutProfile.length > 0 && !loading && <Alert tone="warning">{withoutProfile.length} employee{withoutProfile.length === 1 ? " has" : "s have"} no payroll profile, so they can&apos;t be paid by transfer.</Alert>}

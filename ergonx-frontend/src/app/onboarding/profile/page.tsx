@@ -79,7 +79,7 @@ export default function OnboardingProfilePage() {
     <div className="mx-auto max-w-4xl space-y-6">
       <PageHeader
         title="Institution profile"
-        description="Set the organization details that tailor ErgonX to your location and operations."
+       
         actions={<Link href="/onboarding" className={buttonClasses({ variant: "secondary" })}>Back to setup</Link>}
       />
       {saveError && <ErrorState title="Could not save the profile" message={saveError} />}

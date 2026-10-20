@@ -12,5 +12,5 @@ const areas = [
 ];
 
 export default function OrganizationPage() {
-  return <ModuleLanding title="Organization" description="Set up the departments, positions, grades and locations your people are organized into." module="HR" accent="hr" icon={Building2} eyebrow="Human Resources" areas={areas} />;
+  return <ModuleLanding title="Organization" module="HR" accent="hr" icon={Building2} eyebrow="Human Resources" areas={areas} />;
 }

@@ -256,7 +256,7 @@ export default function LeaveCalendarPage() {
     <div className="space-y-6">
       <PageHeader
         title="Leave Calendar"
-        description="View approved and pending employee leave across the institution."
+       
       />
 
       <div className="flex flex-col gap-4 rounded-xl border border-line bg-surface p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">

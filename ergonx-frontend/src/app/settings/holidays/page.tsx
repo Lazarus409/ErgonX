@@ -73,7 +73,7 @@ export default function PublicHolidaysPage() {
       <PageHeader
         eyebrow="Administration"
         title="Public holidays"
-        description="Days off for everyone. Leave requests don't use up days on a holiday, attendance records them as off days, and working-day payroll leaves them out."
+       
         icon={CalendarDays}
         accent="settings"
         actions={<label className="flex items-center gap-2 text-sm font-semibold text-ink">Year<Select value={String(year)} onChange={(event) => { setYear(Number(event.target.value)); setPicked({}); }} className="w-28">{[thisYear - 1, thisYear, thisYear + 1, thisYear + 2].map((value) => <option key={value} value={value}>{value}</option>)}</Select></label>}

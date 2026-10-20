@@ -257,7 +257,7 @@ export default function ShiftPatternsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Shift Patterns"
-        description="Define repeating shift cycles and the shift worked on each day of the cycle."
+       
         actions={
           <button
             onClick={openCreate}

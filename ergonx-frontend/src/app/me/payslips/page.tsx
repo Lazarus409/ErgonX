@@ -49,7 +49,7 @@ export default function MyPayslipsPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <PageHeader title="My payslips" description="View your payslips and what makes up your pay." icon={CircleDollarSign} accent="payroll"
+      <PageHeader title="My payslips" icon={CircleDollarSign} accent="payroll"
         meta={currency ? <Badge tone="neutral" dot>{currency} · {activeYear ? `${activeYear} gross ${formatAmount(ytdGross.toFixed(2), currency)}` : "No payslips yet"}</Badge> : undefined} />
 
       <section className="flex flex-wrap items-end gap-3 rounded-xl border border-line bg-surface p-4 shadow-elevation-1" aria-label="Filters">

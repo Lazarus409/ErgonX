@@ -122,7 +122,7 @@ export default function MembershipSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Users & Access" description="Manage who can access ErgonX and what they can do." />
+      <PageHeader title="Users & Access" />
 
       <Tabs
         label="Users and access sections"

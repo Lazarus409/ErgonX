@@ -36,7 +36,7 @@ export default function EmergencyContactsPage() {
   }
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <PageHeader title="Emergency contacts" description="People HR can contact if there is an emergency." icon={Contact} accent="brand" />
+      <PageHeader title="Emergency contacts" icon={Contact} accent="brand" />
       {error && <Alert tone="danger" onDismiss={() => setError(null)}>{error}</Alert>}
       {items.length > 0 && (
         <section className="grid gap-4 md:grid-cols-2" aria-label="Your contacts">

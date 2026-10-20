@@ -355,7 +355,7 @@ export default function LeavePoliciesPage() {
     <div className="space-y-6">
       <PageHeader
         title="Leave Policies"
-        description="Configure leave entitlement, accrual rules and employee eligibility."
+       
         actions={
           <button
             onClick={() => openCreate()}

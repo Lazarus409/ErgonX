@@ -109,7 +109,7 @@ export default function PerformancePage() {
       <PageHeader
         eyebrow="Human Resources"
         title="Performance"
-        description="Run review cycles: self-assessment, manager review and HR sign-off."
+       
         icon={Target}
         accent="hr"
         actions={canManage ? <div className="flex flex-wrap gap-2"><Button variant="secondary" leadingIcon={<Plus className="h-4 w-4" />} onClick={() => openCompetency(null)}>Add competency</Button><Button leadingIcon={<Plus className="h-4 w-4" />} onClick={() => openCycle(null)}>New review cycle</Button></div> : null}

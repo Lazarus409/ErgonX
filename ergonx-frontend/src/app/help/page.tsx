@@ -17,7 +17,7 @@ export default function HelpPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <PageHeader title="Help" description="Short guides for common jobs, and what the payroll and HR terms mean." icon={LifeBuoy} accent="settings" />
+      <PageHeader title="Help" icon={LifeBuoy} accent="settings" />
       <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search help, e.g. PAYE, import, leave" leadingIcon={<Search />} aria-label="Search help" />
 
       <section aria-labelledby="guides-heading" className="space-y-3">

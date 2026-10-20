@@ -1,6 +1,6 @@
 /** Payroll runs and periods. Workflow statuses change only through actions. */
 
-import { apiAction, apiDelete, apiGet, apiGetList, apiPatch, apiPost } from "./client";
+import { apiAction, apiDelete, apiDownload, apiGet, apiGetList, apiPatch, apiPost } from "./client";
 import type { ListParams, PaginatedData } from "@/types/api";
 import type {
   PayrollComplianceDeadline,
@@ -90,6 +90,20 @@ export async function listPayslips(params?: ListParams & { payroll_record?: stri
 
 export async function getPayslip(id: string): Promise<Payslip> {
   return apiGet<Payslip>(`/payslips/${id}/`);
+}
+
+/** The finalized payslip rendered as a PDF by the server. */
+export function downloadPayslipPdf(id: string): Promise<Blob> {
+  return apiDownload(`/payslips/${id}/pdf/`);
+}
+
+/** Everything withheld from gross pay: deductions plus employee contributions such as pension. */
+export function payslipWithheld(payload: { total_deductions: string; employee_contributions: string }): string {
+  return (Number(payload.total_deductions) + Number(payload.employee_contributions)).toFixed(2);
+}
+
+export function payslipPdfFilename(periodName: string): string {
+  return `payslip-${periodName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}.pdf`;
 }
 
 /** Re-runs exception detection on a calculated or in-review run. */

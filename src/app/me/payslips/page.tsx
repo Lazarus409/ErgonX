@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, CircleDollarSign, FileText, Search, ShieldCheck } from "lucide-react";
+import { ArrowRight, CircleDollarSign, Download, FileText, Search, ShieldCheck } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/Badge";
 import { DataTable } from "@/components/ui/DataTable";
 import PageHeader from "@/components/ui/PageHeader";
 import { employeesApi, payrollApi } from "@/lib/api";
+import { getApiErrorMessage } from "@/lib/api/client";
+import { saveBlob } from "@/lib/api/policies";
 import { cx } from "@/lib/cx";
 import { formatAmount, formatDate } from "@/lib/format";
 import { useApiResource } from "@/lib/useApiResource";
@@ -35,6 +37,15 @@ export default function MyPayslipsPage() {
   const selected = shown.find((slip) => slip.id === selectedId) ?? shown[0] ?? null;
   const currency = payslips[0]?.payload.currency;
   const ytdGross = shown.reduce((sum, slip) => sum + Number(slip.payload.gross_pay), 0);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const download = async (slip: Payslip) => {
+    setDownloadingId(slip.id);
+    setDownloadError(null);
+    try { await saveBlob(await payrollApi.downloadPayslipPdf(slip.id), payrollApi.payslipPdfFilename(slip.payroll_period.name)); }
+    catch (caught) { setDownloadError(getApiErrorMessage(caught)); }
+    finally { setDownloadingId(null); }
+  };
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -70,7 +81,7 @@ export default function MyPayslipsPage() {
             { key: "period", header: "Pay period", sortValue: (item) => item.payroll_period.pay_date, cell: (item) => <span className="font-semibold text-ink-strong">{item.payroll_period.name}</span> },
             { key: "paydate", header: "Pay date", sortValue: (item) => item.payroll_period.pay_date, cell: (item) => formatDate(item.payroll_period.pay_date) },
             { key: "gross", header: "Gross", numeric: true, hideBelow: "md", cell: (item) => formatAmount(item.payload.gross_pay, item.payload.currency) },
-            { key: "deductions", header: "Deductions", numeric: true, hideBelow: "lg", cell: (item) => formatAmount(item.payload.total_deductions, item.payload.currency) },
+            { key: "deductions", header: "Deductions", numeric: true, hideBelow: "lg", cell: (item) => formatAmount(payrollApi.payslipWithheld(item.payload), item.payload.currency) },
             { key: "net", header: "Net pay", numeric: true, sortValue: (item) => Number(item.payload.net_pay), cell: (item) => <span className="font-semibold text-ink-strong">{formatAmount(item.payload.net_pay, item.payload.currency)}</span> },
             { key: "view", header: <span className="sr-only">Open</span>, cell: (item) => <div className="flex justify-end"><Link href={`/payroll/payslips/${item.id}`} onClick={(event) => event.stopPropagation()} className="inline-flex h-8 items-center gap-1 rounded-lg px-2.5 text-support font-semibold text-primary-ink hover:bg-primary-soft">Open<ArrowRight className="h-3.5 w-3.5" aria-hidden="true" /></Link></div> },
           ]}
@@ -92,10 +103,12 @@ export default function MyPayslipsPage() {
                 </dl>
                 <dl className="mt-4 space-y-1.5 border-t border-line-soft pt-3 text-support">
                   <div className="flex justify-between"><dt className="text-ink-muted">Gross pay</dt><dd className="tabular-nums text-ink-strong">{formatAmount(selected.payload.gross_pay, selected.payload.currency)}</dd></div>
-                  <div className="flex justify-between"><dt className="text-ink-muted">Total deductions</dt><dd className="tabular-nums text-danger-ink">− {formatAmount(selected.payload.total_deductions, selected.payload.currency)}</dd></div>
+                  <div className="flex justify-between"><dt className="text-ink-muted">Total deductions</dt><dd className="tabular-nums text-danger-ink">− {formatAmount(payrollApi.payslipWithheld(selected.payload), selected.payload.currency)}</dd></div>
                   <div className="flex justify-between pt-1 text-base font-bold"><dt className="text-ink-strong">Net pay</dt><dd className="tabular-nums text-primary-ink">{formatAmount(selected.payload.net_pay, selected.payload.currency)}</dd></div>
                 </dl>
                 <Link href={`/payroll/payslips/${selected.id}`} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary/90">Open payslip<ArrowRight className="h-4 w-4" aria-hidden="true" /></Link>
+                <button type="button" onClick={() => void download(selected)} disabled={downloadingId === selected.id} className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-line-strong bg-surface px-4 py-2.5 text-sm font-semibold text-ink-strong hover:bg-surface-muted disabled:opacity-60"><Download className="h-4 w-4" aria-hidden="true" />{downloadingId === selected.id ? "Preparing PDF…" : "Download PDF"}</button>
+                {downloadError && <p role="alert" className="mt-2 text-caption text-danger-ink">Could not download the PDF: {downloadError}</p>}
               </>
             ) : <p className="mt-2 text-support text-ink-muted">Select a payslip to see its breakdown.</p>}
           </section>

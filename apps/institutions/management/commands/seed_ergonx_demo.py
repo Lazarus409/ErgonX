@@ -14,6 +14,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import models, transaction
 from django.utils import timezone
 
+from apps.institutions.demo_payroll_details import ensure_demo_holidays, ensure_demo_payment_details
 from apps.accounts.models import User
 from apps.employees.models import Employee, Employment
 from apps.employees.services import create_employment
@@ -458,6 +459,8 @@ class Command(BaseCommand):
             institution, password, reset_passwords=reset_passwords
         )
         self._ensure_compensation_and_payroll_profiles(institution, admin)
+        ensure_demo_payment_details(institution, admin)
+        ensure_demo_holidays(institution, admin)
         self._ensure_recruitment(institution, admin)
         self._ensure_leave(institution, admin)
         self._ensure_attendance(institution, admin)

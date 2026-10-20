@@ -1,3 +1,4 @@
+from django.http import HttpResponse
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiExample, extend_schema, extend_schema_view
 from rest_framework import viewsets
@@ -70,6 +71,8 @@ from apps.payroll.services import (
 )
 from apps.accounting.serializers import JournalEntrySerializer
 from apps.accounting.services import generate_payroll_journal
+from apps.audit.services import record_audit_event
+from apps.payroll.payslip_pdf import payslip_filename, render_payslip_pdf
 from common.scoping import PAYSLIP_BROAD, scope_to_employees
 from common.permissions import TenantContextPermission, TenantRBACPermission
 from common.serializers import call_validated_service
@@ -728,3 +731,25 @@ class PayslipViewSet(TenantModelViewSet):
         return scope_to_employees(
             queryset, self.request, "payroll_record__employee", allow_team=False, broad=PAYSLIP_BROAD
         )
+
+    @extend_schema(
+        summary="Download payslip PDF",
+        responses={(200, "application/pdf"): OpenApiTypes.BINARY},
+        filters=False,
+    )
+    @action(detail=True, methods=("get",), filter_backends=())
+    def pdf(self, request, pk=None):
+        """Render the finalized payslip as a PDF, with the same access as viewing it."""
+        payslip = self.get_object()
+        content = render_payslip_pdf(payslip)
+        record_audit_event(
+            actor=request.user,
+            institution=payslip.institution,
+            entity=payslip,
+            action="payroll.payslip.downloaded",
+            metadata={"employee_id": str(payslip.payroll_record.employee_id)},
+        )
+        response = HttpResponse(content, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="{payslip_filename(payslip)}"'
+        response["Cache-Control"] = "private, no-store"
+        return response

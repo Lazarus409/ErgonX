@@ -25,8 +25,10 @@ import {
   UserRound,
   Users,
   XCircle,
+  Banknote,
 } from "lucide-react";
 
+import PaymentsPanel from "@/components/payroll/PaymentsPanel";
 import PayrollRunStepper, { PAYROLL_STEPS, payrollStepIndex } from "@/components/payroll/PayrollRunStepper";
 import { PrintFooter, PrintMasthead } from "@/components/brand/PrintDocument";
 import { useAuth } from "@/components/guards/AuthProvider";
@@ -47,7 +49,7 @@ import { hasModule } from "@/types/institutions";
 import type { PayrollRunException } from "@/types/payroll";
 
 type Action = "calculate" | "submit" | "approve" | "finalize" | "cancel" | "generateJournal" | "validate";
-type Tab = "overview" | "employees" | "exceptions" | "approvals" | "activity";
+type Tab = "overview" | "employees" | "exceptions" | "payments" | "approvals" | "activity";
 
 const actionCopy: Record<Action, { label: string; title: string; description: string; destructive?: boolean }> = {
   calculate: { label: "Calculate", title: "Calculate payroll run", description: "Calculate eligible employee records using the configured rules. Exceptions are detected automatically." },
@@ -177,6 +179,7 @@ export default function PayrollRunDetailPage() {
     { value: "overview", label: "Overview", icon: FileText },
     { value: "employees", label: "Employees", icon: Users, count: records.length },
     { value: "exceptions", label: "Exceptions", icon: AlertTriangle, count: openCount },
+    { value: "payments", label: "Payments", icon: Banknote },
     { value: "approvals", label: "Approvals", icon: ShieldCheck },
     { value: "activity", label: "Activity", icon: Clock3 },
   ];
@@ -357,6 +360,8 @@ export default function PayrollRunDetailPage() {
               )}
             </Panel>
           )}
+
+          {tab === "payments" && <PaymentsPanel runId={run.id} canDownload={can("payroll.finalize")} canEditProfiles={can("payroll.configure")} />}
 
           {tab === "approvals" && (
             <Panel icon={ShieldCheck} title="Approval trail" description="Who prepared, approved and finalized this run.">

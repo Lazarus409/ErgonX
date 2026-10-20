@@ -51,3 +51,27 @@ self.addEventListener("fetch", (event) => {
     })),
   );
 });
+
+// Web push: show the notification, and open its page when tapped.
+self.addEventListener("push", (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch { data = { title: "ErgonX", body: event.data ? event.data.text() : "" }; }
+  event.waitUntil(self.registration.showNotification(data.title || "ErgonX", {
+    body: data.body || "",
+    tag: data.tag,
+    icon: "/brand/icon-192.png",
+    badge: "/brand/icon-192.png",
+    data: { url: data.url || "/notifications" },
+  }));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = new URL(event.notification.data?.url || "/notifications", self.location.origin);
+  if (target.origin !== self.location.origin) return;
+  event.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
+    const open = windows.find((client) => client.url.startsWith(self.location.origin));
+    if (open) { open.navigate(target.href); return open.focus(); }
+    return self.clients.openWindow(target.href);
+  }));
+});

@@ -1,4 +1,4 @@
-import { apiGet, apiGetList, apiPost, apiPut } from "./client";
+import { apiDelete, apiGet, apiGetList, apiPost, apiPut } from "./client";
 import type { AppNotification, NotificationBulkAction, NotificationModule, NotificationPreferences } from "@/types/notifications";
 
 export interface NotificationQuery {
@@ -36,4 +36,19 @@ export async function getNotificationPreferences(): Promise<NotificationPreferen
 
 export async function saveNotificationPreferences(emailModules: NotificationModule[]): Promise<NotificationPreferences> {
   return apiPut<NotificationPreferences, { email_modules: NotificationModule[] }>("/notifications/preferences/", { email_modules: emailModules });
+}
+
+export interface PushConfig { enabled: boolean; public_key: string; devices: number; }
+
+/** Whether the server can send web push, and the key a browser subscribes with. */
+export function getPushConfig(): Promise<PushConfig> {
+  return apiGet<PushConfig>("/notifications/push/config/");
+}
+
+export function savePushSubscription(subscription: PushSubscriptionJSON): Promise<{ subscribed: boolean }> {
+  return apiPost<{ subscribed: boolean }, PushSubscriptionJSON>("/notifications/push/subscription/", subscription);
+}
+
+export function deletePushSubscription(endpoint: string): Promise<void> {
+  return apiDelete("/notifications/push/subscription/", { data: { endpoint } });
 }

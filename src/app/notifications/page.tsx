@@ -37,6 +37,7 @@ import { cx } from "@/lib/cx";
 import { formatDateTime, humanizeEnum } from "@/lib/format";
 import { moduleAccents, type ModuleAccent } from "@/lib/moduleTheme";
 import { useApiResource } from "@/lib/useApiResource";
+import PushToggle from "@/components/notifications/PushToggle";
 import { NOTIFICATION_MODULE_LABELS, type AppNotification, type NotificationModule, type NotificationPreferences } from "@/types/notifications";
 
 type View = "inbox" | "unread" | "archived";
@@ -307,10 +308,11 @@ function PreferencesDialog({ onClose }: { onClose: () => void }) {
       open
       onClose={onClose}
       title="Notification preferences"
-      description="Every notification appears here in ErgonX. Choose which modules also send you a copy by email."
+      description="Every notification appears here in ErgonX. You can also get them on this device, and choose which modules send a copy by email."
       size="md"
       footer={<div className="flex justify-end gap-2"><Button variant="secondary" onClick={onClose}>Cancel</Button><Button loading={saving} loadingLabel="Saving…" disabled={!preferences || emailOff} onClick={() => void save()}>Save preferences</Button></div>}
     >
+      <PushToggle />
       {error && <ErrorState variant="inline" title="Preferences unavailable" message={error} />}
       {emailOff && <p className="mb-3 rounded-lg bg-warning-soft p-3 text-support text-warning-ink">Email copies are turned off for this institution, or email delivery is not configured. In-app notifications still arrive.</p>}
       {!preferences && !error && <Skeleton className="h-40 rounded-xl" />}

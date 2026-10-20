@@ -73838,6 +73838,11 @@ components:
         mobile_money_number:
           type: string
           maxLength: 20
+        pension_exempt:
+          type: boolean
+        pension_exemption_reason:
+          type: string
+          maxLength: 300
         created_at:
           type: string
           format: date-time
@@ -82591,6 +82596,11 @@ components:
         mobile_money_number:
           type: string
           maxLength: 20
+        pension_exempt:
+          type: boolean
+        pension_exemption_reason:
+          type: string
+          maxLength: 300
         created_at:
           type: string
           format: date-time
@@ -86951,6 +86961,8 @@ components:
           - LARGE_NET_PAY_CHANGE
           - NOT_IN_RUN
           - MISSING_PAYROLL_PROFILE
+          - BELOW_MINIMUM_WAGE
+          - PENSION_EXEMPT
           type: string
           description: |-
             * `CALCULATION_ERROR` - Calculation error
@@ -86959,7 +86971,9 @@ components:
             * `LARGE_NET_PAY_CHANGE` - Large net pay change
             * `NOT_IN_RUN` - Active employee not in run
             * `MISSING_PAYROLL_PROFILE` - Payroll profile not configured
-          x-spec-enum-id: 271aa580d5bae8f5
+            * `BELOW_MINIMUM_WAGE` - Pay below the national minimum wage
+            * `PENSION_EXEMPT` - Mandatory pension not applied (exemption)
+          x-spec-enum-id: da249738c49cb9be
           readOnly: true
         severity:
           enum:

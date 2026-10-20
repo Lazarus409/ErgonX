@@ -304,6 +304,8 @@ class EmployeePayrollProfileSerializer(TenantRelationSerializer):
             "account_number",
             "mobile_money_network",
             "mobile_money_number",
+            "pension_exempt",
+            "pension_exemption_reason",
             "created_at",
             "updated_at",
         )

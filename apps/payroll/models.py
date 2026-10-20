@@ -597,6 +597,10 @@ class EmployeePayrollProfile(TenantOwnedModel):
     account_number = models.CharField(max_length=34, blank=True)
     mobile_money_network = models.CharField(max_length=12, choices=MobileMoneyNetwork.choices, blank=True)
     mobile_money_number = models.CharField(max_length=20, blank=True)
+    # HR's recorded decision that mandatory pension does not apply (e.g. a retiree already
+    # drawing an SSNIT pension). ErgonX does not judge eligibility; it applies the decision.
+    pension_exempt = models.BooleanField(default=False)
+    pension_exemption_reason = models.CharField(max_length=300, blank=True)
 
     class Meta:
         ordering = ("employee__employee_number",)
@@ -616,6 +620,11 @@ class EmployeePayrollProfile(TenantOwnedModel):
                     errors[field] = f"Enter the {label} for bank transfers."
             if self.account_number and not self.account_number.isalnum():
                 errors["account_number"] = "Use only letters and digits in the account number."
+        self.pension_exemption_reason = self.pension_exemption_reason.strip()
+        if self.pension_exempt and not self.pension_exemption_reason:
+            errors["pension_exemption_reason"] = "Record why mandatory pension does not apply."
+        if not self.pension_exempt:
+            self.pension_exemption_reason = ""
         if self.payment_method == self.PaymentMethod.MOBILE_MONEY:
             if not self.mobile_money_network:
                 errors["mobile_money_network"] = "Choose the mobile money network."
@@ -1150,6 +1159,8 @@ class PayrollRunException(TenantOwnedModel):
         LARGE_NET_PAY_CHANGE = "LARGE_NET_PAY_CHANGE", "Large net pay change"
         NOT_IN_RUN = "NOT_IN_RUN", "Active employee not in run"
         MISSING_PAYROLL_PROFILE = "MISSING_PAYROLL_PROFILE", "Payroll profile not configured"
+        BELOW_MINIMUM_WAGE = "BELOW_MINIMUM_WAGE", "Pay below the national minimum wage"
+        PENSION_EXEMPT = "PENSION_EXEMPT", "Mandatory pension not applied (exemption)"
 
     class Severity(models.TextChoices):
         HIGH = "HIGH", "High"

@@ -438,12 +438,13 @@ Under the Module Delivery and Frontend Integration Contract v1.0, the current de
 
 - Area: Compensation / Ghana payroll
 - Type: Data-model limitation
-- Status: `OPEN`
+- Status: `SAFEGUARDED`
 - Priority: `P1`
 - Governing reference: Context §45.10 requires the GHS 21.77 daily minimum wage to support compliance checks and daily/casual scenarios.
-- Limitation: `EmployeeCompensation` stores `base_salary` but has no pay basis, salary frequency, paid-days quantity, or daily-rate field. A monthly amount therefore cannot be safely compared with a daily minimum.
-- Current safeguard: The threshold is versioned and exposed, but the engine does not claim to enforce it.
-- Decision needed: Define compensation pay basis/frequency and the authoritative paid-days source before enabling minimum-wage checks.
+- Current safeguard (2026-10-20): monthly payroll raises a `BELOW_MINIMUM_WAGE` run exception (MEDIUM, must be acknowledged before review) when an employee's contractual monthly rate is below the preset's `NATIONAL_DAILY_MINIMUM_WAGE` x 27 days (GHS 587.79 for 2026, consistent with SSNIT minimum insurable earnings of GHS 587.80). Prorated pay for partial periods is not compared.
+- Remaining limitation: daily and casual workers paid by the day cannot be checked, because compensation has no daily pay basis or paid-days source.
+- Decision needed: Define compensation pay basis/frequency and the authoritative paid-days source before enabling daily/casual checks.
+- Evidence: `apps/payroll/services.py` (`_below_minimum_wage`), `tests/test_payroll_compliance.py`.
 
 ### GHA-002 — Public overtime eligibility threshold appears stale
 
@@ -460,11 +461,13 @@ Under the Module Delivery and Frontend Integration Contract v1.0, the current de
 
 - Area: Ghana payroll / pensions
 - Type: ERD eligibility gap
-- Status: `OPEN`
+- Status: `SAFEGUARDED`
 - Priority: `P1`
 - Governing reference: ERD §12.5 defines contribution rates and bases but no employee eligibility, exemption, scheme-membership, or coverage fields.
-- Limitation: The current Ghana evaluator applies mandatory pension to every compensated employee, including employees explicitly classified as `CASUAL`.
-- Decision needed: Confirm the required legal treatment and add an explicit, auditable pension coverage/exemption model before using exceptional worker scenarios in production.
+- Current safeguard (2026-10-20): `EmployeePayrollProfile.pension_exempt` with a required `pension_exemption_reason` records HR's decision that mandatory pension does not apply; the Ghana evaluator then applies no employee or employer pension, and every run raises a `PENSION_EXEMPT` exception (LOW) naming the reason. Changes are audited by field name and cannot be made to one's own profile.
+- Remaining limitation: ErgonX does not decide eligibility (age, existing pensioners, casual workers); the legal judgement stays with HR.
+- Decision needed: Confirm the statutory treatment for retirees, casual workers and foreign nationals if automatic eligibility rules are wanted.
+- Evidence: `apps/payroll/models.py`, `apps/payroll/localizations/ghana.py`, `tests/test_payroll_compliance.py`.
 
 ### PAY-001 — Base salary has no explicit pay-period basis
 

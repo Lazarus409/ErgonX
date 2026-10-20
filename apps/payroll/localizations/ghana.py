@@ -195,21 +195,26 @@ def calculate_statutory(
                 )
             }
         ) from exc
+    # Any employment during the period counts: a leaver is still paid to their last day.
     employment = (
         record.employee.employments.filter(
             start_date__lte=payroll_run.payroll_period.end_date
         )
         .filter(
             Q(end_date__isnull=True)
-            | Q(end_date__gte=payroll_run.payroll_period.end_date)
+            | Q(end_date__gte=payroll_run.payroll_period.start_date)
         )
-        .order_by("-is_current", "-start_date")
+        .order_by("-start_date")
         .first()
     )
     if employment is None:
         raise ValidationError({"employee": "An effective employment record is required."})
 
-    employee_pension, employer_pension, items = _pension(payroll_run, basic_pay)
+    if profile.pension_exempt:
+        # HR recorded an exemption; the run flags it (PENSION_EXEMPT) for review.
+        employee_pension, employer_pension, items = Decimal("0"), Decimal("0"), []
+    else:
+        employee_pension, employer_pension, items = _pension(payroll_run, basic_pay)
     statutory_tax = Decimal("0")
     regular_basis = max(Decimal("0"), Decimal(taxable_income) - employee_pension)
 

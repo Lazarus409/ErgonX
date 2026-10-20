@@ -83,7 +83,7 @@ export default function DocumentChecklistPanel({ mode, employeeId, onChanged }: 
   return (
     <Card
       title="Required documents"
-      description={mode === "self" ? "Documents HR needs from you. Upload any that are missing or expired." : "Documents HR requires for this employee."}
+     
       icon={FileCheck2}
       accent="hr"
       actions={summary ? <Badge tone={summary.complete ? "success" : "warning"} icon={summary.complete ? BadgeCheck : undefined}>{summary.complete ? "Complete" : `${summary.satisfied} of ${summary.required} on file`}</Badge> : null}

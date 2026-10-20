@@ -66,7 +66,7 @@ export default function PlatformProfilePage() {
           <>
             <PlatformHero title="Your Super Admin profile" subtitle="Manage your platform identity and account security." />
             <div className="grid gap-6 lg:grid-cols-2">
-              <Card as="form" onSubmit={saveProfile} title="Profile details" description="Your email is your sign-in identifier." icon={UserRound} accent="brand">
+              <Card as="form" onSubmit={saveProfile} title="Profile details" icon={UserRound} accent="brand">
                 <div className="space-y-4">
                   {profileError && <Alert tone="danger">{profileError}</Alert>}
                   {profileSuccess && <Alert tone="success">Profile saved successfully.</Alert>}
@@ -78,7 +78,7 @@ export default function PlatformProfilePage() {
                   <Button type="submit" loading={savingProfile} loadingLabel="Saving…" leadingIcon={<Save className="h-4 w-4" />}>Save profile</Button>
                 </div>
               </Card>
-              <Card as="form" onSubmit={changePassword} title="Password and security" description="Set a new password by confirming your current password." icon={KeyRound} accent="brand">
+              <Card as="form" onSubmit={changePassword} title="Password and security" icon={KeyRound} accent="brand">
                 <div className="space-y-4">
                   {passwordError && <Alert tone="danger">{passwordError}</Alert>}
                   {passwordSuccess && <Alert tone="success">Your password has been updated.</Alert>}

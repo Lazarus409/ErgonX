@@ -63,7 +63,7 @@ function ComplaintsWorkspace() {
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Complaints summary">
         <MetricCard label="Open complaints" value={overview ? formatNumber(overview.open) : "—"} description={overview ? `${formatNumber(overview.by_status.SUBMITTED)} waiting for HR` : undefined} icon={Inbox} accent="hr" loading={initial} />
-        <MetricCard label="High or urgent" value={overview ? formatNumber(overview.urgent_open) : "—"} description="Open complaints" icon={AlertTriangle} accent="audit" loading={initial} />
+        <MetricCard label="High or urgent" value={overview ? formatNumber(overview.urgent_open) : "—"} icon={AlertTriangle} accent="audit" loading={initial} />
         <MetricCard label="Overdue" value={overview ? formatNumber(overview.overdue) : "—"} description={overview ? `Open more than ${overview.overdue_days} days` : undefined} icon={Clock3} accent="leave" loading={initial} />
         <MetricCard label="Resolved this year" value={overview ? formatNumber(overview.resolved_this_year) : "—"} description={overview?.average_days_to_resolve != null ? `${overview.average_days_to_resolve} days on average` : undefined} icon={CheckCircle2} accent="attendance" loading={initial} />
       </section>

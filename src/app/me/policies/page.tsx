@@ -90,8 +90,8 @@ export default function MyPoliciesPage() {
       {summary && summary.applicable > 0 && (
         <section className="grid gap-4 sm:grid-cols-3" aria-label="Policy summary">
           <MetricCard label="To acknowledge" value={String(outstanding)} description={summary.overdue ? `${summary.overdue} overdue` : "Waiting for your signature"} icon={FileSignature} accent="audit" />
-          <MetricCard label="Acknowledged" value={`${summary.acknowledged} of ${summary.applicable}`} description="Current versions signed" icon={BadgeCheck} accent="attendance" />
-          <MetricCard label="Completion" value={`${summary.rate.toFixed(0)}%`} description="Of policies that need a signature" icon={ScrollText} accent="hr" />
+          <MetricCard label="Acknowledged" value={`${summary.acknowledged} of ${summary.applicable}`} icon={BadgeCheck} accent="attendance" />
+          <MetricCard label="Completion" value={`${summary.rate.toFixed(0)}%`} icon={ScrollText} accent="hr" />
         </section>
       )}
 

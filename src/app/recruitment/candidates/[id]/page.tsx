@@ -249,13 +249,13 @@ function ApplicationView({ candidateId, applicationId, onSwitch }: { candidateId
             <ProfilePanel candidate={candidate} />
           </div>
           <div className="space-y-5">
-            <Panel icon={CalendarDays} title="Interview feedback" description="Review feedback from all interviewers." action={<Button variant="secondary" onClick={() => setTab("interviews")}>View interview schedule</Button>}>
+            <Panel icon={CalendarDays} title="Interview feedback" action={<Button variant="secondary" onClick={() => setTab("interviews")}>View interview schedule</Button>}>
               {allFeedback.length ? <FeedbackList items={allFeedback.slice(0, 3)} /> : <EmptyBlock icon={CalendarDays} title="No interview feedback yet" text="Feedback from scheduled and completed interviews will appear here." />}
             </Panel>
-            <Panel icon={FileText} title="Candidate documents" description="" action={<Button variant="secondary" onClick={() => setTab("documents")}>View all documents</Button>}>
+            <Panel icon={FileText} title="Candidate documents" action={<Button variant="secondary" onClick={() => setTab("documents")}>View all documents</Button>}>
               <DocumentList candidateId={candidateId} documents={documents.slice(0, 4)} />
             </Panel>
-            <Panel icon={Clock3} title="Activity" description="">
+            <Panel icon={Clock3} title="Activity">
               <ActivityList entries={overview.activity.slice(0, 5)} />
             </Panel>
           </div>
@@ -271,7 +271,7 @@ function ApplicationView({ candidateId, applicationId, onSwitch }: { candidateId
       )}
 
       {tab === "interviews" && (
-        <Panel icon={CalendarDays} title="Interviews" description="Scheduled and completed interviews for this application, with interviewer feedback." action={actions.can_schedule_interview ? <ButtonLink href={`/recruitment/interviews/new?application=${application.id}`} variant="secondary" leadingIcon={<CalendarPlus className="h-4 w-4" />}>Schedule interview</ButtonLink> : undefined}>
+        <Panel icon={CalendarDays} title="Interviews" action={actions.can_schedule_interview ? <ButtonLink href={`/recruitment/interviews/new?application=${application.id}`} variant="secondary" leadingIcon={<CalendarPlus className="h-4 w-4" />}>Schedule interview</ButtonLink> : undefined}>
           {overview.interviews.length ? (
             <ul className="space-y-3">
               {overview.interviews.map((item) => (
@@ -291,14 +291,14 @@ function ApplicationView({ candidateId, applicationId, onSwitch }: { candidateId
       )}
 
       {tab === "documents" && (
-        <Panel icon={FileText} title="Candidate documents" description="CVs, cover letters and supporting documents. Stored as confidential.">
+        <Panel icon={FileText} title="Candidate documents">
           {actions.can_upload_documents && <DocumentUpload candidateId={candidateId} onUploaded={reload} />}
           <DocumentList candidateId={candidateId} documents={documents} onRemoved={actions.can_upload_documents ? reload : undefined} />
         </Panel>
       )}
 
       {tab === "activity" && (
-        <Panel icon={Clock3} title="Activity" description="Updates, comments and actions related to this candidate." action={<Link href={`/records/application/${application.id}`} className="text-sm font-semibold text-primary-ink hover:underline">History &amp; lineage →</Link>}>
+        <Panel icon={Clock3} title="Activity" action={<Link href={`/records/application/${application.id}`} className="text-sm font-semibold text-primary-ink hover:underline">History &amp; lineage →</Link>}>
           <ActivityList entries={overview.activity} />
         </Panel>
       )}
@@ -367,7 +367,7 @@ function ScorecardPanel({ applicationId, scorecard, active, onSaved, compact }: 
     <Panel
       icon={BarChart3}
       title="Evaluation scorecard"
-      description="Assess the candidate against role requirements. All evaluators score independently."
+     
       action={
         <label className="relative"><span className="sr-only">Filter criteria</span>
           <select value={filter} onChange={(event) => setFilter(event.target.value)} className="h-10 appearance-none rounded-lg border border-line-strong bg-surface pl-3 pr-9 text-sm font-medium text-primary-ink"><option value="all">All criteria</option><option value="open">Not yet assessed</option><option value="done">Assessed</option></select>
@@ -431,7 +431,7 @@ function ScorecardPanel({ applicationId, scorecard, active, onSaved, compact }: 
 
 function PanelSummary({ scorecard }: { scorecard: ApplicationScorecard }) {
   if (scorecard.can_evaluate && !scorecard.locked) {
-    return <Panel icon={Lock} title="Panel results" description="Submit your own evaluation to see the panel's combined results."><p className="text-sm text-ink-muted">Results stay hidden until you submit, so every evaluator scores independently.</p></Panel>;
+    return <Panel icon={Lock} title="Panel results"><p className="text-sm text-ink-muted">Results stay hidden until you submit, so every evaluator scores independently.</p></Panel>;
   }
   const levels = COMPETENCY_RATINGS.filter(([value]) => value !== "NOT_ASSESSED");
   return (
@@ -471,7 +471,7 @@ function ProfilePanel({ candidate }: { candidate: Candidate }) {
     [UserRound, "Source", candidate.source || EM_DASH],
   ];
   return (
-    <Panel icon={UserRound} title="Candidate profile" description="Details captured with the application." action={candidate.linkedin_url ? <a href={candidate.linkedin_url} target="_blank" rel="noreferrer noopener" className="text-sm font-semibold text-primary-ink hover:underline">LinkedIn profile</a> : undefined}>
+    <Panel icon={UserRound} title="Candidate profile" action={candidate.linkedin_url ? <a href={candidate.linkedin_url} target="_blank" rel="noreferrer noopener" className="text-sm font-semibold text-primary-ink hover:underline">LinkedIn profile</a> : undefined}>
       <dl className="divide-y divide-line-soft rounded-xl border border-line-soft">
         {rows.map(([Icon, label, value]) => <div key={label} className="grid grid-cols-[minmax(0,11rem)_minmax(0,1fr)] gap-3 px-3 py-2 text-sm"><dt className="flex items-center gap-2 font-semibold text-ink-strong"><Icon className="h-4 w-4 text-ink-muted" aria-hidden="true" />{label}</dt><dd className="break-words text-ink">{value}</dd></div>)}
       </dl>
@@ -583,7 +583,7 @@ function ProfileOnly({ candidate }: { candidate: Candidate }) {
   );
 }
 
-function Panel({ icon: Icon, title, description, action, children }: { icon: typeof FileText; title: string; description: string; action?: React.ReactNode; children: React.ReactNode }) {
+function Panel({ icon: Icon, title, description, action, children }: { icon: typeof FileText; title: string; description?: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
     <section className="rounded-2xl border border-line bg-surface p-5 shadow-elevation-1">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">

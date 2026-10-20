@@ -74,7 +74,7 @@ export default function MyProfilePage() {
       {error && <Alert tone="danger" onDismiss={() => setError(null)}>{error}</Alert>}
       {message && <Alert tone="success" onDismiss={() => setMessage(null)}>{message}</Alert>}
 
-      <Card as="form" onSubmit={save} title="Personal information" description="Fields managed by HR are read-only." icon={UserRound} accent="brand">
+      <Card as="form" onSubmit={save} title="Personal information" icon={UserRound} accent="brand">
         <div className="grid gap-5 md:grid-cols-2">
           <Field label="Full name"><Input value={employee?.full_name ?? "Loading…"} readOnly /></Field>
           <Field label="Employee number"><Input value={employee?.employee_number ?? ""} readOnly /></Field>
@@ -110,7 +110,7 @@ export default function MyProfilePage() {
       </Card>
 
       {employee && (
-        <Card title="Employment summary" description="Managed by HR. Ask HR to correct anything here." icon={Briefcase} accent="hr">
+        <Card title="Employment summary" icon={Briefcase} accent="hr">
           {employee.current_employment ? (
             <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {([

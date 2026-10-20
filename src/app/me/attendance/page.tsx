@@ -136,8 +136,8 @@ export default function MyAttendancePage() {
           <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label={`Summary for ${month.toLocaleDateString("en-GB", { month: "long", year: "numeric" })}`}>
             <MetricCard label="Present days" value={`${present.length}`} description={month.toLocaleDateString("en-GB", { month: "long" })} icon={CalendarCheck} accent="leave" loading={loading && !data} />
             <MetricCard label="Late arrivals" value={`${late.length}`} description={averageLate !== null ? `Average delay ${attendanceApi.formatMinutes(averageLate)}` : "None this month"} icon={Clock3} accent="payroll" loading={loading && !data} />
-            <MetricCard label="Absent days" value={`${absent.length}`} description="Recorded absences" icon={CalendarX} accent="audit" loading={loading && !data} />
-            <MetricCard label="Average hours" value={averageMinutes !== null ? attendanceApi.formatMinutes(averageMinutes) : EM_DASH} description="Per worked day" icon={BarChart3} accent="attendance" loading={loading && !data} />
+            <MetricCard label="Absent days" value={`${absent.length}`} icon={CalendarX} accent="audit" loading={loading && !data} />
+            <MetricCard label="Average hours" value={averageMinutes !== null ? attendanceApi.formatMinutes(averageMinutes) : EM_DASH} icon={BarChart3} accent="attendance" loading={loading && !data} />
           </section>
 
           <div className="grid gap-6 lg:grid-cols-[22rem_minmax(0,1fr)]">

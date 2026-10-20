@@ -56,7 +56,7 @@ export default function EmergencyContactsPage() {
           ))}
         </section>
       )}
-      <Card as="form" onSubmit={add} title="Add an emergency contact" description={items.length === 0 ? "Your first contact becomes your primary contact." : undefined} icon={Plus} accent="brand">
+      <Card as="form" onSubmit={add} title="Add an emergency contact" icon={Plus} accent="brand">
         <div className="grid gap-4 md:grid-cols-3">
           <Field label="Full name" required><Input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" /></Field>
           <Field label="Relationship" required><Input value={relationship} onChange={(event) => setRelationship(event.target.value)} placeholder="e.g. Spouse" /></Field>

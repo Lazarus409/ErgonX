@@ -82,9 +82,9 @@ export default function TalentPage() {
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Talent summary">
         <MetricCard label="Critical positions" value={String(critical.length)} description={`${critical.filter((plan) => plan.cover.status === "NONE").length} without a successor`} icon={Crown} accent="hr" loading={loading && !data} />
-        <MetricCard label="Ready-now cover" value={critical.length ? `${Math.round((critical.filter((plan) => plan.cover.READY_NOW > 0).length * 100) / critical.length)}%` : "—"} description="Critical roles with a ready-now successor" icon={ShieldAlert} accent="audit" loading={loading && !data} />
+        <MetricCard label="Ready-now cover" value={critical.length ? `${Math.round((critical.filter((plan) => plan.cover.READY_NOW > 0).length * 100) / critical.length)}%` : "—"} icon={ShieldAlert} accent="audit" loading={loading && !data} />
         <MetricCard label="Talent pool" value={String(grid?.summary.talent_pool ?? 0)} description={`${grid?.summary.placed ?? 0} of ${grid?.summary.employees ?? 0} placed on the grid`} icon={Star} accent="leave" loading={loading && !data} />
-        <MetricCard label="High flight risk" value={String(grid?.summary.high_flight_risk ?? 0)} description="People HR has flagged as likely to leave" icon={Users} accent="payroll" loading={loading && !data} />
+        <MetricCard label="High flight risk" value={String(grid?.summary.high_flight_risk ?? 0)} icon={Users} accent="payroll" loading={loading && !data} />
       </section>
 
       <Tabs label="Talent" value={view} onChange={(value) => setView(value as View)} items={[{ value: "succession", label: "Succession" }, { value: "grid", label: "Talent grid" }]} />
@@ -119,7 +119,7 @@ export default function TalentPage() {
         )
       ) : (
         <div className="grid gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-          <Card title="9-box grid" description="Performance comes from each person's latest final review rating unless HR overrides it; HR assesses potential. Select a box to see who is in it." icon={Grid3x3} accent="hr">
+          <Card title="9-box grid" icon={Grid3x3} accent="hr">
             <div className="grid grid-cols-[2rem_repeat(3,minmax(0,1fr))] gap-1.5 text-center">
               {LEVELS.map((potential) => (
                 <div key={potential} className="contents">

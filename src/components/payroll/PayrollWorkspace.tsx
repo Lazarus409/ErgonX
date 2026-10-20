@@ -250,7 +250,7 @@ export default function PayrollWorkspace() {
         </div>
 
         <aside className="space-y-4">
-          <Rail icon={ShieldCheck} title="Approvals" description="Review and manage payroll approvals.">
+          <Rail icon={ShieldCheck} title="Approvals">
             {(base?.awaiting.length ?? 0) === 0 ? (
               <RailEmpty icon={Users} title="No pending approvals" text="There are no payroll approvals required at this time." />
             ) : (
@@ -261,7 +261,7 @@ export default function PayrollWorkspace() {
               </ul>
             )}
           </Rail>
-          <Rail icon={ShieldCheck} title="Compliance checks" description="Ensure payroll meets policy and regulatory requirements.">
+          <Rail icon={ShieldCheck} title="Compliance checks">
             {!run || ["DRAFT", "CALCULATING"].includes(run.status) ? (
               (current?.deadlines.length ?? 0) === 0 ? <RailEmpty icon={FileText} title="No compliance checks to review" text="Compliance issues and alerts will appear here after validation." /> : null
             ) : (
@@ -278,7 +278,7 @@ export default function PayrollWorkspace() {
               </ul>
             )}
           </Rail>
-          <Rail icon={Zap} title="Related actions" description="Quick access to common payroll tasks.">
+          <Rail icon={Zap} title="Related actions">
             <ul className="divide-y divide-line-soft">
               <RelatedLink href="/payroll/components" icon={Settings2} label="Manage payroll components" />
               <RelatedLink href="/reports/dashboard?report=payroll" icon={BarChart3} label="View statutory reports" />
@@ -286,7 +286,7 @@ export default function PayrollWorkspace() {
               <RelatedLink href="/payroll/configuration" icon={Settings} label="Payroll settings" />
             </ul>
           </Rail>
-          <Rail icon={CircleHelp} title="Need help?" description="View guidance on running payroll: the controlled processing lifecycle and each step's checks.">
+          <Rail icon={CircleHelp} title="Need help?">
             <Link href="/payroll" className="inline-flex items-center gap-1.5 text-support font-semibold text-primary-ink hover:underline">Open payroll guide<ChevronRight className="h-4 w-4" aria-hidden="true" /></Link>
           </Rail>
         </aside>
@@ -305,10 +305,10 @@ export default function PayrollWorkspace() {
   );
 }
 
-function Rail({ icon: Icon, title, description, children }: { icon: typeof FileText; title: string; description: string; children: React.ReactNode }) {
+function Rail({ icon: Icon, title, description, children }: { icon: typeof FileText; title: string; description?: string; children: React.ReactNode }) {
   return (
     <section className="rounded-2xl border border-line bg-surface p-5 shadow-elevation-1">
-      <div className="mb-3 flex items-start gap-3"><Icon className="mt-0.5 h-7 w-7 shrink-0 text-section-icon" aria-hidden="true" /><div><h2 className="text-card-title font-bold text-headline">{title}</h2><p className="text-support text-heading-support">{description}</p></div></div>
+      <div className="mb-3 flex items-start gap-3"><Icon className="mt-0.5 h-7 w-7 shrink-0 text-section-icon" aria-hidden="true" /><div><h2 className="text-card-title font-bold text-headline">{title}</h2>{description && <p className="text-support text-heading-support">{description}</p>}</div></div>
       {children}
     </section>
   );

@@ -175,7 +175,7 @@ export default function VendorBillDetailPage() {
           )}
 
           {tab === "details" && (
-            <Panel icon={FileText} title="Bill details" description="Amounts, accounts and tax treatment.">
+            <Panel icon={FileText} title="Bill details">
               <dl className="grid gap-3 text-sm sm:grid-cols-3">
                 {([["Subtotal", formatAmount(bill.subtotal, bill.currency)], ["Tax", formatAmount(bill.tax_total, bill.currency)], ["Withholding", formatAmount(bill.withholding_total, bill.currency)], ["Total", formatAmount(bill.total_amount, bill.currency)], ["Payable to vendor", formatAmount(bill.amount_payable, bill.currency)], ["Paid", formatAmount(bill.amount_paid ?? 0, bill.currency)]] as const).map(([label, value]) => <div key={label} className="rounded-xl bg-surface-muted p-3"><dt className="text-caption text-ink-muted">{label}</dt><dd className="font-bold tabular-nums">{value}</dd></div>)}
               </dl>
@@ -185,13 +185,13 @@ export default function VendorBillDetailPage() {
           )}
 
           {tab === "route" && (
-            <Panel icon={UsersRound} title="Approval route" description="Submission, approval and posting for this bill.">
+            <Panel icon={UsersRound} title="Approval route">
               <RouteSteps bill={bill} />
             </Panel>
           )}
 
           {tab === "related" && (
-            <Panel icon={FileSearch} title="Related records" description="Journal, payments and certificates linked to this bill.">
+            <Panel icon={FileSearch} title="Related records">
               {context.related.length ? <ul className="divide-y divide-line-soft">{context.related.map((row, index) => <li key={`${row.type}-${index}`} className="flex items-center gap-3 py-2.5 text-sm"><span className="w-48 shrink-0 text-ink-muted">{row.type}</span><span className="flex-1 font-semibold">{row.href ? <Link href={row.href} className="text-primary-ink hover:underline">{row.reference}</Link> : row.reference}</span>{row.status && <StatusBadge status={row.status} size="sm" />}</li>)}</ul> : <Empty icon={FileSearch} title="No related records yet" text="The AP journal and payments appear here once the bill is posted and paid." />}
             </Panel>
           )}

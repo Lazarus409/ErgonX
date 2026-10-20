@@ -43,10 +43,10 @@ export function EmployeeAttendanceTab({ employeeId }: { employeeId: string }) {
     <div className="space-y-5">
       <div className="grid gap-4 sm:grid-cols-3">
         <MetricCard label="Hours worked" value={attendanceApi.formatMinutes(worked)} description={`Last ${records.length} recorded days`} icon={Clock3} accent="attendance" size="sm" />
-        <MetricCard label="Late arrivals" value={formatNumber(late)} description="Days with late minutes" icon={Clock3} accent="payroll" size="sm" />
-        <MetricCard label="Absences" value={formatNumber(absent)} description="Recorded absent days" icon={CalendarDays} accent="audit" size="sm" />
+        <MetricCard label="Late arrivals" value={formatNumber(late)} icon={Clock3} accent="payroll" size="sm" />
+        <MetricCard label="Absences" value={formatNumber(absent)} icon={CalendarDays} accent="audit" size="sm" />
       </div>
-      <Card title="Attendance history" description="Most recent attendance records for this employee." icon={Clock3} padding="none" className="[&>div:first-child]:px-5 [&>div:first-child]:pt-5">
+      <Card title="Attendance history" icon={Clock3} padding="none" className="[&>div:first-child]:px-5 [&>div:first-child]:pt-5">
         {records.length === 0 ? (
           <EmptyState size="compact" icon={Clock3} title="No attendance recorded" description="Attendance records will appear here once the employee clocks in." />
         ) : (
@@ -96,7 +96,7 @@ export function EmployeeLeaveTab({ employeeId }: { employeeId: string }) {
           ))}
         </div>
       )}
-      <Card title="Leave requests" description="Requests submitted by or for this employee." icon={CalendarDays} padding="none" className="[&>div:first-child]:px-5 [&>div:first-child]:pt-5">
+      <Card title="Leave requests" icon={CalendarDays} padding="none" className="[&>div:first-child]:px-5 [&>div:first-child]:pt-5">
         {data.requests.length === 0 ? (
           <EmptyState size="compact" icon={CalendarDays} title="No leave requests" description="Leave requests will appear here once submitted." />
         ) : (
@@ -127,11 +127,11 @@ export function EmployeePayrollTab({ employeeId }: { employeeId: string }) {
       {latest && (
         <div className="grid gap-4 sm:grid-cols-3">
           <MetricCard label="Latest gross pay" value={formatAmount(latest.payload.gross_pay, latest.payload.currency)} description={latest.payroll_period?.name ?? "Latest payslip"} icon={Wallet} accent="payroll" size="sm" />
-          <MetricCard label="Latest deductions" value={formatAmount(latest.payload.total_deductions, latest.payload.currency)} description="Statutory and other deductions" icon={Wallet} accent="audit" size="sm" />
+          <MetricCard label="Latest deductions" value={formatAmount(latest.payload.total_deductions, latest.payload.currency)} icon={Wallet} accent="audit" size="sm" />
           <MetricCard label="Latest net pay" value={formatAmount(latest.payload.net_pay, latest.payload.currency)} description={`Generated ${formatDate(latest.generated_at)}`} icon={Wallet} accent="accounting" size="sm" />
         </div>
       )}
-      <Card title="Payslips" description="Generated payslips for finalized payroll runs." icon={FileText} padding="none" className="[&>div:first-child]:px-5 [&>div:first-child]:pt-5">
+      <Card title="Payslips" icon={FileText} padding="none" className="[&>div:first-child]:px-5 [&>div:first-child]:pt-5">
         {data.results.length === 0 ? (
           <EmptyState size="compact" icon={Wallet} title="No payslips yet" description="Payslips appear after a payroll run including this employee is finalized." />
         ) : (

@@ -42,7 +42,7 @@ export function MySignaturesPanel() {
       .catch((caught) => setError(getApiErrorMessage(caught)));
 
   return (
-    <Card title="Documents to sign" description="Documents HR has sent you for signature. Read each one before signing." icon={FileSignature} accent="hr" actions={pending.length ? <Badge tone="warning">{pending.length} waiting</Badge> : undefined}>
+    <Card title="Documents to sign" icon={FileSignature} accent="hr" actions={pending.length ? <Badge tone="warning">{pending.length} waiting</Badge> : undefined}>
       {error && !signing && !declining && <Alert tone="danger" onDismiss={() => setError("")}>{error}</Alert>}
       <ul className="divide-y divide-line-soft">
         {rows.map((row) => (
@@ -104,7 +104,7 @@ export function EmployeeSignaturesPanel({ employeeId, documents, canSend }: { em
   };
 
   return (
-    <Card title="Signatures" description="Documents sent to this employee to sign, with the signature record." icon={FileSignature} accent="hr"
+    <Card title="Signatures" icon={FileSignature} accent="hr"
       actions={canSend && documents.length > 0 ? <Button size="sm" variant="secondary" leadingIcon={<Send className="h-4 w-4" />} onClick={() => { setForm({ document: documents[0]?.id ?? "", title: "", message: "", due_date: "" }); setError(""); setSending(true); }}>Send for signature</Button> : undefined}>
       {error && !sending && <Alert tone="danger" onDismiss={() => setError("")}>{error}</Alert>}
       {rows.length === 0 ? <p className="text-support text-ink-muted">Nothing sent for signature yet. Upload the document to this record, then send it.</p> : (

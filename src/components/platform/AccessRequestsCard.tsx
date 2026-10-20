@@ -133,7 +133,7 @@ export default function AccessRequestsCard({ requests, onChanged }: { requests: 
           <SectionTitle
             eyebrow="Get Started"
             title={<span className="flex items-center gap-2">Access requests{pending.length > 0 && <Badge size="sm" tone="warning">{pending.length} pending</Badge>}</span>}
-            description="Organizations asking to join from the Get Started page."
+           
             meta={<SegmentedControl<Filter> label="Filter requests" value={filter} onChange={setFilter} options={[{ value: "PENDING", label: "Pending" }, { value: "ALL", label: "All" }]} />}
           />
         }

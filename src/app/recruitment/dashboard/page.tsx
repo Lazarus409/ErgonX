@@ -76,9 +76,9 @@ export default function RecruitmentDashboardPage() {
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Hiring indicators">
         <MetricCard label="Open roles" value={value(data?.open_roles)} description={data?.requisitions_pending_approval ? `${formatNumber(data.requisitions_pending_approval)} awaiting approval` : kpi(data?.open_roles, "Openings on published requisitions")} icon={BriefcaseBusiness} accent="brand" loading={initial} href="/recruitment/job-postings" />
-        <MetricCard label="Candidates in process" value={value(data?.candidates_in_process)} description={kpi(data?.candidates_in_process, "Active or offered")} icon={UsersRound} accent="attendance" loading={initial} href="/recruitment/candidates" />
-        <MetricCard label="Interviews this week" value={value(data?.interviews_this_week)} description={kpi(data?.interviews_this_week, "Scheduled Monday to Sunday")} icon={CalendarDays} accent="reports" loading={initial} href="/recruitment/interviews" />
-        <MetricCard label="Offers pending" value={value(data?.offers_pending)} description={kpi(data?.offers_pending, "Drafted or extended")} icon={FileText} accent="leave" loading={initial} href="/recruitment/offers" />
+        <MetricCard label="Candidates in process" value={value(data?.candidates_in_process)} icon={UsersRound} accent="attendance" loading={initial} href="/recruitment/candidates" />
+        <MetricCard label="Interviews this week" value={value(data?.interviews_this_week)} icon={CalendarDays} accent="reports" loading={initial} href="/recruitment/interviews" />
+        <MetricCard label="Offers pending" value={value(data?.offers_pending)} icon={FileText} accent="leave" loading={initial} href="/recruitment/offers" />
       </section>
 
       <section className="rounded-2xl border border-line bg-surface p-4 shadow-elevation-1 sm:p-5" aria-labelledby="pipeline-title">
@@ -116,7 +116,7 @@ export default function RecruitmentDashboardPage() {
       </section>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-        <Card title="Pipeline by stage" description="Applications grouped by the institution-defined recruitment stage, with stage-to-stage conversion." icon={Layers} accent="recruitment" accentLine>
+        <Card title="Pipeline by stage" icon={Layers} accent="recruitment" accentLine>
           {initial ? (
             <div className="space-y-2">{[0, 1, 2, 3, 4].map((index) => <div key={index} className="skeleton h-8 rounded-lg" />)}</div>
           ) : data?.pipeline.length ? (
@@ -146,7 +146,7 @@ export default function RecruitmentDashboardPage() {
         <ChartCard
           className="xl:col-span-3"
           title="Application intake"
-          description="Applications received in each of the last six calendar months."
+         
           accent="recruitment"
           icon={TrendingUp}
           loading={initial}
@@ -160,7 +160,7 @@ export default function RecruitmentDashboardPage() {
         <ChartCard
           className="xl:col-span-2"
           title="Interviews by status"
-          description="Scheduled, completed, cancelled and no-show interviews."
+         
           accent="recruitment"
           icon={PieChartIcon}
           loading={initial}
@@ -177,7 +177,7 @@ export default function RecruitmentDashboardPage() {
       <div className="grid gap-5 xl:grid-cols-2">
         <ChartCard
           title="Candidate sources"
-          description="Where applications come from, by the candidate's recorded source."
+         
           accent="recruitment"
           icon={Share2}
           loading={initial}
@@ -190,7 +190,7 @@ export default function RecruitmentDashboardPage() {
         </ChartCard>
         <ChartCard
           title="Time to hire"
-          description="Days from application to accepted offer."
+         
           accent="recruitment"
           icon={Timer}
           loading={initial}
@@ -204,10 +204,10 @@ export default function RecruitmentDashboardPage() {
       </div>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Recruitment areas">
-        {can("candidate.view") && <ActionCard href="/recruitment/applications" title="Applications" description="Review and progress applicants" icon={FileCheck2} accent="recruitment" />}
-        {can("recruitment_stage.view") && <ActionCard href="/recruitment/pipeline" title="Pipeline board" description="Move candidates between stages" icon={Layers} accent="recruitment" />}
-        {can("interview.view") && <ActionCard href="/recruitment/interviews" title="Interviews" description="Schedule and record outcomes" icon={CalendarDays} accent="recruitment" />}
-        {can("offer.view") && <ActionCard href="/recruitment/offers" title="Offers" description="Draft, extend and track offers" icon={FileSignature} accent="recruitment" />}
+        {can("candidate.view") && <ActionCard href="/recruitment/applications" title="Applications" icon={FileCheck2} accent="recruitment" />}
+        {can("recruitment_stage.view") && <ActionCard href="/recruitment/pipeline" title="Pipeline board" icon={Layers} accent="recruitment" />}
+        {can("interview.view") && <ActionCard href="/recruitment/interviews" title="Interviews" icon={CalendarDays} accent="recruitment" />}
+        {can("offer.view") && <ActionCard href="/recruitment/offers" title="Offers" icon={FileSignature} accent="recruitment" />}
       </section>
     </div>
   );

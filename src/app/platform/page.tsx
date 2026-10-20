@@ -184,7 +184,7 @@ export default function PlatformInvitationsPage() {
 
       {pendingRequests > 0 && requestsSection}
 
-      <PlatformCard eyebrow="New organization" title="Invite an Institution Admin" description="The recipient creates their organization and becomes its primary administrator through a single-use secure link." icon={MailPlus}>
+      <PlatformCard eyebrow="New organization" title="Invite an Institution Admin" icon={MailPlus}>
         {actionError && <Alert tone="danger" title="Invitation could not be created" className="mb-5">{actionError}<p className="mt-1 text-caption">Use an email address that does not already have an ErgonX account.</p></Alert>}
         <form onSubmit={createInvitation} className="grid gap-4 md:grid-cols-[minmax(0,1fr)_11.5rem_auto] md:items-end">
           <label className="block"><span className={fieldLabel}>Administrator work email</span><Input required type="email" size="lg" className={bigControl} value={email} onChange={(event) => setEmail(event.target.value)} placeholder="administrator@organization.com" /></label>

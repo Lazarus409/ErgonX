@@ -333,7 +333,7 @@ export default function EmployeesPage() {
         <MetricCard label="Total employees" value={counts ? counts.total.toLocaleString() : EM_DASH} icon={Users} accent="hr" loading={!counts} />
         <MetricCard label="Active" value={counts ? counts.active.toLocaleString() : EM_DASH} description={counts?.total ? `${Math.round((counts.active / counts.total) * 1000) / 10}% of records` : undefined} icon={UserCheck} accent="accounting" loading={!counts} />
         <MetricCard label="Suspended" value={counts ? counts.suspended.toLocaleString() : EM_DASH} icon={PauseCircle} accent="leave" loading={!counts} />
-        <MetricCard label="Inactive" value={counts ? counts.inactive.toLocaleString() : EM_DASH} description="Inactive or terminated" icon={UserX} accent="audit" loading={!counts} />
+        <MetricCard label="Inactive" value={counts ? counts.inactive.toLocaleString() : EM_DASH} icon={UserX} accent="audit" loading={!counts} />
       </section>
 
       <Dialog

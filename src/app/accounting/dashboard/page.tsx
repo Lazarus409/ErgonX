@@ -73,16 +73,16 @@ export default function AccountingDashboard() {
       {error && <ErrorState variant="inline" title="Unable to load accounting dashboard" message={error} onRetry={reload} />}
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Accounting indicators">
-        <MetricCard label="Reconciliation exceptions" value={data?.reconciliation_exceptions === undefined ? EM_DASH : formatNumber(data.reconciliation_exceptions)} description={data?.reconciliation_exceptions ? "Statement lines not yet matched" : "No data available"} icon={AlertTriangle} accent="leave" loading={initial} href={can("bank_reconciliation.view") ? "/accounting/banking" : undefined} />
+        <MetricCard label="Reconciliation exceptions" value={data?.reconciliation_exceptions === undefined ? EM_DASH : formatNumber(data.reconciliation_exceptions)} icon={AlertTriangle} accent="leave" loading={initial} href={can("bank_reconciliation.view") ? "/accounting/banking" : undefined} />
         <MetricCard label="Pending approvals" value={data?.pending_approvals === undefined ? EM_DASH : formatNumber(data.pending_approvals)} description={data?.pending_approvals ? `${data.pending_approvals_breakdown?.journals ?? 0} journals · ${data.pending_approvals_breakdown?.vendor_bills ?? 0} bills · ${data.pending_approvals_breakdown?.expenses ?? 0} expenses` : "No data available"} icon={FileClock} accent="reports" loading={initial} href={can("journal.view") ? "/accounting/journals?status=PENDING_APPROVAL" : undefined} />
-        <MetricCard label="Unposted journals" value={data?.unposted_journals === undefined ? EM_DASH : formatNumber(data.unposted_journals)} description={data?.unposted_journals ? "Draft, pending or approved" : "No data available"} icon={FilePen} accent="payroll" loading={initial} href={can("journal.view") ? "/accounting/journals" : undefined} />
+        <MetricCard label="Unposted journals" value={data?.unposted_journals === undefined ? EM_DASH : formatNumber(data.unposted_journals)} icon={FilePen} accent="payroll" loading={initial} href={can("journal.view") ? "/accounting/journals" : undefined} />
         <MetricCard label="Close status" value={data?.close_status?.current_status ? humanizeEnum(data.close_status.current_status) : EM_DASH} description={data?.close_status?.current_period ? `${data.close_status.current_period}${data.close_status.overdue_open_periods ? ` · ${data.close_status.overdue_open_periods} past period(s) open` : ""}` : "No data available"} icon={CalendarCheck} accent="settings" loading={initial} href={can("accounting_period.close") ? "/accounting/periods" : undefined} />
       </section>
 
       <div className="grid gap-5 2xl:grid-cols-2">
         <ChartCard
           title="Cash flow overview"
-          description="Inflows and outflows over time."
+         
           accent="accounting"
           icon={BarChart3}
           loading={initial}
@@ -170,14 +170,14 @@ export default function AccountingDashboard() {
       <h2 className="pt-2 text-heading font-bold text-headline">Financial position</h2>
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Financial position">
         <MetricCard size="sm" label="Bank balance" value={data ? formatAmount(data.bank_balance, currency) : EM_DASH} description={data ? formatCount(data.registered_bank_accounts, "registered account") : undefined} icon={Landmark} accent="accounting" loading={initial} />
-        <MetricCard size="sm" label="Accounts receivable" value={data ? formatAmount(data.accounts_receivable, currency) : EM_DASH} description="Outstanding from customers" icon={ArrowDownLeft} accent="attendance" loading={initial} href={can("invoice.view") ? "/accounting/receivables" : undefined} />
-        <MetricCard size="sm" label="Accounts payable" value={data ? formatAmount(data.accounts_payable, currency) : EM_DASH} description="Owed to vendors" icon={ArrowUpRight} accent="payroll" loading={initial} href={can("vendor_bill.view") ? "/accounting/payables" : undefined} />
-        <MetricCard size="sm" label="Posted expenses" value={data ? formatAmount(data.expenses, currency) : EM_DASH} description="Posted to the ledger" icon={Receipt} accent="audit" loading={initial} href={can("expense.view") ? "/accounting/expenses" : undefined} chart={<Sparkline values={pnl.map((point) => point.expenses)} color="var(--mod-audit)" height={32} label="Expenses by month" />} />
+        <MetricCard size="sm" label="Accounts receivable" value={data ? formatAmount(data.accounts_receivable, currency) : EM_DASH} icon={ArrowDownLeft} accent="attendance" loading={initial} href={can("invoice.view") ? "/accounting/receivables" : undefined} />
+        <MetricCard size="sm" label="Accounts payable" value={data ? formatAmount(data.accounts_payable, currency) : EM_DASH} icon={ArrowUpRight} accent="payroll" loading={initial} href={can("vendor_bill.view") ? "/accounting/payables" : undefined} />
+        <MetricCard size="sm" label="Posted expenses" value={data ? formatAmount(data.expenses, currency) : EM_DASH} icon={Receipt} accent="audit" loading={initial} href={can("expense.view") ? "/accounting/expenses" : undefined} chart={<Sparkline values={pnl.map((point) => point.expenses)} color="var(--mod-audit)" height={32} label="Expenses by month" />} />
       </section>
 
       <ChartCard
         title="Profit and loss"
-        description="Monthly income and expenses from posted journals, with the net result."
+       
         accent="accounting"
         loading={initial}
         error={!data && error ? "This data is unavailable right now." : null}
@@ -194,7 +194,7 @@ export default function AccountingDashboard() {
       <div className="grid gap-5">
         <ChartCard
           title="Receivable and payable aging"
-          description="Outstanding balances by age bucket."
+         
           accent="accounting"
           loading={initial}
           error={!data && error ? "This data is unavailable right now." : null}
@@ -211,7 +211,7 @@ export default function AccountingDashboard() {
         <ChartCard
           className="xl:col-span-2"
           title="Expenses by category"
-          description="Posted expenses by expense account."
+         
           accent="accounting"
           icon={PieChartIcon}
           loading={initial}
@@ -225,7 +225,7 @@ export default function AccountingDashboard() {
             <SummaryList items={donutLegend(expenseCategories, "currency", currency).map((item) => ({ label: <span className="inline-flex items-center gap-2"><span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ background: item.color }} />{item.label}</span>, value: item.value }))} />
           </div>
         </ChartCard>
-        <Card className="xl:col-span-3" title="Controls and exceptions" description="Items that need review before the period can close cleanly." icon={Scale} accent="accounting">
+        <Card className="xl:col-span-3" title="Controls and exceptions" icon={Scale} accent="accounting">
           <div className="-mx-3 -mb-2 space-y-1">
             <AttentionItem title="Journals pending approval" description={`${formatCount(data?.pending_journals, "journal")} in the approval workflow.`} severity={data?.pending_journals ? "warning" : "info"} href={can("journal.view") ? "/accounting/journals?status=PENDING_APPROVAL" : undefined} />
             {data && Number(data.accounts_payable) > 0 && Number(data.accounts_payable) > Number(data.bank_balance) && <AttentionItem title="Payables exceed bank balance" description={`Outstanding payables of ${formatAmount(data.accounts_payable, currency)} exceed the registered bank balance.`} severity="high" href={can("vendor_bill.view") ? "/accounting/payables" : undefined} />}
@@ -255,7 +255,7 @@ export default function AccountingDashboard() {
             { key: "status", header: "Status", cell: (line) => <StatusBadge status={line.status} size="sm" /> },
           ]}
         />
-        <Card className="xl:col-span-2" title="Journal status" description="Where journals sit in the approval workflow." icon={FileText} accent="accounting">
+        <Card className="xl:col-span-2" title="Journal status" icon={FileText} accent="accounting">
           {journals.length ? (
             <SummaryList items={(data?.journals_by_status ?? []).map((item) => ({ label: <StatusBadge status={item.status} size="sm" />, value: formatNumber(item.count) }))} />
           ) : <p className="text-support text-ink-muted">{initial ? "Loading…" : "Journals will appear here once created."}</p>}
@@ -263,10 +263,10 @@ export default function AccountingDashboard() {
       </div>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Accounting areas">
-        {can("journal.view") && <ActionCard href="/accounting/journals" title="Journals" description="Create, approve, post and reverse" icon={FileText} accent="accounting" />}
-        {can("invoice.view") && <ActionCard href="/accounting/receivables" title="Receivables" description="Customers, invoices and receipts" icon={ArrowDownLeft} accent="accounting" />}
-        {can("vendor_bill.view") && <ActionCard href="/accounting/payables" title="Payables" description="Vendors, bills and payments" icon={Building2} accent="accounting" />}
-        {can("bank_account.view") && <ActionCard href="/accounting/banking" title="Banking" description="Accounts and reconciliation" icon={Landmark} accent="accounting" />}
+        {can("journal.view") && <ActionCard href="/accounting/journals" title="Journals" icon={FileText} accent="accounting" />}
+        {can("invoice.view") && <ActionCard href="/accounting/receivables" title="Receivables" icon={ArrowDownLeft} accent="accounting" />}
+        {can("vendor_bill.view") && <ActionCard href="/accounting/payables" title="Payables" icon={Building2} accent="accounting" />}
+        {can("bank_account.view") && <ActionCard href="/accounting/banking" title="Banking" icon={Landmark} accent="accounting" />}
       </section>
     </div>
   );

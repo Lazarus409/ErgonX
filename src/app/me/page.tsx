@@ -210,7 +210,7 @@ export default function SelfServiceHome() {
               )}
             </Card>
           ) : <span className="hidden lg:block" />}
-          <Card title="Recent activity" description="Your latest notifications." icon={Bell} accent="brand" actions={<Link href="/notifications" className="text-support font-semibold text-primary-ink hover:underline">View all activity</Link>}>
+          <Card title="Recent activity" icon={Bell} accent="brand" actions={<Link href="/notifications" className="text-support font-semibold text-primary-ink hover:underline">View all activity</Link>}>
             {data?.updates?.length ? (
               <ul className="divide-y divide-line-soft">
                 {data.updates.map((item) => (
@@ -233,7 +233,7 @@ export default function SelfServiceHome() {
 
       {employee && (
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
-          <Card title="Requiring your attention" description="Things waiting on you or about you." icon={CheckCircle2} accent="brand" actions={snapshot?.attention.length ? <span className="rounded-full bg-danger-soft px-2 py-0.5 text-caption font-semibold text-danger-ink">{snapshot.attention.length} pending</span> : undefined}>
+          <Card title="Requiring your attention" icon={CheckCircle2} accent="brand" actions={snapshot?.attention.length ? <span className="rounded-full bg-danger-soft px-2 py-0.5 text-caption font-semibold text-danger-ink">{snapshot.attention.length} pending</span> : undefined}>
             {snapshot?.attention.length ? (
               <div className="-mx-3 space-y-1">
                 {snapshot.attention.map((item) => (
@@ -244,7 +244,7 @@ export default function SelfServiceHome() {
               <p className="text-support text-ink-muted">{loading && !data ? "Loading…" : "Nothing needs your attention right now."}</p>
             )}
           </Card>
-          <Card title="Your milestones" description="From your employment record." icon={CalendarPlus} accent="hr">
+          <Card title="Your milestones" icon={CalendarPlus} accent="hr">
             {anniversary ? (
               <div className="flex items-center justify-between gap-3 rounded-lg bg-surface-muted/70 p-4">
                 <div><p className="text-sm font-semibold text-ink-strong">Work anniversary</p><p className="text-caption text-ink-muted">{anniversary.years ? `${anniversary.years} year${anniversary.years === 1 ? "" : "s"} of service completed` : "Your first year of service is under way"}</p></div>
@@ -270,7 +270,7 @@ export default function SelfServiceHome() {
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
           <ChartCard
             title="My week"
-            description="Hours worked and overtime across your last seven recorded days."
+           
             accent="attendance"
             icon={Timer}
             loading={loading && !data}
@@ -291,7 +291,7 @@ export default function SelfServiceHome() {
               height={220}
             />
           </ChartCard>
-          <Card title="Attendance calendar" description="Your last four weeks at a glance." icon={CalendarDays} accent="attendance">
+          <Card title="Attendance calendar" icon={CalendarDays} accent="attendance">
             <AttendanceCalendar records={history} todayIso={todayIso} />
           </Card>
         </div>
@@ -323,7 +323,7 @@ export default function SelfServiceHome() {
           {showPayroll && (
             <ChartCard
               title="Pay trend"
-              description="Net pay across your latest payslips."
+             
               accent="payroll"
               icon={CircleDollarSign}
               loading={loading && !data}
@@ -352,7 +352,7 @@ export default function SelfServiceHome() {
       {/* Leave requests */}
       {showLeave && employee && (pendingLeave.length > 0 || upcomingLeave.length > 0) && (
         <div className="grid gap-5 lg:grid-cols-2">
-          <Card title="Pending requests" description="Awaiting a decision." icon={Clock3} accent="leave">
+          <Card title="Pending requests" icon={Clock3} accent="leave">
             {pendingLeave.length ? (
               <ul className="divide-y divide-line-soft">
                 {pendingLeave.slice(0, 4).map((request) => (
@@ -367,7 +367,7 @@ export default function SelfServiceHome() {
               </ul>
             ) : <p className="text-support text-ink-muted">No requests awaiting a decision.</p>}
           </Card>
-          <Card title="Upcoming time off" description="Approved leave ahead of you." icon={CalendarDays} accent="leave">
+          <Card title="Upcoming time off" icon={CalendarDays} accent="leave">
             {upcomingLeave.length ? (
               <Timeline items={upcomingLeave.slice(0, 4).map((request) => ({ id: request.id, title: typeName(request.leave_type), time: `${formatNumber(request.requested_days)} days`, description: `${formatDate(request.start_date)} – ${formatDate(request.end_date)}`, tone: "success" as const }))} />
             ) : <p className="text-support text-ink-muted">No approved leave coming up.</p>}
@@ -379,7 +379,7 @@ export default function SelfServiceHome() {
       {employee && showAttendance && (
         <ChartCard
           title="Overtime by week"
-          description="Recorded overtime hours in each of your recent weeks."
+         
           accent="attendance"
           icon={Timer}
           loading={loading && !data}
@@ -396,7 +396,7 @@ export default function SelfServiceHome() {
       {/* Profile summary */}
       <Card
         title="My details"
-        description="Your employee account information."
+       
         icon={UserRound}
         accent="brand"
         actions={<ButtonLink href="/me/profile" size="sm" variant="secondary" leadingIcon={<Pencil className="h-3.5 w-3.5" />}>Edit details</ButtonLink>}

@@ -50,9 +50,9 @@ export default function PrivacyPage() {
       {(error || actionError) && <Alert tone="danger" onDismiss={actionError ? () => setActionError("") : undefined}>{error || actionError}</Alert>}
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Privacy summary">
         <MetricCard label="Open requests" value={String(open.length)} description={`${open.filter((row) => row.overdue).length} overdue`} icon={FileDown} accent="audit" />
-        <MetricCard label="Due for clean-up" value={String(report?.rules.reduce((sum, row) => sum + (ANONYMISABLE.includes(row.category) ? row.due : 0), 0) ?? 0)} description="Candidates and former employees" icon={Archive} accent="hr" />
-        <MetricCard label="Legal holds" value={String(report?.legal_holds ?? 0)} description="Active holds pausing clean-up" icon={Lock} accent="payroll" />
-        <MetricCard label="Consents on record" value={String(consentRows?.consents.length ?? 0)} description="Careers consents and policy signatures" icon={ShieldCheck} accent="attendance" />
+        <MetricCard label="Due for clean-up" value={String(report?.rules.reduce((sum, row) => sum + (ANONYMISABLE.includes(row.category) ? row.due : 0), 0) ?? 0)} icon={Archive} accent="hr" />
+        <MetricCard label="Legal holds" value={String(report?.legal_holds ?? 0)} icon={Lock} accent="payroll" />
+        <MetricCard label="Consents on record" value={String(consentRows?.consents.length ?? 0)} icon={ShieldCheck} accent="attendance" />
       </section>
       <Tabs label="Privacy" value={view} onChange={(value) => setView(value as View)} items={[{ value: "requests", label: `Requests (${open.length} open)` }, { value: "retention", label: "Retention" }, { value: "holds", label: "Legal holds" }, { value: "consents", label: "Consents" }]} />
 
@@ -81,7 +81,7 @@ export default function PrivacyPage() {
       )}
 
       {view === "retention" && (
-        <Card title="Retention rules" description="Set how long each kind of personal data is kept. Anonymise rules clear personal details when due; review rules only list what is due." icon={Archive} accent="hr">
+        <Card title="Retention rules" icon={Archive} accent="hr">
           <ul className="divide-y divide-line-soft">
             {CATEGORIES.map((category) => {
               const rule = ruleFor(category);
@@ -102,7 +102,7 @@ export default function PrivacyPage() {
       )}
 
       {view === "holds" && (
-        <Card title="Legal holds" description="People under a hold are skipped by every retention rule until the hold is released." icon={Lock} accent="payroll"
+        <Card title="Legal holds" icon={Lock} accent="payroll"
           actions={canManage ? <Button size="sm" leadingIcon={<Plus className="h-4 w-4" />} onClick={() => { setHoldForm({ title: "", reason: "", employees: [] }); void employeesApi.listEmployees({ page_size: 100, ordering: "first_name" }).then((page) => setPeople(page.results.map((row) => ({ id: row.id, name: row.full_name })))).catch(() => setPeople([])); }}>Place a hold</Button> : undefined}>
           {holds?.results.length ? (
             <ul className="divide-y divide-line-soft">
@@ -122,7 +122,7 @@ export default function PrivacyPage() {
       )}
 
       {view === "consents" && (
-        <Card title="Consent register" description="Data-use consents given on the careers site and policy acknowledgements, newest first." icon={ShieldCheck} accent="attendance">
+        <Card title="Consent register" icon={ShieldCheck} accent="attendance">
           {consentRows?.consents.length ? (
             <ul className="max-h-[60vh] divide-y divide-line-soft overflow-y-auto">
               {consentRows.consents.map((row, index) => (

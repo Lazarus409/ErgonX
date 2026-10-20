@@ -33,17 +33,17 @@ export default function PayrollDashboardPage() {
       <h2 className="pt-4 text-heading font-bold text-headline">Payroll analytics</h2>
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Finalized payroll totals">
-        <MetricCard size="sm" label="Finalized gross pay" value={data ? formatAmount(data.finalized_gross_pay) : EM_DASH} description="Across finalized runs" icon={WalletCards} accent="payroll" loading={initial} chart={<Sparkline values={periods.map((point) => point.gross_pay)} color="var(--mod-payroll)" height={32} label="Gross pay by period" />} />
-        <MetricCard size="sm" label="Finalized net pay" value={data ? formatAmount(data.finalized_net_pay) : EM_DASH} description="Paid to employees" icon={HandCoins} accent="accounting" loading={initial} chart={<Sparkline values={periods.map((point) => point.net_pay)} color="var(--mod-accounting)" height={32} label="Net pay by period" />} />
-        <MetricCard size="sm" label="Deductions" value={data ? formatAmount(data.finalized_deductions) : EM_DASH} description="Statutory and voluntary" icon={MinusCircle} accent="audit" loading={initial} />
-        <MetricCard size="sm" label="Employer contributions" value={data ? formatAmount(data.employer_contributions) : EM_DASH} description="Employer-side cost" icon={Building2} accent="hr" loading={initial} />
+        <MetricCard size="sm" label="Finalized gross pay" value={data ? formatAmount(data.finalized_gross_pay) : EM_DASH} icon={WalletCards} accent="payroll" loading={initial} chart={<Sparkline values={periods.map((point) => point.gross_pay)} color="var(--mod-payroll)" height={32} label="Gross pay by period" />} />
+        <MetricCard size="sm" label="Finalized net pay" value={data ? formatAmount(data.finalized_net_pay) : EM_DASH} icon={HandCoins} accent="accounting" loading={initial} chart={<Sparkline values={periods.map((point) => point.net_pay)} color="var(--mod-accounting)" height={32} label="Net pay by period" />} />
+        <MetricCard size="sm" label="Deductions" value={data ? formatAmount(data.finalized_deductions) : EM_DASH} icon={MinusCircle} accent="audit" loading={initial} />
+        <MetricCard size="sm" label="Employer contributions" value={data ? formatAmount(data.employer_contributions) : EM_DASH} icon={Building2} accent="hr" loading={initial} />
       </section>
 
       <div className="grid gap-5 xl:grid-cols-5">
         <ChartCard
           className="xl:col-span-3"
           title="Payroll cost trend"
-          description="Gross payroll by finalized pay period."
+         
           accent="payroll"
           loading={initial}
           error={!data && error ? "This data is unavailable right now." : null}
@@ -62,7 +62,7 @@ export default function PayrollDashboardPage() {
               </p>
             ) : <p>At least two finalized periods are needed to compare payroll cost.</p>}
           </InsightCard>
-          <Card title="Runs by status" description="Payroll runs grouped by current workflow status." padding="md">
+          <Card title="Runs by status" padding="md">
             {initial ? <div className="skeleton h-24 rounded-xl" /> : data?.runs_by_status.length ? (
               <ul className="divide-y divide-line-soft">
                 {data.runs_by_status.map((item) => (
@@ -81,7 +81,7 @@ export default function PayrollDashboardPage() {
         <ChartCard
           className="xl:col-span-3"
           title="Earnings and deductions"
-          description="Net pay and deductions that make up gross pay for each finalized period."
+         
           accent="payroll"
           loading={initial}
           error={!data && error ? "This data is unavailable right now." : null}

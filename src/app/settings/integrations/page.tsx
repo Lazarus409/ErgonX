@@ -57,7 +57,7 @@ export default function IntegrationsPage() {
       <Tabs label="Integrations" value={view} onChange={(value) => setView(value as View)} items={[{ value: "keys", label: "API keys" }, { value: "webhooks", label: "Webhooks" }, { value: "guide", label: "Developer guide" }]} />
 
       {view === "keys" && (
-        <Card title="API keys" description="Each key works only for the scopes you give it. Device punches are entered in the name of the person who created the key, so create device keys from an attendance manager's account." icon={KeyRound} accent="settings"
+        <Card title="API keys" icon={KeyRound} accent="settings"
           actions={<Button size="sm" leadingIcon={<Plus className="h-4 w-4" />} onClick={() => setKeyForm({ name: "", scopes: [] })}>New key</Button>}>
           {keys?.results.length ? (
             <ul className="divide-y divide-line-soft">
@@ -76,7 +76,7 @@ export default function IntegrationsPage() {
       )}
 
       {view === "webhooks" && (
-        <Card title="Webhooks" description="ErgonX posts a signed notice to your address when something happens. Notices carry the event and record id only; fetch details with an API key." icon={Webhook} accent="settings"
+        <Card title="Webhooks" icon={Webhook} accent="settings"
           actions={<Button size="sm" leadingIcon={<Plus className="h-4 w-4" />} onClick={() => setHookForm({ url: "https://", description: "", events: [] })}>New webhook</Button>}>
           {hooks?.results.length ? (
             <ul className="divide-y divide-line-soft">

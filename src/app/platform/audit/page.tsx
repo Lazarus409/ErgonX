@@ -68,7 +68,7 @@ function AuditLog() {
         minWidth={880}
         toolbar={
           <div className="space-y-4">
-          <SectionTitle eyebrow="Accountability" title="Audit log" description="Every action a Super Admin has taken on the platform, and each organization sign-up. Entries cannot be edited or deleted." meta={data ? `${data.count} event${data.count === 1 ? "" : "s"}` : undefined} />
+          <SectionTitle eyebrow="Accountability" title="Audit log" meta={data ? `${data.count} event${data.count === 1 ? "" : "s"}` : undefined} />
           <DataToolbar
             search={search}
             onSearchChange={setSearch}

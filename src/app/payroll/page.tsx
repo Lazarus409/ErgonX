@@ -103,7 +103,7 @@ export default function PayrollPage() {
       areas={payrollPages}
       actions={<ButtonLink href="/payroll/runs" leadingIcon={<GitPullRequest className="h-4 w-4" />}>View payroll runs</ButtonLink>}
     >
-      <Card title="Payroll workflow" description="Every run follows the controlled processing lifecycle below." accent="payroll" accentLine>
+      <Card title="Payroll workflow" accent="payroll" accentLine>
         <PayrollWorkflow />
       </Card>
     </ModuleLanding>

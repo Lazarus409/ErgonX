@@ -95,7 +95,7 @@ export default function ApprovalsPage() {
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(20rem,0.85fr)]">
         <Card
           title="Approval requests"
-          description="Requests that need your decision appear here."
+         
           icon={GitPullRequest}
           accent="brand"
           padding="none"
@@ -130,7 +130,7 @@ export default function ApprovalsPage() {
 
         <Card
           title="Recent decisions"
-          description="A record of the latest ten approval actions."
+         
           icon={History}
           accent="brand"
           padding="none"

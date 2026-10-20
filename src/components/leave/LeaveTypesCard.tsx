@@ -55,7 +55,7 @@ export default function LeaveTypesCard({ types, policyTypeIds, canConfigure, onC
   return (
     <Card
       title="Leave types"
-      description="The kinds of leave employees can request. Each needs an active policy to be requestable."
+     
       icon={CalendarRange}
       accent="leave"
       actions={canConfigure ? <Button size="sm" variant="secondary" leadingIcon={<Plus className="h-4 w-4" />} onClick={() => openForm(null)}>Add leave type</Button> : undefined}

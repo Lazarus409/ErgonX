@@ -92,7 +92,7 @@ export default function EmployeeImportPage() {
 
       {error && <Alert tone="danger" title="Something went wrong" onDismiss={() => setError(null)}>{error}</Alert>}
 
-      <Card title="1. Fill in the template" description="One row per employee. Departments, positions, grades, locations and salary structures must already exist; match them by name or code." icon={FileSpreadsheet} accent="hr"
+      <Card title="1. Fill in the template" icon={FileSpreadsheet} accent="hr"
         actions={<Button variant="secondary" leadingIcon={<Download className="h-4 w-4" />} loading={busy === "template"} onClick={() => void downloadTemplate()}>Download template</Button>}>
         <p className="px-5 pb-3 text-support text-ink-muted">Open the template in Excel or Google Sheets, replace the example row, then save as CSV or Excel (.xlsx). Up to 1,000 rows per file.</p>
         {columns && (
@@ -112,7 +112,7 @@ export default function EmployeeImportPage() {
         )}
       </Card>
 
-      <Card title="2. Upload and check" description="Nothing is saved yet. You will see any problems row by row." icon={Upload} accent="hr">
+      <Card title="2. Upload and check" icon={Upload} accent="hr">
         <div className="flex flex-wrap items-center gap-3 px-5 pb-5">
           <input type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={chooseFile} disabled={busy !== null || completed}
             aria-label="Employee file" className="block max-w-full text-sm text-ink file:mr-3 file:rounded-lg file:border file:border-line-strong file:bg-surface file:px-3 file:py-2 file:text-sm file:font-semibold file:text-ink-strong hover:file:bg-surface-muted" />

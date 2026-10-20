@@ -42,8 +42,8 @@ export default function SecurityPage() {
       {error && <ErrorState variant="inline" title="Unable to load security checks" message={error} onRetry={reload} />}
       {data && (
         <section className="grid gap-4 sm:grid-cols-3" aria-label="Security summary">
-          <MetricCard label="Act now" value={String(data.score.critical)} description="Critical findings" icon={ShieldAlert} accent="audit" />
-          <MetricCard label="Review" value={String(data.score.warning)} description="Warnings to look at" icon={ShieldAlert} accent="payroll" />
+          <MetricCard label="Act now" value={String(data.score.critical)} icon={ShieldAlert} accent="audit" />
+          <MetricCard label="Review" value={String(data.score.warning)} icon={ShieldAlert} accent="payroll" />
           <MetricCard label="Checked" value={formatDateTime(data.generated_at)} description={`${data.checks.length} checks`} icon={ShieldAlert} accent="attendance" />
         </section>
       )}
@@ -65,7 +65,7 @@ export default function SecurityPage() {
         </Card>
       )}
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card title="Evidence pack" description="Users, roles and MFA; the audit trail for the period; retention, data requests, policy sign-off and restore tests, as CSV files in a ZIP." icon={FileArchive} accent="settings">
+        <Card title="Evidence pack" icon={FileArchive} accent="settings">
           {exportError && <Alert tone="danger">{exportError}</Alert>}
           <div className="flex flex-wrap items-end gap-3">
             <Field label="From"><Input type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></Field>

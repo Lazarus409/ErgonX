@@ -47,7 +47,7 @@ export default function SettingsPage() {
       <PageHeader eyebrow="Administration" title="Settings" icon={SlidersHorizontal} accent="settings" />
       {visibleAreas.length ? (
         <section aria-label="Settings areas" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {visibleAreas.map((area) => <ActionCard key={area.href} href={area.href} title={area.title} description={area.description} icon={area.icon} accent="settings" />)}
+          {visibleAreas.map((area) => <ActionCard key={area.href} href={area.href} title={area.title} icon={area.icon} accent="settings" />)}
         </section>
       ) : (
         <EmptyState icon={SlidersHorizontal} accent="settings" title="No settings are available" description="Your current role does not grant a settings area in this institution." />

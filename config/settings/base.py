@@ -225,6 +225,11 @@ CORS_ALLOW_HEADERS = (*default_headers, "x-institution-id")
 # X-ErgonX-Client-IP together with this secret. Empty disables per-IP sign-in limits.
 BFF_PROXY_SECRET = os.environ.get("BFF_PROXY_SECRET", "")
 
+# Web push (apps.notifications.push); generate the pair with manage.py generate_vapid_keys.
+WEB_PUSH_PUBLIC_KEY = os.environ.get("WEB_PUSH_PUBLIC_KEY", "")
+WEB_PUSH_PRIVATE_KEY = os.environ.get("WEB_PUSH_PRIVATE_KEY", "")
+WEB_PUSH_SUBJECT = os.environ.get("WEB_PUSH_SUBJECT", "mailto:support@ergonx.app")
+
 EMAIL_DELIVERY_ENABLED = os.environ.get("EMAIL_DELIVERY_ENABLED", "false").lower() == "true"
 EMAIL_BACKEND = os.environ.get(
     "EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend"

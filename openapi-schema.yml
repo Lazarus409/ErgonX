@@ -38658,6 +38658,181 @@ paths:
       - module_disabled
       - permission_denied
       - validation_error
+  /api/v1/notifications/push/config/:
+    get:
+      operationId: notifications_push_config_retrieve
+      description: |-
+        Whether web push is available, and the public key a browser subscribes with.
+
+        Requires an authenticated user, an active institution context, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: Get push config view
+      tags:
+      - notifications
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+  /api/v1/notifications/push/subscription/:
+    post:
+      operationId: notifications_push_subscription_create
+      description: |-
+        Turn push on (POST) or off (DELETE) for this browser or phone.
+
+        Requires an authenticated user, an active institution context, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`, `validation_error`.
+      summary: Post push subscription view
+      tags:
+      - notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PushSubscribe'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PushSubscribe'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PushSubscribe'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - success
+                - data
+                - message
+                - errors
+                properties:
+                  success:
+                    type: boolean
+                    enum:
+                    - true
+                  data:
+                    type: object
+                    additionalProperties: {}
+                  message:
+                    type: string
+                  errors:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+          description: ''
+        '400':
+          description: Validation or business-rule failure; inspect code and errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
+      - validation_error
+    delete:
+      operationId: notifications_push_subscription_destroy
+      description: |-
+        Turn push on (POST) or off (DELETE) for this browser or phone.
+
+        Requires an authenticated user, an active institution context, the `home.view` permission.
+
+        Tenant-owned results are scoped to the active institution.
+
+        Documented error codes: `authentication_required`, `authentication_failed`, `tenant_mismatch`, `module_disabled`, `permission_denied`.
+      summary: Delete push subscription view
+      tags:
+      - notifications
+      security:
+      - jwtAuth: []
+      responses:
+        '204':
+          description: No response body
+        '401':
+          description: Authentication is missing or invalid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '403':
+          description: Tenant context, module enablement, or permission denied.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      x-error-codes:
+      - authentication_required
+      - authentication_failed
+      - tenant_mismatch
+      - module_disabled
+      - permission_denied
   /api/v1/overtime-records/:
     get:
       operationId: overtime_records_list
@@ -87884,6 +88059,21 @@ components:
       - is_active
       - name
       - updated_at
+    PushSubscribe:
+      type: object
+      properties:
+        endpoint:
+          type: string
+          format: uri
+          maxLength: 1000
+        keys:
+          type: object
+          additionalProperties:
+            type: string
+            maxLength: 200
+      required:
+      - endpoint
+      - keys
     RatingInput:
       type: object
       properties:

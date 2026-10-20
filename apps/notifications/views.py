@@ -1,11 +1,13 @@
 from django.utils import timezone
 from django.conf import settings
 from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
+from rest_framework import serializers
 from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.notifications.models import Notification
+from apps.notifications.models import Notification, PushSubscription
+from apps.notifications.push import push_enabled
 from apps.notifications.serializers import NotificationBulkActionSerializer, NotificationPreferencesSerializer, NotificationSerializer
 from apps.notifications.services import MODULES, email_modules, institution_allows_email, notification_module, save_email_modules
 from common.permissions import TenantContextPermission, TenantRBACPermission
@@ -122,3 +124,60 @@ class NotificationPreferencesView(NotificationPermissionMixin, APIView):
         payload.is_valid(raise_exception=True)
         chosen = save_email_modules(request.user, request.institution, payload.validated_data["email_modules"])
         return Response(self._body(request, chosen))
+
+
+class PushSubscribeSerializer(serializers.Serializer):
+    endpoint = serializers.URLField(max_length=1000)
+    keys = serializers.DictField(child=serializers.CharField(max_length=200))
+
+    def validate_endpoint(self, value):
+        if not value.startswith("https://"):
+            raise serializers.ValidationError("Push endpoints must use HTTPS.")
+        return value
+
+    def validate_keys(self, value):
+        if not value.get("p256dh") or not value.get("auth"):
+            raise serializers.ValidationError("Both p256dh and auth keys are required.")
+        return value
+
+
+class PushUnsubscribeSerializer(serializers.Serializer):
+    endpoint = serializers.URLField(max_length=1000)
+
+
+class PushConfigView(NotificationPermissionMixin, APIView):
+    """Whether web push is available, and the public key a browser subscribes with."""
+
+    @extend_schema(responses=OpenApiTypes.OBJECT)
+    def get(self, request):
+        enabled = push_enabled()
+        return Response({
+            "enabled": enabled,
+            "public_key": settings.WEB_PUSH_PUBLIC_KEY if enabled else "",
+            "devices": PushSubscription.objects.filter(user=request.user).count(),
+        })
+
+
+class PushSubscriptionView(NotificationPermissionMixin, APIView):
+    """Turn push on (POST) or off (DELETE) for this browser or phone."""
+
+    @extend_schema(request=PushSubscribeSerializer, responses=OpenApiTypes.OBJECT)
+    def post(self, request):
+        if not push_enabled():
+            return Response({"detail": "Push notifications are not set up on this server."}, status=409)
+        payload = PushSubscribeSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        data = payload.validated_data
+        # An endpoint belongs to one browser: re-subscribing (or a new user on it) takes it over.
+        PushSubscription.objects.update_or_create(
+            endpoint=data["endpoint"],
+            defaults={"user": request.user, "p256dh": data["keys"]["p256dh"], "auth": data["keys"]["auth"], "user_agent": request.META.get("HTTP_USER_AGENT", "")[:300]},
+        )
+        return Response({"subscribed": True}, status=201)
+
+    @extend_schema(request=PushUnsubscribeSerializer, responses=OpenApiTypes.OBJECT)
+    def delete(self, request):
+        payload = PushUnsubscribeSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        removed, _ = PushSubscription.objects.filter(user=request.user, endpoint=payload.validated_data["endpoint"]).delete()
+        return Response({"subscribed": False, "removed": removed})

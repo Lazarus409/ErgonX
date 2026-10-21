@@ -1,8 +1,9 @@
 "use client";
 
 import { CheckCircle2, Download, FileText, Lock, Search, ShieldAlert, ShieldCheck, X, XCircle } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 
+import { describeDevice } from "@/components/auth/ActiveSessions";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Avatar, MetricCard } from "@/components/ui/Card";
@@ -185,15 +186,15 @@ function EventDetail({ entry, onClose }: { entry: AuditLogEntry; onClose: () => 
       <div className="p-5">
         {tab === "overview" && (
           <dl className="space-y-2.5 text-support">
-            {[
+            {([
               ["Actor", entry.actor_email ?? "System"],
               ["Module", moduleOf(entry)],
               ["Action", pretty(entry.action)],
               ["Record", entry.entity_type ? `${pretty(entry.entity_type.split(".").pop() ?? "")}${entry.entity_id ? ` · ${entry.entity_id.slice(0, 8)}` : ""}` : "—"],
               ["Result", failed ? "Failed" : "Success"],
               ["Source IP", entry.ip_address ?? "—"],
-              ["Device", entry.user_agent || "—"],
-            ].map(([label, value]) => <div key={label} className="flex justify-between gap-3"><dt className="text-ink-muted">{label}</dt><dd className="max-w-[60%] break-words text-right text-ink-strong">{value}</dd></div>)}
+              ["Device", entry.user_agent ? <span title={entry.user_agent}>{describeDevice(entry.user_agent).label}</span> : "—"],
+            ] as Array<[string, ReactNode]>).map(([label, value]) => <div key={label} className="flex justify-between gap-3"><dt className="text-ink-muted">{label}</dt><dd className="max-w-[60%] break-words text-right text-ink-strong">{value}</dd></div>)}
           </dl>
         )}
         {tab === "changes" && (changes.length ? (

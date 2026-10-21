@@ -63,12 +63,19 @@ function RangeSelect({ value, onChange, compact = false }: { value: Range; onCha
 }
 
 /** Concept KPI tile with the "No data available" variant for areas outside the caller's access. */
+/** Shrinks the KPI figure so it always fits the card's text column (container width), capped at the regular KPI size. */
+function kpiFontSize(value: ReactNode) {
+  const length = Math.max(String(value ?? "").length, 1);
+  // Bold tabular digits average ~0.62em wide; size so `length` characters fill at most the column width.
+  return `min(1.75rem, calc(100cqi / ${(length * 0.62).toFixed(2)}))`;
+}
+
 function InsightKpiCard({ label, icon: Icon, accent, value, change, changeUnit = "%", loading, denied, detail, info }: { label: string; icon: LucideIcon; accent: ModuleAccent; value?: ReactNode; change?: InsightKpi["change_percent"]; /** "%" for relative change, "pts" for a change in percentage points. */ changeUnit?: "%" | "pts"; loading: boolean; denied: string | null; detail?: ReactNode; info?: string }) {
   const delta = change === null || change === undefined ? null : toNumber(change);
   return (
     <article className="flex gap-4 rounded-2xl border border-line bg-surface p-5 shadow-elevation-1">
       <span className={cx("inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full", denied ? "bg-surface-muted text-ink-subtle" : moduleAccents[accent].tile)} aria-hidden="true"><Icon className="h-6 w-6" /></span>
-      <div className="min-w-0 flex-1">
+      <div className="@container min-w-0 flex-1">
         <p className="flex items-center gap-1.5 text-[0.9375rem] font-bold leading-5 text-headline">{label}{info && <Tooltip content={info}><Info className="h-4 w-4 text-primary" aria-label={info} /></Tooltip>}</p>
         {loading ? <span className="skeleton mt-2 block h-8 w-28 rounded-lg" aria-label="Loading" /> : denied ? (
           <>
@@ -78,7 +85,7 @@ function InsightKpiCard({ label, icon: Icon, accent, value, change, changeUnit =
           </>
         ) : (
           <>
-            <p className={cx("mt-2 font-bold leading-tight tracking-tight text-ink-strong tabular-nums", String(value).length > 11 ? "whitespace-nowrap text-[1.1875rem] 2xl:text-[1.5rem]" : "text-[1.75rem] 2xl:text-kpi")}>{value}</p>
+            <p className="mt-2 whitespace-nowrap font-bold leading-tight tracking-tight text-ink-strong tabular-nums" style={{ fontSize: kpiFontSize(value) }}>{value}</p>
             {delta !== null ? (
               <p className="mt-1.5 text-support"><span className={cx("font-semibold", delta >= 0 ? "text-success-ink" : "text-danger-ink")}>{delta >= 0 ? "+" : ""}{delta.toFixed(1)}{changeUnit === "pts" ? " pts" : "%"} {delta >= 0 ? "▲" : "▼"}</span> <span className="text-ink-muted">vs. previous period</span></p>
             ) : detail ? <p className="mt-1.5 text-support text-ink-muted">{detail}</p> : <p className="mt-1.5 text-support text-ink-muted">No previous period to compare</p>}

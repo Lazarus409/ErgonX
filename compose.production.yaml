@@ -40,6 +40,7 @@ services:
       EMAIL_TIMEOUT: ${EMAIL_TIMEOUT:-15}
       DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-}
       FRONTEND_PUBLIC_URL: ${FRONTEND_PUBLIC_URL:-}
+      BFF_PROXY_SECRET: ${BFF_PROXY_SECRET:-}
     command: >
       sh -c "python manage.py migrate --noinput &&
       python manage.py createcachetable &&
@@ -58,6 +59,8 @@ services:
         NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
         NEXT_PUBLIC_ENABLE_DEV_AUTH_BYPASS: "false"
     restart: unless-stopped
+    environment:
+      BFF_PROXY_SECRET: ${BFF_PROXY_SECRET:-}
     depends_on:
       - backend
     ports:

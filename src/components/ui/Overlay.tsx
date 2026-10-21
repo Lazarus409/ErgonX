@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -191,7 +192,29 @@ export function Popover({ trigger, children, align = "end", width = "w-72", role
   const open = controlledOpen ?? uncontrolled;
   const setOpen = useCallback((next: boolean) => { onOpenChange?.(next); if (controlledOpen === undefined) setUncontrolled(next); }, [controlledOpen, onOpenChange]);
   const rootRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
+  const [placeAbove, setPlaceAbove] = useState(false);
+
+  // Open upward when the panel would run past the bottom of the viewport
+  // (e.g. menus in sticky bottom action bars). Re-checks as async content loads.
+  useLayoutEffect(() => {
+    if (!open) { setPlaceAbove(false); return; }
+    const root = rootRef.current;
+    const panel = panelRef.current;
+    if (!root || !panel) return;
+    const place = () => {
+      const trigger = root.getBoundingClientRect();
+      const below = window.innerHeight - trigger.bottom - 8;
+      const above = trigger.top - 8;
+      setPlaceAbove(panel.offsetHeight > below && above > below);
+    };
+    place();
+    const observer = new ResizeObserver(place);
+    observer.observe(panel);
+    window.addEventListener("resize", place);
+    return () => { observer.disconnect(); window.removeEventListener("resize", place); };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -218,11 +241,12 @@ export function Popover({ trigger, children, align = "end", width = "w-72", role
       {trigger({ onClick: () => setOpen(!open), "aria-expanded": open, "aria-haspopup": role, "aria-controls": panelId })}
       {open && (
         <div
+          ref={panelRef}
           id={panelId}
           role={role}
           aria-label={label}
           onKeyDown={onMenuKeyDown}
-          className={cx("absolute top-[calc(100%+8px)] z-50 origin-top animate-pop-in overflow-hidden rounded-2xl border border-line bg-surface shadow-overlay", align === "end" ? "right-0 origin-top-right" : "left-0 origin-top-left", width, className)}
+          className={cx("absolute z-50 animate-pop-in overflow-hidden rounded-2xl border border-line bg-surface shadow-overlay", placeAbove ? "bottom-[calc(100%+8px)]" : "top-[calc(100%+8px)]", align === "end" ? (placeAbove ? "right-0 origin-bottom-right" : "right-0 origin-top-right") : (placeAbove ? "left-0 origin-bottom-left" : "left-0 origin-top-left"), width, className)}
         >
           {typeof children === "function" ? children(close) : children}
         </div>

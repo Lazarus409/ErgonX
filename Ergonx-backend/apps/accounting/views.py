@@ -313,24 +313,15 @@ class RecordAttachmentsMixin:
 
     @action(detail=True, methods=("post",), filter_backends=(), parser_classes=(MultiPartParser, FormParser))
     def attachments(self, request, pk=None):
-        import mimetypes
-
-        from django.conf import settings as django_settings
         from apps.audit.services import record_audit_event
         from apps.documents.models import Document
         from apps.documents.serializers import DocumentSerializer
-        from rest_framework.exceptions import ValidationError as DRFValidationError
 
         record = self.get_object()
         upload = request.FILES.get("uploaded_file")
-        if upload is None:
-            raise DRFValidationError({"uploaded_file": "Choose a file to upload."})
-        if upload.size > django_settings.DOCUMENT_UPLOAD_MAX_BYTES:
-            raise DRFValidationError({"uploaded_file": f"Files must be {django_settings.DOCUMENT_UPLOAD_MAX_BYTES // (1024 * 1024)} MB or smaller."})
-        name = (upload.name or "attachment").replace("\\", "/").rsplit("/", 1)[-1][:255]
-        content_type = (upload.content_type or "").split(";")[0].strip().lower()
-        if not content_type or content_type == "application/octet-stream":
-            content_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
+        from common.uploads import inspect_upload
+
+        name, content_type = inspect_upload(upload, field="uploaded_file", default_name="attachment")
         document = Document.objects.create(
             institution=request.institution, uploaded_by=request.user, stored_file=upload, original_filename=name,
             content_type=content_type[:150], size_bytes=upload.size, category=self.attachment_category,
@@ -1595,24 +1586,15 @@ class JournalEntryViewSet(TenantModelViewSet):
 
     @action(detail=True, methods=("post",), filter_backends=(), parser_classes=(MultiPartParser, FormParser))
     def attachments(self, request, pk=None):
-        import mimetypes
-
-        from django.conf import settings as django_settings
         from apps.audit.services import record_audit_event
         from apps.documents.models import Document
         from apps.documents.serializers import DocumentSerializer
-        from rest_framework.exceptions import ValidationError as DRFValidationError
 
         journal = self.get_object()
         upload = request.FILES.get("uploaded_file")
-        if upload is None:
-            raise DRFValidationError({"uploaded_file": "Choose a file to upload."})
-        if upload.size > django_settings.DOCUMENT_UPLOAD_MAX_BYTES:
-            raise DRFValidationError({"uploaded_file": f"Files must be {django_settings.DOCUMENT_UPLOAD_MAX_BYTES // (1024 * 1024)} MB or smaller."})
-        name = (upload.name or "attachment").replace("\\", "/").rsplit("/", 1)[-1][:255]
-        content_type = (upload.content_type or "").split(";")[0].strip().lower()
-        if not content_type or content_type == "application/octet-stream":
-            content_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
+        from common.uploads import inspect_upload
+
+        name, content_type = inspect_upload(upload, field="uploaded_file", default_name="attachment")
         document = Document.objects.create(
             institution=request.institution, uploaded_by=request.user, stored_file=upload, original_filename=name,
             content_type=content_type[:150], size_bytes=upload.size, category="JOURNAL_SUPPORT",

@@ -522,8 +522,6 @@ CANDIDATE_DOCUMENT_CATEGORIES = ("CV", "COVER_LETTER", "CERTIFICATE", "PORTFOLIO
 
 @transaction.atomic
 def attach_candidate_document(*, candidate, actor, uploaded_file, category):
-    from django.conf import settings as django_settings
-    import mimetypes
 
     from apps.documents.models import Document
 
@@ -532,12 +530,9 @@ def attach_candidate_document(*, candidate, actor, uploaded_file, category):
         raise ValidationError({"category": "Choose a valid document type."})
     if uploaded_file is None:
         raise ValidationError({"uploaded_file": "Choose a file to upload."})
-    if uploaded_file.size > django_settings.DOCUMENT_UPLOAD_MAX_BYTES:
-        raise ValidationError({"uploaded_file": f"Documents must be {django_settings.DOCUMENT_UPLOAD_MAX_BYTES // (1024 * 1024)} MB or smaller."})
-    name = (uploaded_file.name or "document").replace("\\", "/").rsplit("/", 1)[-1][:255] or "document"
-    content_type = (uploaded_file.content_type or "").lower().split(";")[0].strip()
-    if not content_type or content_type == "application/octet-stream":
-        content_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
+    from common.uploads import inspect_upload
+
+    name, content_type = inspect_upload(uploaded_file, field="uploaded_file")
     document = Document.objects.create(
         institution=candidate.institution, uploaded_by=actor, stored_file=uploaded_file, original_filename=name,
         content_type=content_type[:150], size_bytes=uploaded_file.size, category=category,

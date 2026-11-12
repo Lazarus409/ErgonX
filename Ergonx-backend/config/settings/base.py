@@ -150,6 +150,14 @@ from .storage import media_storage_settings  # noqa: E402
 
 STORAGES, MEDIA_ROOT, MEDIA_STORAGE_KIND = media_storage_settings(base_dir=BASE_DIR)
 DOCUMENT_UPLOAD_MAX_BYTES = int(os.environ.get("DOCUMENT_UPLOAD_MAX_MB", "25")) * 1024 * 1024
+# Optional virus scanning of every upload (common/uploads.py). Set UPLOAD_SCANNER=clamav and
+# point CLAMAV_HOST/CLAMAV_PORT at a clamd service. Uploads are refused while the scanner is
+# unreachable unless UPLOAD_SCAN_FAIL_OPEN=true.
+UPLOAD_SCANNER = os.environ.get("UPLOAD_SCANNER", "").strip().lower()
+CLAMAV_HOST = os.environ.get("CLAMAV_HOST", "127.0.0.1")
+CLAMAV_PORT = int(os.environ.get("CLAMAV_PORT", "3310"))
+CLAMAV_TIMEOUT_SECONDS = float(os.environ.get("CLAMAV_TIMEOUT_SECONDS", "30"))
+UPLOAD_SCAN_FAIL_OPEN = os.environ.get("UPLOAD_SCAN_FAIL_OPEN", "false").lower() == "true"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "accounts.User"
 

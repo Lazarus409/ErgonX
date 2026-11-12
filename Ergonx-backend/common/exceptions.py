@@ -35,6 +35,7 @@ API_ERROR_CODES = (
     "membership_inactive",
     "onboarding_incomplete",
     "search_query_invalid",
+    "upload_rejected",
     "validation_error",
     "invalid_request",
     "not_found",

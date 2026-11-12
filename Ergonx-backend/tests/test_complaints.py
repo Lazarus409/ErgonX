@@ -11,6 +11,8 @@ from apps.notifications.models import Notification
 
 pytestmark = pytest.mark.django_db
 
+PNG = b"\x89PNG\r\n\x1a\n"
+
 COMPLAINTS = "/api/v1/complaints/"
 
 
@@ -167,7 +169,7 @@ def test_attachments_are_confidential(people, settings, tmp_path):
 
     def upload(user, name, internal=False):
         client.force_authenticate(people[user])
-        return client.post(url + "attachments/", {"file": SimpleUploadedFile(name, b"evidence-" + name.encode(), content_type="image/png"), "is_internal": internal}, format="multipart")
+        return client.post(url + "attachments/", {"file": SimpleUploadedFile(name, PNG + b"evidence-" + name.encode(), content_type="image/png"), "is_internal": internal}, format="multipart")
 
     shared = upload("staff", "screenshot.png")
     assert shared.status_code == 200, shared.data
@@ -181,7 +183,7 @@ def test_attachments_are_confidential(people, settings, tmp_path):
     visible = client.get(url).data["attachments"]
     assert [item["original_filename"] for item in visible] == ["screenshot.png"]
     download = client.get(url + f"attachments/{visible[0]['id']}/download/")
-    assert download.status_code == 200 and b"".join(download.streaming_content) == b"evidence-screenshot.png"
+    assert download.status_code == 200 and b"".join(download.streaming_content) == PNG + b"evidence-screenshot.png"
     hidden = next(item for item in internal["attachments"] if item["is_internal"])
     assert client.get(url + f"attachments/{hidden['id']}/download/").status_code == 404
 

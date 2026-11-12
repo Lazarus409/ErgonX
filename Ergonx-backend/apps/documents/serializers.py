@@ -1,10 +1,9 @@
-import mimetypes
 
-from django.conf import settings
 from rest_framework import serializers
 
 from apps.documents.models import Document, DocumentRequirement, DocumentRequirementWaiver, ImageAsset, Policy, PolicyAcknowledgement
 from common.serializers import ValidatedModelSerializer
+from common.uploads import inspect_upload
 
 
 class DocumentSerializer(serializers.ModelSerializer):
@@ -30,16 +29,11 @@ class DocumentSerializer(serializers.ModelSerializer):
         if uploaded_file is None and not attrs.get("file_reference", "").strip():
             raise serializers.ValidationError({"file_reference": "Provide an approved storage reference or upload a file."})
         if uploaded_file is not None:
-            # Any file type is accepted. Downloads are always sent as attachments
-            # with nosniff, so a stored file is never rendered inline.
-            max_bytes = settings.DOCUMENT_UPLOAD_MAX_BYTES
-            if uploaded_file.size > max_bytes:
-                raise serializers.ValidationError({"uploaded_file": f"Documents must be {max_bytes // (1024 * 1024)} MB or smaller."})
-            name = (uploaded_file.name or "document").replace("\\", "/").rsplit("/", 1)[-1][:255] or "document"
-            content_type = (uploaded_file.content_type or "").lower().split(";")[0].strip()
-            if not content_type or content_type == "application/octet-stream":
-                content_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
-            attrs["content_type"] = content_type[:150]
+            # Most file types are accepted; programs, scripts, macro files and files whose
+            # contents don't match their extension are refused (common/uploads.py).
+            # Downloads are always sent as attachments with nosniff.
+            name, content_type = inspect_upload(uploaded_file, field="uploaded_file")
+            attrs["content_type"] = content_type
             attrs["size_bytes"] = uploaded_file.size
             attrs["original_filename"] = name
         return attrs

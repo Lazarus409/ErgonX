@@ -13,6 +13,9 @@ from django.test import override_settings
 from apps.documents.models import Document
 from config.settings.storage import media_storage_settings
 
+# Uploads must really be what their extension says (common/uploads.py).
+PNG_BYTES = b"\x89PNG\r\n\x1a\nPNG-bytes"
+
 
 def test_folder_storage_by_default_and_on_a_persistent_disk():
     storages, root, kind = media_storage_settings({}, Path("/app"))
@@ -90,13 +93,13 @@ def test_uploads_round_trip_through_an_s3_bucket(api_client, institution_factory
         complaint = api_client.post("/api/v1/complaints/", {"category": "OTHER", "subject": "Bucket test", "description": "Checking storage."}, format="json").data
         from django.core.files.uploadedfile import SimpleUploadedFile
 
-        uploaded = api_client.post(f"/api/v1/complaints/{complaint['id']}/attachments/", {"file": SimpleUploadedFile("photo.png", b"PNG-bytes", content_type="image/png")}, format="multipart")
+        uploaded = api_client.post(f"/api/v1/complaints/{complaint['id']}/attachments/", {"file": SimpleUploadedFile("photo.png", PNG_BYTES, content_type="image/png")}, format="multipart")
         assert uploaded.status_code == 200, uploaded.data
         keys = [item["Key"] for item in s3.list_objects_v2(Bucket="ergonx-test-media")["Contents"]]
         assert len(keys) == 1 and keys[0].startswith("media/complaints/")
         attachment = uploaded.data["attachments"][0]
         download = api_client.get(f"/api/v1/complaints/{complaint['id']}/attachments/{attachment['id']}/download/")
-        assert download.status_code == 200 and b"".join(download.streaming_content) == b"PNG-bytes"
+        assert download.status_code == 200 and b"".join(download.streaming_content) == PNG_BYTES
 
 
 DATABASE_STORAGES = media_storage_settings({"MEDIA_STORAGE": "database"}, Path("/app"))[0]
@@ -139,13 +142,13 @@ def test_uploads_round_trip_through_the_database(api_client, institution_factory
         employee_factory(institution, user=user)
         api_client.force_authenticate(user)
         complaint = api_client.post("/api/v1/complaints/", {"category": "OTHER", "subject": "Database test", "description": "Checking storage."}, format="json").data
-        uploaded = api_client.post(f"/api/v1/complaints/{complaint['id']}/attachments/", {"file": SimpleUploadedFile("photo.png", b"PNG-bytes", content_type="image/png")}, format="multipart")
+        uploaded = api_client.post(f"/api/v1/complaints/{complaint['id']}/attachments/", {"file": SimpleUploadedFile("photo.png", PNG_BYTES, content_type="image/png")}, format="multipart")
         assert uploaded.status_code == 200, uploaded.data
         row = StoredFile.objects.get()
-        assert row.name.startswith("complaints/") and bytes(row.content) == b"PNG-bytes"
+        assert row.name.startswith("complaints/") and bytes(row.content) == PNG_BYTES
         attachment = uploaded.data["attachments"][0]
         download = api_client.get(f"/api/v1/complaints/{complaint['id']}/attachments/{attachment['id']}/download/")
-        assert download.status_code == 200 and b"".join(download.streaming_content) == b"PNG-bytes"
+        assert download.status_code == 200 and b"".join(download.streaming_content) == PNG_BYTES
 
 
 @pytest.mark.django_db

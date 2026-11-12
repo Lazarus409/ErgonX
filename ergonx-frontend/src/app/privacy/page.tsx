@@ -11,6 +11,7 @@ import { Field, Input, Select, Textarea } from "@/components/ui/Field";
 import { Dialog } from "@/components/ui/Overlay";
 import PageHeader from "@/components/ui/PageHeader";
 import Tabs from "@/components/ui/Tabs";
+import DataCatalogue from "@/components/privacy/DataCatalogue";
 import { employeesApi, getApiErrorMessage, privacyApi } from "@/lib/api";
 import { saveBlob } from "@/lib/api/policies";
 import { DSR_STATUS_TONES, DSR_TYPE_LABELS, RETENTION_LABELS, type DataSubjectRequest, type DsrStatus, type DsrType, type RetentionCategory } from "@/lib/api/privacy";
@@ -18,7 +19,7 @@ import { useAccess } from "@/lib/access";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { useApiResource } from "@/lib/useApiResource";
 
-type View = "requests" | "retention" | "holds" | "consents";
+type View = "requests" | "retention" | "holds" | "consents" | "classification";
 const CATEGORIES = Object.keys(RETENTION_LABELS) as RetentionCategory[];
 const ANONYMISABLE: RetentionCategory[] = ["CANDIDATES", "FORMER_EMPLOYEES"];
 
@@ -54,7 +55,9 @@ export default function PrivacyPage() {
         <MetricCard label="Legal holds" value={String(report?.legal_holds ?? 0)} icon={Lock} accent="payroll" />
         <MetricCard label="Consents on record" value={String(consentRows?.consents.length ?? 0)} icon={ShieldCheck} accent="attendance" />
       </section>
-      <Tabs label="Privacy" value={view} onChange={(value) => setView(value as View)} items={[{ value: "requests", label: `Requests (${open.length} open)` }, { value: "retention", label: "Retention" }, { value: "holds", label: "Legal holds" }, { value: "consents", label: "Consents" }]} />
+      <Tabs label="Privacy" value={view} onChange={(value) => setView(value as View)} items={[{ value: "requests", label: `Requests (${open.length} open)` }, { value: "retention", label: "Retention" }, { value: "holds", label: "Legal holds" }, { value: "consents", label: "Consents" }, { value: "classification", label: "Data classification" }]} />
+
+      {view === "classification" && <DataCatalogue />}
 
       {view === "requests" && (
         <Card title="Data subject requests" icon={FileDown} accent="audit" actions={canManage ? <Button size="sm" leadingIcon={<Plus className="h-4 w-4" />} onClick={() => setLogging({ request_type: "ACCESS", requester_name: "", requester_email: "", details: "" })}>Log a request</Button> : undefined}>

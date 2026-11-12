@@ -170,9 +170,11 @@ class CandidateViewSet(RecruitmentViewSet):
         return Response({"candidate_id": candidate.id, "average_score": candidate.average_score, "application_count": candidate.application_count})
 
     def _documents(self, candidate):
-        return Document.objects.for_institution(self.request.institution).filter(
+        from apps.documents.access import hide_restricted
+
+        return hide_restricted(Document.objects.for_institution(self.request.institution).filter(
             entity_type="recruitment.Candidate", entity_id=candidate.id, is_active=True
-        )
+        ), self.request)
 
     @action(detail=True, methods=("get", "post"), parser_classes=(MultiPartParser, FormParser, JSONParser))
     def documents(self, request, pk=None):

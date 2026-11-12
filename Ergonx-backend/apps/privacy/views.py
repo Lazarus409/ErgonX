@@ -241,3 +241,18 @@ class MyPrivacyView(APIView):
             requester_email=employee.work_email or request.user.email, details=str(request.data.get("details") or "")[:4000], employee=employee,
         )
         return Response(DataSubjectRequestSerializer(created).data, status=201)
+
+
+class DataCatalogueView(APIView):
+    """Every kind of data ErgonX holds for the organisation: how sensitive it is, who may open it, how many records exist."""
+
+    permission_classes = (TenantContextPermission, TenantRBACPermission)
+
+    def get_required_permission(self):
+        return "privacy.view"
+
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
+    def get(self, request):
+        from apps.privacy.catalogue import data_catalogue
+
+        return Response(data_catalogue(request.institution))

@@ -8,6 +8,7 @@ from rest_framework.viewsets import ViewSet
 
 from apps.reports.services import build_report_details, build_report_rows
 from apps.institutions.services import effective_permission_codes
+from common.classification import CONFIDENTIAL, REPORT_LEVELS
 from common.exports import FORMATS, columns_from_rows, humanize, table_response
 from common.permissions import TenantContextPermission, TenantRBACPermission
 from common.scoping import ATTENDANCE_BROAD, LEAVE_BROAD, scope_to_employees
@@ -132,7 +133,7 @@ class ReportsViewSet(ViewSet):
         ) if part)
         return table_response(
             export, filename=filename, title=title, columns=columns_from_rows(rows), rows=rows,
-            institution=request.institution, subtitle=subtitle,
+            institution=request.institution, subtitle=subtitle, classification=REPORT_LEVELS.get(name, CONFIDENTIAL),
         )
 
     @action(detail=False, methods=("get",), url_path="workforce-cost")

@@ -25,8 +25,19 @@ class DocumentSerializer(serializers.ModelSerializer):
         }
 
     def validate(self, attrs):
+        request = self.context.get("request")
+        new_level = attrs.get("classification")
+        old_level = getattr(self.instance, "classification", None)
+        touches_restricted = Document.Classification.RESTRICTED in (new_level, old_level if new_level and new_level != old_level else None)
+        if request is not None and touches_restricted:
+            from apps.documents.access import can_view_restricted
+
+            if not can_view_restricted(request):
+                raise serializers.ValidationError({"classification": "Only roles that can open Restricted documents can set or remove that classification."})
         uploaded_file = attrs.get("uploaded_file")
-        if uploaded_file is None and not attrs.get("file_reference", "").strip():
+        # A file or reference is needed when creating; a metadata-only update keeps the existing one.
+        has_existing = self.instance is not None and (self.instance.stored_file or self.instance.file_reference)
+        if uploaded_file is None and not attrs.get("file_reference", "").strip() and not has_existing:
             raise serializers.ValidationError({"file_reference": "Provide an approved storage reference or upload a file."})
         if uploaded_file is not None:
             # Most file types are accepted; programs, scripts, macro files and files whose

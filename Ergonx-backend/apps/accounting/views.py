@@ -294,9 +294,11 @@ class RecordAttachmentsMixin:
     def _record_documents(self, record):
         from apps.documents.models import Document
 
-        return Document.objects.for_institution(self.request.institution).filter(
+        from apps.documents.access import hide_restricted
+
+        return hide_restricted(Document.objects.for_institution(self.request.institution).filter(
             entity_type=self.attachment_entity_type, entity_id=record.id, is_active=True
-        )
+        ), self.request)
 
     def _record_context(self, record):
         from apps.audit.models import AuditLog
@@ -1531,9 +1533,11 @@ class JournalEntryViewSet(TenantModelViewSet):
     def _journal_documents(self, journal):
         from apps.documents.models import Document
 
-        return Document.objects.for_institution(self.request.institution).filter(
+        from apps.documents.access import hide_restricted
+
+        return hide_restricted(Document.objects.for_institution(self.request.institution).filter(
             entity_type="accounting.JournalEntry", entity_id=journal.id, is_active=True
-        )
+        ), self.request)
 
     @action(detail=True, methods=("get",), filter_backends=())
     def context(self, request, pk=None):

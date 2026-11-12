@@ -44,3 +44,17 @@ export const consents = (): Promise<{ consents: ConsentRow[] }> => apiGet("/priv
 
 export const myRequests = (): Promise<{ requests: DataSubjectRequest[] }> => apiGet("/me/privacy/");
 export const makeMyRequest = (request_type: DsrType, details: string): Promise<DataSubjectRequest> => apiPost<DataSubjectRequest>("/me/privacy/", { request_type, details });
+
+export type ClassificationLevel = "PUBLIC" | "INTERNAL" | "CONFIDENTIAL" | "RESTRICTED";
+export const LEVEL_TONES: Record<ClassificationLevel, "neutral" | "info" | "warning" | "danger"> = { PUBLIC: "neutral", INTERNAL: "info", CONFIDENTIAL: "warning", RESTRICTED: "danger" };
+export interface DataCategory {
+  key: string; label: string; module: string; module_enabled: boolean; level: ClassificationLevel; level_label: string; kind: string;
+  fields: string[]; access: { code: string; name: string }[]; records: number | null; note: string;
+}
+export interface DataCatalogue {
+  levels: { code: ClassificationLevel; label: string; rank: number; meaning: string }[];
+  categories: DataCategory[];
+  documents: { level: ClassificationLevel; level_label: string; count: number }[];
+}
+/** Every kind of data held, its classification, who may open it and how many records exist. */
+export const dataCatalogue = (): Promise<DataCatalogue> => apiGet<DataCatalogue>("/privacy/data-catalogue/");

@@ -63,7 +63,9 @@ class DocumentViewSet(TenantModelViewSet):
         return super().get_required_permission()
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        from apps.documents.access import hide_restricted
+
+        queryset = hide_restricted(super().get_queryset(), self.request)
         membership = getattr(self.request, "membership", None)
         if membership is not None and membership.role.permissions.filter(code="document.view").exists():
             return queryset
@@ -93,6 +95,15 @@ class DocumentViewSet(TenantModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(institution=self.request.institution, uploaded_by=self.request.user)
+
+    def perform_update(self, serializer):
+        before = serializer.instance.classification
+        document = serializer.save()
+        if document.classification != before:
+            record_audit_event(
+                actor=self.request.user, institution=self.request.institution, entity=document, action="document.classification_changed",
+                metadata={"changes": {"classification": [before, document.classification]}, "category": document.category},
+            )
 
     @action(detail=True, methods=("get",), url_path="download")
     def download(self, request, pk=None):
@@ -562,7 +573,9 @@ class SignatureRequestViewSet(TenantModelViewSet):
         payload.is_valid(raise_exception=True)
         values = payload.validated_data
         employee = get_object_or_404(scope_to_employees(Employee.objects.for_institution(request.institution), request, ""), pk=values["employee"])
-        document = get_object_or_404(Document.objects.for_institution(request.institution), pk=values["document"])
+        from apps.documents.access import hide_restricted
+
+        document = get_object_or_404(hide_restricted(Document.objects.for_institution(request.institution), request), pk=values["document"])
         signature = call_validated_service(
             request_signature, institution=request.institution, document=document, employee=employee, actor=request.user,
             title=values.get("title") or "", message=values.get("message") or "", due_date=values.get("due_date"),

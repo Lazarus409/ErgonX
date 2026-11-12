@@ -102,7 +102,7 @@ def _xlsx_value(value):
     return text
 
 
-def render_xlsx(columns, rows, *, title):
+def render_xlsx(columns, rows, *, title, classification=""):
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill
     from openpyxl.utils import get_column_letter
@@ -131,6 +131,13 @@ def render_xlsx(columns, rows, *, title):
     for index, width in enumerate(widths, start=1):
         sheet.column_dimensions[get_column_letter(index)].width = min(max(width + 2, 10), 60)
     sheet.freeze_panes = "A2"
+    if classification:
+        # Printed on every page, and visible in the file's properties.
+        label = classification.upper()
+        sheet.oddHeader.right.text = label
+        sheet.oddFooter.right.text = label
+        workbook.properties.keywords = f"Classification: {label}"
+        workbook.properties.subject = f"{title} ({label})"
     if columns:
         sheet.auto_filter.ref = sheet.dimensions
     buffer = io.BytesIO()
@@ -138,7 +145,7 @@ def render_xlsx(columns, rows, *, title):
     return buffer.getvalue()
 
 
-def render_pdf(columns, rows, *, title, institution_name="", subtitle=""):
+def render_pdf(columns, rows, *, title, institution_name="", subtitle="", classification=""):
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
@@ -155,8 +162,14 @@ def render_pdf(columns, rows, *, title, institution_name="", subtitle=""):
     margin = 14 * mm
     generated = timezone.localtime().strftime("%d %b %Y, %H:%M")
 
+    label = classification.upper()
+
     def footer(canvas, document):
         canvas.saveState()
+        if label:
+            canvas.setFont("Helvetica-Bold", 8)
+            canvas.setFillColor(colors.HexColor("#b91c1c") if label == "RESTRICTED" else navy)
+            canvas.drawRightString(pagesize[0] - margin, pagesize[1] - 9 * mm, label)
         canvas.setFont("Helvetica", 7.5)
         canvas.setFillColor(muted)
         left = f"{institution_name} · {title}" if institution_name else title
@@ -166,7 +179,7 @@ def render_pdf(columns, rows, *, title, institution_name="", subtitle=""):
 
     document = SimpleDocTemplate(
         buffer, pagesize=pagesize, leftMargin=margin, rightMargin=margin, topMargin=margin, bottomMargin=16 * mm,
-        title=title, author=institution_name or "ErgonX", creator="ErgonX",
+        title=title, author=institution_name or "ErgonX", creator="ErgonX", subject=label or "",
     )
     styles = getSampleStyleSheet()
     heading = ParagraphStyle("ExportTitle", parent=styles["Title"], alignment=0, fontSize=15, leading=19, textColor=navy, spaceAfter=2)
@@ -215,23 +228,25 @@ def render_pdf(columns, rows, *, title, institution_name="", subtitle=""):
     return buffer.getvalue()
 
 
-def render_table(fmt, *, title, columns, rows, institution_name="", subtitle=""):
+def render_table(fmt, *, title, columns, rows, institution_name="", subtitle="", classification=""):
     """Return the file bytes for ``rows`` in ``fmt`` (csv, xlsx or pdf)."""
     if fmt == "xlsx":
-        return render_xlsx(columns, rows, title=title)
+        return render_xlsx(columns, rows, title=title, classification=classification)
     if fmt == "pdf":
-        return render_pdf(columns, rows, title=title, institution_name=institution_name, subtitle=subtitle)
+        return render_pdf(columns, rows, title=title, institution_name=institution_name, subtitle=subtitle, classification=classification)
     return render_csv(columns, rows)
 
 
-def table_response(fmt, *, filename, title, columns, rows, institution=None, subtitle=""):
-    """An attachment response holding ``rows`` as CSV, Excel or PDF."""
+def table_response(fmt, *, filename, title, columns, rows, institution=None, subtitle="", classification=""):
+    """An attachment response holding ``rows`` as CSV, Excel or PDF, labelled with ``classification``."""
     if fmt not in FORMATS:
         fmt = "csv"
     content = render_table(
         fmt, title=title, columns=columns, rows=rows,
-        institution_name=getattr(institution, "name", "") or "", subtitle=subtitle,
+        institution_name=getattr(institution, "name", "") or "", subtitle=subtitle, classification=classification,
     )
     response = HttpResponse(content, content_type=CONTENT_TYPES[fmt])
     response["Content-Disposition"] = f'attachment; filename="{safe_filename(filename)}.{fmt}"'
+    if classification:
+        response["X-Data-Classification"] = classification.upper()
     return response

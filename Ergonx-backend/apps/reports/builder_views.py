@@ -10,6 +10,7 @@ from apps.audit.services import record_audit_event
 from apps.institutions.services import effective_permission_codes
 from apps.reports import builder
 from apps.reports.models import CustomReport
+from common.classification import CONFIDENTIAL
 from common.exports import FORMATS, table_response
 from common.permissions import TenantContextPermission, TenantRBACPermission
 from common.serializers import call_validated_service
@@ -28,7 +29,8 @@ def _export_response(request, result, fmt, name, entity):
     record_audit_event(actor=request.user, institution=request.institution, entity=entity, action="reports.builder.exported", metadata={"dataset": result["dataset"], "rows": len(result["rows"]), "format": fmt})
     columns = [(column["key"], column["label"]) for column in result["columns"]]
     subtitle = "First rows only: the report hit its row limit" if result.get("truncated") else ""
-    return table_response(fmt, filename=name, title=name, columns=columns, rows=result["rows"], institution=request.institution, subtitle=subtitle)
+    # Builder datasets carry personal data, so every export is labelled at least Confidential.
+    return table_response(fmt, filename=name, title=name, columns=columns, rows=result["rows"], institution=request.institution, subtitle=subtitle, classification=CONFIDENTIAL)
 
 
 class DatasetsView(BuilderBase):

@@ -75,7 +75,7 @@ def test_hr_dashboard_and_csv_export_are_tenant_scoped(
     report = api_client.get("/api/v1/reports/workforce-cost/?export=csv")
     assert report.status_code == 200
     assert report["Content-Type"].startswith("text/csv")
-    assert "gross_pay" in report.content.decode()
+    assert "Gross pay" in report.content.decode("utf-8-sig")
 
 
 @pytest.mark.django_db
@@ -119,7 +119,7 @@ def test_finance_manager_receives_finance_dashboard_and_report_access(
     assert expenses_report["Content-Type"].startswith("text/csv")
     # The common exporter labels an otherwise empty report truthfully; it does
     # not manufacture a row merely to populate a CSV header.
-    assert expenses_report.content.decode() == "empty\r\n"
+    assert expenses_report.content.decode("utf-8-sig") == "empty\r\n"
 
     filtered_accounting = api_client.get("/api/v1/reports/accounting/?status=POSTED")
     assert filtered_accounting.status_code == 200

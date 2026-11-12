@@ -220,7 +220,7 @@ def run(request, dataset_key, definition):
         rows = list(queryset.values(*[f"r_{name}" for name in clean["columns"]])[: clean["limit"]])
         columns = [{"key": name, "label": fields[name][0], "type": fields[name][1]} for name in clean["columns"]]
         data = [{name: _plain(row[f"r_{name}"]) for name in clean["columns"]} for row in rows]
-    return {"dataset": dataset_key, "columns": columns, "rows": data, "total": total, "truncated": total > len(data)}
+    return {"dataset": dataset_key, "dataset_label": dataset["label"], "columns": columns, "rows": data, "total": total, "truncated": total > len(data)}
 
 
 def _plain(value):

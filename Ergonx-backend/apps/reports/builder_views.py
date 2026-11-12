@@ -1,8 +1,4 @@
-import csv
-import io
-
 from django.db.models import Q
-from django.http import HttpResponse
 from drf_spectacular.utils import OpenApiTypes, extend_schema
 from rest_framework import serializers
 from rest_framework.decorators import action
@@ -14,6 +10,7 @@ from apps.audit.services import record_audit_event
 from apps.institutions.services import effective_permission_codes
 from apps.reports import builder
 from apps.reports.models import CustomReport
+from common.exports import FORMATS, table_response
 from common.permissions import TenantContextPermission, TenantRBACPermission
 from common.serializers import call_validated_service
 from common.viewsets import TenantModelViewSet
@@ -27,15 +24,11 @@ class BuilderBase(APIView):
         return "home.view"
 
 
-def _csv_response(result, name):
-    buffer = io.StringIO()
-    writer = csv.writer(buffer)
-    writer.writerow([column["label"] for column in result["columns"]])
-    for row in result["rows"]:
-        writer.writerow([row.get(column["key"], "") for column in result["columns"]])
-    response = HttpResponse(buffer.getvalue(), content_type="text/csv; charset=utf-8")
-    response["Content-Disposition"] = f'attachment; filename="{name}.csv"'
-    return response
+def _export_response(request, result, fmt, name, entity):
+    record_audit_event(actor=request.user, institution=request.institution, entity=entity, action="reports.builder.exported", metadata={"dataset": result["dataset"], "rows": len(result["rows"]), "format": fmt})
+    columns = [(column["key"], column["label"]) for column in result["columns"]]
+    subtitle = "First rows only: the report hit its row limit" if result.get("truncated") else ""
+    return table_response(fmt, filename=name, title=name, columns=columns, rows=result["rows"], institution=request.institution, subtitle=subtitle)
 
 
 class DatasetsView(BuilderBase):
@@ -49,7 +42,7 @@ class DatasetsView(BuilderBase):
 class RunSerializer(serializers.Serializer):
     dataset = serializers.CharField(max_length=40)
     definition = serializers.DictField()
-    format = serializers.ChoiceField(choices=("json", "csv"), default="json")
+    format = serializers.ChoiceField(choices=("json", *FORMATS), default="json")
 
 
 class RunView(BuilderBase):
@@ -58,9 +51,9 @@ class RunView(BuilderBase):
         payload = RunSerializer(data=request.data)
         payload.is_valid(raise_exception=True)
         result = call_validated_service(builder.run, request=request, dataset_key=payload.validated_data["dataset"], definition=payload.validated_data["definition"])
-        if payload.validated_data["format"] == "csv":
-            record_audit_event(actor=request.user, institution=request.institution, entity=request.institution, action="reports.builder.exported", metadata={"dataset": result["dataset"], "rows": len(result["rows"])})
-            return _csv_response(result, f"report-{result['dataset']}")
+        fmt = payload.validated_data["format"]
+        if fmt in FORMATS:
+            return _export_response(request, result, fmt, result.get("dataset_label") or result["dataset"], request.institution)
         return Response(result)
 
 
@@ -126,7 +119,8 @@ class CustomReportViewSet(TenantModelViewSet):
     def run(self, request, pk=None):
         report = self.get_object()
         result = call_validated_service(builder.run, request=request, dataset_key=report.dataset, definition=report.definition)
-        if request.query_params.get("format") == "csv":
-            record_audit_event(actor=request.user, institution=request.institution, entity=report, action="reports.builder.exported", metadata={"dataset": report.dataset, "rows": len(result["rows"])})
-            return _csv_response(result, report.name.replace('"', "").replace("/", "-")[:80] or "report")
+        # ?export= (DRF reserves ?format= for its renderers; ?format=csv is kept for old links).
+        fmt = request.query_params.get("export") or request.query_params.get("format")
+        if fmt in FORMATS:
+            return _export_response(request, result, fmt, report.name or "report", report)
         return Response({**result, "report": CustomReportSerializer(report, context={"request": request}).data})

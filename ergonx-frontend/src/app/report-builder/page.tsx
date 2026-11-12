@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { Download, GripVertical, Play, Plus, Save, Table2, Trash2, X } from "lucide-react";
+import { GripVertical, Play, Plus, Save, Table2, Trash2, X } from "lucide-react";
 
 import Alert from "@/components/ui/Alert";
 import { Badge } from "@/components/ui/Badge";
@@ -14,6 +14,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import { useToast } from "@/components/ui/ToastProvider";
 import { getApiErrorMessage, reportBuilderApi } from "@/lib/api";
 import { saveBlob } from "@/lib/api/policies";
+import { ExportMenu, type ExportFormat } from "@/components/ui/ExportMenu";
 import type { BuilderDataset, BuilderDefinition, BuilderFilter, BuilderResult, CustomReport } from "@/lib/api/reportBuilder";
 import { cx } from "@/lib/cx";
 import { useApiResource } from "@/lib/useApiResource";
@@ -58,10 +59,13 @@ export default function ReportBuilderPage() {
     catch (caught) { setRunError(getApiErrorMessage(caught)); }
     finally { setBusy(false); }
   };
-  const exportCsv = async () => {
+  const [exporting, setExporting] = useState(false);
+  const exportAs = async (format: ExportFormat) => {
     if (!dataset) return;
-    try { await saveBlob(await reportBuilderApi.exportReport(dataset.key, definition), `${current?.name ?? dataset.label}.csv`); }
+    setExporting(true);
+    try { await saveBlob(await reportBuilderApi.exportReport(dataset.key, definition, format), `${current?.name ?? dataset.label}.${format}`); }
     catch (caught) { setRunError(getApiErrorMessage(caught)); }
+    finally { setExporting(false); }
   };
   const open = (report: CustomReport) => { setDatasetKey(report.dataset); setDefinition({ ...blank(), ...report.definition }); setCurrent(report); setResult(null); };
   const save = async () => {
@@ -113,7 +117,7 @@ export default function ReportBuilderPage() {
 
         <div className="space-y-4">
           <Card title={current ? current.name : "New report"} icon={Table2} accent="brand"
-            actions={<span className="flex flex-wrap gap-2"><Button size="sm" variant="secondary" leadingIcon={<Save className="h-4 w-4" />} disabled={!definition.columns.length} onClick={() => setSaving({ name: current?.is_owner ? current.name : "", visibility: current?.visibility ?? "PRIVATE" })}>{current?.is_owner ? "Save" : "Save as"}</Button><Button size="sm" variant="secondary" leadingIcon={<Download className="h-4 w-4" />} disabled={!definition.columns.length} onClick={() => void exportCsv()}>CSV</Button><Button size="sm" leadingIcon={<Play className="h-4 w-4" />} loading={busy} disabled={!definition.columns.length} onClick={() => void run()}>Run</Button></span>}>
+            actions={<span className="flex flex-wrap gap-2"><Button size="sm" variant="secondary" leadingIcon={<Save className="h-4 w-4" />} disabled={!definition.columns.length} onClick={() => setSaving({ name: current?.is_owner ? current.name : "", visibility: current?.visibility ?? "PRIVATE" })}>{current?.is_owner ? "Save" : "Save as"}</Button><ExportMenu size="sm" loading={exporting} disabled={!definition.columns.length} onExport={(format) => void exportAs(format)} /><Button size="sm" leadingIcon={<Play className="h-4 w-4" />} loading={busy} disabled={!definition.columns.length} onClick={() => void run()}>Run</Button></span>}>
             <div className="space-y-4">
               <section aria-label="Columns">
                 <p className="text-caption font-semibold uppercase tracking-[0.06em] text-ink-muted">Columns · drag to reorder</p>

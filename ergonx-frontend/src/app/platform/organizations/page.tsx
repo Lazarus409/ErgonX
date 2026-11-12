@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, LayoutGrid, TrendingUp, UserCheck, UsersRound } from "lucide-react";
+import { Building2, CalendarHeart, LayoutGrid, TrendingUp, UserCheck, UsersRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
@@ -82,6 +82,30 @@ export default function PlatformOrganizationsPage() {
           <p className="mt-4 flex items-center gap-2 text-caption text-ink-muted"><LayoutGrid className="h-3.5 w-3.5" aria-hidden="true" />Blocked organizations report a problem in their own setup checklist.</p>
         </section>
       </div>
+
+      {overview?.upcoming_anniversaries?.length ? (
+        <section className={`${platformCard} p-5 sm:p-6`} aria-labelledby="anniversaries-heading">
+          <SectionTitle eyebrow="Milestones" title={<span id="anniversaries-heading">ErgonX anniversaries, next 30 days</span>} />
+          <ul className="mt-3 divide-y divide-line-soft">
+            {overview.upcoming_anniversaries.map((row) => (
+              <li key={row.id}>
+                <button type="button" onClick={() => router.push(`/platform/organizations/${row.id}`)} className="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-2.5 text-left hover:bg-surface-hover">
+                  <span className="flex min-w-0 items-center gap-3">
+                    <CalendarHeart className="h-4 w-4 shrink-0 text-primary-ink" aria-hidden="true" />
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold text-ink-strong">{row.name}</span>
+                      <span className="block text-caption text-ink-muted">{row.years} year{row.years === 1 ? "" : "s"} on ErgonX · joined {formatDate(row.joined_on)}</span>
+                    </span>
+                  </span>
+                  <span className={row.days_away === 0 ? "shrink-0 rounded-full bg-primary-soft px-2.5 py-1 text-caption font-semibold text-primary-ink" : "shrink-0 text-caption font-medium text-ink-muted"}>
+                    {row.days_away === 0 ? "Today" : row.days_away === 1 ? "Tomorrow" : formatDate(row.date)}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <DataTable<PlatformInstitution>
         className={platformTable}

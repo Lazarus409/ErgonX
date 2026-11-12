@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 
 import GoLiveCard from "@/components/home/GoLiveCard";
+import CelebrationsCard from "@/components/home/CelebrationsCard";
 import HomeHero, { HeroStat } from "@/components/home/HomeHero";
 import { AttentionItem, Card, IconTile, SectionHeading } from "@/components/ui/Card";
 import ErrorState from "@/components/ui/ErrorState";
@@ -205,6 +206,8 @@ export default function WorkspaceHome({ areaLabel, continueHref, continueTitle, 
       </div>
 
       <OperationalSnapshot />
+
+      <CelebrationsCard showPreferencesLink={selfServiceEligible} />
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Card title="Continue your work" icon={History} accent="brand">

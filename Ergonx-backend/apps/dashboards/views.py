@@ -1011,6 +1011,23 @@ class HomeViewSet(ViewSet):
             "with the route where it is completed. Others get applicable=false."
         ),
     )
+    @extend_schema(
+        responses={200: OpenApiTypes.OBJECT},
+        description=(
+            "Upcoming birthdays (opted-in employees only; day and month, never the year) and work "
+            "anniversaries (unless opted out) of active employees within ?days= (default 14, max 60)."
+        ),
+    )
+    @action(detail=False, methods=("get",))
+    def celebrations(self, request):
+        from apps.dashboards.celebrations import celebrations
+
+        try:
+            days = int(request.query_params.get("days", 14))
+        except (TypeError, ValueError):
+            days = 14
+        return Response(celebrations(institution=request.institution, user=request.user, days=days))
+
     @action(detail=False, methods=("get",), url_path="go-live")
     def go_live(self, request):
         from apps.dashboards.go_live import go_live_checklist

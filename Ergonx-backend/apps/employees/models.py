@@ -55,6 +55,10 @@ class Employee(AutoCodeMixin, TenantOwnedModel):
     )
     hire_date = models.DateField()
     status = models.CharField(max_length=12, choices=Status.choices, default=Status.ACTIVE)
+    # Celebrations on the home page. A birthday is personal, so it is only shown (day and
+    # month, never the year) when the employee opts in; a work anniversary shows unless they opt out.
+    share_birthday = models.BooleanField(default=False)
+    share_work_anniversary = models.BooleanField(default=True)
 
     class Meta:
         ordering = ("last_name", "first_name", "employee_number")

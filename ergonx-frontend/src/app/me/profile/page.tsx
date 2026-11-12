@@ -2,18 +2,19 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Image from "next/image";
-import { Briefcase, Save, UserRound } from "lucide-react";
+import { Briefcase, PartyPopper, Save, UserRound } from "lucide-react";
 import { formatDate, humanizeEnum } from "@/lib/format";
 
 import Alert from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { Field, FileInput, Input, Select } from "@/components/ui/Field";
+import { Field, FileInput, Input, Select, Switch } from "@/components/ui/Field";
 import PageHeader from "@/components/ui/PageHeader";
 import { employeesApi, getApiErrorMessage, imagesApi } from "@/lib/api";
 import { useAuth } from "@/components/guards/AuthProvider";
 import { cx } from "@/lib/cx";
 import type { Employee } from "@/types/hr";
+import type { CelebrationSettings } from "@/lib/api/employees";
 
 export default function MyProfilePage() {
   const { user, refreshSession } = useAuth();
@@ -109,6 +110,8 @@ export default function MyProfilePage() {
         </div>
       </Card>
 
+      {employee && <CelebrationSettingsCard onError={setError} />}
+
       {employee && (
         <Card title="Employment summary" icon={Briefcase} accent="hr">
           {employee.current_employment ? (
@@ -131,6 +134,41 @@ export default function MyProfilePage() {
         </Card>
       )}
     </div>
+  );
+}
+
+function CelebrationSettingsCard({ onError }: { onError: (message: string) => void }) {
+  const [settings, setSettings] = useState<CelebrationSettings | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    employeesApi.getMyCelebrationSettings().then((value) => setSettings({ share_birthday: value.share_birthday, share_work_anniversary: value.share_work_anniversary })).catch((caught) => onError(getApiErrorMessage(caught)));
+  }, [onError]);
+  const change = async (update: Partial<CelebrationSettings>) => {
+    if (!settings) return;
+    const previous = settings;
+    setSettings({ ...settings, ...update }); setBusy(true);
+    try { await employeesApi.updateMyCelebrationSettings(update); }
+    catch (caught) { setSettings(previous); onError(getApiErrorMessage(caught)); }
+    finally { setBusy(false); }
+  };
+  return (
+    <Card id="celebrations" title="Celebrations" icon={PartyPopper} accent="hr">
+      <div className="space-y-4">
+        <Switch
+          checked={settings?.share_birthday ?? false}
+          disabled={!settings || busy}
+          onChange={(checked) => void change({ share_birthday: checked })}
+          label="Show my birthday to colleagues"
+          description="Only the day and month are shown, never your age."
+        />
+        <Switch
+          checked={settings?.share_work_anniversary ?? true}
+          disabled={!settings || busy}
+          onChange={(checked) => void change({ share_work_anniversary: checked })}
+          label="Show my work anniversary"
+        />
+      </div>
+    </Card>
   );
 }
 

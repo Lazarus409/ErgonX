@@ -311,6 +311,20 @@ def _last_twelve_months(now):
     return list(reversed(months))
 
 
+def _upcoming_anniversaries(institutions, days=30):
+    """Organisations reaching a whole year on ErgonX within ``days``, soonest first."""
+    from apps.dashboards.celebrations import organisation_anniversary
+
+    today = timezone.localdate()
+    until = today + timedelta(days=days)
+    rows = []
+    for institution in institutions.only("id", "name", "code", "created_at"):
+        anniversary = organisation_anniversary(institution, today, until)
+        if anniversary:
+            rows.append({"id": str(institution.id), "code": institution.code, **anniversary})
+    return sorted(rows, key=lambda row: (row["days_away"], row["name"]))
+
+
 class PlatformOverviewView(APIView):
     permission_classes = PLATFORM_PERMISSIONS
 
@@ -354,6 +368,7 @@ class PlatformOverviewView(APIView):
                 "institutions": _monthly_counts(institutions, months),
                 "access_requests": _monthly_counts(InstitutionAccessRequest.objects.all(), months),
             },
+            "upcoming_anniversaries": _upcoming_anniversaries(institutions.filter(is_active=True)),
             "recent_institutions": PlatformInstitutionSerializer(
                 _annotated_institutions().order_by("-created_at")[:5], many=True
             ).data,

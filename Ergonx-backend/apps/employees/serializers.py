@@ -289,5 +289,5 @@ class SelfServiceProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Employee
-        fields = ("id", "employee_number", "first_name", "middle_name", "last_name", "full_name", "preferred_name", "personal_email", "work_email", "phone", "mobile_phone", "linkedin_url", "avatar_key", "date_of_birth", "gender", "hire_date", "status")
+        fields = ("id", "employee_number", "first_name", "middle_name", "last_name", "full_name", "preferred_name", "personal_email", "work_email", "phone", "mobile_phone", "linkedin_url", "avatar_key", "date_of_birth", "gender", "hire_date", "status", "share_birthday", "share_work_anniversary")
         read_only_fields = ("id", "employee_number", "first_name", "middle_name", "last_name", "full_name", "work_email", "hire_date", "status")

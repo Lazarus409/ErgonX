@@ -212,3 +212,24 @@ def test_overview_and_audit_feed(api_client, platform_admin, institution_factory
     assert event["actor_email"] == platform_admin.email
     assert event["institution"]["name"] == "Dormant Co"
     assert api_client.get(AUDIT_URL, {"action": "invitation"}).data["count"] == 0
+
+
+def test_overview_lists_active_organisations_reaching_an_ergonx_anniversary(api_client, platform_admin, institution_factory):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.institutions.models import Institution
+
+    soon = institution_factory(name="Volta Foods")
+    dormant = institution_factory(name="Dormant Co")
+    institution_factory(name="Brand New")
+    in_ten_days = timezone.now() + timedelta(days=10)
+    two_years_ago = in_ten_days.replace(year=in_ten_days.year - 2)
+    Institution.objects.filter(pk__in=(soon.pk, dormant.pk)).update(created_at=two_years_ago)
+    Institution.objects.filter(pk=dormant.pk).update(is_active=False)
+    api_client.force_authenticate(platform_admin)
+
+    rows = api_client.get(OVERVIEW_URL).data["upcoming_anniversaries"]
+
+    assert [(row["name"], row["years"], row["days_away"]) for row in rows] == [("Volta Foods", 2, 10)]

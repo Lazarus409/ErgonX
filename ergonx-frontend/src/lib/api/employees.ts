@@ -449,3 +449,14 @@ export function employeeInitials(employee: Employee): string {
     .slice(0, 2)
     .toUpperCase();
 }
+
+export interface CelebrationSettings { share_birthday: boolean; share_work_anniversary: boolean }
+
+/** Whether the signed-in employee's birthday and work anniversary appear in Celebrations. */
+export async function getMyCelebrationSettings(): Promise<CelebrationSettings> {
+  return apiGet<CelebrationSettings>("/employees/me/profile/");
+}
+
+export async function updateMyCelebrationSettings(payload: Partial<CelebrationSettings>): Promise<CelebrationSettings> {
+  return apiPatch<CelebrationSettings, Partial<CelebrationSettings>>("/employees/me/profile/", payload);
+}

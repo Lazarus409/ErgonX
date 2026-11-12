@@ -14,7 +14,6 @@ Only a hash of the link's token is stored.
 """
 
 import hashlib
-import mimetypes
 import secrets
 from datetime import timedelta
 
@@ -53,18 +52,14 @@ def public_jobs(site, *, today=None):
 
 
 def _check_file(uploaded_file, *, field):
-    max_bytes = min(settings.DOCUMENT_UPLOAD_MAX_BYTES, 10 * 1024 * 1024)
+    from common.uploads import inspect_upload
+
     if uploaded_file is None:
         raise ValidationError({field: "Attach your file."})
-    if uploaded_file.size > max_bytes:
-        raise ValidationError({field: f"Files must be {max_bytes // (1024 * 1024)} MB or smaller."})
-    name = (uploaded_file.name or "document").replace("\\", "/").rsplit("/", 1)[-1][:255] or "document"
-    content_type = (uploaded_file.content_type or "").lower().split(";")[0].strip()
-    if not content_type or content_type == "application/octet-stream":
-        content_type = mimetypes.guess_type(name)[0] or ""
-    if content_type not in CV_TYPES:
-        raise ValidationError({field: "Upload a PDF, Word document, text file or image."})
-    return name, content_type
+    return inspect_upload(
+        uploaded_file, field=field, max_bytes=min(settings.DOCUMENT_UPLOAD_MAX_BYTES, 10 * 1024 * 1024),
+        allowed_types=CV_TYPES, allowed_message="Upload a PDF, Word document, text file or image.",
+    )
 
 
 def _store_document(application, uploaded_file, category, *, field="file"):

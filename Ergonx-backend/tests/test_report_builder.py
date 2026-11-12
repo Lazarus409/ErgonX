@@ -74,7 +74,7 @@ def test_listing_grouping_filters_and_csv(setup):
     assert _run(client, "employees", columns=["nope"]).status_code == 400
     csv = client.post("/api/v1/report-builder/run/", {"dataset": "employees", "definition": {"columns": ["employee_number", "department"]}, "format": "csv"}, format="json")
     assert csv.status_code == 200 and csv["Content-Type"].startswith("text/csv")
-    assert csv.content.decode().splitlines()[0] == "Employee no.,Department"
+    assert csv.content.decode("utf-8-sig").splitlines()[0] == "Employee no.,Department"
 
 
 def test_department_head_sees_only_their_team_even_in_shared_reports(setup):

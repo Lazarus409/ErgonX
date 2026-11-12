@@ -181,6 +181,7 @@ PERMISSIONS = {
     "document.create": "Create shared document references",
     "document.update": "Update shared document metadata",
     "document.delete": "Deactivate shared documents",
+    "document.view_restricted": "Open documents classified Restricted, and set or remove that classification",
     "document_requirement.view": "View document requirements and employee document checklists",
     "document_requirement.manage": "Manage document requirements and waivers",
     "policy.view": "View workplace policies and who has acknowledged them",
@@ -484,6 +485,7 @@ SYSTEM_READ_ONLY_ROLES = frozenset({"AUDITOR"})
 # Administration, oversight and approval-configuration powers. Only a member
 # on a built-in role may grant them (Wave 0 decision PERM-03).
 PRIVILEGED_PERMISSIONS = frozenset({
+    "document.view_restricted",
     "integrations.manage",
     "privacy.manage",
     "settings.institution.manage",

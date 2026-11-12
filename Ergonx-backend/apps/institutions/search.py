@@ -195,7 +195,9 @@ def _budget_results(institution, query, limit):
 
 
 def _document_results(institution, query, limit):
-    rows = Document.objects.for_institution(institution).filter(is_active=True).filter(Q(original_filename__icontains=query) | Q(category__icontains=query)).order_by("-created_at")[:limit]
+    # Restricted documents never appear in global search, not even their names; holders of
+    # document.view_restricted open them from the Documents page.
+    rows = Document.objects.for_institution(institution).filter(is_active=True).exclude(classification=Document.Classification.RESTRICTED).filter(Q(original_filename__icontains=query) | Q(category__icontains=query)).order_by("-created_at")[:limit]
     return [
         {"id": str(row.id), "reference": row.category, "title": row.original_filename, "subtitle": "Document", "status": row.classification, "updated_at": row.updated_at,
          "kind": "Document", "meta": [row.category.replace("_", " ").title() if row.category else "Uncategorised", f"{max(1, row.size_bytes // 1024)} KB"], "snippet": ""}

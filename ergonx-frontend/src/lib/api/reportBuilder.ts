@@ -20,8 +20,8 @@ export interface CustomReport { id: string; name: string; description: string; d
 
 export const datasets = (): Promise<{ datasets: BuilderDataset[] }> => apiGet("/report-builder/datasets/");
 export const runReport = (dataset: string, definition: BuilderDefinition): Promise<BuilderResult> => apiPost<BuilderResult>("/report-builder/run/", { dataset, definition });
-export function exportReport(dataset: string, definition: BuilderDefinition): Promise<Blob> {
-  return apiPost<Blob>("/report-builder/run/", { dataset, definition, format: "csv" }, { responseType: "blob" });
+export function exportReport(dataset: string, definition: BuilderDefinition, format: "csv" | "xlsx" | "pdf" = "csv"): Promise<Blob> {
+  return apiPost<Blob>("/report-builder/run/", { dataset, definition, format }, { responseType: "blob" });
 }
 export const listCustomReports = (): Promise<PaginatedData<CustomReport>> => apiGetList<CustomReport>("/custom-reports/", { page_size: 100 });
 export const saveCustomReport = (payload: Pick<CustomReport, "name" | "description" | "dataset" | "definition" | "visibility">, id?: string): Promise<CustomReport> =>

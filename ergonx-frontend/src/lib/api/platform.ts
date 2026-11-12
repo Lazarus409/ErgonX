@@ -63,6 +63,8 @@ export interface PlatformOverview {
   pipeline: { pending_requests: number; pending_invitations: number; invitations_expiring_48h: number };
   growth: { months: string[]; institutions: number[]; access_requests: number[] };
   recent_institutions: PlatformInstitution[];
+  /** Active organisations reaching a whole year on ErgonX within 30 days, soonest first. */
+  upcoming_anniversaries?: Array<{ id: string; code: string; name: string; joined_on: string; date: string; days_away: number; years: number }>;
 }
 
 export function getOverview(): Promise<PlatformOverview> {

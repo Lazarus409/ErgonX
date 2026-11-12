@@ -9,6 +9,7 @@ import StatusBadge from "@/components/ui/StatusBadge";
 import { FileInput } from "@/components/ui/Field";
 import { getApiErrorMessage, operationsApi } from "@/lib/api";
 import { useApiResource } from "@/lib/useApiResource";
+import { useAccess } from "@/lib/access";
 import { buttonClasses } from "@/components/ui/Button";
 import type { DocumentRecord } from "@/types/operations";
 
@@ -18,6 +19,7 @@ const controlClasses = "h-9 w-full rounded-lg border border-line-strong bg-surfa
 const emptyForm = { category: "", classification: "CONFIDENTIAL" };
 
 export default function DocumentsPage() {
+  const canRestrict = useAccess().can("document.view_restricted");
   const load = useCallback(() => operationsApi.listDocuments(), []);
   const { data, loading, error, reload } = useApiResource(load);
   const [open, setOpen] = useState(false);
@@ -102,7 +104,7 @@ export default function DocumentsPage() {
             <div className="mt-5 grid gap-4">
               <FileInput disabled={uploading} onChange={(event) => selectFile(event.target.files?.[0])} fileName={uploading ? `Uploading… ${progress}%` : file?.name} hint={file ? formatSize(file.size) : "Drop a file here or click to browse"} />
               <label className="grid gap-1 text-sm font-medium">Category<input value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })} placeholder="e.g. Contract, Policy" className={controlClasses} /></label>
-              <label className="grid gap-1 text-sm font-medium">Classification<select value={form.classification} onChange={(event) => setForm({ ...form, classification: event.target.value })} className={controlClasses}><option value="INTERNAL">Internal</option><option value="CONFIDENTIAL">Confidential</option><option value="RESTRICTED">Restricted</option></select></label>
+              <label className="grid gap-1 text-sm font-medium">Classification<select value={form.classification} onChange={(event) => setForm({ ...form, classification: event.target.value })} className={controlClasses}><option value="INTERNAL">Internal</option><option value="CONFIDENTIAL">Confidential</option>{canRestrict && <option value="RESTRICTED">Restricted</option>}</select></label>
             </div>
             <div className="mt-6 flex justify-end gap-3">
               <button type="button" onClick={close} disabled={uploading} className={buttonClasses({ variant: "secondary" })}>Cancel</button>

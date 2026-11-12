@@ -27,6 +27,7 @@ import { ButtonLink } from "@/components/ui/Button";
 import { AttentionItem, Card, SummaryList } from "@/components/ui/Card";
 import ErrorState from "@/components/ui/ErrorState";
 import MyChecklistCard from "@/components/hr/MyChecklistCard";
+import CelebrationsCard from "@/components/home/CelebrationsCard";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { attendanceApi, employeesApi, homeApi, leaveApi, notificationsApi, payrollApi } from "@/lib/api";
 import { useAccess } from "@/lib/access";
@@ -264,6 +265,8 @@ export default function SelfServiceHome() {
           </Card>
         </div>
       )}
+
+      <CelebrationsCard showPreferencesLink />
 
       {/* Attendance */}
       {showAttendance && employee && (

@@ -5,10 +5,9 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.audit.services import record_audit_event
-import mimetypes
 
-from django.conf import settings
 
+from common.uploads import inspect_upload
 from apps.complaints.models import Complaint, ComplaintAttachment, ComplaintNote
 from apps.employees.models import Employee
 from apps.institutions.models import InstitutionMembership
@@ -220,15 +219,9 @@ def _require_participant(complaint, actor, internal):
 def add_attachment(*, complaint, actor, uploaded_file, internal=False):
     complaint = _lock(complaint)
     is_complainant = _require_participant(complaint, actor, internal)
-    max_bytes = settings.DOCUMENT_UPLOAD_MAX_BYTES
-    if uploaded_file.size > max_bytes:
-        raise ValidationError({"file": f"Files must be {max_bytes // (1024 * 1024)} MB or smaller."})
     if complaint.attachments.count() >= ComplaintAttachment.MAX_PER_COMPLAINT:
         raise ValidationError({"file": f"A complaint can hold at most {ComplaintAttachment.MAX_PER_COMPLAINT} files."})
-    name = (uploaded_file.name or "file").replace("\\", "/").rsplit("/", 1)[-1][:255] or "file"
-    content_type = (uploaded_file.content_type or "").lower().split(";")[0].strip()
-    if not content_type or content_type == "application/octet-stream":
-        content_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
+    name, content_type = inspect_upload(uploaded_file, field="file", default_name="file")
     attachment = ComplaintAttachment.objects.create(
         institution=complaint.institution, complaint=complaint, stored_file=uploaded_file, original_filename=name,
         content_type=content_type[:150], size_bytes=uploaded_file.size, uploaded_by=actor, is_internal=internal,

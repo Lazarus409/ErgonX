@@ -52,3 +52,19 @@ export interface GoLivePayload { applicable: boolean; complete: boolean; items: 
 export async function getGoLive(): Promise<GoLivePayload> {
   return apiGet<GoLivePayload>("/home/go-live/");
 }
+
+export interface CelebrationRow { employee_id: string; name: string; department: string | null; avatar_key: string; date: string; days_away: number; is_me: boolean; years?: number; }
+export interface CelebrationsPayload {
+  today: string;
+  days: number;
+  birthdays: CelebrationRow[];
+  anniversaries: (CelebrationRow & { years: number })[];
+  my_celebration_today: { kind: "BIRTHDAY" } | { kind: "WORK_ANNIVERSARY"; years: number } | null;
+  /** The organisation's next whole year on ErgonX, when it falls within the window. */
+  organisation_anniversary: { name: string; joined_on: string; date: string; days_away: number; years: number } | null;
+}
+
+/** Upcoming birthdays (opted-in employees only, no birth year) and work anniversaries within `days`. */
+export async function getCelebrations(days = 14): Promise<CelebrationsPayload> {
+  return apiGet<CelebrationsPayload>(`/home/celebrations/?days=${days}`);
+}

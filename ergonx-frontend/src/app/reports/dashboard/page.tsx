@@ -1,12 +1,13 @@
 "use client";
 
-import { BarChart3, Briefcase, CalendarDays, ChevronRight, Clock3, Download, FileBarChart, ListTree, Receipt, Scale, Users, WalletCards, X, type LucideIcon } from "lucide-react";
+import { BarChart3, Briefcase, CalendarDays, ChevronRight, Clock3, FileBarChart, ListTree, Receipt, Scale, Users, WalletCards, X, type LucideIcon } from "lucide-react";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import ChartCard from "@/components/charts/ChartCard";
 import { BarsChart } from "@/components/charts/Charts";
 import { Button } from "@/components/ui/Button";
+import { ExportMenu, type ExportFormat } from "@/components/ui/ExportMenu";
 import { DataTable, DataToolbar } from "@/components/ui/DataTable";
 import BackNavigation from "@/components/ui/BackNavigation";
 import ErrorState from "@/components/ui/ErrorState";
@@ -60,8 +61,8 @@ const isNumericValue = (value: unknown) => typeof value === "number" || (typeof 
 const numericColumn = (rows: ReportRow[], column: string) => rows.length > 0 && rows.every((row) => row[column] === null || row[column] === undefined || isNumericValue(row[column]));
 const sortValue = (value: string | number | null) => (typeof value === "number" ? value : value !== null && isNumericValue(value) ? Number(value) : value);
 
-async function downloadCsv(path: string, filters: ReportFilters, filename: string) {
-  const blob = await apiDownload(path, { export: "csv", ...filters });
+async function downloadReport(path: string, filters: ReportFilters, filename: string, format: ExportFormat) {
+  const blob = await apiDownload(path, { export: format, ...filters });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url; link.download = filename; link.click(); URL.revokeObjectURL(url);
@@ -78,9 +79,9 @@ function ReportDrillDown({ report, title, group, filters, onClose }: { report: R
   const columns = useMemo(() => Array.from(new Set(rows.flatMap((row) => Object.keys(row)))), [rows]);
   const label = group.map((value) => humanizeEnum(value)).join(" · ");
   useEffect(() => { ref.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, [group]);
-  const download = async () => {
+  const download = async (format: ExportFormat) => {
     setDownloading(true); setDownloadError(null);
-    try { await downloadCsv(reportPath(report, group), filters, `ergonx-${report}-${group.join("-").toLowerCase()}.csv`); }
+    try { await downloadReport(reportPath(report, group), filters, `ergonx-${report}-${group.join("-").toLowerCase()}.${format}`, format); }
     catch (caught) { setDownloadError(getApiErrorMessage(caught)); }
     finally { setDownloading(false); }
   };
@@ -101,10 +102,10 @@ function ReportDrillDown({ report, title, group, filters, onClose }: { report: R
             <div className="min-w-0">
               <p className="flex items-center gap-1 text-caption font-medium text-ink-muted">{title}<ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />Details</p>
               <h2 className="text-card-title font-bold text-headline">{label}</h2>
-              <p className="text-support text-ink-muted">{loading && !data ? "Loading records…" : `${rows.length} record${rows.length === 1 ? "" : "s"}${rows.length >= 1000 ? " (first 1,000 shown; the CSV has the same limit)" : ""}.`}</p>
+              <p className="text-support text-ink-muted">{loading && !data ? "Loading records…" : `${rows.length} record${rows.length === 1 ? "" : "s"}${rows.length >= 1000 ? " (first 1,000 shown; exports have the same limit)" : ""}.`}</p>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="secondary" size="sm" loading={downloading} loadingLabel="Preparing…" onClick={() => void download()} leadingIcon={<Download className="h-4 w-4" />} disabled={!rows.length}>CSV</Button>
+              <ExportMenu size="sm" loading={downloading} disabled={!rows.length} onExport={(format) => void download(format)} />
               <Button variant="ghost" size="sm" onClick={onClose} leadingIcon={<X className="h-4 w-4" />}>Close</Button>
             </div>
           </div>
@@ -148,10 +149,10 @@ function ReportsDashboard() {
   const { data, loading, error, reload } = useApiResource(load);
   const columns = useMemo(() => Array.from(new Set((data?.rows ?? []).flatMap((row) => Object.keys(row)))), [data]);
   const report = visibleReports.find((item) => item.id === activeSelected) ?? visibleReports[0];
-  const download = async () => {
+  const download = async (format: ExportFormat) => {
     setDownloading(true); setDownloadError(null);
     try {
-      await downloadCsv(reportPath(activeSelected), filters, `ergonx-${activeSelected}${status ? `-${status.toLowerCase()}` : ""}.csv`);
+      await downloadReport(reportPath(activeSelected), filters, `ergonx-${activeSelected}${status ? `-${status.toLowerCase()}` : ""}.${format}`, format);
     } catch (caught) { setDownloadError(getApiErrorMessage(caught)); }
     finally { setDownloading(false); }
   };
@@ -179,7 +180,7 @@ function ReportsDashboard() {
        
         icon={BarChart3}
         accent="reports"
-        actions={<Button disabled={!visibleReports.length} loading={downloading} loadingLabel="Preparing CSV…" onClick={() => void download()} leadingIcon={<Download className="h-4 w-4" />}>Download CSV</Button>}
+        actions={<ExportMenu variant="primary" disabled={!visibleReports.length} loading={downloading} onExport={(format) => void download(format)} />}
       />
       {downloadError && <ErrorState variant="inline" title="Unable to export this report" message={downloadError} />}
       {!visibleReports.length ? (

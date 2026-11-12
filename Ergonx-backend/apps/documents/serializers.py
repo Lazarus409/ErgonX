@@ -1,10 +1,9 @@
-import mimetypes
 
-from django.conf import settings
 from rest_framework import serializers
 
 from apps.documents.models import Document, DocumentRequirement, DocumentRequirementWaiver, ImageAsset, Policy, PolicyAcknowledgement
 from common.serializers import ValidatedModelSerializer
+from common.uploads import inspect_upload
 
 
 class DocumentSerializer(serializers.ModelSerializer):
@@ -26,20 +25,26 @@ class DocumentSerializer(serializers.ModelSerializer):
         }
 
     def validate(self, attrs):
+        request = self.context.get("request")
+        new_level = attrs.get("classification")
+        old_level = getattr(self.instance, "classification", None)
+        touches_restricted = Document.Classification.RESTRICTED in (new_level, old_level if new_level and new_level != old_level else None)
+        if request is not None and touches_restricted:
+            from apps.documents.access import can_view_restricted
+
+            if not can_view_restricted(request):
+                raise serializers.ValidationError({"classification": "Only roles that can open Restricted documents can set or remove that classification."})
         uploaded_file = attrs.get("uploaded_file")
-        if uploaded_file is None and not attrs.get("file_reference", "").strip():
+        # A file or reference is needed when creating; a metadata-only update keeps the existing one.
+        has_existing = self.instance is not None and (self.instance.stored_file or self.instance.file_reference)
+        if uploaded_file is None and not attrs.get("file_reference", "").strip() and not has_existing:
             raise serializers.ValidationError({"file_reference": "Provide an approved storage reference or upload a file."})
         if uploaded_file is not None:
-            # Any file type is accepted. Downloads are always sent as attachments
-            # with nosniff, so a stored file is never rendered inline.
-            max_bytes = settings.DOCUMENT_UPLOAD_MAX_BYTES
-            if uploaded_file.size > max_bytes:
-                raise serializers.ValidationError({"uploaded_file": f"Documents must be {max_bytes // (1024 * 1024)} MB or smaller."})
-            name = (uploaded_file.name or "document").replace("\\", "/").rsplit("/", 1)[-1][:255] or "document"
-            content_type = (uploaded_file.content_type or "").lower().split(";")[0].strip()
-            if not content_type or content_type == "application/octet-stream":
-                content_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
-            attrs["content_type"] = content_type[:150]
+            # Most file types are accepted; programs, scripts, macro files and files whose
+            # contents don't match their extension are refused (common/uploads.py).
+            # Downloads are always sent as attachments with nosniff.
+            name, content_type = inspect_upload(uploaded_file, field="uploaded_file")
+            attrs["content_type"] = content_type
             attrs["size_bytes"] = uploaded_file.size
             attrs["original_filename"] = name
         return attrs

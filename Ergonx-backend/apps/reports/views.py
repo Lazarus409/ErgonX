@@ -1,14 +1,15 @@
 import re
 
-from django.http import HttpResponse
 from drf_spectacular.utils import OpenApiTypes, extend_schema
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.viewsets import ViewSet
 
-from apps.reports.services import build_report_details, build_report_rows, rows_to_csv
+from apps.reports.services import build_report_details, build_report_rows
 from apps.institutions.services import effective_permission_codes
+from common.classification import CONFIDENTIAL, REPORT_LEVELS
+from common.exports import FORMATS, columns_from_rows, humanize, table_response
 from common.permissions import TenantContextPermission, TenantRBACPermission
 from common.scoping import ATTENDANCE_BROAD, LEAVE_BROAD, scope_to_employees
 
@@ -27,6 +28,18 @@ REPORT_PERMISSIONS = {
     "accounting": (("journal.view",),),
     "ap-ar": (("invoice.view",), ("vendor_bill.view",)),
     "expenses": (("expense.view",),),
+}
+
+
+REPORT_TITLES = {
+    "workforce-cost": "Workforce cost",
+    "recruitment": "Recruitment",
+    "leave": "Leave",
+    "attendance": "Attendance",
+    "payroll": "Payroll",
+    "accounting": "Journal activity",
+    "ap-ar": "Payables and receivables",
+    "expenses": "Expenses",
 }
 
 
@@ -105,13 +118,23 @@ class ReportsViewSet(ViewSet):
                 rows = build_report_rows(request.institution, name, scope=scope, **filters)
         except ValueError as exc:
             raise ValidationError({"detail": str(exc)}) from exc
-        if request.query_params.get("export") != "csv":
+        export = request.query_params.get("export")
+        if export not in FORMATS:
             return Response({"report": name, "group": group, "rows": rows} if group else {"report": name, "rows": rows})
         # Group values come from the query string, so only safe characters reach the header.
         filename = re.sub(r"[^a-z0-9-]+", "-", "-".join([name, *group]).lower()).strip("-")
-        response = HttpResponse(rows_to_csv(rows), content_type="text/csv")
-        response["Content-Disposition"] = f'attachment; filename="{filename}.csv"'
-        return response
+        title = REPORT_TITLES.get(name, humanize(name))
+        if group:
+            title = f"{title}: {' · '.join(humanize(value.lower()) for value in group)}"
+        subtitle = " · ".join(part for part in (
+            f"Status {humanize(filters['status'].lower())}" if filters["status"] else "",
+            f"From {filters['date_from']}" if filters["date_from"] else "",
+            f"To {filters['date_to']}" if filters["date_to"] else "",
+        ) if part)
+        return table_response(
+            export, filename=filename, title=title, columns=columns_from_rows(rows), rows=rows,
+            institution=request.institution, subtitle=subtitle, classification=REPORT_LEVELS.get(name, CONFIDENTIAL),
+        )
 
     @action(detail=False, methods=("get",), url_path="workforce-cost")
     def workforce_cost(self, request):

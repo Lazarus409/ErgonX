@@ -51,6 +51,22 @@ eye on the database's disk usage as uploads grow.
 
 Downloads always go through the API, which checks access first.
 
+Every upload is checked before it is stored (`common/uploads.py`): programs,
+scripts and macro-enabled Office files are refused, a file's contents must match
+its extension (a `.pdf` must really be a PDF), and the stored type is worked out
+from the file itself rather than taken from the browser.
+
+Optional virus scanning: run a ClamAV daemon (for example the `clamav/clamav`
+image as a private service) and set on the API service:
+
+- `UPLOAD_SCANNER=clamav`
+- `CLAMAV_HOST` and `CLAMAV_PORT` (default `3310`)
+- optionally `CLAMAV_TIMEOUT_SECONDS` (default 30)
+
+While scanning is on, uploads are refused if the scanner can't be reached. Set
+`UPLOAD_SCAN_FAIL_OPEN=true` only if you'd rather accept unscanned files during
+a scanner outage.
+
 Other options, if the database ever grows too large:
 
 - an S3-compatible bucket: `MEDIA_STORAGE=s3` with `MEDIA_S3_BUCKET`,

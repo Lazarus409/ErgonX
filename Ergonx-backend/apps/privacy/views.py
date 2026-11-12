@@ -12,7 +12,7 @@ from rest_framework.views import APIView
 from apps.audit.services import record_audit_event
 from apps.employees.models import Employee
 from apps.privacy import services
-from apps.privacy.models import DataSubjectRequest, LegalHold, RetentionRule
+from apps.privacy.models import DataBreach, DataSubjectRequest, LegalHold, RetentionRule
 from apps.recruitment.models import Candidate
 from common.permissions import TenantContextPermission, TenantRBACPermission
 from common.serializers import ValidatedModelSerializer, call_validated_service
@@ -256,3 +256,105 @@ class DataCatalogueView(APIView):
         from apps.privacy.catalogue import data_catalogue
 
         return Response(data_catalogue(request.institution))
+
+
+class PrivacyProfileSerializer(serializers.Serializer):
+    registration_number = serializers.CharField(max_length=60, required=False, allow_blank=True)
+    registered_on = serializers.DateField(required=False, allow_null=True)
+    registration_expires_on = serializers.DateField(required=False, allow_null=True)
+    officer_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    officer_email = serializers.EmailField(required=False, allow_blank=True)
+    officer_phone = serializers.CharField(max_length=30, required=False, allow_blank=True)
+
+
+class PrivacyProfileView(APIView):
+    """Data Protection Commission registration and the data protection officer, with what needs attention."""
+
+    permission_classes = (TenantContextPermission, TenantRBACPermission)
+
+    def get_required_permission(self):
+        return "privacy.manage" if self.request.method == "PATCH" else "privacy.view"
+
+    def _body(self, request):
+        profile = services.privacy_profile(request.institution)
+        return {**PrivacyProfileSerializer(profile).data, "compliance": services.compliance_summary(request.institution)}
+
+    @extend_schema(responses={200: OpenApiTypes.OBJECT})
+    def get(self, request):
+        return Response(self._body(request))
+
+    @extend_schema(request=PrivacyProfileSerializer, responses={200: OpenApiTypes.OBJECT})
+    def patch(self, request):
+        payload = PrivacyProfileSerializer(data=request.data, partial=True)
+        payload.is_valid(raise_exception=True)
+        call_validated_service(services.update_privacy_profile, institution=request.institution, actor=request.user, **payload.validated_data)
+        return Response(self._body(request))
+
+
+class DataBreachSerializer(serializers.ModelSerializer):
+    severity_label = serializers.CharField(source="get_severity_display", read_only=True)
+    status_label = serializers.CharField(source="get_status_display", read_only=True)
+    reported_by_name = serializers.SerializerMethodField()
+    data_category_labels = serializers.SerializerMethodField()
+    hours_to_commission = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DataBreach
+        fields = (
+            "id", "title", "description", "discovered_at", "occurred_at", "severity", "severity_label", "status", "status_label",
+            "data_categories", "data_category_labels", "people_affected", "containment", "contained_at", "commission_notified_at",
+            "commission_reference", "subjects_notified_at", "not_notifying_reason", "lessons_learned", "reported_by_name",
+            "hours_to_commission", "closed_at", "created_at",
+        )
+        read_only_fields = ("id", "status", "closed_at", "created_at")
+
+    def get_reported_by_name(self, breach):
+        return (breach.reported_by.get_full_name() or breach.reported_by.email) if breach.reported_by_id else None
+
+    def get_data_category_labels(self, breach):
+        from common.classification import DATA_CATALOGUE
+
+        labels = {category.key: category.label for category in DATA_CATALOGUE}
+        return [labels.get(key, key) for key in breach.data_categories]
+
+    def get_hours_to_commission(self, breach):
+        """Hours from discovery to notifying the Commission, or so far when not yet notified."""
+        end = breach.commission_notified_at or timezone.now()
+        return round((end - breach.discovered_at).total_seconds() / 3600, 1)
+
+
+class DataBreachViewSet(TenantModelViewSet):
+    """The organisation's register of personal data breaches."""
+
+    model = DataBreach
+    serializer_class = DataBreachSerializer
+    http_method_names = ("get", "post", "patch", "head", "options")
+    filterset_fields = ("status", "severity")
+
+    def get_required_permission(self):
+        return _read_or_manage(self)
+
+    def get_queryset(self):
+        return super().get_queryset().select_related("reported_by")
+
+    def create(self, request, *args, **kwargs):
+        payload = DataBreachSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        breach = call_validated_service(services.record_breach, institution=request.institution, actor=request.user, **payload.validated_data)
+        return Response(self.get_serializer(breach).data, status=201)
+
+    def partial_update(self, request, *args, **kwargs):
+        breach = self.get_object()
+        payload = DataBreachSerializer(breach, data=request.data, partial=True)
+        payload.is_valid(raise_exception=True)
+        updated = call_validated_service(services.update_breach, breach=breach, actor=request.user, **payload.validated_data)
+        return Response(self.get_serializer(updated).data)
+
+    @extend_schema(request=OpenApiTypes.OBJECT, responses=DataBreachSerializer)
+    @action(detail=True, methods=("post",))
+    def close(self, request, pk=None):
+        breach = self.get_object()
+        payload = DataBreachSerializer(breach, data=request.data, partial=True)
+        payload.is_valid(raise_exception=True)
+        closed = call_validated_service(services.update_breach, breach=breach, actor=request.user, close=True, **payload.validated_data)
+        return Response(self.get_serializer(closed).data)

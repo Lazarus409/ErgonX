@@ -58,3 +58,34 @@ export interface DataCatalogue {
 }
 /** Every kind of data held, its classification, who may open it and how many records exist. */
 export const dataCatalogue = (): Promise<DataCatalogue> => apiGet<DataCatalogue>("/privacy/data-catalogue/");
+
+export interface PrivacyCompliance {
+  registration: "MISSING" | "EXPIRED" | "EXPIRING" | "OK";
+  registration_expires_on: string | null;
+  officer_named: boolean;
+  open_breaches: number;
+  breaches_not_reported: number;
+  overdue_requests: number;
+}
+export interface PrivacyProfile {
+  registration_number: string; registered_on: string | null; registration_expires_on: string | null;
+  officer_name: string; officer_email: string; officer_phone: string; compliance: PrivacyCompliance;
+}
+export const getPrivacyProfile = (): Promise<PrivacyProfile> => apiGet<PrivacyProfile>("/privacy/profile/");
+export const updatePrivacyProfile = (payload: Partial<Omit<PrivacyProfile, "compliance">>): Promise<PrivacyProfile> => apiPatch<PrivacyProfile>("/privacy/profile/", payload);
+
+export type BreachSeverity = "LOW" | "MEDIUM" | "HIGH";
+export type BreachStatus = "OPEN" | "CONTAINED" | "CLOSED";
+export interface DataBreach {
+  id: string; title: string; description: string; discovered_at: string; occurred_at: string | null;
+  severity: BreachSeverity; severity_label: string; status: BreachStatus; status_label: string;
+  data_categories: string[]; data_category_labels: string[]; people_affected: number | null;
+  containment: string; contained_at: string | null; commission_notified_at: string | null; commission_reference: string;
+  subjects_notified_at: string | null; not_notifying_reason: string; lessons_learned: string;
+  reported_by_name: string | null; hours_to_commission: number; closed_at: string | null; created_at: string;
+}
+export type BreachInput = Partial<Omit<DataBreach, "id" | "severity_label" | "status" | "status_label" | "data_category_labels" | "reported_by_name" | "hours_to_commission" | "closed_at" | "created_at">>;
+export const listBreaches = (): Promise<PaginatedData<DataBreach>> => apiGetList<DataBreach>("/privacy/breaches/", { page_size: 100 });
+export const recordBreach = (payload: BreachInput): Promise<DataBreach> => apiPost<DataBreach>("/privacy/breaches/", payload);
+export const updateBreach = (id: string, payload: BreachInput): Promise<DataBreach> => apiPatch<DataBreach>(`/privacy/breaches/${id}/`, payload);
+export const closeBreach = (id: string, payload: BreachInput): Promise<DataBreach> => apiPost<DataBreach>(`/privacy/breaches/${id}/close/`, payload);

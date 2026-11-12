@@ -84,9 +84,10 @@ services:
     name: ergonx-scheduled-reports
     dockerfilePath: Ergonx-backend/Dockerfile
     dockerContext: Ergonx-backend
-    # Daily at 02:00 UTC: refresh scheduled financial reports.
+    # Daily at 02:00 UTC: refresh scheduled financial reports, then apply privacy
+    # retention rules (sharing this job avoids paying for another cron service).
     schedule: "0 2 * * *"
-    dockerCommand: python manage.py run_scheduled_reports
+    dockerCommand: sh -c "python manage.py run_scheduled_reports; python manage.py run_retention_rules"
     envVars:
       - key: DJANGO_SETTINGS_MODULE
         value: config.settings.production

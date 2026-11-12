@@ -103,3 +103,70 @@ class DataSubjectRequest(TenantOwnedModel):
             related = getattr(self, name, None)
             if related is not None and related.institution_id != self.institution_id:
                 raise ValidationError({name: "Referenced record must belong to the same institution."})
+
+
+class PrivacyProfile(TenantOwnedModel):
+    """The organisation's standing as a data controller: Data Protection Commission registration and its officer."""
+
+    institution = models.OneToOneField(Institution, on_delete=models.CASCADE, related_name="privacy_profile")
+    registration_number = models.CharField(max_length=60, blank=True)
+    registered_on = models.DateField(null=True, blank=True)
+    registration_expires_on = models.DateField(null=True, blank=True)
+    officer_name = models.CharField(max_length=150, blank=True)
+    officer_email = models.EmailField(blank=True)
+    officer_phone = models.CharField(max_length=30, blank=True)
+
+    def clean(self):
+        if self.registered_on and self.registration_expires_on and self.registration_expires_on <= self.registered_on:
+            raise ValidationError({"registration_expires_on": "The expiry date must be after the registration date."})
+
+
+class DataBreach(TenantOwnedModel):
+    """A security compromise of personal data, and who was told about it (Data Protection Act, 2012, s.31)."""
+
+    class Severity(models.TextChoices):
+        LOW = "LOW", "Low"
+        MEDIUM = "MEDIUM", "Medium"
+        HIGH = "HIGH", "High"
+
+    class Status(models.TextChoices):
+        OPEN = "OPEN", "Open"
+        CONTAINED = "CONTAINED", "Contained"
+        CLOSED = "CLOSED", "Closed"
+
+    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="data_breaches")
+    title = models.CharField(max_length=200)
+    description = models.TextField(max_length=4000)
+    discovered_at = models.DateTimeField()
+    occurred_at = models.DateTimeField(null=True, blank=True)
+    severity = models.CharField(max_length=8, choices=Severity.choices, default=Severity.MEDIUM)
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.OPEN)
+    # Keys from common.classification.DATA_CATALOGUE.
+    data_categories = models.JSONField(default=list, blank=True)
+    people_affected = models.PositiveIntegerField(null=True, blank=True)
+    containment = models.TextField(blank=True, max_length=4000)
+    contained_at = models.DateTimeField(null=True, blank=True)
+    commission_notified_at = models.DateTimeField(null=True, blank=True)
+    commission_reference = models.CharField(max_length=100, blank=True)
+    subjects_notified_at = models.DateTimeField(null=True, blank=True)
+    not_notifying_reason = models.TextField(blank=True, max_length=2000)
+    reported_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="+")
+    closed_at = models.DateTimeField(null=True, blank=True)
+    lessons_learned = models.TextField(blank=True, max_length=4000)
+
+    class Meta:
+        ordering = ("-discovered_at",)
+        indexes = [models.Index(fields=("institution", "status"))]
+
+    def clean(self):
+        from common.classification import DATA_CATALOGUE
+
+        known = {category.key for category in DATA_CATALOGUE}
+        if not isinstance(self.data_categories, list) or any(key not in known for key in self.data_categories):
+            raise ValidationError({"data_categories": "Choose kinds of data from the data catalogue."})
+        if self.occurred_at and self.discovered_at and self.occurred_at > self.discovered_at:
+            raise ValidationError({"occurred_at": "A breach can't be discovered before it happened."})
+        for name in ("contained_at", "commission_notified_at", "subjects_notified_at", "closed_at"):
+            value = getattr(self, name)
+            if value and self.discovered_at and value < self.discovered_at:
+                raise ValidationError({name: "This can't be before the breach was discovered."})

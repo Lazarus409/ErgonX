@@ -12,6 +12,8 @@ import { Dialog } from "@/components/ui/Overlay";
 import PageHeader from "@/components/ui/PageHeader";
 import Tabs from "@/components/ui/Tabs";
 import DataCatalogue from "@/components/privacy/DataCatalogue";
+import BreachRegister from "@/components/privacy/BreachRegister";
+import RegistrationCard from "@/components/privacy/RegistrationCard";
 import { employeesApi, getApiErrorMessage, privacyApi } from "@/lib/api";
 import { saveBlob } from "@/lib/api/policies";
 import { DSR_STATUS_TONES, DSR_TYPE_LABELS, RETENTION_LABELS, type DataSubjectRequest, type DsrStatus, type DsrType, type RetentionCategory } from "@/lib/api/privacy";
@@ -19,7 +21,7 @@ import { useAccess } from "@/lib/access";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { useApiResource } from "@/lib/useApiResource";
 
-type View = "requests" | "retention" | "holds" | "consents" | "classification";
+type View = "requests" | "retention" | "holds" | "consents" | "breaches" | "registration" | "classification";
 const CATEGORIES = Object.keys(RETENTION_LABELS) as RetentionCategory[];
 const ANONYMISABLE: RetentionCategory[] = ["CANDIDATES", "FORMER_EMPLOYEES"];
 
@@ -30,6 +32,16 @@ export default function PrivacyPage() {
   const load = useCallback(() => Promise.all([privacyApi.listRequests(), privacyApi.listRetentionRules(), privacyApi.retentionReport(), privacyApi.listLegalHolds(), privacyApi.consents()]), []);
   const { data, error, reload } = useApiResource(load);
   const [requests, rules, report, holds, consentRows] = data ?? [null, null, null, null, null];
+  const loadProfile = useCallback(() => privacyApi.getPrivacyProfile(), []);
+  const { data: profile, reload: reloadProfile } = useApiResource(loadProfile);
+  const compliance = profile?.compliance;
+  const warnings = compliance ? [
+    compliance.registration === "MISSING" && "Record your Data Protection Commission registration.",
+    compliance.registration === "EXPIRED" && `Your Data Protection Commission registration expired on ${formatDate(compliance.registration_expires_on)}.`,
+    compliance.registration === "EXPIRING" && `Your Data Protection Commission registration is due for renewal on ${formatDate(compliance.registration_expires_on)}.`,
+    !compliance.officer_named && "Name a data protection officer and their email.",
+    compliance.breaches_not_reported > 0 && `${compliance.breaches_not_reported} open breach${compliance.breaches_not_reported === 1 ? " has" : "es have"} not been reported to the Data Protection Commission.`,
+  ].filter(Boolean) as string[] : [];
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState("");
   const [deciding, setDeciding] = useState<{ request: DataSubjectRequest; status: DsrStatus; outcome: string } | null>(null);
@@ -55,7 +67,15 @@ export default function PrivacyPage() {
         <MetricCard label="Legal holds" value={String(report?.legal_holds ?? 0)} icon={Lock} accent="payroll" />
         <MetricCard label="Consents on record" value={String(consentRows?.consents.length ?? 0)} icon={ShieldCheck} accent="attendance" />
       </section>
-      <Tabs label="Privacy" value={view} onChange={(value) => setView(value as View)} items={[{ value: "requests", label: `Requests (${open.length} open)` }, { value: "retention", label: "Retention" }, { value: "holds", label: "Legal holds" }, { value: "consents", label: "Consents" }, { value: "classification", label: "Data classification" }]} />
+      {warnings.length > 0 && (
+        <Alert tone="warning" title="Needs attention">
+          <ul className="list-disc space-y-0.5 pl-5">{warnings.map((text) => <li key={text}>{text}</li>)}</ul>
+        </Alert>
+      )}
+      <Tabs label="Privacy" value={view} onChange={(value) => setView(value as View)} items={[{ value: "requests", label: `Requests (${open.length} open)` }, { value: "retention", label: "Retention" }, { value: "holds", label: "Legal holds" }, { value: "consents", label: "Consents" }, { value: "breaches", label: `Breaches${compliance?.open_breaches ? ` (${compliance.open_breaches} open)` : ""}` }, { value: "registration", label: "Registration" }, { value: "classification", label: "Data classification" }]} />
+
+      {view === "breaches" && <BreachRegister canManage={canManage} onChanged={reloadProfile} />}
+      {view === "registration" && (profile ? <RegistrationCard profile={profile} canManage={canManage} onSaved={reloadProfile} /> : <p className="text-support text-ink-muted">Loading…</p>)}
 
       {view === "classification" && <DataCatalogue />}
 

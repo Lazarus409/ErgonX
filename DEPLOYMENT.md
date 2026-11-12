@@ -115,6 +115,18 @@ docker compose --env-file .env.production -f compose.production.yaml exec backen
 4. Send the acceptance link through your approved email channel. The recipient sets their own password at `/accept-invitation/{token}` and then signs in normally.
 5. Confirm onboarding readiness from the server-provided bootstrap response. Never mark onboarding complete client-side.
 
+## Scheduled jobs
+
+On Render these run as the cron services in `render.yaml`. When self-hosting
+with `compose.production.yaml`, schedule them yourself (for example with the
+host's cron and `docker compose exec api ...`):
+
+- hourly: `python manage.py send_approval_reminders`
+- daily: `python manage.py run_scheduled_reports` and
+  `python manage.py run_retention_rules` (applies each organisation's active
+  anonymising retention rules; people under a legal hold are skipped)
+- every 5 minutes: `python manage.py deliver_webhooks`
+
 ## Release checks
 
 - Verify `/api/v1/schema/` through the public API origin and the application login through the public application origin.

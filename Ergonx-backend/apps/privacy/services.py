@@ -190,33 +190,86 @@ def export_personal_data(*, request):
     raise ValidationError({"request": "Link the request to an employee or candidate first."})
 
 
+def _text(value):
+    return "" if value is None else (value.isoformat() if hasattr(value, "isoformat") else str(value))
+
+
 def _employee_export(employee):
+    """Everything ErgonX holds about an employee, for a request for a copy of their data."""
+    from apps.accounting.models import Expense
+    from apps.complaints.models import Complaint
+    from apps.compensation.models import EmployeeCompensation, EmployeePayComponent
     from apps.documents.models import EMPLOYEE_ENTITY_TYPE, Document, PolicyAcknowledgement
     from apps.leave.models import LeaveRequest
+    from apps.payroll.models import EmployeePayrollProfile, EmployeeTaxReliefClaim, Payslip
+    from apps.performance.models import PerformanceReview
+    from apps.training.models import TrainingEnrollment
 
+    profile = EmployeePayrollProfile.objects.filter(employee=employee).first()
+    compensation = list(EmployeeCompensation.objects.filter(employee=employee).order_by("effective_from"))
+    components = {}
+    for item in EmployeePayComponent.objects.filter(employee_compensation__in=compensation).select_related("pay_component"):
+        components.setdefault(item.employee_compensation_id, []).append({"component": item.pay_component.name, "amount": _text(item.amount), "percentage": _text(item.percentage)})
     return {
         "generated_at": timezone.now().isoformat(),
         "subject": "employee",
-        "profile": {field: str(getattr(employee, field) or "") for field in ("employee_number", "first_name", "middle_name", "last_name", "preferred_name", "work_email", "personal_email", "phone", "mobile_phone", "date_of_birth", "gender", "hire_date", "status")},
+        "profile": {field: _text(getattr(employee, field)) for field in ("employee_number", "first_name", "middle_name", "last_name", "preferred_name", "work_email", "personal_email", "phone", "mobile_phone", "office_location", "linkedin_url", "date_of_birth", "gender", "hire_date", "status", "share_birthday", "share_work_anniversary")},
         "employment_history": [
-            {"start_date": str(row.start_date), "end_date": str(row.end_date or ""), "department": row.department.name if row.department_id else "", "position": row.position.title if row.position_id else "", "employment_type": row.employment_type, "status": row.status}
+            {"start_date": _text(row.start_date), "end_date": _text(row.end_date), "department": row.department.name if row.department_id else "", "position": row.position.title if row.position_id else "", "employment_type": row.employment_type, "status": row.status}
             for row in employee.employments.select_related("department", "position").order_by("start_date")
         ],
-        "emergency_contacts": [{"name": row.full_name, "relationship": row.relationship, "phone": row.phone, "email": row.email} for row in employee.emergency_contacts.all()],
-        "leave_requests": [{"type": row.leave_type.name, "start_date": str(row.start_date), "end_date": str(row.end_date), "days": str(row.requested_days), "status": row.status} for row in LeaveRequest.objects.filter(employee=employee).select_related("leave_type").order_by("start_date")],
-        "attendance_days_recorded": employee.attendance_records.count(),
-        "documents": [{"name": row.original_filename, "category": row.category, "uploaded_at": row.created_at.isoformat()} for row in Document.objects.filter(entity_type=EMPLOYEE_ENTITY_TYPE, entity_id=employee.id, is_active=True)],
+        "emergency_contacts": [{"name": row.full_name, "relationship": row.relationship, "phone": row.phone, "alternate_phone": row.alternate_phone, "email": row.email, "address": row.address} for row in employee.emergency_contacts.all()],
+        "pay_and_tax_details": None if profile is None else {
+            field: _text(getattr(profile, field)) for field in ("tax_residency", "tax_identification_number", "social_security_number", "payment_method", "bank_name", "bank_branch", "bank_sort_code", "account_name", "account_number", "mobile_money_network", "mobile_money_number", "pension_exempt", "pension_exemption_reason")
+        },
+        "compensation": [
+            {"base_salary": _text(row.base_salary), "currency": row.currency, "pay_basis": row.pay_basis, "effective_from": _text(row.effective_from), "effective_to": _text(row.effective_to), "components": components.get(row.id, [])}
+            for row in compensation
+        ],
+        "payslips": [
+            {"period": row.payroll_record.payroll_run.payroll_period.name, "gross_pay": _text(row.payroll_record.gross_pay), "total_deductions": _text(row.payroll_record.total_deductions), "net_pay": _text(row.payroll_record.net_pay), "currency": row.payroll_record.currency, "generated_at": _text(row.generated_at)}
+            for row in Payslip.objects.filter(payroll_record__employee=employee).select_related("payroll_record__payroll_run__payroll_period").order_by("generated_at")
+        ],
+        "tax_relief_claims": [{"relief": row.relief_definition.name, "tax_year": row.tax_year, "claimed": _text(row.claimed_amount), "approved": _text(row.approved_amount), "status": row.status} for row in EmployeeTaxReliefClaim.objects.filter(employee=employee).select_related("relief_definition")],
+        "leave_requests": [{"type": row.leave_type.name, "start_date": _text(row.start_date), "end_date": _text(row.end_date), "days": _text(row.requested_days), "reason": row.reason, "status": row.status} for row in LeaveRequest.objects.filter(employee=employee).select_related("leave_type").order_by("start_date")],
+        "attendance": [
+            {"date": _text(row.attendance_date), "status": row.status, "check_in": _text(row.check_in), "check_out": _text(row.check_out), "worked_minutes": row.worked_minutes, "source": row.source, "check_in_position": row.check_in_position, "check_out_position": row.check_out_position}
+            for row in employee.attendance_records.order_by("attendance_date")
+        ],
+        "performance_reviews": [
+            {"cycle": row.cycle.name, "status": row.status, "self_summary": row.self_summary, "manager_summary": row.manager_summary, "development_plan": row.development_plan, "overall_rating": row.overall_rating, "calibrated_rating": row.calibrated_rating}
+            for row in PerformanceReview.objects.filter(employee=employee).select_related("cycle").order_by("cycle__period_start")
+        ],
+        "training": [{"course": row.course.title, "status": row.status, "completed_on": _text(row.completed_on), "score": _text(row.score), "certificate_number": row.certificate_number, "certificate_expires_on": _text(row.certificate_expires_on)} for row in TrainingEnrollment.objects.filter(employee=employee).select_related("course")],
+        "expense_claims": [{"date": _text(row.expense_date), "amount": _text(row.amount), "currency": row.currency, "description": row.description, "status": row.status} for row in Expense.objects.filter(claimant=employee).order_by("expense_date")],
+        # Complaints the employee raised. Complaints naming them are withheld where disclosure would affect others.
+        "complaints_raised": [{"reference": row.code, "subject": row.subject, "category": row.category, "description": row.description, "status": row.status, "resolution": row.resolution} for row in Complaint.objects.filter(complainant=employee)],
+        "documents": [{"name": row.original_filename, "category": row.category, "classification": row.classification, "uploaded_at": row.created_at.isoformat()} for row in Document.objects.filter(entity_type=EMPLOYEE_ENTITY_TYPE, entity_id=employee.id, is_active=True)],
         "policy_acknowledgements": [{"policy": row.policy.title, "version": row.version, "signed_name": row.signed_name, "acknowledged_at": row.acknowledged_at.isoformat()} for row in PolicyAcknowledgement.objects.filter(employee=employee).select_related("policy")],
-        "note": "Payslips are available under My Payslips. Ask HR for copies of any document listed here.",
+        "note": "Copies of documents and payslip PDFs are available from HR or My Payslips. Complaints that name you are withheld where disclosing them would affect other people's rights.",
     }
 
 
 def _candidate_export(candidate):
+    from apps.documents.models import Document
+    from apps.recruitment.models import Interview, Offer
+
+    applications = list(candidate.applications.select_related("job_posting"))
+    interviews, offers = {}, {}
+    for item in Interview.objects.filter(application__in=applications):
+        interviews.setdefault(item.application_id, []).append({"scheduled_at": _text(item.scheduled_at), "type": item.interview_type, "status": item.status})
+    for item in Offer.objects.filter(application__in=applications):
+        offers.setdefault(item.application_id, []).append({"status": item.status, "base_salary": _text(item.base_salary), "currency": item.currency, "proposed_start_date": _text(item.proposed_start_date)})
     return {
         "generated_at": timezone.now().isoformat(),
         "subject": "candidate",
-        "profile": {field: str(getattr(candidate, field) or "") for field in ("first_name", "middle_name", "last_name", "email", "phone", "location", "linkedin_url", "current_employer", "current_title", "years_experience", "highest_qualification")},
-        "applications": [{"job": row.job_posting.title, "status": row.status, "applied_at": row.applied_at.isoformat() if row.applied_at else "", "consented_at": row.consent_at.isoformat() if row.consent_at else ""} for row in candidate.applications.select_related("job_posting")],
+        "profile": {field: _text(getattr(candidate, field)) for field in ("first_name", "middle_name", "last_name", "email", "phone", "location", "linkedin_url", "current_employer", "current_title", "years_experience", "highest_qualification", "field_of_study", "education_institution", "skills", "notice_period_weeks")},
+        "applications": [
+            {"job": row.job_posting.title, "status": row.status, "applied_at": _text(row.applied_at), "consented_at": _text(row.consent_at), "cover_letter": row.cover_letter, "rejection_reason": row.rejection_reason,
+             "interviews": interviews.get(row.id, []), "offers": offers.get(row.id, [])}
+            for row in applications
+        ],
+        "documents": [{"name": row.original_filename, "category": row.category, "uploaded_at": row.created_at.isoformat()} for row in Document.objects.filter(entity_type="recruitment.Candidate", entity_id=candidate.id, is_active=True)],
     }
 
 
@@ -234,3 +287,125 @@ def consent_register(institution, *, limit=500):
         for row in PolicyAcknowledgement.objects.filter(institution=institution).select_related("employee", "policy").order_by("-acknowledged_at")[:limit]
     ]
     return sorted(rows, key=lambda row: row["given_at"], reverse=True)[:limit]
+
+
+# ----------------------------------------------------------- scheduled retention
+
+
+def run_due_retention(*, institutions=None):
+    """Apply every active anonymising rule; run daily. Returns {institution code: records changed}."""
+    from apps.institutions.models import Institution
+
+    results = {}
+    for institution in institutions if institutions is not None else Institution.objects.filter(is_active=True):
+        rules = RetentionRule.objects.for_institution(institution).filter(is_active=True, action=RetentionRule.Action.ANONYMISE)
+        for rule in rules:
+            with transaction.atomic():
+                done = run_retention(institution=institution, actor=None, rule=rule)
+            results[institution.code] = results.get(institution.code, 0) + done
+    return results
+
+
+# ------------------------------------------------- registration and compliance
+
+REGISTRATION_WARNING_DAYS = 60
+
+
+def privacy_profile(institution):
+    from apps.privacy.models import PrivacyProfile
+
+    return PrivacyProfile.objects.get_or_create(institution=institution)[0]
+
+
+def compliance_summary(institution):
+    """What needs attention: registration, the data protection officer, breaches not yet reported, overdue requests."""
+    from apps.privacy.models import DataBreach
+
+    profile = privacy_profile(institution)
+    today = timezone.localdate()
+    if not profile.registration_number:
+        registration = "MISSING"
+    elif profile.registration_expires_on and profile.registration_expires_on < today:
+        registration = "EXPIRED"
+    elif profile.registration_expires_on and profile.registration_expires_on <= today + timedelta(days=REGISTRATION_WARNING_DAYS):
+        registration = "EXPIRING"
+    else:
+        registration = "OK"
+    breaches = DataBreach.objects.for_institution(institution).exclude(status=DataBreach.Status.CLOSED)
+    return {
+        "registration": registration,
+        "registration_expires_on": profile.registration_expires_on,
+        "officer_named": bool(profile.officer_name and profile.officer_email),
+        "open_breaches": breaches.count(),
+        "breaches_not_reported": breaches.filter(commission_notified_at__isnull=True).count(),
+        "overdue_requests": DataSubjectRequest.objects.for_institution(institution).filter(
+            status__in=(DataSubjectRequest.Status.RECEIVED, DataSubjectRequest.Status.IN_PROGRESS), due_on__lt=today
+        ).count(),
+    }
+
+
+PROFILE_FIELDS = ("registration_number", "registered_on", "registration_expires_on", "officer_name", "officer_email", "officer_phone")
+
+
+@transaction.atomic
+def update_privacy_profile(*, institution, actor, **values):
+    profile = privacy_profile(institution)
+    changed = {}
+    for field in PROFILE_FIELDS:
+        if field in values and getattr(profile, field) != values[field]:
+            changed[field] = [_text(getattr(profile, field)), _text(values[field])]
+            setattr(profile, field, values[field])
+    profile.full_clean()
+    profile.save()
+    if changed:
+        record_audit_event(actor=actor, institution=institution, entity=profile, action="privacy.profile.updated", metadata={"changes": changed})
+    return profile
+
+
+# ------------------------------------------------------------- breach register
+
+BREACH_FIELDS = (
+    "title", "description", "discovered_at", "occurred_at", "severity", "data_categories", "people_affected", "containment",
+    "contained_at", "commission_notified_at", "commission_reference", "subjects_notified_at", "not_notifying_reason", "lessons_learned",
+)
+
+
+@transaction.atomic
+def record_breach(*, institution, actor, **values):
+    from apps.privacy.models import DataBreach
+
+    breach = DataBreach(institution=institution, reported_by=actor, **{key: value for key, value in values.items() if key in BREACH_FIELDS})
+    breach.status = DataBreach.Status.CONTAINED if breach.contained_at else DataBreach.Status.OPEN
+    breach.full_clean()
+    breach.save()
+    record_audit_event(actor=actor, institution=institution, entity=breach, action="privacy.breach.recorded", metadata={"severity": breach.severity, "data_categories": breach.data_categories})
+    return breach
+
+
+@transaction.atomic
+def update_breach(*, breach, actor, close=False, **values):
+    from apps.privacy.models import DataBreach
+
+    breach = DataBreach.objects.select_for_update().get(pk=breach.pk)
+    if breach.status == DataBreach.Status.CLOSED:
+        raise ValidationError({"status": "This breach is closed."})
+    changed = []
+    for field in BREACH_FIELDS:
+        if field in values and getattr(breach, field) != values[field]:
+            setattr(breach, field, values[field])
+            changed.append(field)
+    if breach.contained_at and breach.status == DataBreach.Status.OPEN:
+        breach.status = DataBreach.Status.CONTAINED
+    if close:
+        if not breach.contained_at:
+            raise ValidationError({"contained_at": "Record when the breach was contained before closing it."})
+        if not breach.commission_notified_at and not breach.not_notifying_reason.strip():
+            raise ValidationError({"commission_notified_at": "Record when the Data Protection Commission was notified, or why it was not."})
+        if not breach.subjects_notified_at and not breach.not_notifying_reason.strip():
+            raise ValidationError({"subjects_notified_at": "Record when the affected people were told, or why they were not."})
+        breach.status = DataBreach.Status.CLOSED
+        breach.closed_at = timezone.now()
+    breach.full_clean()
+    breach.save()
+    record_audit_event(actor=actor, institution=breach.institution, entity=breach, action="privacy.breach.closed" if close else "privacy.breach.updated", metadata={"fields": changed, "status": breach.status})
+    return breach

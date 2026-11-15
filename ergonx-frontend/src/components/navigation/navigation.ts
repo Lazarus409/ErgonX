@@ -17,6 +17,7 @@ import {
   ScrollText,
   Settings,
   ShieldCheck,
+  ShoppingCart,
   Table2,
   Target,
   Users,
@@ -30,7 +31,8 @@ export type ModuleCode =
   | "PAYROLL"
   | "ACCOUNTING"
   | "RECRUITMENT"
-  | "REPORTS";
+  | "REPORTS"
+  | "PROCUREMENT";
 
 /** Whose records the member works with; mirrors `common/scoping.py`. */
 export type DataScope = "INSTITUTION" | "DEPARTMENT" | "SELF";
@@ -73,6 +75,7 @@ export const moduleWorkspacePermissions = {
   ACCOUNTING: ["dashboard.finance.view", "budget.view", "accounting.configure", "account.view", "account.create", "account.update", "journal.view", "journal.create", "journal.approve", "journal.post", "journal.reverse", "financial_report.view", "accounting_period.close", "accounting_period.reopen", "vendor.view", "vendor.create", "vendor.update", "vendor_bill.view", "vendor_bill.create", "vendor_bill.approve", "vendor_bill.post", "vendor_bill.void", "customer.view", "customer.create", "customer.update", "invoice.view", "invoice.create", "invoice.issue", "invoice.void", "bank_account.view", "bank_account.create", "bank_account.update", "payment.view", "payment.create", "payment.void", "receipt.view", "receipt.create", "receipt.void", "expense.view", "expense.create", "expense.approve", "expense.post", "payroll_accounting.view", "payroll_accounting.configure", "bank_reconciliation.view", "bank_reconciliation.manage", "vat_withholding_certificate.view", "vat_withholding_certificate.issue"],
   RECRUITMENT: ["job_posting.view", "job_posting.create", "job_posting.update", "candidate.view", "candidate.create", "candidate.update", "recruitment_stage.view", "recruitment_stage.manage", "interview.view", "interview.manage", "candidate_evaluation.create", "offer.view", "offer.create", "offer.manage"],
   REPORTS: ["report.view"],
+  PROCUREMENT: ["procurement.view", "purchase_order.create", "purchase_order.approve", "goods_receipt.create"],
 } as const;
 
 /** Module workspaces work across the whole institution. */
@@ -85,6 +88,8 @@ export const INSTITUTION_WIDE: readonly DataScope[] = ["INSTITUTION"];
  */
 export const sharedRecordRoutes: Array<{ pattern: RegExp; anyPermissions: readonly string[]; scopes?: readonly DataScope[] }> = [
   { pattern: /^\/leave\/requests\/[^/]+$/, anyPermissions: ["leave.view"] },
+  // Requesters and the approvers a workflow names open the requisition itself.
+  { pattern: /^\/procurement\/requisitions\/[^/]+$/, anyPermissions: ["requisition.create_own", "requisition.approve"] },
   { pattern: /^\/payroll\/payslips\/[^/]+$/, anyPermissions: ["payslip.view"] },
   { pattern: /^\/leave\/calendar$/, anyPermissions: ["leave.view"], scopes: ["DEPARTMENT"] },
   { pattern: /^\/hr\/employees\/(?!new$)[^/]+$/, anyPermissions: ["employee.view"], scopes: ["DEPARTMENT"] },
@@ -94,7 +99,7 @@ export const sharedRecordRoutes: Array<{ pattern: RegExp; anyPermissions: readon
 export const INSIGHT_PERMISSIONS = ["dashboard.executive.view", "dashboard.hr.view", "dashboard.payroll.view", "dashboard.finance.view", "dashboard.leave.view", "dashboard.attendance.view", "candidate.view", "background_job.view"] as const;
 
 // Anyone who can decide something in a module gets the cross-module approvals inbox.
-export const APPROVAL_PERMISSIONS = ["approval_request.view", "leave.approve", "attendance.approve", "payroll.approve", "tax_relief.approve", "job_posting.approve", "offer.approve", "journal.approve", "vendor_bill.approve", "expense.approve", "budget.approve"];
+export const APPROVAL_PERMISSIONS = ["approval_request.view", "leave.approve", "attendance.approve", "payroll.approve", "tax_relief.approve", "job_posting.approve", "offer.approve", "journal.approve", "vendor_bill.approve", "expense.approve", "budget.approve", "requisition.approve", "purchase_order.approve"];
 
 export const navigation: NavigationItem[] = [
   // Ordered by how often people need each area: daily work first, oversight and setup last.
@@ -170,6 +175,20 @@ export const navigation: NavigationItem[] = [
       { label: "Budgets", href: "/accounting/budgets", permission: "budget.view" },
       { label: "Expenses", href: "/accounting/expenses", permission: "expense.view" },
       { label: "Financial Reports", href: "/accounting/reports", permission: "financial_report.view" },
+    ],
+  },
+  {
+    label: "Procurement",
+    href: "/procurement",
+    icon: ShoppingCart,
+    module: "PROCUREMENT",
+    anyPermissions: moduleWorkspacePermissions.PROCUREMENT,
+    scopes: INSTITUTION_WIDE,
+    children: [
+      { label: "Requisitions", href: "/procurement", permission: "procurement.view" },
+      { label: "Purchase Orders", href: "/procurement/orders", permission: "procurement.view" },
+      { label: "Goods Received", href: "/procurement/receipts", permission: "procurement.view" },
+      { label: "Commitments & Suppliers", href: "/procurement/suppliers", permission: "procurement.view" },
     ],
   },
   {
@@ -259,6 +278,14 @@ export const selfServiceNavigation: NavigationItem[] = [
     icon: Receipt,
     module: "ACCOUNTING",
     permission: "expense.claim_own",
+    selfService: true,
+  },
+  {
+    label: "My Purchase Requests",
+    href: "/me/purchases",
+    icon: ShoppingCart,
+    module: "PROCUREMENT",
+    permission: "requisition.create_own",
     selfService: true,
   },
   {

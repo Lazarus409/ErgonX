@@ -19,6 +19,11 @@ SERVICE_AUTHORIZED = {
     ("ApprovalRequestViewSet", "post", "reject"),
     ("ApprovalRequestViewSet", "post", "return_for_changes"),
     ("ApprovalRequestViewSet", "post", "cancel"),
+    # Purchase requisition steps: the named approver may hold no procurement permission.
+    ("PurchaseRequisitionViewSet", "post", "approve"),
+    ("PurchaseRequisitionViewSet", "post", "return_for_changes"),
+    ("PurchaseRequisitionViewSet", "post", "reject"),
+    ("PurchaseRequisitionViewSet", "post", "cancel"),
 }
 
 

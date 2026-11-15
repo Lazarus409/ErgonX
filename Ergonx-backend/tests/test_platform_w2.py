@@ -178,7 +178,7 @@ def test_institution_can_turn_notification_email_off(org, email_on, django_captu
 
 
 def test_preferences_reject_unknown_modules(org):
-    response = org["as"](org["admin"]).put(f"{NOTIFICATIONS}preferences/", {"email_modules": ["PROCUREMENT"]}, format="json")
+    response = org["as"](org["admin"]).put(f"{NOTIFICATIONS}preferences/", {"email_modules": ["INVENTORY"]}, format="json")
     assert response.status_code == 400
 
 

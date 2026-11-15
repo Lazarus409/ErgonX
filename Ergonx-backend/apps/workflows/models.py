@@ -17,6 +17,7 @@ class ApprovalWorkflowDefinition(TenantOwnedModel):
         OFFER = "OFFER", "Offer"
         BUDGET = "BUDGET", "Budget"
         VENDOR_BILL = "VENDOR_BILL", "Vendor bill"
+        PURCHASE_REQUISITION = "PURCHASE_REQUISITION", "Purchase requisition"
 
     institution = models.ForeignKey(
         Institution, on_delete=models.CASCADE, related_name="approval_workflows"

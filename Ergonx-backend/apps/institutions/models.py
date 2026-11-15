@@ -227,6 +227,7 @@ class InstitutionModule(TenantOwnedModel):
         ACCOUNTING = "ACCOUNTING", "Accounting"
         RECRUITMENT = "RECRUITMENT", "Recruitment"
         REPORTS = "REPORTS", "Reports"
+        PROCUREMENT = "PROCUREMENT", "Procurement"
 
     class ConfigurationStatus(models.TextChoices):
         NOT_CONFIGURED = "NOT_CONFIGURED", "Not configured"

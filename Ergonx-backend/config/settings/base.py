@@ -63,6 +63,7 @@ LOCAL_APPS = [
     "apps.complaints.apps.ComplaintsConfig",
     "apps.integrations.apps.IntegrationsConfig",
     "apps.privacy.apps.PrivacyConfig",
+    "apps.procurement.apps.ProcurementConfig",
     "apps.security.apps.SecurityConfig",
     "apps.filestore.apps.FilestoreConfig",
 ]

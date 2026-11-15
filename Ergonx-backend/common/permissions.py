@@ -11,6 +11,7 @@ SELF_SERVICE_ACTIONS = frozenset({
     "attendance.adjust",
     "tax_relief.claim",
     "expense.claim_own",
+    "requisition.create_own",
 })
 
 

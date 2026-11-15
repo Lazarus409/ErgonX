@@ -1,5 +1,5 @@
 /** Category a notification belongs to; derived by the API from its type and record. */
-export type NotificationModule = "APPROVALS" | "HR" | "LEAVE" | "ATTENDANCE" | "PAYROLL" | "RECRUITMENT" | "ACCOUNTING" | "REPORTS" | "SECURITY" | "SYSTEM";
+export type NotificationModule = "APPROVALS" | "HR" | "LEAVE" | "ATTENDANCE" | "PAYROLL" | "RECRUITMENT" | "ACCOUNTING" | "PROCUREMENT" | "REPORTS" | "SECURITY" | "SYSTEM";
 
 export const NOTIFICATION_MODULE_LABELS: Record<NotificationModule, string> = {
   APPROVALS: "Approvals",
@@ -9,6 +9,7 @@ export const NOTIFICATION_MODULE_LABELS: Record<NotificationModule, string> = {
   PAYROLL: "Payroll",
   RECRUITMENT: "Recruitment",
   ACCOUNTING: "Accounting",
+  PROCUREMENT: "Procurement",
   REPORTS: "Reports",
   SECURITY: "Security",
   SYSTEM: "System",

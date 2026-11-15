@@ -97,7 +97,7 @@ export interface ApprovalAction {
   acted_at: string;
 }
 
-export type InboxModule = "LEAVE" | "ATTENDANCE" | "PAYROLL" | "RECRUITMENT" | "ACCOUNTING" | "WORKFLOW";
+export type InboxModule = "LEAVE" | "ATTENDANCE" | "PAYROLL" | "RECRUITMENT" | "ACCOUNTING" | "PROCUREMENT" | "WORKFLOW";
 
 export interface InboxAction {
   code: "approve" | "reject" | "return";

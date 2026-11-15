@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, ArrowUpRight, BriefcaseBusiness, CalendarDays, Check, CheckCircle2, Clock3, GitPullRequest, History, Hourglass, Landmark, Lock, Undo2, Wallet, X, type LucideIcon } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, BriefcaseBusiness, CalendarDays, Check, CheckCircle2, Clock3, GitPullRequest, History, Hourglass, Landmark, Lock, ShoppingCart, Undo2, Wallet, X, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 
@@ -28,6 +28,7 @@ const MODULES: Record<InboxModule, { label: string; icon: LucideIcon; accent: Mo
   PAYROLL: { label: "Payroll", icon: Wallet, accent: "payroll" },
   RECRUITMENT: { label: "Recruitment", icon: BriefcaseBusiness, accent: "recruitment" },
   ACCOUNTING: { label: "Finance", icon: Landmark, accent: "accounting" },
+  PROCUREMENT: { label: "Procurement", icon: ShoppingCart, accent: "accounting" },
   WORKFLOW: { label: "Workflows", icon: GitPullRequest, accent: "brand" },
 };
 

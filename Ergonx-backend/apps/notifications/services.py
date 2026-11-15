@@ -20,14 +20,15 @@ logger = logging.getLogger(__name__)
 PREFERENCE_KEY = "notifications"
 INSTITUTION_EMAIL_SETTING = "notifications.email_enabled"
 
-MODULES = ("APPROVALS", "HR", "LEAVE", "ATTENDANCE", "PAYROLL", "RECRUITMENT", "ACCOUNTING", "REPORTS", "SECURITY", "SYSTEM")
+MODULES = ("APPROVALS", "HR", "LEAVE", "ATTENDANCE", "PAYROLL", "RECRUITMENT", "ACCOUNTING", "PROCUREMENT", "REPORTS", "SECURITY", "SYSTEM")
 MODULE_LABELS = {
     "APPROVALS": "Approvals", "HR": "HR", "LEAVE": "Leave", "ATTENDANCE": "Attendance", "PAYROLL": "Payroll",
-    "RECRUITMENT": "Recruitment", "ACCOUNTING": "Accounting", "REPORTS": "Reports", "SECURITY": "Security", "SYSTEM": "System",
+    "RECRUITMENT": "Recruitment", "ACCOUNTING": "Accounting", "PROCUREMENT": "Procurement", "REPORTS": "Reports", "SECURITY": "Security", "SYSTEM": "System",
 }
 
 # Type prefixes first (most specific), then the record the metadata points at.
 _TYPE_PREFIXES = (
+    ("PROCUREMENT", "PROCUREMENT"),
     ("APPROVAL", "APPROVALS"),
     ("LEAVE", "LEAVE"),
     ("ATTENDANCE", "ATTENDANCE"),

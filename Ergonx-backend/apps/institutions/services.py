@@ -136,6 +136,16 @@ ACCOUNTING_PERMISSIONS = {
 }
 
 
+PROCUREMENT_PERMISSIONS = {
+    "procurement.view": "View purchase requisitions, orders, goods receipts and commitments",
+    "requisition.create_own": "Raise purchase requisitions",
+    "requisition.approve": "Approve purchase requisitions at the procurement step",
+    "purchase_order.create": "Create, edit, submit, cancel and close purchase orders",
+    "purchase_order.approve": "Approve and issue purchase orders",
+    "goods_receipt.create": "Record goods received against purchase orders",
+}
+
+
 PERMISSIONS = {
     "home.view": "View personalized home",
     "search.use": "Use universal search",
@@ -246,6 +256,7 @@ PERMISSIONS = {
     "tax_relief.claim": "Create and submit tax relief claims",
     "tax_relief.approve": "Approve tax relief claims",
     **ACCOUNTING_PERMISSIONS,
+    **PROCUREMENT_PERMISSIONS,
 }
 
 PERMISSION_MODULES = {
@@ -260,6 +271,8 @@ PERMISSION_MODULES = {
     if code.startswith(("compensation.", "payroll.", "payslip.", "tax_relief."))
 } | {
     code: "ACCOUNTING" for code in ACCOUNTING_PERMISSIONS
+} | {
+    code: "PROCUREMENT" for code in PROCUREMENT_PERMISSIONS
 } | {
     code: "RECRUITMENT"
     for code in PERMISSIONS
@@ -278,6 +291,7 @@ SELF_SERVICE_PERMISSIONS = (
     "attendance.adjust",
     "payslip.view",
     "expense.claim_own",
+    "requisition.create_own",
 )
 
 ROLE_PERMISSION_CODES = {
@@ -285,8 +299,9 @@ ROLE_PERMISSION_CODES = {
     "HR_ADMIN": tuple(
         code
         for code in PERMISSIONS
-        # HR staff still claim their own expenses.
+        # HR staff still claim their own expenses and request purchases.
         if (code not in ACCOUNTING_PERMISSIONS or code == "expense.claim_own")
+        and (code not in PROCUREMENT_PERMISSIONS or code == "requisition.create_own")
         and code not in {"dashboard.executive.view", "dashboard.finance.view"}
         and code not in {
             "settings.institution.manage",
@@ -331,6 +346,9 @@ ROLE_PERMISSION_CODES = {
         "offer.approve",
         "budget.view",
         "budget.approve",
+        "procurement.view",
+        "requisition.approve",
+        "purchase_order.approve",
         "candidate.view",
         "recruitment_stage.view",
         "interview.view",
@@ -362,6 +380,7 @@ ROLE_PERMISSION_CODES = {
         "tax_relief.view",
         "tax_relief.claim",
         "expense.claim_own",
+        "requisition.create_own",
     ),
     # Data is limited to the member and the departments they head; pay records
     # stay self-only (see common.scoping).
@@ -389,6 +408,7 @@ ROLE_PERMISSION_CODES = {
         "dashboard.department.view",
         "document_requirement.view",
         "training.view",
+        "requisition.create_own",
     ),
     "ACCOUNTANT": (
         *SELF_SERVICE_PERMISSIONS,
@@ -428,6 +448,9 @@ ROLE_PERMISSION_CODES = {
         "dashboard.finance.view",
         "budget.view",
         "budget.manage",
+        "procurement.view",
+        "purchase_order.create",
+        "goods_receipt.create",
     ),
     "FINANCE_MANAGER": (
         *SELF_SERVICE_PERMISSIONS,
@@ -446,6 +469,7 @@ ROLE_PERMISSION_CODES = {
         "report.view",
         "report.publish",
         *ACCOUNTING_PERMISSIONS,
+        *PROCUREMENT_PERMISSIONS,
     ),
     "AUDITOR": (
         *SELF_SERVICE_PERMISSIONS,
@@ -460,6 +484,7 @@ ROLE_PERMISSION_CODES = {
         "journal.view",
         "financial_report.view",
         "budget.view",
+        "procurement.view",
         # Auditors land on Insights, not the Executive dashboard (BQ-01).
         "dashboard.finance.view",
         "report.view",
@@ -661,6 +686,7 @@ MODULE_DEPENDENCIES = {
     "ATTENDANCE": ("CORE_HR",),
     "PAYROLL": ("CORE_HR",),
     "RECRUITMENT": ("CORE_HR",),
+    "PROCUREMENT": ("ACCOUNTING",),
 }
 ALWAYS_ENABLED_MODULES = frozenset({"CORE_HR"})
 
@@ -1262,6 +1288,7 @@ def bootstrap_institution(institution):
         InstitutionModule.ModuleCode.ACCOUNTING,
         InstitutionModule.ModuleCode.RECRUITMENT,
         InstitutionModule.ModuleCode.REPORTS,
+        InstitutionModule.ModuleCode.PROCUREMENT,
     ):
         InstitutionModule.objects.get_or_create(
             institution=institution,

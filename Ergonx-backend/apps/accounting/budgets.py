@@ -67,6 +67,12 @@ def line_figures(line):
                 vendor_bill__status__in=(VendorBill.Status.PENDING, VendorBill.Status.APPROVED),
                 vendor_bill__bill_date__gte=year.start_date, vendor_bill__bill_date__lte=year.end_date,
             ).aggregate(total=Sum("line_total"))["total"])
+        # Open purchase orders not yet billed are committed too (procurement).
+        from apps.procurement.services import open_order_commitments
+
+        committed = _money(committed + open_order_commitments(
+            budget.institution, account_id=line.account_id, department_id=budget.department_id, start=year.start_date, end=year.end_date,
+        ))
     allocated = _money(line.allocated)
     return {"allocated": allocated, "committed": committed, "actual": actual, "remaining": _money(allocated - committed - actual), "variance": _money(allocated - actual)}
 

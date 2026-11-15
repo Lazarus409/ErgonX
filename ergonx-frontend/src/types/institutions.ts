@@ -12,7 +12,8 @@ export type ModuleCode =
   | "PAYROLL"
   | "ACCOUNTING"
   | "RECRUITMENT"
-  | "REPORTS";
+  | "REPORTS"
+  | "PROCUREMENT";
 
 export const MODULE_CODES: ModuleCode[] = [
   "CORE_HR",
@@ -22,6 +23,7 @@ export const MODULE_CODES: ModuleCode[] = [
   "ACCOUNTING",
   "RECRUITMENT",
   "REPORTS",
+  "PROCUREMENT",
 ];
 
 export const MODULE_LABELS: Record<ModuleCode, string> = {
@@ -32,6 +34,7 @@ export const MODULE_LABELS: Record<ModuleCode, string> = {
   ACCOUNTING: "Accounting",
   RECRUITMENT: "Recruitment",
   REPORTS: "Reports",
+  PROCUREMENT: "Procurement",
 };
 
 /**

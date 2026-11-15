@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { BarChart3, Banknote, CalendarDays, Calculator, CheckCircle2, Info, Layers3, Lock, Plane, UserRoundPlus, UsersRound, type LucideIcon } from "lucide-react";
+import { BarChart3, Banknote, CalendarDays, Calculator, CheckCircle2, Info, Layers3, Lock, Plane, ShoppingCart, UserRoundPlus, UsersRound, type LucideIcon } from "lucide-react";
 
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -23,6 +23,7 @@ const moduleDetails: Record<string, { name: string; description: string; icon: L
   PAYROLL: { name: "Payroll", description: "Pay runs, payslips, components and statutory setup.", icon: Banknote, accent: "payroll" },
   ACCOUNTING: { name: "Accounting", description: "Financial records, journals, payables and receivables.", icon: Calculator, accent: "accounting" },
   REPORTS: { name: "Reports & Analytics", description: "Operational reports and organization insights.", icon: BarChart3, accent: "reports" },
+  PROCUREMENT: { name: "Procurement", description: "Requisitions, purchase orders and goods received.", icon: ShoppingCart, accent: "accounting" },
 };
 
 const nameOf = (code: string) => moduleDetails[code]?.name ?? code.replaceAll("_", " ");

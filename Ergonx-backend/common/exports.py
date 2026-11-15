@@ -145,7 +145,7 @@ def render_xlsx(columns, rows, *, title, classification=""):
     return buffer.getvalue()
 
 
-def render_pdf(columns, rows, *, title, institution_name="", subtitle="", classification=""):
+def render_pdf(columns, rows, *, title, institution_name="", subtitle="", classification="", count_rows=True):
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
@@ -193,7 +193,7 @@ def render_pdf(columns, rows, *, title, institution_name="", subtitle="", classi
     if institution_name:
         story.append(Paragraph(escape(institution_name), meta))
     story.append(Paragraph(escape(title), heading))
-    details = [f"{len(rows)} row{'' if len(rows) == 1 else 's'}", f"Generated {generated}"]
+    details = ([f"{len(rows)} row{'' if len(rows) == 1 else 's'}"] if count_rows else []) + [f"Generated {generated}"]
     if subtitle:
         details.insert(0, subtitle)
     story.append(Paragraph(escape(" · ".join(details)), meta))
@@ -228,22 +228,22 @@ def render_pdf(columns, rows, *, title, institution_name="", subtitle="", classi
     return buffer.getvalue()
 
 
-def render_table(fmt, *, title, columns, rows, institution_name="", subtitle="", classification=""):
+def render_table(fmt, *, title, columns, rows, institution_name="", subtitle="", classification="", count_rows=True):
     """Return the file bytes for ``rows`` in ``fmt`` (csv, xlsx or pdf)."""
     if fmt == "xlsx":
         return render_xlsx(columns, rows, title=title, classification=classification)
     if fmt == "pdf":
-        return render_pdf(columns, rows, title=title, institution_name=institution_name, subtitle=subtitle, classification=classification)
+        return render_pdf(columns, rows, title=title, institution_name=institution_name, subtitle=subtitle, classification=classification, count_rows=count_rows)
     return render_csv(columns, rows)
 
 
-def table_response(fmt, *, filename, title, columns, rows, institution=None, subtitle="", classification=""):
+def table_response(fmt, *, filename, title, columns, rows, institution=None, subtitle="", classification="", count_rows=True):
     """An attachment response holding ``rows`` as CSV, Excel or PDF, labelled with ``classification``."""
     if fmt not in FORMATS:
         fmt = "csv"
     content = render_table(
         fmt, title=title, columns=columns, rows=rows,
-        institution_name=getattr(institution, "name", "") or "", subtitle=subtitle, classification=classification,
+        institution_name=getattr(institution, "name", "") or "", subtitle=subtitle, classification=classification, count_rows=count_rows,
     )
     response = HttpResponse(content, content_type=CONTENT_TYPES[fmt])
     response["Content-Disposition"] = f'attachment; filename="{safe_filename(filename)}.{fmt}"'

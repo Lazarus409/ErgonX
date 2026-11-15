@@ -348,7 +348,47 @@ def _workflow_requests(ctx):
     return rows
 
 
-COLLECTORS = (_leave, _attendance, _payroll, _recruitment, _accounting, _workflow_requests)
+def _procurement(ctx):
+    if "PROCUREMENT" not in ctx.enabled:
+        return []
+    from apps.procurement.models import PurchaseOrder, PurchaseRequisition, RequisitionApproval
+    from apps.procurement.services import may_decide_step, order_blocked_reason
+
+    rows = []
+    steps = RequisitionApproval.objects.filter(
+        institution=ctx.institution, status=RequisitionApproval.Status.PENDING, requisition__status=PurchaseRequisition.Status.PENDING,
+    ).filter(Q(approver=ctx.user) | Q(approver__isnull=True)).select_related("requisition__requested_by", "requisition__department")
+    for step in steps:
+        requisition = step.requisition
+        if requisition.approvals.filter(status=RequisitionApproval.Status.PENDING, sequence__lt=step.sequence).exists():
+            continue  # an earlier step is still open
+        if step.approver_id is None and not ("requisition.approve" in ctx.permissions and may_decide_step(step, ctx.user)):
+            continue
+        base = f"/procurement/requisitions/{requisition.pk}"
+        rows.append(_item(
+            kind="PURCHASE_REQUISITION", module="PROCUREMENT", record=requisition,
+            title=f"Purchase requisition · {requisition.title}"[:160],
+            subtitle=f"{step.step_name}" + (f" · {requisition.department.name}" if requisition.department_id else ""),
+            reference=requisition.requisition_number, requested_by=_name(requisition.requested_by), submitted_at=requisition.submitted_at,
+            amount=requisition.estimated_total, currency=requisition.currency, route=base,
+            actions=(_approve(f"{base}/approve/", "comment"), _return(f"{base}/return/", "comment", "Return"), _reject(f"{base}/reject/", "comment", required=True)),
+        ))
+    if ctx.can("PROCUREMENT", "purchase_order.approve"):
+        for order in PurchaseOrder.objects.for_institution(ctx.institution).filter(status=PurchaseOrder.Status.PENDING).select_related("vendor", "submitted_by", "requisition"):
+            base = f"/procurement/orders/{order.pk}"
+            rows.append(_item(
+                kind="PURCHASE_ORDER", module="PROCUREMENT", record=order,
+                title=f"Purchase order · {order.vendor.name}",
+                subtitle=f"Ordered {order.order_date:%d %b %Y}" + (f" · for {order.requisition.requisition_number}" if order.requisition_id else ""),
+                reference=order.order_number, requested_by=_name(order.submitted_by), submitted_at=order.submitted_at,
+                amount=order.total_amount, currency=order.currency, route=base,
+                actions=(_approve(f"{base}/approve/"), _return(f"{base}/reject/", "reason", "Send back")),
+                blocked_reason=order_blocked_reason(order, ctx.user),
+            ))
+    return rows
+
+
+COLLECTORS = (_leave, _attendance, _payroll, _recruitment, _accounting, _procurement, _workflow_requests)
 
 # audit action -> (kind, outcome); "decided" actions read the outcome from metadata.
 DECISION_ACTIONS = {
@@ -378,6 +418,12 @@ DECISION_ACTIONS = {
     "accounting.expense.finance_reviewed": ("EXPENSE_CLAIM", None),
     "accounting.budget.approved": ("BUDGET", "APPROVED"),
     "accounting.budget.returned": ("BUDGET", "RETURNED"),
+    "procurement.requisition.approved": ("PURCHASE_REQUISITION", "APPROVED"),
+    "procurement.requisition.step_approved": ("PURCHASE_REQUISITION", "FORWARDED"),
+    "procurement.requisition.returned": ("PURCHASE_REQUISITION", "RETURNED"),
+    "procurement.requisition.rejected": ("PURCHASE_REQUISITION", "REJECTED"),
+    "procurement.order.approved": ("PURCHASE_ORDER", "APPROVED"),
+    "procurement.order.returned": ("PURCHASE_ORDER", "RETURNED"),
     "APPROVAL_APPROVE": ("WORKFLOW_REQUEST", "APPROVED"),
     "APPROVAL_REJECT": ("WORKFLOW_REQUEST", "REJECTED"),
 }
@@ -398,6 +444,8 @@ KINDS = {
     "EXPENSE": ("ACCOUNTING", "expense.approve", "Expense", lambda pk: "/accounting/expenses"),
     "EXPENSE_CLAIM": ("ACCOUNTING", "expense.claim_own", "Expense claim", lambda pk: "/accounting/expenses"),
     "BUDGET": ("ACCOUNTING", "budget.approve", "Budget", lambda pk: f"/accounting/budgets/{pk}"),
+    "PURCHASE_REQUISITION": ("PROCUREMENT", "requisition.approve", "Purchase requisition", lambda pk: f"/procurement/requisitions/{pk}"),
+    "PURCHASE_ORDER": ("PROCUREMENT", "purchase_order.approve", "Purchase order", lambda pk: f"/procurement/orders/{pk}"),
     "WORKFLOW_REQUEST": ("WORKFLOW", None, "Workflow request", None),
 }
 

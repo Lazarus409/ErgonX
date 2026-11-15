@@ -95,6 +95,19 @@ class MembershipViewSet(TenantModelViewSet):
     def get_queryset(self):
         return super().get_queryset().select_related("user", "role", "institution").prefetch_related("role__permissions")
 
+    @extend_schema(request=None, responses={200: OpenApiTypes.OBJECT})
+    @action(detail=True, methods=("post",), url_path="sign-out")
+    def sign_out(self, request, pk=None):
+        """Emergency: end every signed-in session of this member, on every device (e.g. a lost phone or a suspected compromise)."""
+        from apps.accounts.sessions import revoke_sessions
+
+        membership = self.get_object()
+        if membership.user_id == request.user.id:
+            return Response({"detail": "To sign yourself out elsewhere, use Settings > Security."}, status=400)
+        revoked = revoke_sessions(membership.user, actor=request.user, reason="revoked_by_admin")
+        record_audit_event(actor=request.user, institution=request.institution, entity=membership, action="access.membership.signed_out", metadata={"sessions": revoked, "email": membership.user.email})
+        return Response({"revoked": revoked})
+
     def partial_update(self, request, *args, **kwargs):
         payload = MembershipUpdateSerializer(data=request.data, partial=True)
         payload.is_valid(raise_exception=True)
@@ -468,3 +481,29 @@ class SearchEntriesView(APIView):
         elif request.query_params.get("kind") == "RECENT":
             entries.filter(kind=SearchEntry.Kind.RECENT).delete()
         return Response(self._rows(request))
+
+
+def _export_response(institution, actor, request):
+    from django.http import FileResponse
+
+    from apps.institutions.data_export import build_organisation_export
+
+    include_files = request.query_params.get("files", "true").lower() != "false"
+    handle, filename = build_organisation_export(institution, actor=actor, include_files=include_files)
+    response = FileResponse(handle, as_attachment=True, filename=filename, content_type="application/zip")
+    response["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
+class InstitutionDataExportView(APIView):
+    """Everything the organisation holds in ErgonX as a ZIP, for handover or moving server. ?files=false leaves out uploads."""
+
+    permission_classes = [TenantContextPermission, TenantRBACPermission]
+    required_module = None
+
+    def get_required_permission(self):
+        return "settings.institution.manage"
+
+    @extend_schema(responses={(200, "application/zip"): OpenApiTypes.BINARY})
+    def get(self, request):
+        return _export_response(request.institution, request.user, request)

@@ -1,7 +1,7 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
-from apps.institutions.views import CurrentInstitutionView, InstitutionInvitationViewSet, InstitutionModuleViewSet, InstitutionOnboardingStepActionView, InstitutionOnboardingView, InstitutionSettingsView, LocaleCataloguesView, MembershipViewSet, MyMembershipsView, MyPreferencesView, PermissionCatalogView, RoleViewSet
+from apps.institutions.views import CurrentInstitutionView, InstitutionDataExportView, InstitutionInvitationViewSet, InstitutionModuleViewSet, InstitutionOnboardingStepActionView, InstitutionOnboardingView, InstitutionSettingsView, LocaleCataloguesView, MembershipViewSet, MyMembershipsView, MyPreferencesView, PermissionCatalogView, RoleViewSet
 
 router = DefaultRouter()
 router.register("roles", RoleViewSet, basename="role")
@@ -12,6 +12,7 @@ router.register("modules", InstitutionModuleViewSet, basename="institution-modul
 # Search is mounted once, at /api/v1/search/ (W0-API-03).
 urlpatterns = [
     path("current/", CurrentInstitutionView.as_view(), name="current"),
+    path("current/export/", InstitutionDataExportView.as_view(), name="current-export"),
     path("memberships/", MyMembershipsView.as_view(), name="memberships"),
     path("permissions/", PermissionCatalogView.as_view(), name="permission-catalog"),
     path("preferences/", MyPreferencesView.as_view(), name="my-preferences"),

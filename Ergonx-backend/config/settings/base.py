@@ -158,6 +158,10 @@ CLAMAV_HOST = os.environ.get("CLAMAV_HOST", "127.0.0.1")
 CLAMAV_PORT = int(os.environ.get("CLAMAV_PORT", "3310"))
 CLAMAV_TIMEOUT_SECONDS = float(os.environ.get("CLAMAV_TIMEOUT_SECONDS", "30"))
 UPLOAD_SCAN_FAIL_OPEN = os.environ.get("UPLOAD_SCAN_FAIL_OPEN", "false").lower() == "true"
+# Disaster recovery targets (docs/operations/DISASTER_RECOVERY.md): how long the service may be
+# down after an incident, and how much recent data may be lost (the backup interval).
+DR_RECOVERY_TIME_OBJECTIVE_HOURS = float(os.environ.get("DR_RECOVERY_TIME_OBJECTIVE_HOURS", "4"))
+DR_RECOVERY_POINT_OBJECTIVE_HOURS = float(os.environ.get("DR_RECOVERY_POINT_OBJECTIVE_HOURS", "24"))
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "accounts.User"
 

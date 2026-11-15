@@ -8,11 +8,15 @@ from rest_framework import serializers, viewsets
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.decorators import action
 from rest_framework.views import APIView
 
 from apps.audit.services import record_audit_event
 from apps.security import services
-from apps.security.models import RestoreTest
+from apps.institutions.models import Institution
+from apps.security import incidents
+from apps.security.models import IncidentUpdate, RestoreTest, SecurityIncident
+from common.serializers import call_validated_service
 from common.permissions import TenantContextPermission, TenantRBACPermission
 from common.scoping import permission_codes
 
@@ -85,3 +89,92 @@ class RestoreTestViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         test = serializer.save(performed_by=self.request.user)
         record_audit_event(actor=self.request.user, entity=test, action="security.restore_test.recorded", metadata={"result": test.result, "performed_on": str(test.performed_on)})
+
+
+class PlatformOnlyMixin:
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        if not (request.user.is_platform_admin or request.user.is_superuser):
+            raise PermissionDenied("Only platform administrators handle platform incidents.")
+
+
+class IncidentUpdateSerializer(serializers.ModelSerializer):
+    author_name = serializers.SerializerMethodField()
+    status_label = serializers.SerializerMethodField()
+
+    class Meta:
+        model = IncidentUpdate
+        fields = ("id", "note", "status", "status_label", "author_name", "created_at")
+
+    def get_author_name(self, entry):
+        return (entry.author.get_full_name() or entry.author.email) if entry.author_id else "System"
+
+    def get_status_label(self, entry):
+        return SecurityIncident.Status(entry.status).label if entry.status else ""
+
+
+class SecurityIncidentSerializer(serializers.ModelSerializer):
+    kind_label = serializers.CharField(source="get_kind_display", read_only=True)
+    severity_label = serializers.CharField(source="get_severity_display", read_only=True)
+    status_label = serializers.CharField(source="get_status_display", read_only=True)
+    affected_institutions = serializers.PrimaryKeyRelatedField(many=True, queryset=Institution.objects.all(), required=False)
+    affected_names = serializers.SerializerMethodField()
+    lead_name = serializers.SerializerMethodField()
+    timings = serializers.SerializerMethodField()
+    updates = IncidentUpdateSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = SecurityIncident
+        fields = (
+            "id", "title", "summary", "kind", "kind_label", "severity", "severity_label", "status", "status_label",
+            "detected_at", "contained_at", "recovered_at", "closed_at", "personal_data_affected", "affected_institutions",
+            "affected_names", "root_cause", "lessons_learned", "lead", "lead_name", "timings", "updates", "created_at",
+        )
+        read_only_fields = ("id", "status", "contained_at", "recovered_at", "closed_at", "created_at")
+
+    def get_affected_names(self, incident):
+        return [institution.name for institution in incident.affected_institutions.all()]
+
+    def get_lead_name(self, incident):
+        return (incident.lead.get_full_name() or incident.lead.email) if incident.lead_id else None
+
+    def get_timings(self, incident):
+        return incidents.timings(incident)
+
+
+class SecurityIncidentViewSet(PlatformOnlyMixin, viewsets.ModelViewSet):
+    """The platform incident register, with each incident's timeline and recovery times against the targets."""
+
+    serializer_class = SecurityIncidentSerializer
+    permission_classes = (IsAuthenticated,)
+    http_method_names = ("get", "post", "patch", "head", "options")
+
+    def get_queryset(self):
+        return SecurityIncident.objects.select_related("lead").prefetch_related("affected_institutions", "updates__author")
+
+    def list(self, request, *args, **kwargs):
+        response = super().list(request, *args, **kwargs)
+        response.data = {"targets": incidents.recovery_targets(), **(response.data if isinstance(response.data, dict) else {"results": response.data})}
+        return response
+
+    def create(self, request, *args, **kwargs):
+        payload = self.get_serializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        values = dict(payload.validated_data)
+        incident = call_validated_service(incidents.record_incident, actor=request.user, affected_institutions=values.pop("affected_institutions", []), **values)
+        return Response(self.get_serializer(self.get_queryset().get(pk=incident.pk)).data, status=201)
+
+    def partial_update(self, request, *args, **kwargs):
+        incident = self.get_object()
+        payload = self.get_serializer(incident, data=request.data, partial=True)
+        payload.is_valid(raise_exception=True)
+        values = dict(payload.validated_data)
+        call_validated_service(incidents.update_incident, incident=incident, actor=request.user, affected_institutions=values.pop("affected_institutions", None), **values)
+        return Response(self.get_serializer(self.get_queryset().get(pk=incident.pk)).data)
+
+    @extend_schema(request=OpenApiTypes.OBJECT, responses=SecurityIncidentSerializer)
+    @action(detail=True, methods=("post",))
+    def updates(self, request, pk=None):
+        incident = self.get_object()
+        call_validated_service(incidents.add_update, incident=incident, actor=request.user, note=str(request.data.get("note") or ""), status=str(request.data.get("status") or ""))
+        return Response(self.get_serializer(self.get_queryset().get(pk=incident.pk)).data)

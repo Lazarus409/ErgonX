@@ -3,7 +3,7 @@
  * overview metrics and the platform audit feed. Platform administrators only.
  */
 
-import { apiGet, apiGetList, apiPost } from "./client";
+import { apiDownload, apiGet, apiGetList, apiPost } from "./client";
 import type { PaginatedData } from "@/types/api";
 
 export type OnboardingStatus = "NOT_STARTED" | "IN_PROGRESS" | "BLOCKED" | "READY";
@@ -109,4 +109,14 @@ const ACTION_LABELS: Record<string, string> = {
 
 export function auditActionLabel(action: string): string {
   return ACTION_LABELS[action] ?? action.replace(/^platform\./, "").replace(/[._]/g, " ");
+}
+
+/** Emergency: sign out every member of the organisation on every device. */
+export function signOutInstitution(id: string, reason: string): Promise<{ revoked: number; people: number }> {
+  return apiPost<{ revoked: number; people: number }, { reason: string }>(`/platform/institutions/${id}/sign-out/`, { reason });
+}
+
+/** The organisation's full data export (ZIP). */
+export function exportInstitution(id: string, includeFiles = true): Promise<Blob> {
+  return apiDownload(`/platform/institutions/${id}/export/`, includeFiles ? undefined : { files: "false" });
 }

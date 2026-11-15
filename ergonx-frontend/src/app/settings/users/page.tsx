@@ -39,6 +39,9 @@ export default function MembershipSettingsPage() {
   const [confirming, setConfirming] = useState(false);
   const [saving, setSaving] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutBusy, setSignOutBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRoleId, setInviteRoleId] = useState("");
   const [inviting, setInviting] = useState(false);
@@ -220,7 +223,8 @@ export default function MembershipSettingsPage() {
             )}
           </section>
 
-          {editing && <div className="rounded-2xl border border-line bg-surface p-5 shadow-elevation-1"><div className="flex items-start justify-between"><div><h2 className="text-card-title font-bold text-headline">Update access</h2><p className="mt-1 text-sm text-ink-muted">{memberName(editing.user?.first_name, editing.user?.last_name, editing.user?.email)}</p></div><button onClick={() => setEditing(null)} className="text-sm font-medium text-ink-muted">Cancel</button></div><div className="mt-5 grid gap-4 md:grid-cols-3"><label className="text-sm font-medium text-ink">Role<select value={roleId} onChange={(event) => setRoleId(event.target.value)} className="mt-1 h-10 w-full rounded-lg border border-line-strong px-3">{data.roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label><label className="text-sm font-medium text-ink">Status<select value={status} onChange={(event) => setStatus(event.target.value)} className="mt-1 h-10 w-full rounded-lg border border-line-strong px-3"><option value="INVITED">Invited</option><option value="ACTIVE">Active</option><option value="SUSPENDED">Suspended</option><option value="INACTIVE">Inactive</option></select></label><label className="flex items-center gap-2 pt-7 text-sm font-medium text-ink"><input type="checkbox" checked={isPrimary} onChange={(event) => setIsPrimary(event.target.checked)} /> Primary institution</label></div>{actionError && <p className="mt-3 text-sm text-danger-ink">{actionError}</p>}<div className="mt-5 flex justify-end"><button disabled={!roleId} onClick={() => setConfirming(true)} className={buttonClasses({ variant: "primary" })}>Review changes</button></div></div>}
+          {editing && <div className="rounded-2xl border border-line bg-surface p-5 shadow-elevation-1"><div className="flex items-start justify-between"><div><h2 className="text-card-title font-bold text-headline">Update access</h2><p className="mt-1 text-sm text-ink-muted">{memberName(editing.user?.first_name, editing.user?.last_name, editing.user?.email)}</p></div><button onClick={() => setEditing(null)} className="text-sm font-medium text-ink-muted">Cancel</button></div><div className="mt-5 grid gap-4 md:grid-cols-3"><label className="text-sm font-medium text-ink">Role<select value={roleId} onChange={(event) => setRoleId(event.target.value)} className="mt-1 h-10 w-full rounded-lg border border-line-strong px-3">{data.roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label><label className="text-sm font-medium text-ink">Status<select value={status} onChange={(event) => setStatus(event.target.value)} className="mt-1 h-10 w-full rounded-lg border border-line-strong px-3"><option value="INVITED">Invited</option><option value="ACTIVE">Active</option><option value="SUSPENDED">Suspended</option><option value="INACTIVE">Inactive</option></select></label><label className="flex items-center gap-2 pt-7 text-sm font-medium text-ink"><input type="checkbox" checked={isPrimary} onChange={(event) => setIsPrimary(event.target.checked)} /> Primary institution</label></div>{actionError && <p className="mt-3 text-sm text-danger-ink">{actionError}</p>}<div className="mt-5 flex flex-wrap justify-end gap-2"><button type="button" onClick={() => setSigningOut(true)} className={buttonClasses({ variant: "danger" })}>Sign out everywhere</button><button disabled={!roleId} onClick={() => setConfirming(true)} className={buttonClasses({ variant: "primary" })}>Review changes</button></div></div>}
+          {notice && <p className="rounded-xl bg-success-soft px-4 py-3 text-sm font-semibold text-success-ink" role="status">{notice}</p>}
         </>
       )}
 
@@ -238,6 +242,24 @@ export default function MembershipSettingsPage() {
         </div>
       </div>
 
+      <ConfirmDialog
+        open={signingOut && editing !== null}
+        title="Sign this person out everywhere?"
+        description="Every signed-in session they have ends now, on every device and in every organisation. Use it for a lost phone or a suspected compromised account. They can sign in again with their password."
+        record={editing ? { name: memberName(editing.user?.first_name, editing.user?.last_name, editing.user?.email) } : undefined}
+        confirmLabel="Sign out everywhere"
+        destructive
+        loading={signOutBusy}
+        onCancel={() => setSigningOut(false)}
+        onConfirm={() => {
+          if (!editing) return;
+          setSignOutBusy(true); setActionError(null);
+          institutionsApi.signOutMember(editing.id)
+            .then((result) => { setNotice(`Signed out of ${result.revoked} session${result.revoked === 1 ? "" : "s"}.`); setSigningOut(false); setEditing(null); })
+            .catch((caught) => { setActionError(getApiErrorMessage(caught)); setSigningOut(false); })
+            .finally(() => setSignOutBusy(false));
+        }}
+      />
       <ConfirmDialog open={confirming} title="Update membership access?" description="This will change the member’s role, status, or primary institution selection. The backend prevents removing the final active Institution Admin." confirmLabel="Update access" destructive={status === "SUSPENDED" || status === "INACTIVE"} loading={saving} onConfirm={() => void save()} onCancel={() => setConfirming(false)} />
       {invitationConfirmCopy && <ConfirmDialog open title={invitationConfirmCopy.title} description={invitationConfirmCopy.description} confirmLabel={invitationConfirmCopy.label} destructive={invitationConfirmCopy.destructive} loading={inviting} onConfirm={() => void confirmInvitationAction()} onCancel={() => { setInvitationAction(null); setPendingInvitationId(null); }} />}
     </div>

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, Ban, Building2, History, KeyRound, LayoutGrid, MailCheck, PlayCircle, ShieldCheck, UsersRound } from "lucide-react";
+import { ArrowLeft, Ban, Building2, Download, History, KeyRound, LayoutGrid, LogOut, MailCheck, PlayCircle, ShieldCheck, UsersRound } from "lucide-react";
+import { saveBlob } from "@/lib/api/policies";
 import { useParams } from "next/navigation";
 import { useCallback, useState } from "react";
 
@@ -33,6 +34,10 @@ export default function PlatformOrganizationDetailPage() {
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutReason, setSignOutReason] = useState("");
+  const [notice, setNotice] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const data = updated?.id === loaded?.id && updated ? updated : loaded;
 
@@ -63,6 +68,21 @@ export default function PlatformOrganizationDetailPage() {
     }
   };
 
+  const signOutEveryone = async () => {
+    setBusy(true); setActionError(null);
+    try {
+      const result = await platformApi.signOutInstitution(id, signOutReason.trim());
+      setNotice(`Signed out ${result.people} ${result.people === 1 ? "person" : "people"} (${result.revoked} session${result.revoked === 1 ? "" : "s"}).`);
+      setSigningOut(false); setSignOutReason("");
+    } catch (caught) { setActionError(getApiErrorMessage(caught)); }
+    finally { setBusy(false); }
+  };
+  const exportData = async () => {
+    setExporting(true); setActionError(null);
+    try { await saveBlob(await platformApi.exportInstitution(id), `ergonx-${(loaded?.code ?? "organisation").toLowerCase()}-export.zip`); }
+    catch (caught) { setActionError(getApiErrorMessage(caught)); }
+    finally { setExporting(false); }
+  };
   if (loading && !data) return <LoadingState />;
   if (error || !data) return <ErrorState message={error ?? "Could not load this organization."} onRetry={reload} />;
 
@@ -81,12 +101,17 @@ export default function PlatformOrganizationDetailPage() {
             <p className="mt-1 text-sm text-ink-muted">{data.code} · {countryName(data.country_code)} · joined {formatDate(data.created_at)}</p>
           </div>
         </div>
-        {data.is_active
-          ? <Button variant="danger" leadingIcon={<Ban className="h-4 w-4" />} onClick={() => { setActionError(null); setSuspending(true); }}>Suspend organization</Button>
-          : <Button leadingIcon={<PlayCircle className="h-4 w-4" />} onClick={() => { setActionError(null); setReactivating(true); }}>Reactivate</Button>}
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" leadingIcon={<Download className="h-4 w-4" />} loading={exporting} loadingLabel="Preparing…" onClick={() => void exportData()}>Export data</Button>
+          <Button variant="secondary" leadingIcon={<LogOut className="h-4 w-4" />} onClick={() => { setActionError(null); setSigningOut(true); }}>Sign out everyone</Button>
+          {data.is_active
+            ? <Button variant="danger" leadingIcon={<Ban className="h-4 w-4" />} onClick={() => { setActionError(null); setSuspending(true); }}>Suspend organization</Button>
+            : <Button leadingIcon={<PlayCircle className="h-4 w-4" />} onClick={() => { setActionError(null); setReactivating(true); }}>Reactivate</Button>}
+        </div>
       </section>
 
-      {actionError && !suspending && <Alert tone="danger" title="That didn't work">{actionError}</Alert>}
+      {actionError && !suspending && !signingOut && <Alert tone="danger" title="That didn't work">{actionError}</Alert>}
+      {notice && <Alert tone="success" onDismiss={() => setNotice(null)}>{notice}</Alert>}
       {!data.is_active && (
         <Alert tone="danger" title={`Suspended ${formatDateTime(data.suspended_at)}`}>
           <p>Nobody in this organization can sign in or use ErgonX until it is reactivated. Their data is kept.</p>
@@ -182,6 +207,26 @@ export default function PlatformOrganizationDetailPage() {
         {actionError && <Alert tone="danger" className="mb-4">{actionError}</Alert>}
         <Field label="Reason" helper="Recorded in the platform audit log and shown on this page.">
           <Textarea required rows={3} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="e.g. Subscription unpaid since August" maxLength={1000} />
+        </Field>
+      </Dialog>
+
+      <Dialog
+        open={signingOut}
+        onClose={() => { if (!busy) setSigningOut(false); }}
+        dismissible={!busy}
+        size="sm"
+        title={`Sign out everyone in ${data.name}?`}
+        description="Every member's signed-in sessions end now, on every device. They can sign in again with their passwords. Use this when accounts may be compromised."
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setSigningOut(false)} disabled={busy}>Cancel</Button>
+            <Button variant="danger" onClick={() => void signOutEveryone()} loading={busy} loadingLabel="Signing out…" disabled={!signOutReason.trim()}>Sign out everyone</Button>
+          </>
+        }
+      >
+        {actionError && <Alert tone="danger" className="mb-4">{actionError}</Alert>}
+        <Field label="Reason" helper="Recorded in the platform audit log.">
+          <Textarea required rows={3} value={signOutReason} onChange={(event) => setSignOutReason(event.target.value)} placeholder="e.g. Suspected leak of an administrator password" maxLength={1000} />
         </Field>
       </Dialog>
 

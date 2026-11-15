@@ -4,6 +4,7 @@
 .coverage
 *.sqlite3
 *.dump
+backups/
 *.backup
 *.log
 __pycache__/

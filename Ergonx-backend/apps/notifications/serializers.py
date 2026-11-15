@@ -25,6 +25,7 @@ class NotificationSerializer(serializers.ModelSerializer):
         "PAYSLIP_AVAILABLE": "/me/payslips",
         "TAX_RELIEF_CLAIM_APPROVED": "/me/payslips",
         "TAX_RELIEF_CLAIM_REJECTED": "/me/payslips",
+        "SECURITY_NEW_SIGN_IN": "/settings/security",
     }
     RECRUITMENT_ROUTES = {
         "recruitment.JobPosting": "/recruitment/job-postings/{id}",

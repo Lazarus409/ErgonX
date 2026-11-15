@@ -8,7 +8,7 @@
  * grants access.
  */
 
-import { apiGet, apiGetList, apiPatch, apiPost, apiPut, setInstitutionId } from "./client";
+import { apiDownload, apiGet, apiGetList, apiPatch, apiPost, apiPut, setInstitutionId } from "./client";
 import type {
   CurrentInstitutionContext,
   InstitutionMembership,
@@ -256,4 +256,14 @@ export function permissionsFor(
 /** Ask the institution's user managers for access to a restricted page (in-app notification + audit). */
 export function requestAccess(payload: { area: string; permission?: string; path?: string; note?: string }): Promise<{ sent_to: number; already_requested: boolean }> {
   return apiPost<{ sent_to: number; already_requested: boolean }, typeof payload>("/access-requests/", payload);
+}
+
+/** Emergency: end every signed-in session of a member, on every device. */
+export function signOutMember(membershipId: string): Promise<{ revoked: number }> {
+  return apiPost<{ revoked: number }>(`/institutions/members/${membershipId}/sign-out/`, {});
+}
+
+/** Everything the organisation holds in ErgonX, as a ZIP. */
+export function exportOrganisationData(includeFiles = true): Promise<Blob> {
+  return apiDownload("/institutions/current/export/", includeFiles ? undefined : { files: "false" });
 }

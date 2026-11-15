@@ -10,6 +10,7 @@ from django.conf import settings
 from django.db import transaction
 from django.db.models import Count, IntegerField, Max, OuterRef, Q, Subquery, Sum, Value
 from django.db.models.functions import Coalesce, TruncMonth
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from drf_spectacular.utils import OpenApiParameter, OpenApiTypes, extend_schema
 from rest_framework import serializers
@@ -411,3 +412,35 @@ def _is_uuid(value):
     except ValueError:
         return False
     return True
+
+
+class PlatformInstitutionExportView(APIView):
+    """Super Admin: a full data export of one organisation (ZIP). ?files=false leaves out uploads."""
+
+    permission_classes = PLATFORM_PERMISSIONS
+
+    @extend_schema(responses={(200, "application/zip"): OpenApiTypes.BINARY})
+    def get(self, request, pk):
+        from apps.institutions.views import _export_response
+
+        institution = get_object_or_404(Institution, pk=pk)
+        return _export_response(institution, request.user, request)
+
+
+class PlatformInstitutionSignOutView(APIView):
+    """Super Admin emergency action: sign out every member of an organisation on every device."""
+
+    permission_classes = PLATFORM_PERMISSIONS
+
+    @extend_schema(request=OpenApiTypes.OBJECT, responses={200: OpenApiTypes.OBJECT})
+    def post(self, request, pk):
+        from apps.accounts.sessions import revoke_sessions
+
+        institution = get_object_or_404(Institution, pk=pk)
+        reason = str(request.data.get("reason") or "").strip()
+        if not reason:
+            return Response({"reason": ["Say why everyone is being signed out."]}, status=400)
+        users = User.objects.filter(memberships__institution=institution, is_platform_admin=False).distinct()
+        revoked = sum(revoke_sessions(user, actor=request.user, reason="revoked_by_platform") for user in users)
+        record_platform_event(actor=request.user, action="institution.signed_out", institution=institution, entity=institution, metadata={"sessions": revoked, "people": users.count(), "reason": reason})
+        return Response({"revoked": revoked, "people": users.count()})

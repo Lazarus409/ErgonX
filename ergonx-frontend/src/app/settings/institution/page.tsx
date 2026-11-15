@@ -1,6 +1,7 @@
 "use client";
 
-import { Building2, Pencil, Save } from "lucide-react";
+import { Building2, Download, Pencil, Save } from "lucide-react";
+import { saveBlob } from "@/lib/api/policies";
 import { useCallback, useState } from "react";
 import Image from "next/image";
 
@@ -121,7 +122,33 @@ export default function InstitutionSettingsPage() {
           </div>
         )}
       </section>
+
+      {canManage && <DataExportSection />}
     </div>
+  );
+}
+
+/** Everything the organisation holds in ErgonX as a ZIP, for handover or moving server. */
+function DataExportSection() {
+  const [includeFiles, setIncludeFiles] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const download = async () => {
+    setBusy(true); setError(null);
+    try { await saveBlob(await institutionsApi.exportOrganisationData(includeFiles), `ergonx-data-export${includeFiles ? "" : "-no-files"}.zip`); }
+    catch (caught) { setError(getApiErrorMessage(caught)); }
+    finally { setBusy(false); }
+  };
+  return (
+    <section className="rounded-xl border border-line bg-surface p-5 shadow-elevation-1 sm:p-6" aria-labelledby="data-export">
+      <h2 id="data-export" className="flex items-center gap-2 text-section-title font-semibold text-ink-strong"><Download size={20} className="text-primary" aria-hidden="true" />Export all data</h2>
+      <p className="mt-2 text-support text-ink-muted">A ZIP of every record your organisation holds, its members and uploaded files. Passwords and secrets are never included. The download is recorded in the audit trail.</p>
+      {error && <ErrorState variant="inline" title="Unable to export" message={error} />}
+      <div className="mt-4 flex flex-wrap items-center gap-4">
+        <label className="flex items-center gap-2 text-sm text-ink"><input type="checkbox" checked={includeFiles} onChange={(event) => setIncludeFiles(event.target.checked)} />Include uploaded files</label>
+        <button type="button" disabled={busy} onClick={() => void download()} className={buttonClasses({ variant: "secondary" })}><Download size={16} />{busy ? "Preparing…" : "Download export"}</button>
+      </div>
+    </section>
   );
 }
 

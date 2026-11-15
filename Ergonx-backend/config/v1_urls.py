@@ -32,5 +32,6 @@ urlpatterns = [
     path("", include("apps.integrations.urls")),
     path("", include("apps.privacy.urls")),
     path("", include("apps.procurement.urls")),
+    path("", include("apps.assistant.urls")),
     path("", include("apps.security.urls")),
 ]

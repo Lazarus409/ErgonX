@@ -124,8 +124,32 @@ host's cron and `docker compose exec api ...`):
 - hourly: `python manage.py send_approval_reminders`
 - daily: `python manage.py run_scheduled_reports` and
   `python manage.py run_retention_rules` (applies each organisation's active
-  anonymising retention rules; people under a legal hold are skipped)
+  anonymising retention rules; people under a legal hold are skipped, and
+  assistant conversations older than `ASSISTANT_RETENTION_DAYS` are deleted)
 - every 5 minutes: `python manage.py deliver_webhooks`
+
+## AI assistant (optional)
+
+The "Ask ErgonX" assistant answers questions about a person's own leave, pay,
+approvals, colleagues and published policies, using Claude (Anthropic). It is
+off unless both of these are true:
+
+1. The server has `ANTHROPIC_API_KEY` set (on Render: the `ergonx-api` service).
+   Without it the assistant is hidden everywhere.
+2. An organisation administrator turns it on under Settings → Organisation →
+   AI assistant. Each organisation decides for itself.
+
+What it sends to Anthropic: the question, the conversation so far, and what
+its tools read for that person. Tools are read-only and apply the person's own
+permissions and data scope; Restricted documents, passwords, secrets, bank
+details and personal contact details are never sent. Each answer is recorded in
+the audit trail (tools used and token counts, never the text). Record Anthropic
+as a data processor in your privacy notice before turning it on.
+
+Settings: `ASSISTANT_MODEL` (default `claude-opus-5-5`), `ASSISTANT_EFFORT`
+(default `medium`), `ASSISTANT_DAILY_LIMIT` questions per person per day
+(default 40), `ASSISTANT_RETENTION_DAYS` (default 30). Answers can take up to a
+minute, so gunicorn runs with `--timeout 120` (`GUNICORN_TIMEOUT` on Render).
 
 ## Release checks
 

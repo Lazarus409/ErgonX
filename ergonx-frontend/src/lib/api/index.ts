@@ -55,6 +55,7 @@ export * as organizationApi from "./organization";
 export * as payrollApi from "./payroll";
 export * as platformApi from "./platform";
 export * as procurementApi from "./procurement";
+export * as assistantApi from "./assistant";
 export * as reportsApi from "./reports";
 export * as recruitmentApi from "./recruitment";
 export * as schedulingApi from "./scheduling";

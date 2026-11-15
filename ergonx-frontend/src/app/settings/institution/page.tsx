@@ -1,8 +1,8 @@
 "use client";
 
-import { Building2, Download, Pencil, Save } from "lucide-react";
+import { Building2, Download, Pencil, Save, Sparkles } from "lucide-react";
 import { saveBlob } from "@/lib/api/policies";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 
 import { useAuth } from "@/components/guards/AuthProvider";
@@ -10,7 +10,7 @@ import ErrorState from "@/components/ui/ErrorState";
 import { FileInput } from "@/components/ui/Field";
 import LoadingState from "@/components/ui/LoadingState";
 import PageHeader from "@/components/ui/PageHeader";
-import { getApiErrorMessage, imagesApi, institutionsApi } from "@/lib/api";
+import { assistantApi, getApiErrorMessage, imagesApi, institutionsApi } from "@/lib/api";
 import { useApiResource } from "@/lib/useApiResource";
 import { buttonClasses } from "@/components/ui/Button";
 
@@ -123,8 +123,38 @@ export default function InstitutionSettingsPage() {
         )}
       </section>
 
+      {canManage && <AssistantSection />}
       {canManage && <DataExportSection />}
     </div>
+  );
+}
+
+/** Organisation opt-in for the AI assistant; shown only when the server has an Anthropic key. */
+function AssistantSection() {
+  const [state, setState] = useState<{ configured: boolean; on: boolean } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    Promise.all([assistantApi.getStatus(), institutionsApi.listInstitutionSettings()])
+      .then(([status, settings]) => { if (active) setState({ configured: status.configured, on: settings.some((row) => row.key === "assistant.enabled" && row.value === true) }); })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, []);
+  if (!state?.configured) return null;
+  const toggle = async () => {
+    setBusy(true); setError(null);
+    try { await institutionsApi.saveInstitutionSetting("assistant.enabled", !state.on); setState({ ...state, on: !state.on }); }
+    catch (caught) { setError(getApiErrorMessage(caught)); }
+    finally { setBusy(false); }
+  };
+  return (
+    <section className="rounded-xl border border-line bg-surface p-5 shadow-elevation-1 sm:p-6" aria-labelledby="assistant-setting">
+      <h2 id="assistant-setting" className="flex items-center gap-2 text-section-title font-semibold text-ink-strong"><Sparkles size={20} className="text-primary" aria-hidden="true" />AI assistant</h2>
+      <p className="mt-2 text-support text-ink-muted">Lets members ask questions about their own leave, pay, approvals and your published policies. Questions, and the records the assistant reads for that person, are sent to Anthropic to produce answers. Restricted documents are never sent, and the assistant cannot change anything.</p>
+      {error && <ErrorState variant="inline" title="Unable to save" message={error} />}
+      <div className="mt-4"><button type="button" disabled={busy} onClick={() => void toggle()} className={buttonClasses({ variant: state.on ? "secondary" : "primary" })}>{busy ? "Saving…" : state.on ? "Turn off" : "Turn on"}</button></div>
+    </section>
   );
 }
 

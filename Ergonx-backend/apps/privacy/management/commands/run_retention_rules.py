@@ -2,6 +2,7 @@
 
 from django.core.management.base import BaseCommand
 
+from apps.assistant.services import purge_old_conversations
 from apps.privacy.services import run_due_retention
 
 
@@ -14,3 +15,4 @@ class Command(BaseCommand):
         for code, count in sorted(results.items()):
             self.stdout.write(f"{code}: {count} record(s)")
         self.stdout.write(self.style.SUCCESS(f"Retention applied to {total} record(s) across {len(results)} organisation(s)."))
+        self.stdout.write(f"Assistant conversations deleted: {purge_old_conversations()}")

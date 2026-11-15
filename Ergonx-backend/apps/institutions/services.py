@@ -639,16 +639,20 @@ def _validate_delegable_permissions(permission_codes):
 SETTING_NAMESPACE_PERMISSIONS = {
     "security.": "settings.security.manage",
     "notifications.": "settings.notifications.manage",
+    "assistant.": "settings.institution.manage",
 }
 GOVERNED_SETTINGS = {
     # Separation of duties (BQ-04): preparer != approver, default ON.
     "security.separation_of_duties": {"payroll": bool, "journals": bool, "payables": bool},
     # Whether members may receive notification copies by email.
     "notifications.email_enabled": bool,
+    # The AI assistant sends questions and the asker's own ErgonX data to Anthropic; off until an admin opts in.
+    "assistant.enabled": bool,
 }
 SETTING_DEFAULTS = {
     "security.separation_of_duties": {"payroll": True, "journals": True, "payables": True},
     "notifications.email_enabled": True,
+    "assistant.enabled": False,
 }
 
 

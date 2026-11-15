@@ -25,6 +25,8 @@ from apps.audit.services import record_audit_event
 from apps.institutions.models import Institution
 
 SECRET_FIELD = re.compile(r"(secret|password|token_hash|key_hash)", re.I)
+# Private to each person, never handed to administrators: assistant chats.
+PRIVATE_APPS = frozenset({"assistant"})
 
 
 def organisation_models():
@@ -35,7 +37,7 @@ def organisation_models():
             field = model._meta.get_field("institution")
         except Exception:  # noqa: BLE001 - models without the field are skipped
             continue
-        if field.is_relation and field.related_model is Institution:
+        if field.is_relation and field.related_model is Institution and model._meta.app_label not in PRIVATE_APPS:
             found.append(model)
     return sorted(found, key=lambda model: model._meta.label)
 

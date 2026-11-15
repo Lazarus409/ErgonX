@@ -1,5 +1,6 @@
 "use client";
 
+import AssistantPanel from "@/components/assistant/AssistantPanel";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Sidebar from "@/components/layout/Sidebar";
 import TopBar from "@/components/layout/TopBar";
@@ -97,6 +98,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <div className="mx-auto w-full max-w-[1360px] min-w-0">{children}</div>
           </main>
         </div>
+        <AssistantPanel />
       </div>
     </AuthenticationGate>
   );

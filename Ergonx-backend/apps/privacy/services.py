@@ -246,8 +246,18 @@ def _employee_export(employee):
         "complaints_raised": [{"reference": row.code, "subject": row.subject, "category": row.category, "description": row.description, "status": row.status, "resolution": row.resolution} for row in Complaint.objects.filter(complainant=employee)],
         "documents": [{"name": row.original_filename, "category": row.category, "classification": row.classification, "uploaded_at": row.created_at.isoformat()} for row in Document.objects.filter(entity_type=EMPLOYEE_ENTITY_TYPE, entity_id=employee.id, is_active=True)],
         "policy_acknowledgements": [{"policy": row.policy.title, "version": row.version, "signed_name": row.signed_name, "acknowledged_at": row.acknowledged_at.isoformat()} for row in PolicyAcknowledgement.objects.filter(employee=employee).select_related("policy")],
+        "assistant_conversations": _assistant_conversations(employee),
         "note": "Copies of documents and payslip PDFs are available from HR or My Payslips. Complaints that name you are withheld where disclosing them would affect other people's rights.",
     }
+
+
+def _assistant_conversations(employee):
+    from apps.assistant.models import AssistantMessage
+
+    if not employee.user_id:
+        return []
+    rows = AssistantMessage.objects.filter(institution=employee.institution, conversation__user_id=employee.user_id).select_related("conversation").order_by("created_at")
+    return [{"conversation": row.conversation.title, "role": row.role, "text": row.text, "at": row.created_at.isoformat()} for row in rows]
 
 
 def _candidate_export(candidate):

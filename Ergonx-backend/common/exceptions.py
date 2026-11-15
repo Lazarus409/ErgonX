@@ -36,6 +36,8 @@ API_ERROR_CODES = (
     "onboarding_incomplete",
     "search_query_invalid",
     "upload_rejected",
+    "assistant_unavailable",
+    "assistant_limit_reached",
     "validation_error",
     "invalid_request",
     "not_found",

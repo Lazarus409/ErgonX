@@ -30,6 +30,10 @@ services:
       # sign-in limits and audit records. Generated once here, read by the web service.
       - key: BFF_PROXY_SECRET
         generateValue: true
+      # Optional AI assistant: set the Anthropic API key, then each organisation
+      # opts in under Settings. Without a key the assistant stays hidden.
+      - key: ANTHROPIC_API_KEY
+        sync: false
       # Uploaded files are stored in the database by default (nothing to set).
       # Optional: MEDIA_STORAGE=s3 plus MEDIA_S3_* for a bucket; see DEPLOYMENT.md.
 

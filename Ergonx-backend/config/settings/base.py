@@ -63,6 +63,7 @@ LOCAL_APPS = [
     "apps.complaints.apps.ComplaintsConfig",
     "apps.integrations.apps.IntegrationsConfig",
     "apps.privacy.apps.PrivacyConfig",
+    "apps.assistant.apps.AssistantConfig",
     "apps.procurement.apps.ProcurementConfig",
     "apps.security.apps.SecurityConfig",
     "apps.filestore.apps.FilestoreConfig",
@@ -163,6 +164,13 @@ UPLOAD_SCAN_FAIL_OPEN = os.environ.get("UPLOAD_SCAN_FAIL_OPEN", "false").lower()
 # down after an incident, and how much recent data may be lost (the backup interval).
 DR_RECOVERY_TIME_OBJECTIVE_HOURS = float(os.environ.get("DR_RECOVERY_TIME_OBJECTIVE_HOURS", "4"))
 DR_RECOVERY_POINT_OBJECTIVE_HOURS = float(os.environ.get("DR_RECOVERY_POINT_OBJECTIVE_HOURS", "24"))
+# AI assistant (apps/assistant). Off unless ANTHROPIC_API_KEY is set here and an organisation
+# administrator turns it on. Conversations are deleted after ASSISTANT_RETENTION_DAYS.
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+ASSISTANT_MODEL = os.environ.get("ASSISTANT_MODEL", "claude-opus-5-5")
+ASSISTANT_EFFORT = os.environ.get("ASSISTANT_EFFORT", "medium")
+ASSISTANT_DAILY_LIMIT = int(os.environ.get("ASSISTANT_DAILY_LIMIT", "40"))
+ASSISTANT_RETENTION_DAYS = int(os.environ.get("ASSISTANT_RETENTION_DAYS", "30"))
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "accounts.User"
 

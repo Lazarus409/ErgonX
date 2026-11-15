@@ -126,6 +126,10 @@ DATA_CATALOGUE = (
     DataCategory("privacy_records", "Data subject requests and legal holds", "CORE_HR", CONFIDENTIAL, "Personal",
                  ("privacy.DataSubjectRequest.outcome", "privacy.LegalHold.reason"),
                  ("privacy.view",)),
+    DataCategory("assistant_conversations", "Questions asked of the AI assistant and its answers", "PLATFORM", CONFIDENTIAL, "Personal",
+                 ("assistant.AssistantMessage.text", "assistant.AssistantMessage.api_messages"),
+                 (),
+                 "Only the person who asked can read their chats. Sent to Anthropic to produce answers when the organisation has turned the assistant on; deleted after ASSISTANT_RETENTION_DAYS."),
 )
 
 # Exports are labelled with the level of the data they carry.
